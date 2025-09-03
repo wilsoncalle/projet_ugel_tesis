@@ -16,22 +16,25 @@ const DashboardVigilantePage = () => {
   const [visitantesEnEspera, setVisitantesEnEspera] = useState([]);
   const [visitantesActivos, setVisitantesActivos] = useState([]);
   const [historialVisitas, setHistorialVisitas] = useState([]);
-  const [historialPagination, setHistorialPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    totalItems: 0,
-    itemsPerPage: 10
-  });
   const [filtros, setFiltros] = useState({
     busqueda: '',
     empleadoId: '',
     motivoId: '',
+    lugar: '',
     fechaDesde: '',
     fechaHasta: ''
   });
   const [activeTab, setActiveTab] = useState('activos');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Estados para paginación del historial
+  const [historialPagination, setHistorialPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10
+  });
   
   // Estado para la vista previa en tiempo real
   const [vistaPreviaVisitante, setVistaPreviaVisitante] = useState(null);
@@ -40,6 +43,8 @@ const DashboardVigilantePage = () => {
   // Cargar visitantes activos al montar el componente
   useEffect(() => {
     cargarVisitantesActivos();
+    // Cargar historial inicial con paginación
+    handleBuscarHistorial(filtros, 1);
   }, []);
 
   const cargarVisitantesActivos = async () => {
@@ -109,13 +114,20 @@ const DashboardVigilantePage = () => {
   
   // Handler para cambios en tiempo real en el formulario
   const handleFormChange = (formData) => {
+    console.log('=== HANDLE FORM CHANGE ===');
+    console.log('formData recibido:', formData);
+    console.log('formData.visita:', formData.visita);
+    console.log('formData.visita.lugar:', formData.visita?.lugar);
+    console.log('formData.visita.lugarId:', formData.visita?.lugarId);
+    
     // Actualizar los visitantes en espera con los datos de la visita
     if (formData.visita && Object.values(formData.visita).some(val => val) && visitantesEnEspera.length > 0) {
       // Crear un objeto con los datos de la visita
       const visitaData = {
         empleado: formData.visita.empleado,
         motivo: formData.visita.motivo,
-        lugar: formData.visita.lugar,
+        lugar: formData.visita.lugar, // Nombre del área para mostrar
+        lugarId: formData.visita.lugarId, // ID del área para el backend
         empleadoVisitado: formData.visita.empleado,
         personal_nombres: formData.visita.empleado?.nombres || '',
         personal_apellidos: formData.visita.empleado?.apellidos || '',
@@ -128,6 +140,10 @@ const DashboardVigilantePage = () => {
         ...visitante,
         ...visitaData
       }));
+      
+      console.log('=== VISITANTES ACTUALIZADOS ===');
+      console.log('visitaData aplicado:', visitaData);
+      console.log('Primer visitante actualizado:', visitantesActualizados[0]);
       
       setVisitantesEnEspera(visitantesActualizados);
     }
@@ -180,6 +196,11 @@ const DashboardVigilantePage = () => {
       
       for (const visitante of visitantesEnEspera) {
         try {
+          console.log('=== PROCESANDO VISITANTE ===');
+          console.log('Visitante completo:', visitante);
+          console.log('lugar (nombre):', visitante.lugar);
+          console.log('lugarId (ID):', visitante.lugarId);
+          
           // Primero crear o buscar el visitante
           let visitanteId = visitante.id;
           
@@ -215,7 +236,8 @@ const DashboardVigilantePage = () => {
           console.log('ID del visitante:', visitanteId);
           console.log('Datos del empleado:', visitante.empleado);
           console.log('Datos del motivo:', visitante.motivo);
-          console.log('Datos del lugar:', visitante.lugar);
+          console.log('Datos del lugar (nombre):', visitante.lugar);
+          console.log('Datos del lugarId (ID):', visitante.lugarId);
           
           // Validar que todos los campos requeridos estén presentes
           if (!visitante.empleado?.id && !visitante.empleadoVisitado?.id) {
@@ -226,7 +248,7 @@ const DashboardVigilantePage = () => {
             throw new Error(`Falta ID del motivo para visitante ${visitante.nombres} ${visitante.apellidos}`);
           }
           
-          if (!visitante.lugar) {
+          if (!visitante.lugarId && !visitante.lugar) {
             throw new Error(`Falta lugar para visitante ${visitante.nombres} ${visitante.apellidos}`);
           }
           
@@ -234,7 +256,7 @@ const DashboardVigilantePage = () => {
             visitanteId: parseInt(visitanteId),
             personalVisitadoId: parseInt(visitante.empleado?.id || visitante.empleadoVisitado?.id), // Usar datos del visitante
             motivoVisitaId: parseInt(visitante.motivo?.id), // Usar datos del visitante
-            areaDestinoId: parseInt(visitante.lugar), // Usar datos del visitante
+            areaDestinoId: parseInt(visitante.lugarId || visitante.lugar), // Usar lugarId si existe, sino lugar como fallback
             usuarioIngresoId: user?.id ? parseInt(user.id) : 1, // ID del usuario autenticado o valor por defecto
             // Usar la fecha y hora actual para evitar problemas con fechas futuras
             fechaIngreso: currentDate.toISOString().split('T')[0],
@@ -242,6 +264,7 @@ const DashboardVigilantePage = () => {
           };
           
           console.log('Payload de la visita a enviar:', visitaPayload);
+          console.log('areaDestinoId que se enviará:', visitaPayload.areaDestinoId);
 
           const responseVisita = await visitasService.create(visitaPayload);
           
@@ -287,16 +310,17 @@ const DashboardVigilantePage = () => {
       setError('');
       setFiltros(filtrosData);
       
-      // Construir parámetros de búsqueda de manera explícita
+      // Construir parámetros de búsqueda con paginación
       const params = {
         page: page,
-        limit: historialPagination.itemsPerPage
+        limit: historialPagination.itemsPerPage // Usar 10 elementos por página
       };
       
-      // Añadir filtros si existen
-      if (filtrosData.busqueda) params.q = filtrosData.busqueda;
-      if (filtrosData.empleadoId) params.empleadoId = filtrosData.empleadoId;
-      if (filtrosData.motivoId) params.motivoId = filtrosData.motivoId;
+      // Añadir filtros si existen (usar los mismos nombres que en el registro)
+      if (filtrosData.busqueda) params.busqueda = filtrosData.busqueda; // Cambiar de 'q' a 'busqueda' para que coincida con el backend
+      if (filtrosData.empleadoId) params.personalVisitadoId = filtrosData.empleadoId; // Usar el mismo campo que en el registro
+      if (filtrosData.motivoId) params.motivoVisitaId = filtrosData.motivoId; // Usar el mismo campo que en el registro
+      if (filtrosData.lugar) params.areaDestinoId = filtrosData.lugar; // Usar el mismo campo que en el registro
       if (filtrosData.fechaDesde) params.fechaDesde = filtrosData.fechaDesde;
       if (filtrosData.fechaHasta) params.fechaHasta = filtrosData.fechaHasta;
       
@@ -307,20 +331,68 @@ const DashboardVigilantePage = () => {
       console.log('Datos del historial:', response.data);
       
       if (response.data.success) {
-        const historialData = response.data.visitas || [];
+        const historialData = response.data.data || [];
         
         console.log('Número de registros en historial:', historialData.length);
         
+        // Mostrar estructura completa del primer elemento para depuración
+        if (historialData.length > 0) {
+          console.log('Estructura completa del primer elemento del historial:', JSON.stringify(historialData[0], null, 2));
+          
+          // Mostrar todas las claves disponibles en el objeto
+          const primerElemento = historialData[0];
+          console.log('Todas las claves disponibles en el objeto:', Object.keys(primerElemento));
+          
+          // Verificar campos específicos
+          console.log('Campos individuales del primer elemento:');
+          console.log('- ID:', primerElemento.id);
+          
+          // Visitante
+          console.log('- Visitante (objeto completo):', primerElemento.visitante);
+          console.log('- visitante_id:', primerElemento.visitante_id);
+          console.log('- visitante_nombres:', primerElemento.visitante_nombres);
+          console.log('- visitante_apellidos:', primerElemento.visitante_apellidos);
+          console.log('- visitante_numero_documento:', primerElemento.visitante_numero_documento);
+          
+          // Empleado
+          console.log('- empleadoVisitado:', primerElemento.empleadoVisitado);
+          console.log('- empleado_visitado:', primerElemento.empleado_visitado);
+          console.log('- empleado_visitado_id:', primerElemento.empleado_visitado_id);
+          console.log('- empleado_nombres:', primerElemento.empleado_nombres);
+          console.log('- empleado_apellidos:', primerElemento.empleado_apellidos);
+          console.log('- empleado_nombre_completo:', primerElemento.empleado_nombre_completo);
+          
+          // Motivo
+          console.log('- motivo:', primerElemento.motivo);
+          console.log('- motivo_id:', primerElemento.motivo_id);
+          console.log('- motivo_nombre:', primerElemento.motivo_nombre);
+          console.log('- motivo_visita_nombre:', primerElemento.motivo_visita_nombre);
+          
+          // Lugar
+          console.log('- lugar:', primerElemento.lugar);
+          
+          // Fechas y horas
+          console.log('- fechaIngreso:', primerElemento.fechaIngreso);
+          console.log('- fecha_ingreso:', primerElemento.fecha_ingreso);
+          console.log('- horaIngreso:', primerElemento.horaIngreso);
+          console.log('- hora_ingreso:', primerElemento.hora_ingreso);
+          console.log('- horaSalida:', primerElemento.horaSalida);
+          console.log('- hora_salida:', primerElemento.hora_salida);
+          
+          // Mostrar el objeto completo para referencia
+          console.log('Objeto completo:', primerElemento);
+        }
+        
         setHistorialVisitas(historialData);
         
-        // Actualizar paginación
+        // Actualizar paginación si la respuesta incluye información de paginación
         if (response.data.pagination) {
-          setHistorialPagination({
-            currentPage: response.data.pagination.page,
-            totalPages: response.data.pagination.totalPages,
-            totalItems: response.data.pagination.total,
-            itemsPerPage: response.data.pagination.limit
-          });
+          setHistorialPagination(prev => ({
+            ...prev,
+            currentPage: page,
+            totalPages: response.data.pagination.totalPages || 1,
+            totalItems: response.data.pagination.totalItems || historialData.length
+          }));
         }
       } else {
         setError('Error al buscar en el historial');
@@ -333,9 +405,9 @@ const DashboardVigilantePage = () => {
     }
   };
 
-  // Función para manejar cambio de página en el historial
-  const handleHistorialPageChange = (page) => {
-    handleBuscarHistorial(filtros, page);
+  // Función para manejar cambios de página en el historial
+  const handleHistorialPageChange = (newPage) => {
+    handleBuscarHistorial(filtros, newPage);
   };
 
   const handleRegistrarSalida = async (visitaId) => {
@@ -418,15 +490,15 @@ const DashboardVigilantePage = () => {
               visitantesActivos={visitantesActivos}
               visitantesEnEspera={visitantesEnEspera}
               historialVisitas={historialVisitas}
-              historialPagination={historialPagination}
               activeTab={activeTab}
               onTabChange={setActiveTab}
               onBuscarHistorial={handleBuscarHistorial}
-              onHistorialPageChange={handleHistorialPageChange}
               onRegistrarSalida={handleRegistrarSalida}
               filtros={filtros}
               vistaPreviaVisitante={vistaPreviaVisitante}
               vistaPreviaVisita={vistaPreviaVisita}
+              historialPagination={historialPagination}
+              onHistorialPageChange={handleHistorialPageChange}
             />
           </div>
 

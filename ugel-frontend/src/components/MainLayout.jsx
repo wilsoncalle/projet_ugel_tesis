@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 // Componente de elemento de navegación reutilizable
@@ -226,6 +226,7 @@ const BasicSidebar = () => (
 const MainLayout = () => {
   const { user, logout, hasRole } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isPinned, setIsPinned] = useState(
     localStorage.getItem('sidebarPinned') === 'true'
@@ -235,6 +236,9 @@ const MainLayout = () => {
   
   // Determine user role for sidebar display
   const userRole = user?.rol?.toLowerCase() || '';
+  
+  // Verificar si estamos en la ruta del vigilante
+  const isVigilanteRoute = location.pathname.startsWith('/vigilante');
 
   // Actualizar la fecha actual
   useEffect(() => {
@@ -334,16 +338,18 @@ const MainLayout = () => {
         <div className="container-fluid px-6 py-3">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              {/* Botón de hamburguesa para móvil */}
-              <button 
-                className="md:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100 mr-3"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                aria-label="Toggle menu"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
+              {/* Botón de hamburguesa para móvil - No mostrar en rutas de vigilante */}
+              {!isVigilanteRoute && (
+                <button 
+                  className="md:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100 mr-3"
+                  onClick={() => setSidebarOpen(!sidebarOpen)}
+                  aria-label="Toggle menu"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              )}
               
               <div className="flex flex-col">
                 <span className="text-lg font-bold text-gray-800">Sistema Integral de Control de Acceso</span>
@@ -432,14 +438,15 @@ const MainLayout = () => {
         </div>
       </nav>
       
-      {/* Sidebar */}
-      <aside 
-        id="sidebar"
-        className={`fixed left-0 top-0 z-20 h-screen w-72 bg-white shadow-lg pt-16 transition-all duration-300 
-                   ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-                   md:translate-x-0`}
-        onScroll={handleSidebarScroll}
-      >
+      {/* Sidebar - No mostrar en rutas de vigilante */}
+      {!isVigilanteRoute && (
+        <aside 
+          id="sidebar"
+          className={`fixed left-0 top-0 z-20 h-screen w-72 bg-white shadow-lg pt-16 transition-all duration-300 
+                     ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+                     md:translate-x-0`}
+          onScroll={handleSidebarScroll}
+        >
                 {/* Botón para cerrar el sidebar (solo visible en móvil) */}
         <div className="absolute right-2 top-2 md:hidden">
           <button 
@@ -490,10 +497,11 @@ const MainLayout = () => {
             <BasicSidebar />
           )}
         </div>
-      </aside>
+        </aside>
+      )}
       
-      {/* Overlay para cerrar el sidebar en móvil */}
-      {sidebarOpen && (
+      {/* Overlay para cerrar el sidebar en móvil - No mostrar en rutas de vigilante */}
+      {!isVigilanteRoute && sidebarOpen && (
         <div 
           className="fixed inset-0 z-10 bg-gray-600 bg-opacity-50 md:hidden"
           onClick={() => setSidebarOpen(false)}
@@ -502,7 +510,9 @@ const MainLayout = () => {
       
       {/* Contenido principal */}
       <main 
-        className="pt-16 min-h-screen transition-all duration-300 ease-in-out ml-0 md:ml-72"
+        className={`pt-16 min-h-screen transition-all duration-300 ease-in-out ${
+          isVigilanteRoute ? 'ml-0' : 'ml-0 md:ml-72'
+        }`}
       >
         {/* Contenido principal */}
         <div className="px-6 py-6 bg-gray-50">

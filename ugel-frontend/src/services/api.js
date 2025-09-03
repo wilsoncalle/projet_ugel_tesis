@@ -118,9 +118,10 @@ export const papeletasSalidaService = {
 export const visitasService = {
   getAll: (filters = {}) => {
     const params = new URLSearchParams();
-    if (filters.busqueda) params.append('q', filters.busqueda);
-    if (filters.empleadoId) params.append('empleadoId', filters.empleadoId);
-    if (filters.motivoId) params.append('motivoId', filters.motivoId);
+    if (filters.busqueda) params.append('busqueda', filters.busqueda);
+    if (filters.empleadoId) params.append('personalVisitadoId', filters.empleadoId);
+    if (filters.motivoId) params.append('motivoVisitaId', filters.motivoId);
+    if (filters.lugar) params.append('areaDestinoId', filters.lugar);
     if (filters.fechaDesde) params.append('fechaDesde', filters.fechaDesde);
     if (filters.fechaHasta) params.append('fechaHasta', filters.fechaHasta);
     if (filters.page) params.append('page', filters.page);

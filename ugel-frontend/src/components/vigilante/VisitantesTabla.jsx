@@ -5,22 +5,21 @@ import Button from '../Button';
 import Popover from '../Popover';
 import FiltrosVisitas from './FiltrosVisitas';
 import TablaVisitas from './TablaVisitas';
-import Pagination from '../Pagination';
 import { UsersIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 const VisitantesTabla = ({
   visitantesActivos,
   visitantesEnEspera,
   historialVisitas,
-  historialPagination,
   activeTab,
   onTabChange,
   onBuscarHistorial,
-  onHistorialPageChange,
   onRegistrarSalida,
   filtros,
   vistaPreviaVisitante,
-  vistaPreviaVisita
+  vistaPreviaVisita,
+  historialPagination,
+  onHistorialPageChange
 }) => {
   console.log('=== VISITANTES TABLA RENDERIZANDO ===');
   console.log('onRegistrarSalida es función:', typeof onRegistrarSalida);
@@ -41,6 +40,10 @@ const VisitantesTabla = ({
   const getTabData = () => {
     switch (activeTab) {
       case 'activos': {
+        console.log('=== DATOS DE VISITANTES ACTIVOS ===');
+        console.log('visitantesActivos:', visitantesActivos);
+        console.log('visitantesEnEspera:', visitantesEnEspera);
+        
         let data = [...visitantesActivos, ...visitantesEnEspera];
         
         // Añadir vista previa si existe y no está vacía
@@ -62,15 +65,33 @@ const VisitantesTabla = ({
             if (vistaPreviaVisita.motivo) {
               previewData.motivo = vistaPreviaVisita.motivo;
               previewData.nombre_motivo = vistaPreviaVisita.motivo.label;
+              // Agregar campos adicionales para compatibilidad
+              previewData.motivo_nombre = vistaPreviaVisita.motivo.label;
+              previewData.motivo_visita_nombre = vistaPreviaVisita.motivo.label;
+              previewData.motivo_visita = vistaPreviaVisita.motivo.label;
+              previewData.motivo_descripcion = vistaPreviaVisita.motivo.label;
             }
             
             if (vistaPreviaVisita.lugar) {
+              console.log('=== CONSTRUYENDO VISTA PREVIA DEL LUGAR ===');
+              console.log('vistaPreviaVisita.lugar:', vistaPreviaVisita.lugar);
+              console.log('vistaPreviaVisita.lugarId:', vistaPreviaVisita.lugarId);
+              
               previewData.lugar = vistaPreviaVisita.lugar;
               previewData.nombre_area = vistaPreviaVisita.lugar;
+              // Agregar campos adicionales para compatibilidad
+              previewData.area = vistaPreviaVisita.lugar;
+              previewData.area_nombre = vistaPreviaVisita.lugar;
+              previewData.area_destino = vistaPreviaVisita.lugar;
+              previewData.area_destino_nombre = vistaPreviaVisita.lugar;
             }
           }
           
           // Agregar la vista previa al principio del array
+          console.log('=== VISTA PREVIA CONSTRUIDA ===');
+          console.log('previewData completo:', previewData);
+          console.log('previewData.motivo:', previewData.motivo);
+          console.log('previewData.nombre_motivo:', previewData.nombre_motivo);
           data = [previewData, ...data];
         }
         
@@ -144,7 +165,7 @@ const VisitantesTabla = ({
       },
       {
         key: 'empleado',
-        label: 'Datos de la Visita',
+        label: 'Empleado Visitado',
         render: (row) => {
           console.log('Renderizando empleado, row:', row);
           
@@ -202,19 +223,40 @@ const VisitantesTabla = ({
               const motivo = row.motivo || {};
               motivoNombre = motivo.label || '';
             } 
-            // Si es un visitante activo (de la API)
-            else {
-              // Verificar si tenemos un objeto motivo anidado
-              if (row.motivo && typeof row.motivo === 'object') {
-                motivoNombre = row.motivo.nombre_motivo || row.motivo.nombre || '';
-              } else {
-                motivoNombre = row.nombre_motivo || '';
-              }
-            }
+                    // Si es un visitante activo (de la API)
+        else {
+          console.log('=== DEPURANDO MOTIVO PARA VISITANTE ACTIVO ===');
+          console.log('Row completo:', row);
+          console.log('row.motivo:', row.motivo);
+          console.log('row.nombre_motivo:', row.nombre_motivo);
+          console.log('row.motivo_nombre:', row.motivo_nombre);
+          console.log('row.motivo_visita_nombre:', row.motivo_visita_nombre);
+          console.log('row.motivo_visita:', row.motivo_visita);
+          console.log('row.motivo_descripcion:', row.motivo_descripcion);
+          
+          // Verificar si tenemos un objeto motivo anidado
+          if (row.motivo && typeof row.motivo === 'object') {
+            motivoNombre = row.motivo.label || row.motivo.nombre_motivo || row.motivo.nombre || '';
+            console.log('Motivo encontrado en objeto anidado:', motivoNombre);
+            console.log('Valor final del motivo (objeto):', motivoNombre);
+          } else {
+            // Buscar el motivo en diferentes campos posibles
+            motivoNombre = row.nombre_motivo || 
+                          row.motivo_nombre || 
+                          row.motivo_visita_nombre ||
+                          row.motivo_visita ||
+                          row.motivo_descripcion ||
+                          (row.motivo && row.motivo.label) ||
+                          '';
+            console.log('Motivo encontrado en campos planos:', motivoNombre);
+            console.log('Valor final del motivo (campos planos):', motivoNombre);
+          }
+        }
           } 
           // Para historial (formato plano)
           else {
             motivoNombre = row.nombre_motivo || '';
+            console.log('Motivo encontrado en historial:', motivoNombre);
           }
           
           return (
@@ -240,12 +282,34 @@ const VisitantesTabla = ({
             } 
             // Si es un visitante activo (de la API)
             else {
-              lugar = row.lugar || row.nombre_area || '';
+              console.log('=== DEPURANDO LUGAR PARA VISITANTE ACTIVO ===');
+              console.log('Row completo:', row);
+              console.log('row.lugar:', row.lugar);
+              console.log('row.nombre_area:', row.nombre_area);
+              console.log('row.area:', row.area);
+              console.log('row.area_nombre:', row.area_nombre);
+              console.log('row.area_destino:', row.area_destino);
+              console.log('row.area_destino_nombre:', row.area_destino_nombre);
+              
+              // Buscar el lugar en diferentes campos posibles
+              // Priorizar nombres sobre IDs
+              lugar = row.nombre_area || 
+                     row.area_nombre ||
+                     row.area_destino_nombre ||
+                     row.lugarNombre ||
+                     row.lugar || 
+                     row.area || 
+                     row.area_destino ||
+                     '';
+              
+              console.log('Lugar encontrado:', lugar);
+              console.log('Valor final del lugar:', lugar);
             }
           } 
           // Para historial (formato plano)
           else {
             lugar = row.nombre_area || '';
+            console.log('Lugar encontrado en historial:', lugar);
           }
           
           return (
@@ -545,6 +609,8 @@ const VisitantesTabla = ({
                 onBuscar={onBuscarHistorial}
                 isExpanded={filtrosExpanded}
                 onToggleExpanded={setFiltrosExpanded}
+                historialPagination={historialPagination}
+                onHistorialPageChange={onHistorialPageChange}
               />
             </div>
           )}
@@ -561,19 +627,6 @@ const VisitantesTabla = ({
                   : 'No se encontraron registros para los filtros aplicados'
               }
             />
-            
-            {/* Paginación para el historial */}
-            {activeTab === 'historial' && historialPagination && historialPagination.totalPages > 1 && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <Pagination
-                  currentPage={historialPagination.currentPage}
-                  totalPages={historialPagination.totalPages}
-                  totalItems={historialPagination.totalItems}
-                  itemsPerPage={historialPagination.itemsPerPage}
-                  onPageChange={onHistorialPageChange}
-                />
-              </div>
-            )}
           </div>
         </div>
       </Card>

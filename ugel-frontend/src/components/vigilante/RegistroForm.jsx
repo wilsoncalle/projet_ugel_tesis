@@ -44,6 +44,65 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
   useEffect(() => {
     cargarDatosFormulario();
   }, []);
+  
+  // Efecto para establecer DNI por defecto cuando se carguen los tipos
+  useEffect(() => {
+    console.log('useEffect ejecutándose - tiposDocumento.length:', tiposDocumento.length, 'formVisitante.tipoDocumentoId:', formVisitante.tipoDocumentoId);
+    
+    if (tiposDocumento.length > 0) {
+      // Buscar DNI en los tipos cargados
+      const dniTipo = tiposDocumento.find(tipo => 
+        tipo.label.toLowerCase().includes('dni') || 
+        tipo.label.toLowerCase().includes('documento nacional de identidad')
+      );
+      
+      if (dniTipo) {
+        console.log('Estableciendo DNI por defecto desde useEffect:', dniTipo);
+        setFormVisitante(prev => ({
+          ...prev,
+          tipoDocumentoId: dniTipo.value
+        }));
+      } else {
+        // Si no se encuentra DNI, usar el primer tipo disponible
+        console.log('Usando primer tipo disponible como fallback:', tiposDocumento[0]);
+        setFormVisitante(prev => ({
+          ...prev,
+          tipoDocumentoId: tiposDocumento[0].value
+        }));
+      }
+    }
+  }, [tiposDocumento]); // Solo depende de tiposDocumento
+  
+  // Debug: Log del estado inicial de manera segura
+  useEffect(() => {
+    console.log('Estado inicial formVisitante:', formVisitante);
+    console.log('tiposDocumento disponibles:', tiposDocumento);
+  }, [formVisitante, tiposDocumento]);
+  
+  // Efecto para establecer el valor inicial cuando se carguen los tipos
+  useEffect(() => {
+    if (tiposDocumento.length > 0 && formVisitante.tipoDocumentoId === '1') {
+      // Solo establecer si el valor actual es el fallback '1'
+      const dniTipo = tiposDocumento.find(tipo => 
+        tipo.label.toLowerCase().includes('dni') || 
+        tipo.label.toLowerCase().includes('documento nacional de identidad')
+      );
+      
+      if (dniTipo) {
+        console.log('Estableciendo DNI inicial desde useEffect:', dniTipo);
+        setFormVisitante(prev => ({
+          ...prev,
+          tipoDocumentoId: dniTipo.value
+        }));
+      } else {
+        console.log('Estableciendo primer tipo disponible como inicial:', tiposDocumento[0]);
+        setFormVisitante(prev => ({
+          ...prev,
+          tipoDocumentoId: tiposDocumento[0].value
+        }));
+      }
+    }
+  }, [tiposDocumento]); // Solo depende de tiposDocumento
 
   const cargarDatosFormulario = async () => {
     try {
@@ -84,7 +143,10 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
             };
           });
           console.log('Tipos de documento formateados:', tiposFormateados);
+          console.log('Buscando DNI en tipos:', tiposFormateados.map(t => t.label));
           setTiposDocumento(tiposFormateados);
+          
+          // El useEffect se encargará de establecer el valor por defecto
         }
 
         // Transformar motivos
@@ -255,7 +317,7 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
       const motivo = motivos.find(m => m.value === newFormVisita.motivoId);
       const lugarSeleccionado = lugares.find(l => l.value === newFormVisita.lugar);
       
-      onFormChange({
+      const formDataToSend = {
         visitante: {
           ...formVisitante,
           tipoDocumento: tiposDocumento.find(t => t.value === formVisitante.tipoDocumentoId)
@@ -272,15 +334,22 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
             id: newFormVisita.motivoId,
             label: motivo.label
           } : null,
-          lugar: newFormVisita.lugar, // Enviar el ID del área, no el nombre
-          lugarNombre: lugarSeleccionado ? lugarSeleccionado.label : '' // Enviar el nombre para mostrar
+          lugar: lugarSeleccionado ? lugarSeleccionado.label : '', // Enviar el nombre del área para mostrar
+          lugarId: newFormVisita.lugar // Enviar el ID del área para el backend
         }
-      });
+      };
+      
+      console.log('=== ENVIANDO FORM DATA ===');
+      console.log('formDataToSend:', formDataToSend);
+      console.log('lugar (nombre):', formDataToSend.visita.lugar);
+      console.log('lugarId (ID):', formDataToSend.visita.lugarId);
+      
+      onFormChange(formDataToSend);
     }
   };
 
   const handleAddVisitor = () => {
-    if (!formVisitante.numeroDocumento || !formVisitante.nombres || !formVisitante.apellidos || !formVisitante.tipoDocumentoId) {
+    if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento || !formVisitante.nombres || !formVisitante.apellidos) {
       alert('Por favor complete los campos obligatorios');
       return;
     }
@@ -296,21 +365,23 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
       return;
     }
 
+    const tipoDocumento = tiposDocumento.find(t => t.value === formVisitante.tipoDocumentoId);
+    
     // Crear un objeto visitante con exactamente la estructura que espera el backend
     const visitanteData = {
       ...formVisitante,
-      tipoDocumentoId: 1, // DNI por defecto
-      tipoDocumento: { 
-        id: 1,
-        nombre: 'DNI' 
-      }
+      tipoDocumentoId: parseInt(formVisitante.tipoDocumentoId), // Convertir a número
+      tipoDocumento: tipoDocumento ? { 
+        id: parseInt(formVisitante.tipoDocumentoId),
+        nombre: tipoDocumento.label 
+      } : null
     };
 
     onAddVisitor(visitanteData);
     
     // Limpiar solo el formulario de visitante y la búsqueda
     setFormVisitante({
-      tipoDocumentoId: '1', // Mantener DNI por defecto
+      tipoDocumentoId: '',
       numeroDocumento: '',
       nombres: '',
       apellidos: '',
@@ -353,9 +424,14 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
         id: formVisita.motivoId,
         nombre: motivo.label
       },
-      lugar: formVisita.lugar, // Guardar el ID del área, no el nombre
-      lugarNombre: lugarSeleccionado ? lugarSeleccionado.label : '' // Guardar el nombre para mostrar
+      lugar: lugarSeleccionado ? lugarSeleccionado.label : '', // Guardar el nombre del área para mostrar
+      lugarId: formVisita.lugar // Guardar el ID del área para el backend
     };
+    
+    console.log('=== VISITA DATA ENVIADA ===');
+    console.log('visitaData:', visitaData);
+    console.log('lugar (nombre):', visitaData.lugar);
+    console.log('lugarId (ID):', visitaData.lugarId);
 
     onRegisterVisit(visitaData);
     
@@ -380,8 +456,8 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
 
   // Función para buscar visitante por documento
   const buscarVisitante = async () => {
-    if (!formVisitante.numeroDocumento) {
-      setMensajeVisitante('Ingrese número de documento');
+    if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento) {
+      setMensajeVisitante('Por favor seleccione el tipo de documento e ingrese el número');
       setTipoMensaje('warning');
       return;
     }
@@ -392,7 +468,7 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
       setVisitanteEncontrado(null);
 
       const response = await visitantesService.getByDocumento(
-        1, // DNI por defecto
+        formVisitante.tipoDocumentoId,
         formVisitante.numeroDocumento
       );
 
@@ -447,8 +523,18 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
   };
 
   const handleLimpiarVisitante = () => {
+    // Buscar DNI en los tipos disponibles o usar el primer tipo
+    let tipoPorDefecto = '1'; // Fallback
+    if (tiposDocumento.length > 0) {
+      const dniTipo = tiposDocumento.find(tipo => 
+        tipo.label.toLowerCase().includes('dni') || 
+        tipo.label.toLowerCase().includes('documento nacional de identidad')
+      );
+      tipoPorDefecto = dniTipo ? dniTipo.value : tiposDocumento[0].value;
+    }
+    
     const newFormVisitante = {
-      tipoDocumentoId: '1', // Mantener DNI por defecto
+      tipoDocumentoId: tipoPorDefecto, // Mantener DNI por defecto
       numeroDocumento: '',
       nombres: '',
       apellidos: '',
@@ -483,30 +569,40 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
         }
       >
         <div className="space-y-2 h-full flex flex-col">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Número de Documento *
-            </label>
-            <div className="flex">
-              <Input
-                value={formVisitante.numeroDocumento}
-                onChange={(e) => handleVisitanteChange('numeroDocumento', e.target.value)}
-                placeholder="Ej: 12345678"
-                maxLength="12"
-                className="rounded-r-none border-r-0"
-              />
-              <Button
-                onClick={buscarVisitante}
-                disabled={!formVisitante.numeroDocumento || buscandoVisitante}
-                className="rounded-l-none border-l-0 bg-blue-600 hover:bg-blue-700 text-white px-3"
-                size="sm"
-              >
-                {buscandoVisitante ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <MagnifyingGlassIcon className="h-4 w-4" />
-                )}
-              </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Tipo de Documento *"
+              value={formVisitante.tipoDocumentoId}
+              onChange={(e) => handleVisitanteChange('tipoDocumentoId', e.target.value)}
+              options={tiposDocumento}
+              placeholder="Seleccionar tipo"
+              isLoading={loadingData}
+            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Número de Documento *
+              </label>
+              <div className="flex">
+                <Input
+                  value={formVisitante.numeroDocumento}
+                  onChange={(e) => handleVisitanteChange('numeroDocumento', e.target.value)}
+                  placeholder="Ej: 12345678"
+                  maxLength="12"
+                  className="rounded-r-none border-r-0"
+                />
+                <Button
+                  onClick={buscarVisitante}
+                  disabled={!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento || buscandoVisitante}
+                  className="rounded-l-none border-l-0 bg-blue-600 hover:bg-blue-700 text-white px-3"
+                  size="sm"
+                >
+                  {buscandoVisitante ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <MagnifyingGlassIcon className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 

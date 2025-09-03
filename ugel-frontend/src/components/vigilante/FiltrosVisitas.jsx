@@ -2,14 +2,23 @@ import { useState, useEffect } from 'react';
 import Button from '../Button';
 import Input from '../Input';
 import Select from '../Select';
+import Pagination from '../Pagination';
 import { MagnifyingGlassIcon, ChevronUpIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { motivosVisitaService, personalService } from '../../services/api';
+import { motivosVisitaService, personalService, areasService } from '../../services/api';
 
-const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => {
+const FiltrosVisitas = ({ 
+  filtros, 
+  onBuscar, 
+  isExpanded, 
+  onToggleExpanded,
+  historialPagination,
+  onHistorialPageChange
+}) => {
   const [formFiltros, setFormFiltros] = useState({
     busqueda: '',
     empleadoId: '',
     motivoId: '',
+    lugar: '',
     fechaDesde: '',
     fechaHasta: '',
     ...filtros
@@ -18,6 +27,7 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
   // Estados para datos de los selects
   const [empleados, setEmpleados] = useState([]);
   const [motivos, setMotivos] = useState([]);
+  const [lugares, setLugares] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
 
   // Cargar datos de las APIs al montar el componente
@@ -29,16 +39,17 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
     try {
       setLoadingData(true);
       
-      const [motivosResp, personalResp] = await Promise.all([
+      const [motivosResp, personalResp, areasResp] = await Promise.all([
         motivosVisitaService.getAll({ activo: true }),
-        personalService.getAll()
+        personalService.getAll(),
+        areasService.getAll({ activo: true })
       ]);
 
       // Transformar motivos
       if (motivosResp.data.success) {
         const motivosFormateados = motivosResp.data.data.map(motivo => ({
           value: motivo.id.toString(),
-          label: motivo.nombre
+          label: motivo.nombre_motivo // Usar el mismo campo que en el registro
         }));
         setMotivos(motivosFormateados);
       }
@@ -47,9 +58,20 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
       if (personalResp.data.success) {
         const empleadosFormateados = personalResp.data.data.map(emp => ({
           value: emp.id.toString(),
-          label: `${emp.nombres} ${emp.apellidos} - ${emp.area?.nombre || 'Sin área'}`
+          label: `${emp.nombres} ${emp.apellidos}`, // Solo nombre completo, sin área
+          areaId: emp.area_destino_id, // Guardar el ID del área para el filtro
+          areaNombre: emp.area_nombre || 'Sin área'
         }));
         setEmpleados(empleadosFormateados);
+      }
+      
+      // Transformar áreas (lugares)
+      if (areasResp.data.success) {
+        const areasFormateadas = areasResp.data.data.map(area => ({
+          value: area.id.toString(),
+          label: area.nombre_area
+        }));
+        setLugares(areasFormateadas);
       }
 
     } catch (error) {
@@ -67,7 +89,16 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
   };
 
   const handleBuscar = () => {
-    onBuscar(formFiltros);
+    // Transformar los nombres de campos para que coincidan con el backend
+    const filtrosTransformados = {
+      busqueda: formFiltros.busqueda,
+      empleadoId: formFiltros.empleadoId,
+      motivoId: formFiltros.motivoId,
+      lugar: formFiltros.lugar,
+      fechaDesde: formFiltros.fechaDesde,
+      fechaHasta: formFiltros.fechaHasta
+    };
+    onBuscar(filtrosTransformados);
   };
 
   const handleLimpiar = () => {
@@ -75,6 +106,7 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
       busqueda: '',
       empleadoId: '',
       motivoId: '',
+      lugar: '',
       fechaDesde: '',
       fechaHasta: ''
     };
@@ -134,7 +166,7 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
           {/* Segunda fila - Selects */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
-              label="Datos de la Visita"
+              label="Empleado visitado"
               value={formFiltros.empleadoId}
               onChange={(e) => handleChange('empleadoId', e.target.value)}
               options={empleados}
@@ -147,6 +179,18 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
               onChange={(e) => handleChange('motivoId', e.target.value)}
               options={motivos}
               placeholder="Todos los motivos"
+              isLoading={loadingData}
+            />
+          </div>
+          
+          {/* Tercera fila - Lugar */}
+          <div>
+            <Select
+              label="Lugar (Área)"
+              value={formFiltros.lugar}
+              onChange={(e) => handleChange('lugar', e.target.value)}
+              options={lugares}
+              placeholder="Todos los lugares"
               isLoading={loadingData}
             />
           </div>
@@ -199,12 +243,17 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
                 )}
                 {formFiltros.empleadoId && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                    Datos de la Visita seleccionados
+                    Empleado seleccionado
                   </span>
                 )}
                 {formFiltros.motivoId && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
                     Motivo seleccionado
+                  </span>
+                )}
+                {formFiltros.lugar && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                    Lugar seleccionado
                   </span>
                 )}
                 {(formFiltros.fechaDesde || formFiltros.fechaHasta) && (
@@ -215,6 +264,21 @@ const FiltrosVisitas = ({ filtros, onBuscar, isExpanded, onToggleExpanded }) => 
               </div>
             </div>
           )}
+        </div>
+      )}
+      
+      {/* Paginación del historial */}
+      {historialPagination && historialPagination.totalPages > 1 && (
+        <div className="mt-6 pt-4 border-t border-blue-200/50">
+          <Pagination
+            currentPage={historialPagination.currentPage}
+            totalPages={historialPagination.totalPages}
+            totalItems={historialPagination.totalItems}
+            itemsPerPage={historialPagination.itemsPerPage}
+            onPageChange={onHistorialPageChange}
+            showInfo={true}
+            className="justify-center"
+          />
         </div>
       )}
     </div>
