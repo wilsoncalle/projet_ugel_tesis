@@ -4,17 +4,17 @@ import Button from '../Button';
 import Input from '../Input';
 import Select from '../Select';
 import Badge from '../Badge';
-import { PlusIcon, ClipboardDocumentListIcon, UserGroupIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ClipboardDocumentListIcon, UserGroupIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { tiposDocumentoService, motivosVisitaService, personalService, areasService, visitantesService } from '../../services/api';
 
-const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange }) => {
+const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange, activeTab = 'activos' }) => {
   // Estados del formulario de visitante
   const [formVisitante, setFormVisitante] = useState({
-    tipoDocumentoId: '1', // DNI por defecto (ID 1)
+    tipoDocumentoId: '',
     numeroDocumento: '',
     nombres: '',
     apellidos: '',
-    visitanteId: null // ID del visitante si ya existe en la base de datos
+    visitanteId: null
   });
 
   // Estados del formulario de visita
@@ -24,240 +24,140 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     lugar: ''
   });
 
-  // Estados para datos de los selects
+  // Estados para los datos de los selects
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [motivos, setMotivos] = useState([]);
   const [empleados, setEmpleados] = useState([]);
-  const [lugares, setLugares] = useState([]);
-  const [lugaresOriginales, setLugaresOriginales] = useState([]);
   const [empleadosFiltrados, setEmpleadosFiltrados] = useState([]);
-  const [empleadosOriginales, setEmpleadosOriginales] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [lugares, setLugares] = useState([]);
   
-  // Estados para búsqueda y validación de visitantes
+  // Estados para la búsqueda de visitante
   const [buscandoVisitante, setBuscandoVisitante] = useState(false);
   const [visitanteEncontrado, setVisitanteEncontrado] = useState(null);
   const [mensajeVisitante, setMensajeVisitante] = useState('');
-  const [tipoMensaje, setTipoMensaje] = useState(''); // 'success', 'warning', 'error'
+  const [tipoMensaje, setTipoMensaje] = useState('');
 
-  // Cargar datos de las APIs al montar el componente
+  // Estados de carga
+  const [loadingData, setLoadingData] = useState(false);
+
+  // Cargar datos iniciales
   useEffect(() => {
-    cargarDatosFormulario();
+    cargarDatosIniciales();
   }, []);
   
-  // Efecto para establecer DNI por defecto cuando se carguen los tipos
-  useEffect(() => {
-    console.log('useEffect ejecutándose - tiposDocumento.length:', tiposDocumento.length, 'formVisitante.tipoDocumentoId:', formVisitante.tipoDocumentoId);
-    
-    if (tiposDocumento.length > 0) {
-      // Buscar DNI en los tipos cargados
-      const dniTipo = tiposDocumento.find(tipo => 
-        tipo.label.toLowerCase().includes('dni') || 
-        tipo.label.toLowerCase().includes('documento nacional de identidad')
-      );
-      
-      if (dniTipo) {
-        console.log('Estableciendo DNI por defecto desde useEffect:', dniTipo);
-        setFormVisitante(prev => ({
-          ...prev,
-          tipoDocumentoId: dniTipo.value
-        }));
-      } else {
-        // Si no se encuentra DNI, usar el primer tipo disponible
-        console.log('Usando primer tipo disponible como fallback:', tiposDocumento[0]);
-        setFormVisitante(prev => ({
-          ...prev,
-          tipoDocumentoId: tiposDocumento[0].value
-        }));
-      }
-    }
-  }, [tiposDocumento]); // Solo depende de tiposDocumento
-  
-  // Debug: Log del estado inicial de manera segura
-  useEffect(() => {
-    console.log('Estado inicial formVisitante:', formVisitante);
-    console.log('tiposDocumento disponibles:', tiposDocumento);
-  }, [formVisitante, tiposDocumento]);
-  
-  // Efecto para establecer el valor inicial cuando se carguen los tipos
-  useEffect(() => {
-    if (tiposDocumento.length > 0 && formVisitante.tipoDocumentoId === '1') {
-      // Solo establecer si el valor actual es el fallback '1'
-      const dniTipo = tiposDocumento.find(tipo => 
-        tipo.label.toLowerCase().includes('dni') || 
-        tipo.label.toLowerCase().includes('documento nacional de identidad')
-      );
-      
-      if (dniTipo) {
-        console.log('Estableciendo DNI inicial desde useEffect:', dniTipo);
-        setFormVisitante(prev => ({
-          ...prev,
-          tipoDocumentoId: dniTipo.value
-        }));
-      } else {
-        console.log('Estableciendo primer tipo disponible como inicial:', tiposDocumento[0]);
-        setFormVisitante(prev => ({
-          ...prev,
-          tipoDocumentoId: tiposDocumento[0].value
-        }));
-      }
-    }
-  }, [tiposDocumento]); // Solo depende de tiposDocumento
-
-  const cargarDatosFormulario = async () => {
+  const cargarDatosIniciales = async () => {
+    setLoadingData(true);
     try {
-      setLoadingData(true);
-      
-      // Valores iniciales vacíos hasta que se carguen los datos reales
-      setTiposDocumento([]);
-      setMotivos([]);
-      setEmpleados([]);
-      setLugares([]);
-      
-      // Intentar cargar datos reales del backend
-      try {
-        const [tiposDoc, motivosResp, personalResp, areasResp] = await Promise.all([
-          tiposDocumentoService.getAll({ activo: true }),
-          motivosVisitaService.getAll({ activo: true }),
+      const [tiposResponse, motivosResponse, empleadosResponse, areasResponse] = await Promise.all([
+        tiposDocumentoService.getAll(),
+        motivosVisitaService.getAll(),
           personalService.getAll(),
-          areasService.getAll({ activo: true })
-        ]);
+        areasService.getAll()
+      ]);
 
-      console.log('Datos recibidos:', { tiposDoc, motivosResp, personalResp, areasResp });
-      
-      // Inspeccionar estructura completa de los datos
-      if (tiposDoc.data && tiposDoc.data.data) {
-        console.log('Estructura de tiposDoc.data.data[0]:', tiposDoc.data.data[0]);
-      }
-      
-      if (motivosResp.data && motivosResp.data.data) {
-        console.log('Estructura de motivosResp.data.data[0]:', motivosResp.data.data[0]);
-      }
-
-        // Transformar tipos de documento
-        if (tiposDoc.data && tiposDoc.data.success && tiposDoc.data.data && tiposDoc.data.data.length > 0) {
-          const tiposFormateados = tiposDoc.data.data.map(tipo => {
-            return {
-              value: tipo.id.toString(),
-              label: tipo.nombre_completo
-            };
-          });
-          console.log('Tipos de documento formateados:', tiposFormateados);
-          console.log('Buscando DNI en tipos:', tiposFormateados.map(t => t.label));
-          setTiposDocumento(tiposFormateados);
-          
-          // El useEffect se encargará de establecer el valor por defecto
-        }
-
-        // Transformar motivos
-        if (motivosResp.data && motivosResp.data.success && motivosResp.data.data && motivosResp.data.data.length > 0) {
-          const motivosFormateados = motivosResp.data.data.map(motivo => {
-            return {
-              value: motivo.id.toString(),
-              label: motivo.nombre_motivo
-            };
-          });
-          console.log('Motivos formateados:', motivosFormateados);
-          setMotivos(motivosFormateados);
-        }
-
-        // Transformar personal (empleados)
-        if (personalResp.data && personalResp.data.success && personalResp.data.data && personalResp.data.data.length > 0) {
-          console.log('Datos originales del personal:', personalResp.data.data[0]);
-          
-          const empleadosFormateados = personalResp.data.data.map(emp => ({
-            value: emp.id.toString(),
-            label: `${emp.nombres} ${emp.apellidos}`,
-            areaId: emp.area_destino_id, // Campo correcto del backend
-            areaNombre: emp.area_nombre || 'Sin área' // Campo correcto del backend
-          }));
-          
-          console.log('Empleados formateados:', empleadosFormateados);
-          setEmpleados(empleadosFormateados);
-          setEmpleadosOriginales(personalResp.data.data);
-          setEmpleadosFiltrados(empleadosFormateados);
-        }
+      if (tiposResponse.data.success) {
+        const tiposData = tiposResponse.data.data.map(tipo => ({
+          value: tipo.id.toString(),
+          label: tipo.nombre_completo || tipo.nombre
+        }));
+        setTiposDocumento(tiposData);
         
-        // Transformar áreas (lugares)
-        if (areasResp.data && areasResp.data.success && areasResp.data.data && areasResp.data.data.length > 0) {
-          console.log('Datos originales de áreas:', areasResp.data.data[0]);
-          
-          const areasFormateadas = areasResp.data.data.map(area => ({
-            value: area.id.toString(),
-            label: area.nombre_area // Campo correcto del backend
-          }));
-          
-          console.log('Áreas formateadas:', areasFormateadas);
-          setLugares(areasFormateadas);
-          setLugaresOriginales(areasFormateadas);
+        const tipoDNI = tiposData.find(tipo => tipo.label?.toLowerCase().includes('dni'));
+        if (tipoDNI && !formVisitante.tipoDocumentoId) {
+          setFormVisitante(prev => ({ ...prev, tipoDocumentoId: tipoDNI.value }));
         }
-      } catch (error) {
-        console.error('Error al cargar datos del backend:', error);
+      }
+
+      if (motivosResponse.data.success) {
+        setMotivos(motivosResponse.data.data.map(motivo => ({
+          value: motivo.id.toString(),
+          label: motivo.nombre_motivo || motivo.nombre
+        })));
+      }
+
+      if (empleadosResponse.data.success) {
+        const empleadosData = empleadosResponse.data.data.map(empleado => ({
+          value: empleado.id.toString(),
+          label: `${empleado.nombres} ${empleado.apellidos}`,
+          areaId: empleado.area_id
+        }));
+        setEmpleados(empleadosData);
+        setEmpleadosFiltrados(empleadosData);
+      }
+
+      if (areasResponse.data.success) {
+        setLugares(areasResponse.data.data.map(area => ({
+            value: area.id.toString(),
+          label: area.nombre_area || area.nombre
+        })));
       }
     } catch (error) {
-      console.error('Error al cargar datos del formulario:', error);
+      console.error('Error al cargar datos iniciales:', error);
     } finally {
       setLoadingData(false);
     }
   };
 
-  // Función para filtrar empleados por área
+  // Filtrar empleados por área
   const filtrarEmpleadosPorArea = (areaId) => {
-    console.log('Filtrando empleados por área:', areaId);
-    console.log('Empleados disponibles:', empleados);
-    
     if (!areaId) {
-      console.log('Restaurando empleados originales en filtrarEmpleadosPorArea');
       setEmpleadosFiltrados(empleados);
-      return;
-    }
-    
-    // Mostrar cada empleado y su área para depuración
-    empleados.forEach(emp => {
-      console.log(`Empleado ${emp.label}: areaId=${emp.areaId} (tipo: ${typeof emp.areaId})`);
-    });
-    
-    const empleadosFiltrados = empleados.filter(emp => {
-      const match = parseInt(emp.areaId) === parseInt(areaId);
-      console.log(`Comparando: ${emp.areaId} === ${areaId} = ${match}`);
-      return match;
-    });
-    
-    console.log('Empleados filtrados:', empleadosFiltrados);
+    } else {
+      const empleadosFiltrados = empleados.filter(empleado => 
+        empleado.areaId && empleado.areaId.toString() === areaId
+      );
     setEmpleadosFiltrados(empleadosFiltrados);
-    
-    // Si solo hay un empleado en el área seleccionada, seleccionarlo automáticamente
-    if (empleadosFiltrados.length === 1 && !formVisita.empleadoId) {
-      const empleadoUnico = empleadosFiltrados[0];
-      console.log('Seleccionando automáticamente empleado único:', empleadoUnico);
-      setFormVisita(prev => ({
-        ...prev,
-        empleadoId: empleadoUnico.value
-      }));
     }
   };
 
-  // Función para filtrar áreas por empleado
-  const filtrarAreasPorEmpleado = (empleadoId) => {
-    console.log('Filtrando áreas por empleado:', empleadoId);
-    console.log('Empleado encontrado:', empleados.find(emp => emp.value === empleadoId));
-    
-    if (!empleadoId) {
-      // Restaurar todas las áreas originales
-      if (lugaresOriginales.length > 0) {
-        console.log('Restaurando áreas originales en filtrarAreasPorEmpleado');
-        setLugares(lugaresOriginales);
+  // Resetear filtros de empleados
+  const resetearFiltros = () => {
+    setEmpleadosFiltrados(empleados);
+  };
+
+  // Buscar visitante por documento
+  const buscarVisitante = async () => {
+    if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento) return;
+
+    setBuscandoVisitante(true);
+    setMensajeVisitante('');
+    setVisitanteEncontrado(null);
+
+    try {
+      const response = await visitantesService.buscarPorDocumento(
+        formVisitante.tipoDocumentoId,
+        formVisitante.numeroDocumento
+      );
+
+      if (response.data.success && response.data.data) {
+        const visitante = response.data.data;
+        setVisitanteEncontrado(visitante);
+        setFormVisitante(prev => ({
+          ...prev,
+          nombres: visitante.nombres || '',
+          apellidos: visitante.apellidos || '',
+          visitanteId: visitante.id
+        }));
+        setMensajeVisitante('Visitante encontrado en el sistema');
+        setTipoMensaje('success');
+      } else {
+        setMensajeVisitante('Visitante no encontrado. Complete los datos para registrar uno nuevo.');
+        setTipoMensaje('info');
+        setFormVisitante(prev => ({
+          ...prev,
+          visitanteId: null
+        }));
       }
-      return;
+    } catch (error) {
+      console.error('Error al buscar visitante:', error);
+      setMensajeVisitante('Error al buscar visitante. Intente nuevamente.');
+      setTipoMensaje('error');
+    } finally {
+      setBuscandoVisitante(false);
     }
-    
-    const empleado = empleados.find(emp => emp.value === empleadoId);
-    console.log('Empleado para filtrar:', empleado);
-    
-    // No modificar el estado de lugares, solo filtrar para mostrar
-    // Esto evita que se pierda la selección del lugar
   };
 
+  // Manejar cambios en el formulario de visitante
   const handleVisitanteChange = (field, value) => {
     const newFormVisitante = {
       ...formVisitante,
@@ -272,20 +172,14 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     
     // Enviar datos actualizados en tiempo real al componente padre
     if (onFormChange) {
-      const tipoDocumento = tiposDocumento.find(t => t.value === newFormVisitante.tipoDocumentoId);
       onFormChange({
-        visitante: {
-          ...newFormVisitante,
-          tipoDocumento: tipoDocumento ? { 
-            id: newFormVisitante.tipoDocumentoId,
-            nombre: tipoDocumento.label 
-          } : null
-        },
+        visitante: newFormVisitante,
         visita: formVisita
       });
     }
   };
 
+  // Manejar cambios en el formulario de visita
   const handleVisitaChange = (field, value) => {
     const newFormVisita = {
       ...formVisita,
@@ -293,88 +187,31 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     };
     setFormVisita(newFormVisita);
     
-    // Aplicar filtros dinámicos
-    if (field === 'empleadoId') {
-      // Si se selecciona un empleado, filtrar las áreas y seleccionar automáticamente el lugar
-      filtrarAreasPorEmpleado(value);
-      
-      // Seleccionar automáticamente el lugar del empleado
-      if (value) {
-        const empleado = empleados.find(emp => emp.value === value);
-        if (empleado && empleado.areaId) {
-          newFormVisita.lugar = empleado.areaId.toString();
-        }
-      }
-    } else if (field === 'lugar') {
       // Si se selecciona un lugar, filtrar los empleados
+    if (field === 'lugar') {
       filtrarEmpleadosPorArea(value);
-      // NO limpiar la selección del empleado para mantener la coherencia
     }
     
     // Enviar datos actualizados en tiempo real al componente padre
     if (onFormChange) {
-      const empleado = empleados.find(e => e.value === newFormVisita.empleadoId);
-      const motivo = motivos.find(m => m.value === newFormVisita.motivoId);
-      const lugarSeleccionado = lugares.find(l => l.value === newFormVisita.lugar);
-      
-      const formDataToSend = {
-        visitante: {
-          ...formVisitante,
-          tipoDocumento: tiposDocumento.find(t => t.value === formVisitante.tipoDocumentoId)
-        },
-        visita: {
-          ...newFormVisita,
-          empleado: empleado ? {
-            id: newFormVisita.empleadoId,
-            label: empleado.label,
-            nombres: empleado.label ? empleado.label.split(' ')[0] : '',
-            apellidos: empleado.label ? empleado.label.split(' ').slice(1).join(' ') : ''
-          } : null,
-          motivo: motivo ? {
-            id: newFormVisita.motivoId,
-            label: motivo.label
-          } : null,
-          lugar: lugarSeleccionado ? lugarSeleccionado.label : '', // Enviar el nombre del área para mostrar
-          lugarId: newFormVisita.lugar // Enviar el ID del área para el backend
-        }
-      };
-      
-      console.log('=== ENVIANDO FORM DATA ===');
-      console.log('formDataToSend:', formDataToSend);
-      console.log('lugar (nombre):', formDataToSend.visita.lugar);
-      console.log('lugarId (ID):', formDataToSend.visita.lugarId);
-      
-      onFormChange(formDataToSend);
+      onFormChange({
+        visitante: formVisitante,
+        visita: newFormVisita
+      });
     }
   };
 
+  // Agregar visitante
   const handleAddVisitor = () => {
-    if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento || !formVisitante.nombres || !formVisitante.apellidos) {
-      alert('Por favor complete los campos obligatorios');
-      return;
-    }
+    if (!isVisitanteFormValid) return;
 
-    // Verificar si el visitante ya tiene una visita activa
-    const visitaActiva = visitantesEnEspera.find(v => 
-      v.numeroDocumento === formVisitante.numeroDocumento && 
-      v.tipoDocumentoId === formVisitante.tipoDocumentoId
-    );
-
-    if (visitaActiva) {
-      alert('Este visitante ya tiene una visita activa. Debe registrar su salida antes de una nueva entrada.');
-      return;
-    }
-
-    const tipoDocumento = tiposDocumento.find(t => t.value === formVisitante.tipoDocumentoId);
-    
-    // Crear un objeto visitante con exactamente la estructura que espera el backend
     const visitanteData = {
-      ...formVisitante,
-      tipoDocumentoId: parseInt(formVisitante.tipoDocumentoId), // Convertir a número
-      tipoDocumento: tipoDocumento ? { 
-        id: parseInt(formVisitante.tipoDocumentoId),
-        nombre: tipoDocumento.label 
-      } : null
+      tipoDocumentoId: formVisitante.tipoDocumentoId,
+      numeroDocumento: formVisitante.numeroDocumento,
+      nombres: formVisitante.nombres,
+      apellidos: formVisitante.apellidos,
+      visitanteId: formVisitante.visitanteId,
+      tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId)
     };
 
     onAddVisitor(visitanteData);
@@ -390,48 +227,18 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     limpiarBusqueda();
   };
 
+  // Registrar visita
   const handleRegisterVisit = () => {
-    if (visitantesEnEspera.length === 0) {
-      alert('No hay visitantes en espera para registrar');
-      return;
-    }
-
-    if (!formVisita.empleadoId || !formVisita.motivoId || !formVisita.lugar) {
-      alert('Por favor complete todos los datos de la visita');
-      return;
-    }
-
-    const empleado = empleados.find(e => e.value === formVisita.empleadoId);
-    const motivo = motivos.find(m => m.value === formVisita.motivoId);
-
-    if (!empleado || !motivo) {
-      alert('Error: No se encontraron los datos seleccionados');
-      return;
-    }
-
-    const nombreCompleto = empleado.label.split(' - ')[0];
-    const partesNombre = nombreCompleto.split(' ');
-    
-    const lugarSeleccionado = lugares.find(l => l.value === formVisita.lugar);
+    if (!isVisitaFormValid || visitantesEnEspera.length === 0) return;
     
     const visitaData = {
-      empleado: {
-        id: formVisita.empleadoId,
-        nombres: partesNombre[0] || '',
-        apellidos: partesNombre.slice(1).join(' ') || ''
-      },
-      motivo: {
-        id: formVisita.motivoId,
-        nombre: motivo.label
-      },
-      lugar: lugarSeleccionado ? lugarSeleccionado.label : '', // Guardar el nombre del área para mostrar
-      lugarId: formVisita.lugar // Guardar el ID del área para el backend
+      empleadoId: formVisita.empleadoId,
+      motivoId: formVisita.motivoId,
+      lugar: formVisita.lugar,
+      empleado: empleados.find(emp => emp.value === formVisita.empleadoId),
+      motivo: motivos.find(mot => mot.value === formVisita.motivoId),
+      lugarId: formVisita.lugar
     };
-    
-    console.log('=== VISITA DATA ENVIADA ===');
-    console.log('visitaData:', visitaData);
-    console.log('lugar (nombre):', visitaData.lugar);
-    console.log('lugarId (ID):', visitaData.lugarId);
 
     onRegisterVisit(visitaData);
     
@@ -441,77 +248,17 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
       motivoId: '',
       lugar: ''
     });
-  };
+    resetearFiltros();
 
-  const resetearFiltros = () => {
-    console.log('Reseteando filtros...');
-    setEmpleadosFiltrados(empleados);
-    
-    // Restaurar todas las áreas originales
-    if (lugaresOriginales.length > 0) {
-      console.log('Restaurando áreas originales:', lugaresOriginales);
-      setLugares(lugaresOriginales);
-    }
-  };
-
-  // Función para buscar visitante por documento
-  const buscarVisitante = async () => {
-    if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento) {
-      setMensajeVisitante('Por favor seleccione el tipo de documento e ingrese el número');
-      setTipoMensaje('warning');
-      return;
-    }
-
-    try {
-      setBuscandoVisitante(true);
-      setMensajeVisitante('');
-      setVisitanteEncontrado(null);
-
-      const response = await visitantesService.getByDocumento(
-        formVisitante.tipoDocumentoId,
-        formVisitante.numeroDocumento
-      );
-
-              if (response.data.success && response.data.data) {
-          const visitante = response.data.data;
-          setVisitanteEncontrado(visitante);
-          
-          // Auto-completar nombres y apellidos, y guardar el ID del visitante
-          setFormVisitante(prev => ({
-            ...prev,
-            nombres: visitante.nombres,
-            apellidos: visitante.apellidos,
-            visitanteId: visitante.id // Guardar el ID del visitante existente
-          }));
-
-        // Verificar si el visitante ya tiene una visita activa (sin salida)
-        const visitaActiva = visitantesEnEspera.find(v => 
-          v.numeroDocumento === formVisitante.numeroDocumento && 
-          v.tipoDocumentoId === formVisitante.tipoDocumentoId
-        );
-
-        if (visitaActiva) {
-          setMensajeVisitante('Este visitante ya tiene una visita activa. Debe registrar su salida antes de una nueva entrada.');
-          setTipoMensaje('warning');
-        } else {
-          setMensajeVisitante('Visitante encontrado. Los datos se han completado automáticamente.');
-          setTipoMensaje('success');
+    if (onFormChange) {
+      onFormChange({
+        visitante: formVisitante,
+        visita: {
+          empleadoId: '',
+          motivoId: '',
+          lugar: ''
         }
-      } else {
-        setMensajeVisitante('Visitante no encontrado. Puede proceder con el registro como nuevo visitante.');
-        setTipoMensaje('info');
-      }
-    } catch (error) {
-      console.error('Error buscando visitante:', error);
-      if (error.response?.status === 404) {
-        setMensajeVisitante('Visitante no encontrado. Puede proceder con el registro como nuevo visitante.');
-        setTipoMensaje('info');
-      } else {
-        setMensajeVisitante('Error al buscar visitante. Intente nuevamente.');
-        setTipoMensaje('error');
-      }
-    } finally {
-      setBuscandoVisitante(false);
+      });
     }
   };
 
@@ -526,15 +273,17 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     // Buscar DNI en los tipos disponibles o usar el primer tipo
     let tipoPorDefecto = '1'; // Fallback
     if (tiposDocumento.length > 0) {
-      const dniTipo = tiposDocumento.find(tipo => 
+      const tipoDNI = tiposDocumento.find(tipo => 
+        tipo.label && (
         tipo.label.toLowerCase().includes('dni') || 
-        tipo.label.toLowerCase().includes('documento nacional de identidad')
+          tipo.label.toLowerCase().includes('nacional')
+        )
       );
-      tipoPorDefecto = dniTipo ? dniTipo.value : tiposDocumento[0].value;
+      tipoPorDefecto = tipoDNI ? tipoDNI.value : tiposDocumento[0].value;
     }
     
     const newFormVisitante = {
-      tipoDocumentoId: tipoPorDefecto, // Mantener DNI por defecto
+      tipoDocumentoId: tipoPorDefecto,
       numeroDocumento: '',
       nombres: '',
       apellidos: '',
@@ -553,42 +302,51 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     }
   };
 
-  const isVisitanteFormValid = formVisitante.numeroDocumento && formVisitante.nombres && formVisitante.apellidos;
-  const isVisitaFormValid = formVisita.empleadoId && formVisita.motivoId && formVisita.lugar;
+  const isVisitanteFormValid = activeTab === 'activos' 
+    ? (formVisitante.numeroDocumento && formVisitante.nombres && formVisitante.apellidos)
+    : true; // En historial siempre es válido (puede estar en "Todos")
+
+  const isVisitaFormValid = activeTab === 'activos'
+    ? (formVisita.empleadoId && formVisita.motivoId && formVisita.lugar)
+    : true; // En historial siempre es válido (puede estar en "Todos")
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Formulario Unificado de Visitante y Visita */}
+    <div className="h-full flex flex-col overflow-hidden">
       <Card
-        className="shadow-lg border-0 bg-white/90 backdrop-blur-sm flex-1"
-        title={
-          <div className="flex items-center space-x-2 text-gray-800">
-            <UserGroupIcon className="h-5 w-5 text-primary-600" />
-            <span className="font-semibold">Registro de Visitas</span>
-          </div>
-        }
+        className="shadow-lg border border-gray-200 bg-white flex flex flex-col overflow-hidden rounded-2xl"
       >
-        <div className="space-y-2 h-full flex flex-col">
+        <div className="p-0 flex-1 flex flex-col overflow-hidden">
+          {/* Sección de Datos del Visitante */}
+          <div className="flex-shrink-0 space-y-3 border border-gray-200 rounded-xl pb-3 mb-3 p-3">
+            <h3 className="text-base font-semibold text-gray-800 mb-3">
+              {activeTab === 'activos' ? 'Datos del Visitante' : 'Buscar Visitante'}
+            </h3>
+            
+            {activeTab === 'activos' ? (
+              <>
           <div className="grid grid-cols-2 gap-3">
+                  <div>
             <Select
               label="Tipo de Documento *"
               value={formVisitante.tipoDocumentoId}
               onChange={(e) => handleVisitanteChange('tipoDocumentoId', e.target.value)}
               options={tiposDocumento}
-              placeholder="Seleccionar tipo"
+                      placeholder="Seleccione tipo de documento..."
               isLoading={loadingData}
             />
+                  </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
                 Número de Documento *
               </label>
               <div className="flex">
                 <Input
                   value={formVisitante.numeroDocumento}
                   onChange={(e) => handleVisitanteChange('numeroDocumento', e.target.value)}
-                  placeholder="Ej: 12345678"
+                        placeholder=""
                   maxLength="12"
                   className="rounded-r-none border-r-0"
+                        style={{ borderTopRightRadius: '0', borderBottomRightRadius: '0' }}
                 />
                 <Button
                   onClick={buscarVisitante}
@@ -611,21 +369,33 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
               label="Nombres *"
               value={formVisitante.nombres}
               onChange={(e) => handleVisitanteChange('nombres', e.target.value)}
-              placeholder="Nombres del visitante"
+                    placeholder=""
             />
             <Input
               label="Apellidos *"
               value={formVisitante.apellidos}
               onChange={(e) => handleVisitanteChange('apellidos', e.target.value)}
-              placeholder="Apellidos del visitante"
+                    placeholder=""
+                  />
+                </div>
+              </>
+            ) : (
+              /* Campo de búsqueda para historial */
+              <div>
+                <Input
+                  label="Buscar por nombres o número de documento"
+                  value={formVisitante.numeroDocumento}
+                  onChange={(e) => handleVisitanteChange('numeroDocumento', e.target.value)}
+                  placeholder="Ingrese nombre, apellido o documento..."
+                  leftIcon={<MagnifyingGlassIcon className="h-4 w-4" />}
             />
           </div>
+            )}
 
           {/* Mensaje de estado de la búsqueda */}
           {mensajeVisitante && (
-            <div className={`p-3 rounded-lg border ${
+              <div className={`p-2 rounded-lg border text-xs ${
               tipoMensaje === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
-              tipoMensaje === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
               tipoMensaje === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
               'bg-blue-50 border-blue-200 text-blue-800'
             }`}>
@@ -643,46 +413,46 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
             </div>
           )}
 
-          <div className="flex space-x-3">
+            <div className="flex gap-2">
             <Button
-              onClick={handleAddVisitor}
+                onClick={activeTab === 'activos' ? handleAddVisitor : () => console.log('Buscar visitante')}
               disabled={!isVisitanteFormValid}
-              leftIcon={<PlusIcon className="h-4 w-4" />}
-              className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg"
-              size="md"
-            >
-              Agregar Visitante
+                leftIcon={activeTab === 'activos' ? <PlusIcon className="h-4 w-4" /> : <MagnifyingGlassIcon className="h-4 w-4" />}
+                className="flex-1 bg-gray-900 hover:bg-gray-800 text-white"
+                size="sm"
+              >
+                {activeTab === 'activos' ? 'Agregar Visitante' : 'Buscar Visitante'}
             </Button>
             <Button
               variant="outline"
               onClick={handleLimpiarVisitante}
-              className="border-gray-300 text-gray-700 hover:bg-gray-50"
-              size="md"
+                className="border-gray-300 text-gray-700 hover:bg-gray-50 px-3"
+                size="sm"
             >
-              Limpiar
+                <XMarkIcon className="h-4 w-4" />
             </Button>
+            </div>
           </div>
 
           {/* Lista de Visitantes en Espera */}
           {visitantesEnEspera.length > 0 && (
-            <div className="mt-1 border-t border-b border-gray-200 py-2">
-              <div className="flex items-center justify-between mb-1">
-                <span className="flex items-center space-x-2 text-amber-800">
-                  <ClipboardDocumentListIcon className="h-4 w-4 text-amber-600" />
-                  <span className="font-semibold text-sm">Visitantes en Espera</span>
-                </span>
+            <div className="flex-shrink-0 border-b border-gray-200 pb-3 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-gray-800">
+                  Visitantes en Espera
+                </h3>
                 <Badge variant="warning">
                   {visitantesEnEspera.length}
                 </Badge>
               </div>
-              <div className="space-y-1 max-h-28 overflow-y-auto">
+              <div className="space-y-2 max-h-20 overflow-y-auto">
                 {visitantesEnEspera.map((visitante, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-1.5 bg-amber-50 rounded-lg border border-amber-200"
+                    className="flex items-center justify-between p-2 bg-amber-50 rounded-lg border border-amber-200"
                   >
                     <div>
-                      <p className="font-medium text-gray-900 text-sm">
+                      <p className="font-medium text-gray-900 text-xs">
                         {visitante.nombres} {visitante.apellidos}
                       </p>
                       <p className="text-xs text-gray-500">
@@ -696,25 +466,31 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
           )}
 
           {/* Sección de datos de la visita */}
-          <div className="mt-1">
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Datos de la Visita</h3>
+          <div className="flex-1 flex flex-col overflow-hidden border border-gray-200 rounded-xl p-3">
+            <h3 className="text-base font-semibold text-gray-800 mb-3">
+              {activeTab === 'activos' ? 'Datos de la Visita' : 'Buscar Visita'}
+            </h3>
             
+            {activeTab === 'activos' ? (
+              <div className="space-y-4 flex-1">
             <Select
               label="Empleado a Visitar *"
               value={formVisita.empleadoId}
               onChange={(e) => handleVisitaChange('empleadoId', e.target.value)}
               options={empleadosFiltrados}
-              placeholder="Buscar empleado..."
+                  placeholder="Seleccione empleado..."
+                  isSearchable={true}
+                  searchPlaceholder="Buscar empleado..."
               isLoading={loadingData}
             />
 
-            <div className="grid grid-cols-2 gap-3 mt-2">
+                <div className="grid grid-cols-2 gap-3">
               <Select
                 label="Motivo de Visita *"
                 value={formVisita.motivoId}
                 onChange={(e) => handleVisitaChange('motivoId', e.target.value)}
                 options={motivos}
-                placeholder="Seleccionar motivo"
+                    placeholder="Seleccione motivo..."
                 isLoading={loadingData}
               />
               <Select
@@ -722,11 +498,65 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
                 value={formVisita.lugar}
                 onChange={(e) => handleVisitaChange('lugar', e.target.value)}
                 options={lugares}
-                placeholder="Seleccionar lugar"
-              />
+                    placeholder="Seleccione lugar..."
+                  />
+                </div>
+              </div>
+            ) : (
+              /* Campos de búsqueda para historial */
+              <div className="space-y-4 flex-1">
+                <Select
+                  label="Buscar por Empleado"
+                  value={formVisita.empleadoId}
+                  onChange={(e) => handleVisitaChange('empleadoId', e.target.value)}
+                  options={[{ value: '', label: 'Todos los empleados' }, ...empleadosFiltrados]}
+                  placeholder="Seleccione empleado..."
+                  isSearchable={true}
+                  searchPlaceholder="Buscar empleado..."
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Select
+                    label="Buscar por Motivo"
+                    value={formVisita.motivoId}
+                    onChange={(e) => handleVisitaChange('motivoId', e.target.value)}
+                    options={[{ value: '', label: 'Todos los motivos' }, ...motivos]}
+                    placeholder="Seleccione motivo..."
+                    isSearchable={true}
+                    searchPlaceholder="Buscar motivo..."
+                  />
+                  <Select
+                    label="Buscar por Lugar"
+                    value={formVisita.lugar}
+                    onChange={(e) => handleVisitaChange('lugar', e.target.value)}
+                    options={[{ value: '', label: 'Todos los lugares' }, ...lugares]}
+                    placeholder="Seleccione lugar..."
+                    isSearchable={true}
+                    searchPlaceholder="Buscar lugar..."
+                  />
+                </div>
+              </div>
+            )}
             </div>
             
-            <div className="flex justify-end mt-2">
+                    {/* Botones de registro y limpieza */}
+          <div className="flex-shrink-0 mt-2 pt-2">
+            <div className="flex gap-3">
+              <Button
+                onClick={activeTab === 'activos' ? handleRegisterVisit : () => console.log('Buscar visita')}
+                disabled={!isVisitaFormValid}
+                variant="primary"
+                size="lg"
+                leftIcon={<ClipboardDocumentListIcon className="h-5 w-5" />}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {activeTab === 'activos' ? 'Registrar Visita Completa' : 'Buscar Visita'}
+                {activeTab === 'activos' && visitantesEnEspera.length > 0 && (
+                  <Badge variant="primary" className="ml-3 bg-white text-blue-600">
+                    {visitantesEnEspera.length}
+                  </Badge>
+                )}
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -737,32 +567,13 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
                   });
                   resetearFiltros();
                 }}
-                className="border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
-                size="sm"
+                className="border-gray-300 text-gray-700 hover:bg-gray-50 px-3"
+                size="lg"
               >
-                Limpiar Formulario
+                <XMarkIcon className="h-5 w-5" />
               </Button>
             </div>
           </div>
-
-          <div className="flex-grow"></div>
-
-          <Button
-            onClick={handleRegisterVisit}
-            disabled={!isVisitaFormValid || visitantesEnEspera.length === 0}
-            variant="primary"
-            size="lg"
-            isFullWidth
-            leftIcon={<ClipboardDocumentListIcon className="h-5 w-5" />}
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg transform hover:scale-105 transition-all duration-200 mt-2"
-          >
-            Registrar Visita Completa
-            {visitantesEnEspera.length > 0 && (
-              <Badge variant="primary" className="ml-3 bg-white text-indigo-600">
-                {visitantesEnEspera.length}
-              </Badge>
-            )}
-          </Button>
         </div>
       </Card>
     </div>

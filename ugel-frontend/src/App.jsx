@@ -2,6 +2,19 @@ import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 
+// Default Redirect Component
+const DefaultRedirect = () => {
+  const { user } = useAuth();
+  const role = user?.rol?.toLowerCase() || '';
+  
+  if (role.includes('admin')) return <Navigate to="/admin" replace />;
+  if (role.includes('rrhh')) return <Navigate to="/rrhh" replace />;
+  if (role.includes('vigilante')) return <Navigate to="/vigilante" replace />;
+  
+  // Fallback to login if role is unknown
+  return <Navigate to="/login" replace />;
+};
+
 // Layout
 import MainLayout from './components/MainLayout';
 
@@ -74,17 +87,7 @@ function App() {
 
           
           {/* Default Redirect Based on Role */}
-          <Route path="/" element={
-            <ProtectedRoute element={
-              ({ user }) => {
-                const role = user?.rol?.toLowerCase() || '';
-                if (role.includes('admin')) return <Navigate to="/admin" replace />;
-                if (role.includes('rrhh')) return <Navigate to="/rrhh" replace />;
-                if (role.includes('vigilante')) return <Navigate to="/vigilante" replace />;
-                return <Navigate to="/login" replace />;
-              }
-            } />
-          } />
+          <Route path="/" element={<ProtectedRoute element={<DefaultRedirect />} />} />
         </Route>
       </Route>
       

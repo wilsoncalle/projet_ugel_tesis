@@ -5,7 +5,7 @@ const Card = forwardRef(
     return (
       <div
         ref={ref}
-        className={`bg-white shadow rounded-lg overflow-hidden ${className}`}
+        className={`bg-white shadow rounded-xl overflow-hidden ${className}`}
         {...props}
       >
         {title && (

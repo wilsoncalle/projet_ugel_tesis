@@ -3,8 +3,9 @@ import Card from '../Card';
 import Badge from '../Badge';
 import Button from '../Button';
 import Popover from '../Popover';
+import TabView from '../TabView';
 import FiltrosVisitas from './FiltrosVisitas';
-import TablaVisitas from './TablaVisitas';
+import TableGenerica from '../TableGenerica';
 import { UsersIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 const VisitantesTabla = ({
@@ -45,59 +46,38 @@ const VisitantesTabla = ({
         console.log('visitantesEnEspera:', visitantesEnEspera);
         
         let data = [...visitantesActivos, ...visitantesEnEspera];
+        console.log('Data combinada:', data);
         
-        // Añadir vista previa si existe y no está vacía
-        if (vistaPreviaVisitante && Object.values(vistaPreviaVisitante).some(val => val)) {
-          // Crear un objeto combinado con la información del visitante y la visita
+        // Solo agregar vista previa si tiene datos válidos
+        if (vistaPreviaVisitante && 
+            vistaPreviaVisitante.nombres && 
+            vistaPreviaVisitante.apellidos && 
+            vistaPreviaVisitante.numeroDocumento) {
+          
           const previewData = {
-            ...vistaPreviaVisitante,
-            isPreview: true // Marca para identificar que es una vista previa
+            id: 'preview',
+            visitante_nombres: vistaPreviaVisitante.nombres,
+            visitante_apellidos: vistaPreviaVisitante.apellidos,
+            tipo_documento_codigo: 'DNI',
+            numero_documento: vistaPreviaVisitante.numeroDocumento,
+            personal_nombres: vistaPreviaVisita?.empleado?.nombres || '',
+            personal_apellidos: vistaPreviaVisita?.empleado?.apellidos || '',
+            nombre_motivo: vistaPreviaVisita?.motivo?.label || '',
+            nombre_area: vistaPreviaVisita?.lugar || '',
+            fecha_ingreso: new Date().toLocaleDateString(),
+            hora_ingreso: new Date().toLocaleTimeString(),
+            isPreview: true
           };
           
-          // Añadir datos de la visita si existen
-          if (vistaPreviaVisita) {
-            if (vistaPreviaVisita.empleado) {
-              previewData.empleadoVisitado = vistaPreviaVisita.empleado;
-              previewData.personal_nombres = vistaPreviaVisita.empleado.nombres;
-              previewData.personal_apellidos = vistaPreviaVisita.empleado.apellidos;
-            }
-            
-            if (vistaPreviaVisita.motivo) {
-              previewData.motivo = vistaPreviaVisita.motivo;
-              previewData.nombre_motivo = vistaPreviaVisita.motivo.label;
-              // Agregar campos adicionales para compatibilidad
-              previewData.motivo_nombre = vistaPreviaVisita.motivo.label;
-              previewData.motivo_visita_nombre = vistaPreviaVisita.motivo.label;
-              previewData.motivo_visita = vistaPreviaVisita.motivo.label;
-              previewData.motivo_descripcion = vistaPreviaVisita.motivo.label;
-            }
-            
-            if (vistaPreviaVisita.lugar) {
-              console.log('=== CONSTRUYENDO VISTA PREVIA DEL LUGAR ===');
-              console.log('vistaPreviaVisita.lugar:', vistaPreviaVisita.lugar);
-              console.log('vistaPreviaVisita.lugarId:', vistaPreviaVisita.lugarId);
-              
-              previewData.lugar = vistaPreviaVisita.lugar;
-              previewData.nombre_area = vistaPreviaVisita.lugar;
-              // Agregar campos adicionales para compatibilidad
-              previewData.area = vistaPreviaVisita.lugar;
-              previewData.area_nombre = vistaPreviaVisita.lugar;
-              previewData.area_destino = vistaPreviaVisita.lugar;
-              previewData.area_destino_nombre = vistaPreviaVisita.lugar;
-            }
-          }
-          
-          // Agregar la vista previa al principio del array
-          console.log('=== VISTA PREVIA CONSTRUIDA ===');
-          console.log('previewData completo:', previewData);
-          console.log('previewData.motivo:', previewData.motivo);
-          console.log('previewData.nombre_motivo:', previewData.nombre_motivo);
           data = [previewData, ...data];
         }
         
+        console.log('Data final retornada:', data);
         return data;
       }
       case 'historial':
+        console.log('=== DATOS DE HISTORIAL ===');
+        console.log('historialVisitas:', historialVisitas);
         return historialVisitas;
       default:
         return [];
@@ -110,6 +90,17 @@ const VisitantesTabla = ({
         key: 'visitante',
         label: 'Visitante',
         render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in visitante render function');
+            return (
+              <div>
+                <div className="font-medium text-gray-900">-</div>
+                <div className="text-sm text-gray-500">-</div>
+              </div>
+            );
+          }
+          
           console.log('Renderizando visitante, row:', row);
           
           // Verificar si estamos en visitantes activos o historial
@@ -129,24 +120,17 @@ const VisitantesTabla = ({
             } 
             // Si es un visitante activo (de la API)
             else {
-              // Verificar si tenemos un objeto visitante anidado
-              if (row.visitante && typeof row.visitante === 'object') {
-                nombres = row.visitante.nombres || '';
-                apellidos = row.visitante.apellidos || '';
-                tipoDoc = row.visitante.tipoDocumento?.nombre_completo || 'DNI';
-                numDoc = row.visitante.numeroDocumento || '';
-              } else {
-                nombres = row.nombres || row.visitante_nombres || '';
-                apellidos = row.apellidos || row.visitante_apellidos || '';
-                tipoDoc = row.tipo_documento_codigo || 'DNI';
-                numDoc = row.numeroDocumento || row.numero_documento || '';
-              }
+              // Usar la estructura transformada del dashboard
+              nombres = row.visitante_nombres || row.nombres || '';
+              apellidos = row.visitante_apellidos || row.apellidos || '';
+              tipoDoc = row.tipo_documento_codigo || 'DNI';
+              numDoc = row.numero_documento || row.numeroDocumento || '';
             }
           } 
           // Para historial (formato plano)
           else {
-            nombres = row.visitante_nombres || '';
-            apellidos = row.visitante_apellidos || '';
+            nombres = row.visitante_nombres || row.nombres || '';
+            apellidos = row.visitante_apellidos || row.apellidos || '';
             tipoDoc = row.tipo_documento_codigo || 'DNI';
             numDoc = row.numero_documento || '';
           }
@@ -167,6 +151,12 @@ const VisitantesTabla = ({
         key: 'empleado',
         label: 'Empleado Visitado',
         render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in empleado render function');
+            return <div className="text-sm">-</div>;
+          }
+          
           console.log('Renderizando empleado, row:', row);
           
           let empleadoNombre = '';
@@ -185,14 +175,9 @@ const VisitantesTabla = ({
             } 
             // Si es un visitante activo (de la API)
             else {
-              // Verificar si tenemos un objeto empleadoVisitado anidado
-              if (row.empleadoVisitado && typeof row.empleadoVisitado === 'object') {
-                empleadoNombre = row.empleadoVisitado.nombres || '';
-                empleadoApellido = row.empleadoVisitado.apellidos || '';
-              } else {
-                empleadoNombre = row.personal_nombres || '';
-                empleadoApellido = row.personal_apellidos || '';
-              }
+              // Usar la estructura transformada del dashboard
+              empleadoNombre = row.personal_nombres || '';
+              empleadoApellido = row.personal_apellidos || '';
             }
           } 
           // Para historial (formato plano)
@@ -212,6 +197,12 @@ const VisitantesTabla = ({
         key: 'motivo',
         label: 'Motivo',
         render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in motivo render function');
+            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">-</span>;
+          }
+          
           console.log('Renderizando motivo, row:', row);
           
           let motivoNombre = '';
@@ -223,40 +214,15 @@ const VisitantesTabla = ({
               const motivo = row.motivo || {};
               motivoNombre = motivo.label || '';
             } 
-                    // Si es un visitante activo (de la API)
-        else {
-          console.log('=== DEPURANDO MOTIVO PARA VISITANTE ACTIVO ===');
-          console.log('Row completo:', row);
-          console.log('row.motivo:', row.motivo);
-          console.log('row.nombre_motivo:', row.nombre_motivo);
-          console.log('row.motivo_nombre:', row.motivo_nombre);
-          console.log('row.motivo_visita_nombre:', row.motivo_visita_nombre);
-          console.log('row.motivo_visita:', row.motivo_visita);
-          console.log('row.motivo_descripcion:', row.motivo_descripcion);
-          
-          // Verificar si tenemos un objeto motivo anidado
-          if (row.motivo && typeof row.motivo === 'object') {
-            motivoNombre = row.motivo.label || row.motivo.nombre_motivo || row.motivo.nombre || '';
-            console.log('Motivo encontrado en objeto anidado:', motivoNombre);
-            console.log('Valor final del motivo (objeto):', motivoNombre);
-          } else {
-            // Buscar el motivo en diferentes campos posibles
-            motivoNombre = row.nombre_motivo || 
-                          row.motivo_nombre || 
-                          row.motivo_visita_nombre ||
-                          row.motivo_visita ||
-                          row.motivo_descripcion ||
-                          (row.motivo && row.motivo.label) ||
-                          '';
-            console.log('Motivo encontrado en campos planos:', motivoNombre);
-            console.log('Valor final del motivo (campos planos):', motivoNombre);
-          }
-        }
+            // Si es un visitante activo (de la API)
+            else {
+              // Usar la estructura transformada del dashboard
+              motivoNombre = row.nombre_motivo || '';
+            }
           } 
           // Para historial (formato plano)
           else {
             motivoNombre = row.nombre_motivo || '';
-            console.log('Motivo encontrado en historial:', motivoNombre);
           }
           
           return (
@@ -270,46 +236,24 @@ const VisitantesTabla = ({
         key: 'lugar',
         label: 'Lugar',
         render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in lugar render function');
+            return <div className="text-sm text-gray-900">-</div>;
+          }
+          
           console.log('Renderizando lugar, row:', row);
           
           let lugar = '';
           
           // Para visitantes activos (estructura diferente)
           if (activeTab === 'activos') {
-            // Si es un visitante en espera (local)
-            if (visitantesEnEspera.some(v => v.id === row.id)) {
-              lugar = row.lugar || '';
-            } 
             // Si es un visitante activo (de la API)
-            else {
-              console.log('=== DEPURANDO LUGAR PARA VISITANTE ACTIVO ===');
-              console.log('Row completo:', row);
-              console.log('row.lugar:', row.lugar);
-              console.log('row.nombre_area:', row.nombre_area);
-              console.log('row.area:', row.area);
-              console.log('row.area_nombre:', row.area_nombre);
-              console.log('row.area_destino:', row.area_destino);
-              console.log('row.area_destino_nombre:', row.area_destino_nombre);
-              
-              // Buscar el lugar en diferentes campos posibles
-              // Priorizar nombres sobre IDs
-              lugar = row.nombre_area || 
-                     row.area_nombre ||
-                     row.area_destino_nombre ||
-                     row.lugarNombre ||
-                     row.lugar || 
-                     row.area || 
-                     row.area_destino ||
-                     '';
-              
-              console.log('Lugar encontrado:', lugar);
-              console.log('Valor final del lugar:', lugar);
-            }
+            lugar = row.nombre_area || '';
           } 
           // Para historial (formato plano)
           else {
             lugar = row.nombre_area || '';
-            console.log('Lugar encontrado en historial:', lugar);
           }
           
           return (
@@ -321,6 +265,12 @@ const VisitantesTabla = ({
         key: 'fecha',
         label: 'Fecha',
         render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in fecha render function');
+            return <div className="text-sm text-gray-900">-</div>;
+          }
+          
           console.log('Renderizando fecha, row:', row);
           
           let fechaStr = '';
@@ -376,6 +326,12 @@ const VisitantesTabla = ({
         key: 'horaIngreso',
         label: 'Hora Ingreso',
         render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in hora ingreso render function');
+            return <div className="text-sm text-gray-900">-</div>;
+          }
+          
           console.log('Renderizando hora ingreso, row:', row);
           
           let horaFormateada = '';
@@ -434,6 +390,12 @@ const VisitantesTabla = ({
         key: 'horaSalida',
         label: 'Hora Salida',
         render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in hora salida render function');
+            return <div className="text-sm text-gray-900">-</div>;
+          }
+          
           console.log('Renderizando hora salida, row:', row);
           
           // Extraer la hora de la fecha_salida
@@ -457,95 +419,83 @@ const VisitantesTabla = ({
           );
         }
       });
-    } else {
+    }
+
+    // Add actions column for active visitors
+    if (activeTab === 'activos') {
       baseColumns.push({
-        key: 'acciones',
-        label: 'Salida',
+        key: 'actions',
+        label: 'Acciones',
         render: (row) => {
-          console.log('=== RENDERIZANDO ACCIONES PARA ROW ===');
-          console.log('Row ID:', row.id);
-          console.log('Empleado visitado:', row.empleadoVisitado);
-          console.log('Visitantes en espera:', visitantesEnEspera);
-          
-          // Verificar si es un visitante en espera (sin empleadoVisitado completo)
-          const isEnEspera = !row.empleadoVisitado?.nombres || visitantesEnEspera.some(v => v.id === row.id);
-          
-          console.log('¿Es en espera?', isEnEspera);
-          console.log('Condición 1 - Sin empleado:', !row.empleadoVisitado?.nombres);
-          console.log('Condición 2 - En visitantes en espera:', visitantesEnEspera.some(v => v.id === row.id));
-          
-          if (isEnEspera) {
-            console.log('Mostrando "En espera" para row ID:', row.id);
-            return (
-              <span className="text-sm text-gray-400 italic">
-                En espera
-              </span>
-            );
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in actions render function');
+            return null;
           }
           
-          console.log('Mostrando botón "Registrar" para row ID:', row.id);
+          const enEspera = visitantesEnEspera.some(v => v.id === row.id);
+          const isPreview = row.isPreview === true;
           
-                     return (
-             <div className="relative">
-               <button 
-                 className="text-sm text-primary-600 hover:text-primary-800 font-medium"
-                 onClick={() => {
-                   console.log('=== BOTÓN REGISTRAR CLICKEADO ===');
-                   console.log('Row ID:', row.id);
-                   console.log('Row completo:', row);
-                   console.log('Empleado visitado:', row.empleadoVisitado);
-                   console.log('Visitantes en espera:', visitantesEnEspera);
-                                       // Toggle del estado del modal para esta fila específica
-                    setModalAbierto(prev => ({
-                      ...prev,
-                      [row.id]: !prev[row.id]
-                    }));
-                 }}
-               >
-                 Registrar
-               </button>
-               
-                               {/* Modal simple en lugar de Popover */}
-                {modalAbierto[row.id] && (
-                 <div className="absolute left-0 top-8 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-[250px]">
-                   <div className="text-center space-y-3">
-                     <p className="text-sm text-gray-700">
-                       ¿Confirmar salida de <strong>{row.visitante_nombres} {row.visitante_apellidos}</strong>?
-                     </p>
-                     <div className="flex space-x-2">
-                       <button
-                         onClick={() => {
-                           console.log('=== BOTÓN CONFIRMAR SALIDA CLICKEADO ===');
-                           console.log('Row ID:', row.id);
-                           console.log('Llamando a onRegistrarSalida...');
-                           console.log('onRegistrarSalida es función:', typeof onRegistrarSalida);
-                           console.log('Antes de llamar a onRegistrarSalida');
-                           onRegistrarSalida(row.id);
-                           console.log('Después de llamar a onRegistrarSalida');
-                                                       setModalAbierto(prev => ({
-                              ...prev,
-                              [row.id]: false
-                            }));
-                         }}
-                         className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
-                       >
-                         Confirmar Salida
-                       </button>
-                       <button
-                         onClick={() => setModalAbierto(prev => ({
-                           ...prev,
-                           [row.id]: false
-                         }))}
-                         className="px-3 py-1.5 bg-gray-500 text-white text-sm rounded-md hover:bg-gray-600 transition-colors"
-                       >
-                         Cancelar
-                       </button>
-                     </div>
-                   </div>
-                 </div>
-               )}
-             </div>
-           );
+          // Only show actions for active visitors (not previews)
+          if (isPreview) {
+            return null;
+          }
+          
+          return (
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setModalAbierto(prev => ({
+                    ...prev,
+                    [row.id]: !prev[row.id]
+                  }));
+                }}
+                className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
+              >
+                Registrar Salida
+              </button>
+              
+              {/* Modal simple en lugar de Popover */}
+              {modalAbierto[row.id] && (
+                <div className="absolute left-0 top-8 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-[250px]">
+                  <div className="text-center space-y-3">
+                    <p className="text-sm text-gray-700">
+                      ¿Confirmar salida de <strong>{row.visitante_nombres || row.nombres || ''} {row.visitante_apellidos || row.apellidos || ''}</strong>?
+                    </p>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => {
+                          console.log('=== BOTÓN CONFIRMAR SALIDA CLICKEADO ===');
+                          console.log('Row ID:', row.id);
+                          console.log('Llamando a onRegistrarSalida...');
+                          console.log('onRegistrarSalida es función:', typeof onRegistrarSalida);
+                          console.log('Antes de llamar a onRegistrarSalida');
+                          onRegistrarSalida(row.id);
+                          console.log('Después de llamar a onRegistrarSalida');
+                          setModalAbierto(prev => ({
+                            ...prev,
+                            [row.id]: false
+                          }));
+                        }}
+                        className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
+                      >
+                        Confirmar Salida
+                      </button>
+                      <button
+                        onClick={() => setModalAbierto(prev => ({
+                          ...prev,
+                          [row.id]: false
+                        }))}
+                        className="px-3 py-1.5 bg-gray-500 text-white text-sm rounded-md hover:bg-gray-600 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
         }
       });
     }
@@ -555,79 +505,50 @@ const VisitantesTabla = ({
 
   const countActivos = visitantesActivos.length;
 
+  // Configuración de las pestañas
+  const tabs = [
+    {
+      key: 'activos',
+      label: 'Visitantes Activos',
+      icon: <UsersIcon className="h-4 w-4" />,
+      count: countActivos
+    },
+    {
+      key: 'historial',
+      label: 'Historial de Visitas',
+      icon: <ClockIcon className="h-4 w-4" />
+    }
+  ];
+
   return (
     <div className="h-full flex flex-col">
-      {/* Pestañas */}
-      <Card className="shadow-lg border-0 bg-white/90 backdrop-blur-sm flex-1 flex flex-col">
-        <div className="border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
-          <nav className="-mb-px flex space-x-2 px-6">
-            <button
-              onClick={() => handleTabClick('activos')}
-              className={`py-4 px-6 border-b-3 font-semibold text-sm transition-all duration-200 rounded-t-lg ${
-                activeTab === 'activos'
-                  ? 'border-primary-500 text-primary-700 bg-white shadow-sm'
-                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/50'
-              }`}
-            >
-              <div className="flex items-center space-x-3">
-                <div className={`p-1.5 rounded-lg ${activeTab === 'activos' ? 'bg-primary-100' : 'bg-gray-200'}`}>
-                  <UsersIcon className={`h-4 w-4 ${activeTab === 'activos' ? 'text-primary-600' : 'text-gray-500'}`} />
-                </div>
-                <span>Visitantes Activos</span>
-                {countActivos > 0 && (
-                  <Badge variant={activeTab === 'activos' ? 'primary' : 'default'} size="sm">
-                    {countActivos}
-                  </Badge>
-                )}
-              </div>
-            </button>
-            
-            <button
-              onClick={() => handleTabClick('historial')}
-              className={`py-4 px-6 border-b-3 font-semibold text-sm transition-all duration-200 rounded-t-lg ${
-                activeTab === 'historial'
-                  ? 'border-primary-500 text-primary-700 bg-white shadow-sm'
-                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-white/50'
-              }`}
-            >
-              <div className="flex items-center space-x-3">
-                <div className={`p-1.5 rounded-lg ${activeTab === 'historial' ? 'bg-primary-100' : 'bg-gray-200'}`}>
-                  <ClockIcon className={`h-4 w-4 ${activeTab === 'historial' ? 'text-primary-600' : 'text-gray-500'}`} />
-                </div>
-                <span>Historial de Visitas</span>
-              </div>
-            </button>
-          </nav>
-        </div>
+      <Card className="shadow-lg border border-gray-200 bg-card flex-1 flex flex-col rounded-2xl">
+        <div className="p-0 flex flex-col h-full">
+          {/* Título de la sección */}
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">Gestión de Visitantes</h2>
+          
+          {/* Tab Slider */}
+          <TabView 
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={handleTabClick}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
 
-        {/* Contenido de las pestañas */}
-        <div className="p-4 flex-1 flex flex-col">
-          {activeTab === 'historial' && (
-            <div className="mb-4">
-              <FiltrosVisitas
-                filtros={filtros}
-                onBuscar={onBuscarHistorial}
-                isExpanded={filtrosExpanded}
-                onToggleExpanded={setFiltrosExpanded}
-                historialPagination={historialPagination}
-                onHistorialPageChange={onHistorialPageChange}
+
+            {/* Tabla de datos con scroll interno */}
+            <div className="flex-1 overflow-hidden">
+              <TableGenerica
+                columns={getColumns()}
+                data={getTabData()}
+                emptyMessage={
+                  activeTab === 'activos'
+                    ? 'No hay visitantes activos en este momento'
+                    : 'No se encontraron registros para los filtros aplicados'
+                }
               />
             </div>
-          )}
-
-          <div className="flex-1 overflow-hidden">
-            <TablaVisitas
-            data={getTabData()}
-            columns={getColumns()}
-            visitantesEnEspera={visitantesEnEspera}
-            onRegistrarSalida={onRegistrarSalida}
-              emptyMessage={
-                activeTab === 'activos'
-                  ? 'No hay visitantes activos en este momento'
-                  : 'No se encontraron registros para los filtros aplicados'
-              }
-            />
-          </div>
+          </TabView>
         </div>
       </Card>
     </div>

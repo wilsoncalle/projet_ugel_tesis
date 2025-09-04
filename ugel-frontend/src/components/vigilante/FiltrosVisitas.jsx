@@ -224,11 +224,10 @@ const FiltrosVisitas = ({
             <Button
               variant="outline"
               onClick={handleLimpiar}
-              leftIcon={<XMarkIcon className="h-4 w-4" />}
-              className="flex-1 sm:flex-none border-blue-300 text-blue-700 hover:bg-blue-50"
+              className="flex-1 sm:flex-none border-blue-300 text-blue-700 hover:bg-blue-50 px-3"
               size="lg"
             >
-              Limpiar Filtros
+              <XMarkIcon className="h-4 w-4" />
             </Button>
           </div>
 

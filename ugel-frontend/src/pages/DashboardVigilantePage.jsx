@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Card from '../components/Card';
 import RegistroForm from '../components/vigilante/RegistroForm';
 import VisitantesTabla from '../components/vigilante/VisitantesTabla';
+import DateRangeFilter from '../components/DateRangeFilter';
 import { visitasService, visitantesService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -22,7 +23,7 @@ const DashboardVigilantePage = () => {
     motivoId: '',
     lugar: '',
     fechaDesde: '',
-    fechaHasta: ''
+    fechaHasta: new Date().toISOString().split('T')[0] // Fecha actual por defecto
   });
   const [activeTab, setActiveTab] = useState('activos');
   const [loading, setLoading] = useState(false);
@@ -456,36 +457,38 @@ const DashboardVigilantePage = () => {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+    <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col overflow-hidden">
       {/* Error and Loading Messages */}
-      {error && (
-        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-red-600">{error}</p>
-            <button
-              onClick={() => setError('')}
-              className="text-red-400 hover:text-red-600"
-            >
-              ✕
-            </button>
+      <div className="flex-shrink-0">
+        {error && (
+          <div className="mx-2 mt-2 p-2 bg-red-50 border border-red-200 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-red-600">{error}</p>
+              <button
+                onClick={() => setError('')}
+                className="text-red-400 hover:text-red-600"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-      
-      {loading && (
-        <div className="mx-4 mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
-          <div className="flex items-center">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-            <p className="text-sm text-blue-600">Procesando...</p>
+        )}
+        
+        {loading && (
+          <div className="mx-2 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
+            <div className="flex items-center">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+              <p className="text-sm text-blue-600">Procesando...</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 p-4">
-        <div className="h-full grid grid-cols-1 lg:grid-cols-5 gap-4">
-          {/* Columna Izquierda - Tabla (67%) */}
-          <div className="lg:col-span-3 h-full">
+      {/* Main Content - Fixed Height */}
+      <div className="flex-1 p-4 min-h-0 mt-4">
+        <div className="h-full flex gap-4">
+          {/* Columna Izquierda - Tabla (70%) */}
+          <div className="w-[70%] h-full">
             <VisitantesTabla
               visitantesActivos={visitantesActivos}
               visitantesEnEspera={visitantesEnEspera}
@@ -502,13 +505,25 @@ const DashboardVigilantePage = () => {
             />
           </div>
 
-          {/* Columna Derecha - Registro (33%) */}
-          <div className="lg:col-span-2 h-full">
+          {/* Columna Derecha - Registro (30%) */}
+          <div className="w-[30%] h-full pt-0">
+            {/* Filtro de fechas para historial */}
+            {activeTab === 'historial' && (
+              <DateRangeFilter
+                fechaDesde={filtros.fechaDesde}
+                fechaHasta={filtros.fechaHasta}
+                onFechaDesdeChange={(fecha) => setFiltros(prev => ({ ...prev, fechaDesde: fecha }))}
+                onFechaHastaChange={(fecha) => setFiltros(prev => ({ ...prev, fechaHasta: fecha }))}
+                className="mb-4"
+              />
+            )}
+            
             <RegistroForm
               visitantesEnEspera={visitantesEnEspera}
               onAddVisitor={handleAddVisitor}
               onRegisterVisit={handleRegisterVisit}
               onFormChange={handleFormChange}
+              activeTab={activeTab}
             />
           </div>
         </div>

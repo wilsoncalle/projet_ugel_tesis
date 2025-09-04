@@ -32,7 +32,13 @@ export default {
           800: '#5b21b6',
           900: '#4c1d95',
           950: '#2e1065',
-        }
+        },
+        'input-background': '#f3f3f5',
+        'muted': '#ececf0',
+        'foreground': '#111827',
+        'muted-foreground': '#6b7280',
+        'card': '#ffffff',
+        'background': '#ffffff'
       }
     },
   },

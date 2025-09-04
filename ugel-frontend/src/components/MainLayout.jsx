@@ -358,21 +358,6 @@ const MainLayout = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              {/* Indicador de estado de conexión */}
-              <div className="hidden sm:flex items-center text-sm text-green-600">
-                <span className="w-2 h-2 bg-green-600 rounded-full mr-2"></span>
-                <span>Conectado</span>
-              </div>
-              
-              {/* Botón de notificaciones */}
-              <button className="p-2 rounded-full text-gray-600 hover:bg-gray-100 focus:outline-none relative">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                {/* Indicador de notificaciones */}
-                <span className="absolute top-0 right-0 block w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
-              
               {/* Menú de usuario */}
               <div className="relative user-menu-container">
                 <button 
@@ -515,12 +500,15 @@ const MainLayout = () => {
         }`}
       >
         {/* Contenido principal */}
-        <div className="px-6 py-6 bg-gray-50">
-          <div className="container mx-auto">
+        <div className={isVigilanteRoute ? 'bg-gray-50 h-screen' : 'px-6 py-6 bg-gray-50'}>
+          {isVigilanteRoute ? (
             <Outlet />
-          </div>
+          ) : (
+            <div className="container mx-auto">
+              <Outlet />
+            </div>
+          )}
         </div>
-        
 
       </main>
     </div>

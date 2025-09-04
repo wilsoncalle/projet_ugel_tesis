@@ -1,37 +1,45 @@
 import { useState } from 'react';
 
-const TabView = ({ tabs, activeTab, onTabChange, children }) => {
+const TabView = ({ tabs, activeTab, onTabChange, children, className = '' }) => {
   return (
-    <div className="space-y-4">
-      {/* Pestañas */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => onTabChange(tab.key)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === tab.key
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
-                {tab.icon}
-                <span>{tab.label}</span>
-                {tab.count !== undefined && (
-                  <span className="bg-gray-100 text-gray-900 py-0.5 px-2 rounded-full text-xs font-medium">
-                    {tab.count}
-                  </span>
-                )}
-              </div>
-            </button>
-          ))}
-        </nav>
+    <div className={`space-y-2 ${className}`}>
+      {/* Tab List - Pill Style Slider */}
+      <div className="bg-muted rounded-full p-1 grid grid-cols-2">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => onTabChange(tab.key)}
+            className={`px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${
+              activeTab === tab.key
+                ? 'bg-background text-foreground shadow-md'
+                : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              {tab.icon && (
+                <span className="h-4 w-4 flex-shrink-0">
+                  {tab.icon}
+                </span>
+              )}
+              <span>{tab.label}</span>
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className={`py-0.5 px-1.5 rounded-full text-xs font-medium ${
+                  activeTab === tab.key
+                    ? 'bg-primary-100 text-primary-800'
+                    : 'bg-gray-200 text-gray-700'
+                }`}>
+                  {tab.count}
+                </span>
+              )}
+            </div>
+          </button>
+        ))}
       </div>
 
-      {/* Contenido de las pestañas */}
-      <div>{children}</div>
+      {/* Tab Content */}
+      <div className="mt-6 flex-1 flex flex-col overflow-hidden">
+        {children}
+      </div>
     </div>
   );
 };
