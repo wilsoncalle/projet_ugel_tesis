@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Card from '../Card';
 import Badge from '../Badge';
 import Button from '../Button';
@@ -20,7 +20,9 @@ const VisitantesTabla = ({
   vistaPreviaVisitante,
   vistaPreviaVisita,
   historialPagination,
-  onHistorialPageChange
+  onHistorialPageChange,
+  activosPagination,
+  onActivosPageChange
 }) => {
   console.log('=== VISITANTES TABLA RENDERIZANDO ===');
   console.log('onRegistrarSalida es función:', typeof onRegistrarSalida);
@@ -38,14 +40,14 @@ const VisitantesTabla = ({
     }
   };
 
-  const getTabData = () => {
+  const getTabData = useCallback(() => {
     switch (activeTab) {
       case 'activos': {
         console.log('=== DATOS DE VISITANTES ACTIVOS ===');
         console.log('visitantesActivos:', visitantesActivos);
         console.log('visitantesEnEspera:', visitantesEnEspera);
         
-        let data = [...visitantesActivos, ...visitantesEnEspera];
+        let data = [...(visitantesActivos || []), ...(visitantesEnEspera || [])];
         console.log('Data combinada:', data);
         
         // Solo agregar vista previa si tiene datos válidos
@@ -78,17 +80,54 @@ const VisitantesTabla = ({
       case 'historial':
         console.log('=== DATOS DE HISTORIAL ===');
         console.log('historialVisitas:', historialVisitas);
-        return historialVisitas;
+        return historialVisitas || [];
       default:
         return [];
     }
-  };
+  }, [activeTab, visitantesActivos, visitantesEnEspera, historialVisitas, vistaPreviaVisitante, vistaPreviaVisita]);
+  
+  const getPaginationProps = useCallback(() => {
+    const data = getTabData();
+    const totalItems = data.length;
+    
+    switch (activeTab) {
+      case 'activos':
+        const activosProps = {
+          pagination: true,
+          itemsPerPage: activosPagination?.itemsPerPage || 10,
+          currentPage: activosPagination?.currentPage || 1,
+          totalItems: totalItems, // Usar el total real de datos
+          onPageChange: onActivosPageChange
+        };
+        console.log('=== PAGINACIÓN ACTIVOS ===');
+        console.log('activosPagination:', activosPagination);
+        console.log('data.length (totalItems):', totalItems);
+        console.log('activosProps:', activosProps);
+        return activosProps;
+      case 'historial':
+        const historialProps = {
+          pagination: true,
+          itemsPerPage: historialPagination?.itemsPerPage || 10,
+          currentPage: historialPagination?.currentPage || 1,
+          totalItems: totalItems, // Usar el total real de datos
+          onPageChange: onHistorialPageChange
+        };
+        console.log('=== PAGINACIÓN HISTORIAL ===');
+        console.log('historialPagination:', historialPagination);
+        console.log('data.length (totalItems):', totalItems);
+        console.log('historialProps:', historialProps);
+        return historialProps;
+      default:
+        return { pagination: false };
+    }
+  }, [activeTab, activosPagination, historialPagination, onActivosPageChange, onHistorialPageChange, getTabData]);
 
-  const getColumns = () => {
+  const getColumns = useMemo(() => {
     const baseColumns = [
       {
         key: 'visitante',
         label: 'Visitante',
+        className: 'min-w-[200px]',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -112,7 +151,7 @@ const VisitantesTabla = ({
           // Para visitantes activos (estructura diferente)
           if (activeTab === 'activos') {
             // Si es un visitante en espera (local)
-            if (visitantesEnEspera.some(v => v.id === row.id)) {
+            if ((visitantesEnEspera || []).some(v => v.id === row.id)) {
               nombres = row.nombres || '';
               apellidos = row.apellidos || '';
               tipoDoc = row.tipoDocumento?.nombre_completo || 'DNI';
@@ -150,6 +189,7 @@ const VisitantesTabla = ({
       {
         key: 'empleado',
         label: 'Empleado Visitado',
+        className: 'w-[150px] max-w-[150px]',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -165,7 +205,7 @@ const VisitantesTabla = ({
           // Para visitantes activos (estructura diferente)
           if (activeTab === 'activos') {
             // Si es un visitante en espera (local)
-            if (visitantesEnEspera.some(v => v.id === row.id)) {
+            if ((visitantesEnEspera || []).some(v => v.id === row.id)) {
               const empleado = row.empleado || {};
               return (
                 <div className="text-sm">
@@ -187,7 +227,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="text-sm">
+            <div className="text-sm truncate" title={`${empleadoNombre} ${empleadoApellido}`}>
               {`${empleadoNombre} ${empleadoApellido}` || '-'}
             </div>
           );
@@ -196,6 +236,7 @@ const VisitantesTabla = ({
       {
         key: 'motivo',
         label: 'Motivo',
+        className: 'min-w-[150px]',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -210,7 +251,7 @@ const VisitantesTabla = ({
           // Para visitantes activos (estructura diferente)
           if (activeTab === 'activos') {
             // Si es un visitante en espera (local)
-            if (visitantesEnEspera.some(v => v.id === row.id)) {
+            if ((visitantesEnEspera || []).some(v => v.id === row.id)) {
               const motivo = row.motivo || {};
               motivoNombre = motivo.label || '';
             } 
@@ -235,6 +276,7 @@ const VisitantesTabla = ({
       {
         key: 'lugar',
         label: 'Lugar',
+        className: 'min-w-[150px]',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -262,69 +304,9 @@ const VisitantesTabla = ({
         }
       },
       {
-        key: 'fecha',
-        label: 'Fecha',
-        render: (row) => {
-          // Safety check: if row is undefined/null, return empty content
-          if (!row) {
-            console.warn('Row is undefined/null in fecha render function');
-            return <div className="text-sm text-gray-900">-</div>;
-          }
-          
-          console.log('Renderizando fecha, row:', row);
-          
-          let fechaStr = '';
-          
-          // Para visitantes activos (estructura diferente)
-          if (activeTab === 'activos') {
-            // Si es un visitante en espera (local)
-            if (visitantesEnEspera.some(v => v.id === row.id)) {
-              fechaStr = row.fechaIngreso || '';
-            } 
-            // Si es un visitante activo (de la API)
-            else {
-              try {
-                const fechaIngreso = row.fechaIngreso || row.fecha_ingreso;
-                if (fechaIngreso) {
-                  const fecha = new Date(fechaIngreso);
-                  if (!isNaN(fecha.getTime())) {
-                    fechaStr = fecha.toLocaleDateString('es-PE');
-                  } else {
-                    fechaStr = fechaIngreso;
-                  }
-                }
-              } catch (e) {
-                console.error('Error al formatear fecha:', e);
-              }
-            }
-          } 
-          // Para historial (formato plano)
-          else {
-            try {
-              const fechaIngreso = row.fecha_ingreso;
-              if (fechaIngreso) {
-                const fecha = new Date(fechaIngreso);
-                if (!isNaN(fecha.getTime())) {
-                  fechaStr = fecha.toLocaleDateString('es-PE');
-                } else {
-                  fechaStr = fechaIngreso;
-                }
-              }
-            } catch (e) {
-              console.error('Error al formatear fecha:', e);
-            }
-          }
-          
-          return (
-            <div className="text-sm text-gray-900">
-              {fechaStr || '-'}
-            </div>
-          );
-        }
-      },
-      {
         key: 'horaIngreso',
         label: 'Hora Ingreso',
+        className: 'min-w-[80px]',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -339,7 +321,7 @@ const VisitantesTabla = ({
           // Para visitantes activos (estructura diferente)
           if (activeTab === 'activos') {
             // Si es un visitante en espera (local)
-            if (visitantesEnEspera.some(v => v.id === row.id)) {
+            if ((visitantesEnEspera || []).some(v => v.id === row.id)) {
               horaFormateada = row.horaIngreso || '';
             } 
             // Si es un visitante activo (de la API)
@@ -353,7 +335,7 @@ const VisitantesTabla = ({
                 else if (row.fecha_ingreso) {
                   const fecha = new Date(row.fecha_ingreso);
                   if (!isNaN(fecha.getTime())) {
-                    horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+                    horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
                   }
                 }
               } catch (e) {
@@ -368,7 +350,7 @@ const VisitantesTabla = ({
               if (fechaIngreso) {
                 const fecha = new Date(fechaIngreso);
                 if (!isNaN(fecha.getTime())) {
-                  horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+                  horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
                 }
               }
             } catch (e) {
@@ -377,7 +359,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="text-sm text-gray-900">
+            <div className="text-sm text-gray-900 px-2">
               {horaFormateada || '-'}
             </div>
           );
@@ -386,9 +368,48 @@ const VisitantesTabla = ({
     ];
 
     if (activeTab === 'historial') {
+      // Agregar columna de fecha solo para historial
+      baseColumns.push({
+        key: 'fecha',
+        label: 'Fecha',
+        className: 'min-w-[80px]',
+        render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            console.warn('Row is undefined/null in fecha render function');
+            return <div className="text-sm text-gray-900">-</div>;
+          }
+          
+          console.log('Renderizando fecha, row:', row);
+          
+          let fechaStr = '';
+          
+          try {
+            const fechaIngreso = row.fecha_ingreso;
+            if (fechaIngreso) {
+              const fecha = new Date(fechaIngreso);
+              if (!isNaN(fecha.getTime())) {
+                fechaStr = fecha.toLocaleDateString('es-PE');
+              } else {
+                fechaStr = fechaIngreso;
+              }
+            }
+          } catch (e) {
+            console.error('Error al formatear fecha:', e);
+          }
+          
+          return (
+            <div className="text-sm text-gray-900 px-2">
+              {fechaStr || '-'}
+            </div>
+          );
+        }
+      });
+      
       baseColumns.push({
         key: 'horaSalida',
         label: 'Hora Salida',
+        className: 'min-w-[80px]',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -405,7 +426,7 @@ const VisitantesTabla = ({
             if (fechaSalida) {
               const fecha = new Date(fechaSalida);
               if (!isNaN(fecha.getTime())) {
-                horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+                horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
               }
             }
           } catch (e) {
@@ -413,7 +434,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="text-sm text-gray-900">
+            <div className="text-sm text-gray-900 px-2">
               {horaFormateada || '-'}
             </div>
           );
@@ -426,6 +447,7 @@ const VisitantesTabla = ({
       baseColumns.push({
         key: 'actions',
         label: 'Acciones',
+        className: 'min-w-[150px]',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -433,7 +455,7 @@ const VisitantesTabla = ({
             return null;
           }
           
-          const enEspera = visitantesEnEspera.some(v => v.id === row.id);
+          const enEspera = (visitantesEnEspera || []).some(v => v.id === row.id);
           const isPreview = row.isPreview === true;
           
           // Only show actions for active visitors (not previews)
@@ -501,7 +523,7 @@ const VisitantesTabla = ({
     }
 
     return baseColumns;
-  };
+  }, [activeTab, visitantesEnEspera, onRegistrarSalida]);
 
   const countActivos = visitantesActivos.length;
 
@@ -532,15 +554,22 @@ const VisitantesTabla = ({
             tabs={tabs}
             activeTab={activeTab}
             onTabChange={handleTabClick}
-            className="flex-1 flex flex-col overflow-hidden"
+            className="flex-1 flex flex-col"
           >
 
 
-            {/* Tabla de datos con scroll interno */}
-            <div className="flex-1 overflow-hidden">
+            {/* Tabla de datos */}
+            <div className="flex-1" style={{ maxWidth: '100%' }}>
               <TableGenerica
-                columns={getColumns()}
+                columns={getColumns}
                 data={getTabData()}
+                minTableWidth={activeTab === 'activos' ? '1100px' : '1100px'}
+                {...(() => {
+                  const paginationProps = getPaginationProps();
+                  console.log('=== PROPS DE PAGINACIÓN ENVIADAS ===');
+                  console.log('paginationProps:', paginationProps);
+                  return paginationProps;
+                })()}
                 emptyMessage={
                   activeTab === 'activos'
                     ? 'No hay visitantes activos en este momento'

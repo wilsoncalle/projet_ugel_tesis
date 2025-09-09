@@ -500,7 +500,7 @@ const MainLayout = () => {
         }`}
       >
         {/* Contenido principal */}
-        <div className={isVigilanteRoute ? 'bg-gray-50 h-screen' : 'px-6 py-6 bg-gray-50'}>
+        <div className={isVigilanteRoute ? 'bg-gray-50' : 'px-6 py-6 bg-gray-50'}>
           {isVigilanteRoute ? (
             <Outlet />
           ) : (

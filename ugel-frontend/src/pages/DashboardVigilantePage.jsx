@@ -23,7 +23,14 @@ const DashboardVigilantePage = () => {
     motivoId: '',
     lugar: '',
     fechaDesde: '',
-    fechaHasta: new Date().toISOString().split('T')[0] // Fecha actual por defecto
+    fechaHasta: (() => {
+      // Crear fecha local sin problemas de zona horaria
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    })()
   });
   const [activeTab, setActiveTab] = useState('activos');
   const [loading, setLoading] = useState(false);
@@ -31,6 +38,14 @@ const DashboardVigilantePage = () => {
   
   // Estados para paginación del historial
   const [historialPagination, setHistorialPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10
+  });
+  
+  // Estados para paginación de visitantes activos
+  const [activosPagination, setActivosPagination] = useState({
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
@@ -86,6 +101,14 @@ const DashboardVigilantePage = () => {
         }
         
         setVisitantesActivos(activosTransformados);
+        
+        // Actualizar paginación para activos
+        setActivosPagination(prev => ({
+          ...prev,
+          totalItems: activosTransformados.length,
+          totalPages: Math.ceil(activosTransformados.length / prev.itemsPerPage),
+          currentPage: 1 // Resetear a la primera página
+        }));
       } else {
         setError('Error al cargar visitantes activos');
       }
@@ -410,6 +433,14 @@ const DashboardVigilantePage = () => {
   const handleHistorialPageChange = (newPage) => {
     handleBuscarHistorial(filtros, newPage);
   };
+  
+  // Función para manejar cambios de página en los activos
+  const handleActivosPageChange = (newPage) => {
+    setActivosPagination(prev => ({
+      ...prev,
+      currentPage: newPage
+    }));
+  };
 
   const handleRegistrarSalida = async (visitaId) => {
     try {
@@ -457,7 +488,7 @@ const DashboardVigilantePage = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col overflow-hidden">
+    <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
       {/* Error and Loading Messages */}
       <div className="flex-shrink-0">
         {error && (
@@ -485,10 +516,10 @@ const DashboardVigilantePage = () => {
       </div>
 
       {/* Main Content - Fixed Height */}
-      <div className="flex-1 p-4 min-h-0 mt-4">
-        <div className="h-full flex gap-4">
+      <div className="flex-1 p-4 mt-4 overflow-y-auto">
+        <div className="flex gap-4 min-h-0">
           {/* Columna Izquierda - Tabla (70%) */}
-          <div className="w-[70%] h-full">
+          <div className="w-[70%] overflow-x-auto">
             <VisitantesTabla
               visitantesActivos={visitantesActivos}
               visitantesEnEspera={visitantesEnEspera}
@@ -502,11 +533,13 @@ const DashboardVigilantePage = () => {
               vistaPreviaVisita={vistaPreviaVisita}
               historialPagination={historialPagination}
               onHistorialPageChange={handleHistorialPageChange}
+              activosPagination={activosPagination}
+              onActivosPageChange={handleActivosPageChange}
             />
           </div>
 
           {/* Columna Derecha - Registro (30%) */}
-          <div className="w-[30%] h-full pt-0">
+          <div className="w-[30%] pt-0">
             {/* Filtro de fechas para historial */}
             {activeTab === 'historial' && (
               <DateRangeFilter
@@ -524,6 +557,7 @@ const DashboardVigilantePage = () => {
               onRegisterVisit={handleRegisterVisit}
               onFormChange={handleFormChange}
               activeTab={activeTab}
+              onTabChange={setActiveTab}
             />
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Button from '../Button';
 import Input from '../Input';
-import Select from '../Select';
+import SelectCustom from '../SelectCustom';
 import Pagination from '../Pagination';
 import { MagnifyingGlassIcon, ChevronUpIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { motivosVisitaService, personalService, areasService } from '../../services/api';
@@ -165,7 +165,7 @@ const FiltrosVisitas = ({
 
           {/* Segunda fila - Selects */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Select
+            <SelectCustom
               label="Empleado visitado"
               value={formFiltros.empleadoId}
               onChange={(e) => handleChange('empleadoId', e.target.value)}
@@ -173,7 +173,7 @@ const FiltrosVisitas = ({
               placeholder="Todos los empleados"
               isLoading={loadingData}
             />
-            <Select
+            <SelectCustom
               label="Motivo de visita"
               value={formFiltros.motivoId}
               onChange={(e) => handleChange('motivoId', e.target.value)}
@@ -185,7 +185,7 @@ const FiltrosVisitas = ({
           
           {/* Tercera fila - Lugar */}
           <div>
-            <Select
+            <SelectCustom
               label="Lugar (Área)"
               value={formFiltros.lugar}
               onChange={(e) => handleChange('lugar', e.target.value)}

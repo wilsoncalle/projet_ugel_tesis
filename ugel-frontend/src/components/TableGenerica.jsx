@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
+import PaginationTable from './PaginationTable';
 
 const TableGenerica = ({
   columns,
@@ -13,9 +13,14 @@ const TableGenerica = ({
   searchable = false,
   searchPlaceholder = 'Buscar...',
   actions = null,
+  minTableWidth = '1200px',
+  currentPage: externalCurrentPage,
+  totalPages: externalTotalPages,
+  totalItems: externalTotalItems,
+  onPageChange: externalOnPageChange,
   ...props
 }) => {
-  const [currentPage, setCurrentPage] = useState(1);
+  const [internalCurrentPage, setInternalCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Filter data based on search term
@@ -28,20 +33,25 @@ const TableGenerica = ({
       )
     );
   }, [data, searchTerm]);
+  
+  // Usar paginación externa si está disponible, sino usar interna
+  const currentPage = externalCurrentPage !== undefined ? externalCurrentPage : internalCurrentPage;
+  const totalItems = externalTotalItems !== undefined ? externalTotalItems : filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage); // Siempre calcular correctamente
+  const onPageChange = externalOnPageChange || setInternalCurrentPage;
 
   // Pagination logic
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentData = pagination ? filteredData.slice(startIndex, endIndex) : filteredData;
 
   const handlePageChange = (page) => {
-    setCurrentPage(page);
+    onPageChange(page);
   };
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to first page when searching
+    onPageChange(1); // Reset to first page when searching
   };
 
   return (
@@ -81,134 +91,111 @@ const TableGenerica = ({
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto bg-white rounded-xl shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              {columns.map((column, index) => (
-                <th
-                  key={column.key || index}
-                  scope="col"
-                  className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    column.className || ''
-                  }`}
-                  style={column.style}
-                >
-                  {column.title}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {isLoading ? (
+      {/* Table Container - Solo la tabla con scroll */}
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div 
+          className="overflow-x-auto" 
+          style={{ 
+            maxWidth: '100%', 
+            scrollbarWidth: 'thin',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          <table className="divide-y divide-gray-200" style={{ width: minTableWidth, minWidth: minTableWidth }}>
+            <thead className="bg-gray-50">
               <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500"
-                >
-                  <div className="flex justify-center items-center">
-                    <svg
-                      className="animate-spin h-5 w-5 text-primary-500"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    <span className="ml-2">Cargando...</span>
-                  </div>
-                </td>
+                {columns.map((column, index) => (
+                  <th
+                    key={column.key || index}
+                    scope="col"
+                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                      column.className || ''
+                    }`}
+                    style={column.style}
+                  >
+                    {column.label || column.title}
+                  </th>
+                ))}
               </tr>
-            ) : currentData.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500"
-                >
-                  {searchTerm ? 'No se encontraron resultados para tu búsqueda' : emptyMessage}
-                </td>
-              </tr>
-            ) : (
-              currentData.map((row, rowIndex) => (
-                <tr
-                  key={row.id || rowIndex}
-                  className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                >
-                  {columns.map((column, colIndex) => (
-                    <td
-                      key={`${rowIndex}-${column.key || colIndex}`}
-                      className={`px-6 py-4 whitespace-nowrap text-sm ${
-                        column.cellClassName || ''
-                      }`}
-                      style={column.cellStyle}
-                    >
-                      {column.render
-                        ? column.render(row[column.key], row, rowIndex)
-                        : row[column.key]}
-                    </td>
-                  ))}
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500"
+                  >
+                    <div className="flex justify-center items-center">
+                      <svg
+                        className="animate-spin h-5 w-5 text-primary-500"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      <span className="ml-2">Cargando...</span>
+                    </div>
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : currentData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500"
+                  >
+                    {searchTerm ? 'No se encontraron resultados para tu búsqueda' : emptyMessage}
+                  </td>
+                </tr>
+              ) : (
+                currentData.map((row, rowIndex) => (
+                  <tr
+                    key={row.id || rowIndex}
+                    className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  >
+                    {columns.map((column, colIndex) => (
+                      <td
+                        key={`${rowIndex}-${column.key || colIndex}`}
+                        className={`px-6 py-4 whitespace-nowrap text-sm ${
+                          column.cellClassName || ''
+                        }`}
+                        style={column.cellStyle}
+                      >
+                        {column.render
+                          ? column.render(row, rowIndex)
+                          : row[column.key]}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Pagination */}
-      {pagination && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center text-sm text-gray-700">
-            <span>
-              Mostrando {startIndex + 1} a {Math.min(endIndex, filteredData.length)} de{' '}
-              {filteredData.length} resultados
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronLeftIcon className="h-5 w-5" />
-            </button>
-            
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                  page === currentPage
-                    ? 'z-10 bg-primary-50 border-primary-500 text-primary-600'
-                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <ChevronRightIcon className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
+      {pagination && (
+        <PaginationTable
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          onPageChange={handlePageChange}
+        />
       )}
     </div>
   );

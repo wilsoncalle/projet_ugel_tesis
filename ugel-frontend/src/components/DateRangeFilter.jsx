@@ -87,7 +87,9 @@ const DateRangeFilter = ({
   // Función para convertir Date a string YYYY-MM-DD
   const dateToString = (date) => {
     if (!date || !isValid(date)) return '';
-    return format(date, 'yyyy-MM-dd');
+    // Crear fecha solo con año/mes/día para evitar problemas de zona horaria
+    const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    return format(localDate, 'yyyy-MM-dd');
   };
 
   const handleFechaDesdeSelect = (date) => {

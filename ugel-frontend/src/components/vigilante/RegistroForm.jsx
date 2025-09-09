@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import Card from '../Card';
 import Button from '../Button';
 import Input from '../Input';
-import Select from '../Select';
+import SelectCustom from '../SelectCustom';
 import Badge from '../Badge';
 import { PlusIcon, ClipboardDocumentListIcon, UserGroupIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { tiposDocumentoService, motivosVisitaService, personalService, areasService, visitantesService } from '../../services/api';
 
-const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange, activeTab = 'activos' }) => {
-  // Estados del formulario de visitante
+const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange, activeTab = 'activos', onTabChange }) => {
+  // Estados del formulario de visitante (compartido entre tabs)
   const [formVisitante, setFormVisitante] = useState({
     tipoDocumentoId: '',
     numeroDocumento: '',
@@ -17,19 +17,35 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     visitanteId: null
   });
 
-  // Estados del formulario de visita
-  const [formVisita, setFormVisita] = useState({
+  // Estados del formulario de visita para ACTIVOS
+  const [formVisitaActivos, setFormVisitaActivos] = useState({
     empleadoId: '',
     motivoId: '',
-    lugar: ''
+    lugar: '',
+    _tab: 'activos' // Identificador único para evitar reutilización
+  });
+
+  // Estados del formulario de visita para HISTORIAL
+  const [formVisitaHistorial, setFormVisitaHistorial] = useState({
+    empleadoId: '',
+    motivoId: '',
+    lugar: '',
+    _tab: 'historial' // Identificador único para evitar reutilización
   });
 
   // Estados para los datos de los selects
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [motivos, setMotivos] = useState([]);
   const [empleados, setEmpleados] = useState([]);
-  const [empleadosFiltrados, setEmpleadosFiltrados] = useState([]);
   const [lugares, setLugares] = useState([]);
+  
+  // Estados completamente separados para cada vista
+  const [empleadosActivos, setEmpleadosActivos] = useState([]);
+  const [empleadosHistorial, setEmpleadosHistorial] = useState([]);
+  const [motivosActivos, setMotivosActivos] = useState([]);
+  const [motivosHistorial, setMotivosHistorial] = useState([]);
+  const [lugaresActivos, setLugaresActivos] = useState([]);
+  const [lugaresHistorial, setLugaresHistorial] = useState([]);
   
   // Estados para la búsqueda de visitante
   const [buscandoVisitante, setBuscandoVisitante] = useState(false);
@@ -40,10 +56,75 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
   // Estados de carga
   const [loadingData, setLoadingData] = useState(false);
 
+
+  // Función para actualizar el formulario de visita de ACTIVOS
+  const updateFormVisitaActivos = (newFormVisita) => {
+    setFormVisitaActivos(newFormVisita);
+  };
+
+  // Función para actualizar el formulario de visita de HISTORIAL
+  const updateFormVisitaHistorial = (newFormVisita) => {
+    setFormVisitaHistorial(newFormVisita);
+  };
+
   // Cargar datos iniciales
   useEffect(() => {
     cargarDatosIniciales();
   }, []);
+
+  // Estado para rastrear el tab anterior
+  const [previousTab, setPreviousTab] = useState(activeTab);
+
+  // Limpiar formularios al cambiar de tab
+  useEffect(() => {
+    // Solo limpiar si realmente cambió el tab (no en el montaje inicial)
+    if (previousTab !== activeTab) {
+      console.log('=== CAMBIO DE TAB DETECTADO ===');
+      console.log('Tab anterior:', previousTab);
+      console.log('Tab actual:', activeTab);
+      console.log('Formulario activos antes:', formVisitaActivos);
+      console.log('Formulario historial antes:', formVisitaHistorial);
+      
+      // Limpiar ambos formularios al cambiar de tab para evitar persistencia
+      const newFormVisitaActivos = {
+        empleadoId: '',
+        motivoId: '',
+        lugar: '',
+        _tab: 'activos'
+      };
+      
+      const newFormVisitaHistorial = {
+        empleadoId: '',
+        motivoId: '',
+        lugar: '',
+        _tab: 'historial'
+      };
+      
+      console.log('Formulario activos después:', newFormVisitaActivos);
+      console.log('Formulario historial después:', newFormVisitaHistorial);
+      
+      // Actualizar ambos formularios
+      updateFormVisitaActivos(newFormVisitaActivos);
+      updateFormVisitaHistorial(newFormVisitaHistorial);
+      
+      // Resetear filtros
+      resetearFiltrosActivos();
+      resetearFiltrosHistorial();
+      
+      // Notificar al componente padre con el formulario del tab activo
+      if (onFormChange) {
+        const currentFormVisita = activeTab === 'activos' ? newFormVisitaActivos : newFormVisitaHistorial;
+        onFormChange({
+          visitante: formVisitante,
+          visita: currentFormVisita
+        });
+      }
+      
+      // Actualizar el tab anterior
+      setPreviousTab(activeTab);
+      console.log('=== FIN CAMBIO DE TAB ===');
+    }
+  }, [activeTab, previousTab]);
   
   const cargarDatosIniciales = async () => {
     setLoadingData(true);
@@ -69,10 +150,13 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
       }
 
       if (motivosResponse.data.success) {
-        setMotivos(motivosResponse.data.data.map(motivo => ({
+        const motivosData = motivosResponse.data.data.map(motivo => ({
           value: motivo.id.toString(),
           label: motivo.nombre_motivo || motivo.nombre
-        })));
+        }));
+        setMotivos(motivosData);
+        setMotivosActivos(motivosData);
+        setMotivosHistorial([{ value: '', label: 'Todos los motivos' }, ...motivosData]);
       }
 
       if (empleadosResponse.data.success) {
@@ -82,14 +166,18 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
           areaId: empleado.area_id
         }));
         setEmpleados(empleadosData);
-        setEmpleadosFiltrados(empleadosData);
+        setEmpleadosActivos(empleadosData);
+        setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...empleadosData]);
       }
 
       if (areasResponse.data.success) {
-        setLugares(areasResponse.data.data.map(area => ({
-            value: area.id.toString(),
+        const lugaresData = areasResponse.data.data.map(area => ({
+          value: area.id.toString(),
           label: area.nombre_area || area.nombre
-        })));
+        }));
+        setLugares(lugaresData);
+        setLugaresActivos(lugaresData);
+        setLugaresHistorial([{ value: '', label: 'Todos los lugares' }, ...lugaresData]);
       }
     } catch (error) {
       console.error('Error al cargar datos iniciales:', error);
@@ -98,21 +186,38 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     }
   };
 
-  // Filtrar empleados por área
-  const filtrarEmpleadosPorArea = (areaId) => {
+  // Filtrar empleados por área para ACTIVOS
+  const filtrarEmpleadosPorAreaActivos = (areaId) => {
     if (!areaId) {
-      setEmpleadosFiltrados(empleados);
+      setEmpleadosActivos(empleados);
     } else {
       const empleadosFiltrados = empleados.filter(empleado => 
         empleado.areaId && empleado.areaId.toString() === areaId
       );
-    setEmpleadosFiltrados(empleadosFiltrados);
+      setEmpleadosActivos(empleadosFiltrados);
     }
   };
 
-  // Resetear filtros de empleados
-  const resetearFiltros = () => {
-    setEmpleadosFiltrados(empleados);
+  // Filtrar empleados por área para HISTORIAL
+  const filtrarEmpleadosPorAreaHistorial = (areaId) => {
+    if (!areaId) {
+      setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...empleados]);
+    } else {
+      const empleadosFiltrados = empleados.filter(empleado => 
+        empleado.areaId && empleado.areaId.toString() === areaId
+      );
+      setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...empleadosFiltrados]);
+    }
+  };
+
+  // Resetear filtros de empleados para ACTIVOS
+  const resetearFiltrosActivos = () => {
+    setEmpleadosActivos(empleados);
+  };
+
+  // Resetear filtros de empleados para HISTORIAL
+  const resetearFiltrosHistorial = () => {
+    setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...empleados]);
   };
 
   // Buscar visitante por documento
@@ -174,22 +279,44 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     if (onFormChange) {
       onFormChange({
         visitante: newFormVisitante,
-        visita: formVisita
+        visita: activeTab === 'activos' ? formVisitaActivos : formVisitaHistorial
       });
     }
   };
 
-  // Manejar cambios en el formulario de visita
-  const handleVisitaChange = (field, value) => {
+  // Manejar cambios en el formulario de visita para ACTIVOS
+  const handleVisitaChangeActivos = (field, value) => {
     const newFormVisita = {
-      ...formVisita,
+      ...formVisitaActivos,
       [field]: value
     };
-    setFormVisita(newFormVisita);
+    updateFormVisitaActivos(newFormVisita);
     
-      // Si se selecciona un lugar, filtrar los empleados
+    // Si se selecciona un lugar, filtrar los empleados para ACTIVOS
     if (field === 'lugar') {
-      filtrarEmpleadosPorArea(value);
+      filtrarEmpleadosPorAreaActivos(value);
+    }
+    
+    // Enviar datos actualizados en tiempo real al componente padre
+    if (onFormChange) {
+      onFormChange({
+        visitante: formVisitante,
+        visita: newFormVisita
+      });
+    }
+  };
+
+  // Manejar cambios en el formulario de visita para HISTORIAL
+  const handleVisitaChangeHistorial = (field, value) => {
+    const newFormVisita = {
+      ...formVisitaHistorial,
+      [field]: value
+    };
+    updateFormVisitaHistorial(newFormVisita);
+    
+    // Si se selecciona un lugar, filtrar los empleados para HISTORIAL
+    if (field === 'lugar') {
+      filtrarEmpleadosPorAreaHistorial(value);
     }
     
     // Enviar datos actualizados en tiempo real al componente padre
@@ -232,23 +359,24 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     if (!isVisitaFormValid || visitantesEnEspera.length === 0) return;
     
     const visitaData = {
-      empleadoId: formVisita.empleadoId,
-      motivoId: formVisita.motivoId,
-      lugar: formVisita.lugar,
-      empleado: empleados.find(emp => emp.value === formVisita.empleadoId),
-      motivo: motivos.find(mot => mot.value === formVisita.motivoId),
-      lugarId: formVisita.lugar
+      empleadoId: formVisitaActivos.empleadoId,
+      motivoId: formVisitaActivos.motivoId,
+      lugar: formVisitaActivos.lugar,
+      empleado: empleados.find(emp => emp.value === formVisitaActivos.empleadoId),
+      motivo: motivos.find(mot => mot.value === formVisitaActivos.motivoId),
+      lugarId: formVisitaActivos.lugar
     };
 
     onRegisterVisit(visitaData);
     
-    // Limpiar todo el formulario
-    setFormVisita({
+    // Limpiar solo el formulario de activos
+    updateFormVisitaActivos({
       empleadoId: '',
       motivoId: '',
-      lugar: ''
+      lugar: '',
+      _tab: 'activos'
     });
-    resetearFiltros();
+    resetearFiltrosActivos();
 
     if (onFormChange) {
       onFormChange({
@@ -256,7 +384,8 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
         visita: {
           empleadoId: '',
           motivoId: '',
-          lugar: ''
+          lugar: '',
+          _tab: 'activos'
         }
       });
     }
@@ -269,13 +398,14 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     setVisitanteEncontrado(null);
   };
 
+  // Función corregida para limpiar visitante
   const handleLimpiarVisitante = () => {
     // Buscar DNI en los tipos disponibles o usar el primer tipo
     let tipoPorDefecto = '1'; // Fallback
     if (tiposDocumento.length > 0) {
       const tipoDNI = tiposDocumento.find(tipo => 
         tipo.label && (
-        tipo.label.toLowerCase().includes('dni') || 
+          tipo.label.toLowerCase().includes('dni') || 
           tipo.label.toLowerCase().includes('nacional')
         )
       );
@@ -293,12 +423,94 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     setFormVisitante(newFormVisitante);
     limpiarBusqueda(); // Limpiar estado de búsqueda
     
+    // ✅ CORRECCIÓN: Usar el formulario correcto según el tab activo
+    const currentFormVisita = activeTab === 'activos' ? formVisitaActivos : formVisitaHistorial;
+    
     // Notificar al componente padre que se ha limpiado el formulario
     if (onFormChange) {
       onFormChange({
         visitante: newFormVisitante,
-        visita: formVisita
+        visita: currentFormVisita // ✅ Ahora usa el formulario correcto
       });
+    }
+  };
+
+  // También deberías agregar una función para limpiar el formulario de visita específico
+  const handleLimpiarFormularioVisita = () => {
+    if (activeTab === 'activos') {
+      const newFormVisitaActivos = {
+        empleadoId: '',
+        motivoId: '',
+        lugar: '',
+        _tab: 'activos'
+      };
+      updateFormVisitaActivos(newFormVisitaActivos);
+      resetearFiltrosActivos();
+      
+      if (onFormChange) {
+        onFormChange({
+          visitante: formVisitante,
+          visita: newFormVisitaActivos
+        });
+      }
+    } else {
+      const newFormVisitaHistorial = {
+        empleadoId: '',
+        motivoId: '',
+        lugar: '',
+        _tab: 'historial'
+      };
+      updateFormVisitaHistorial(newFormVisitaHistorial);
+      resetearFiltrosHistorial();
+      
+      if (onFormChange) {
+        onFormChange({
+          visitante: formVisitante,
+          visita: newFormVisitaHistorial
+        });
+      }
+    }
+  };
+
+  // Función adicional: Limpiar al cambiar de tab (llamar desde el componente padre)
+  const handleTabChange = (newTab) => {
+    // Limpiar formularios al cambiar de tab para evitar persistencia de valores
+    if (newTab === 'activos') {
+      // Limpiar formulario de activos
+      const newFormVisitaActivos = {
+        empleadoId: '',
+        motivoId: '',
+        lugar: '',
+        _tab: 'activos'
+      };
+      updateFormVisitaActivos(newFormVisitaActivos);
+      resetearFiltrosActivos();
+      
+      // Notificar al componente padre
+      if (onFormChange) {
+        onFormChange({
+          visitante: formVisitante,
+          visita: newFormVisitaActivos
+        });
+      }
+    } else {
+      // Limpiar formulario de historial
+      const newFormVisitaHistorial = {
+        empleadoId: '',
+        motivoId: '',
+        lugar: '',
+        _tab: 'historial'
+      };
+      updateFormVisitaHistorial(newFormVisitaHistorial);
+      resetearFiltrosHistorial();
+      
+      // Notificar al componente padre
+      if (onFormChange) {
+        onFormChange({
+          visitante: formVisitante,
+          visita: newFormVisitaHistorial
+        });
+      }
     }
   };
 
@@ -307,15 +519,15 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     : true; // En historial siempre es válido (puede estar en "Todos")
 
   const isVisitaFormValid = activeTab === 'activos'
-    ? (formVisita.empleadoId && formVisita.motivoId && formVisita.lugar)
+    ? (formVisitaActivos.empleadoId && formVisitaActivos.motivoId && formVisitaActivos.lugar)
     : true; // En historial siempre es válido (puede estar en "Todos")
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-visible">
       <Card
-        className="shadow-lg border border-gray-200 bg-white flex flex flex-col overflow-hidden rounded-2xl"
+        className="shadow-lg border border-gray-200 bg-white flex flex flex-col overflow-visible rounded-2xl"
       >
-        <div className="p-0 flex-1 flex flex-col overflow-hidden">
+        <div className="p-0 flex-1 flex flex-col overflow-visible">
           {/* Sección de Datos del Visitante */}
           <div className="flex-shrink-0 space-y-3 border border-gray-200 rounded-xl pb-3 mb-3 p-3">
             <h3 className="text-base font-semibold text-gray-800 mb-3">
@@ -326,13 +538,14 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
               <>
           <div className="grid grid-cols-2 gap-3">
                   <div>
-            <Select
+            <SelectCustom
               label="Tipo de Documento *"
-              value={formVisitante.tipoDocumentoId}
-              onChange={(e) => handleVisitanteChange('tipoDocumentoId', e.target.value)}
+              value={tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId)}
+              onChange={(selectedOption) => handleVisitanteChange('tipoDocumentoId', selectedOption?.value || '')}
               options={tiposDocumento}
-                      placeholder="Seleccione tipo de documento..."
+              placeholder="Seleccione..."
               isLoading={loadingData}
+              isClearable={false}
             />
                   </div>
             <div>
@@ -383,7 +596,7 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
               /* Campo de búsqueda para historial */
               <div>
                 <Input
-                  label="Buscar por nombres o número de documento"
+
                   value={formVisitante.numeroDocumento}
                   onChange={(e) => handleVisitanteChange('numeroDocumento', e.target.value)}
                   placeholder="Ingrese nombre, apellido o documento..."
@@ -466,73 +679,78 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
           )}
 
           {/* Sección de datos de la visita */}
-          <div className="flex-1 flex flex-col overflow-hidden border border-gray-200 rounded-xl p-3">
+          <div className="flex-1 flex flex-col overflow-visible border border-gray-200 rounded-xl p-3">
             <h3 className="text-base font-semibold text-gray-800 mb-3">
               {activeTab === 'activos' ? 'Datos de la Visita' : 'Buscar Visita'}
             </h3>
             
             {activeTab === 'activos' ? (
               <div className="space-y-4 flex-1">
-            <Select
+            <SelectCustom
               label="Empleado a Visitar *"
-              value={formVisita.empleadoId}
-              onChange={(e) => handleVisitaChange('empleadoId', e.target.value)}
-              options={empleadosFiltrados}
-                  placeholder="Seleccione empleado..."
-                  isSearchable={true}
-                  searchPlaceholder="Buscar empleado..."
+              value={formVisitaActivos.empleadoId ? empleadosActivos.find(emp => emp.value === formVisitaActivos.empleadoId) : null}
+              onChange={(selectedOption) => handleVisitaChangeActivos('empleadoId', selectedOption?.value || '')}
+              options={empleadosActivos}
+              placeholder="Seleccione empleado..."
+              isSearchable={true}
               isLoading={loadingData}
+              menuWidth="auto" // El menú se ajustará automáticamente al contenido
+              noOptionsMessage="No se encontraron empleados"
             />
 
                 <div className="grid grid-cols-2 gap-3">
-              <Select
+              <SelectCustom
                 label="Motivo de Visita *"
-                value={formVisita.motivoId}
-                onChange={(e) => handleVisitaChange('motivoId', e.target.value)}
-                options={motivos}
-                    placeholder="Seleccione motivo..."
+                value={formVisitaActivos.motivoId ? motivosActivos.find(mot => mot.value === formVisitaActivos.motivoId) : null}
+                onChange={(selectedOption) => handleVisitaChangeActivos('motivoId', selectedOption?.value || '')}
+                options={motivosActivos}
+                placeholder="Seleccione motivo..."
                 isLoading={loadingData}
+                isClearable={false}
+                noOptionsMessage="No se encontraron motivos"
               />
-              <Select
+              <SelectCustom
                 label="Lugar *"
-                value={formVisita.lugar}
-                onChange={(e) => handleVisitaChange('lugar', e.target.value)}
-                options={lugares}
-                    placeholder="Seleccione lugar..."
-                  />
+                value={formVisitaActivos.lugar ? lugaresActivos.find(lug => lug.value === formVisitaActivos.lugar) : null}
+                onChange={(selectedOption) => handleVisitaChangeActivos('lugar', selectedOption?.value || '')}
+                options={lugaresActivos}
+                placeholder="Seleccione lugar..."
+                isClearable={false}
+                noOptionsMessage="No se encontraron lugares"
+              />
                 </div>
               </div>
             ) : (
               /* Campos de búsqueda para historial */
               <div className="space-y-4 flex-1">
-                <Select
+                <SelectCustom
                   label="Buscar por Empleado"
-                  value={formVisita.empleadoId}
-                  onChange={(e) => handleVisitaChange('empleadoId', e.target.value)}
-                  options={[{ value: '', label: 'Todos los empleados' }, ...empleadosFiltrados]}
+                  value={formVisitaHistorial.empleadoId ? empleadosHistorial.find(emp => emp.value === formVisitaHistorial.empleadoId) : null}
+                  onChange={(selectedOption) => handleVisitaChangeHistorial('empleadoId', selectedOption?.value || '')}
+                  options={empleadosHistorial}
                   placeholder="Seleccione empleado..."
                   isSearchable={true}
-                  searchPlaceholder="Buscar empleado..."
+                  noOptionsMessage="No se encontraron empleados"
                 />
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Select
+                  <SelectCustom
                     label="Buscar por Motivo"
-                    value={formVisita.motivoId}
-                    onChange={(e) => handleVisitaChange('motivoId', e.target.value)}
-                    options={[{ value: '', label: 'Todos los motivos' }, ...motivos]}
+                    value={formVisitaHistorial.motivoId ? motivosHistorial.find(mot => mot.value === formVisitaHistorial.motivoId) : null}
+                    onChange={(selectedOption) => handleVisitaChangeHistorial('motivoId', selectedOption?.value || '')}
+                    options={motivosHistorial}
                     placeholder="Seleccione motivo..."
                     isSearchable={true}
-                    searchPlaceholder="Buscar motivo..."
+                    noOptionsMessage="No se encontraron motivos"
                   />
-                  <Select
+                  <SelectCustom
                     label="Buscar por Lugar"
-                    value={formVisita.lugar}
-                    onChange={(e) => handleVisitaChange('lugar', e.target.value)}
-                    options={[{ value: '', label: 'Todos los lugares' }, ...lugares]}
+                    value={formVisitaHistorial.lugar ? lugaresHistorial.find(lug => lug.value === formVisitaHistorial.lugar) : null}
+                    onChange={(selectedOption) => handleVisitaChangeHistorial('lugar', selectedOption?.value || '')}
+                    options={lugaresHistorial}
                     placeholder="Seleccione lugar..."
                     isSearchable={true}
-                    searchPlaceholder="Buscar lugar..."
+                    noOptionsMessage="No se encontraron lugares"
                   />
                 </div>
               </div>
@@ -559,14 +777,7 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
               </Button>
               <Button
                 variant="outline"
-                onClick={() => {
-                  setFormVisita({
-                    empleadoId: '',
-                    motivoId: '',
-                    lugar: ''
-                  });
-                  resetearFiltros();
-                }}
+                onClick={handleLimpiarFormularioVisita} // Usar la función que limpia según el tab activo
                 className="border-gray-300 text-gray-700 hover:bg-gray-50 px-3"
                 size="lg"
               >
