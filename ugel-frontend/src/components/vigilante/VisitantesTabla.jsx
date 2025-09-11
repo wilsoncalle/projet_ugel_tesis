@@ -16,6 +16,7 @@ const VisitantesTabla = ({
   onTabChange,
   onBuscarHistorial,
   onRegistrarSalida,
+  onEliminarVisitanteEspera, // Nueva prop para eliminar visitante de espera
   filtros,
   vistaPreviaVisitante,
   vistaPreviaVisita,
@@ -31,7 +32,6 @@ const VisitantesTabla = ({
   console.log('Visitantes en espera:', visitantesEnEspera);
   console.log('=== FIN VISITANTES TABLA ===');
   const [filtrosExpanded, setFiltrosExpanded] = useState(false);
-  const [modalAbierto, setModalAbierto] = useState({});
 
   const handleTabClick = (tab) => {
     onTabChange(tab);
@@ -465,56 +465,33 @@ const VisitantesTabla = ({
           
           return (
             <div className="relative">
-              <button
-                onClick={() => {
-                  setModalAbierto(prev => ({
-                    ...prev,
-                    [row.id]: !prev[row.id]
-                  }));
-                }}
-                className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
-              >
-                Registrar Salida
-              </button>
-              
-              {/* Modal simple en lugar de Popover */}
-              {modalAbierto[row.id] && (
-                <div className="absolute left-0 top-8 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-[250px]">
-                  <div className="text-center space-y-3">
-                    <p className="text-sm text-gray-700">
-                      ¿Confirmar salida de <strong>{row.visitante_nombres || row.nombres || ''} {row.visitante_apellidos || row.apellidos || ''}</strong>?
-                    </p>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => {
-                          console.log('=== BOTÓN CONFIRMAR SALIDA CLICKEADO ===');
-                          console.log('Row ID:', row.id);
-                          console.log('Llamando a onRegistrarSalida...');
-                          console.log('onRegistrarSalida es función:', typeof onRegistrarSalida);
-                          console.log('Antes de llamar a onRegistrarSalida');
-                          onRegistrarSalida(row.id);
-                          console.log('Después de llamar a onRegistrarSalida');
-                          setModalAbierto(prev => ({
-                            ...prev,
-                            [row.id]: false
-                          }));
-                        }}
-                        className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-colors"
-                      >
-                        Confirmar Salida
-                      </button>
-                      <button
-                        onClick={() => setModalAbierto(prev => ({
-                          ...prev,
-                          [row.id]: false
-                        }))}
-                        className="px-3 py-1.5 bg-gray-500 text-white text-sm rounded-md hover:bg-gray-600 transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                </div>
+              {enEspera ? (
+                <button
+                  onClick={() => {
+                    console.log('=== BOTÓN ELIMINAR CLICKEADO ===');
+                    console.log('Row ID:', row.id);
+                    console.log('Row data:', row);
+                    if (onEliminarVisitanteEspera) {
+                      onEliminarVisitanteEspera(row.id);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors"
+                >
+                  Eliminar
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    console.log('=== BOTÓN REGISTRAR SALIDA CLICKEADO ===');
+                    console.log('Row ID:', row.id);
+                    console.log('Row data:', row);
+                    console.log('Llamando a onRegistrarSalida...');
+                    onRegistrarSalida(row.id, row);
+                  }}
+                  className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-2xl hover:bg-primary-700 transition-colors"
+                >
+                  Registrar Salida
+                </button>
               )}
             </div>
           );
@@ -547,7 +524,17 @@ const VisitantesTabla = ({
       <Card className="shadow-lg border border-gray-200 bg-card flex-1 flex flex-col rounded-2xl">
         <div className="p-0 flex flex-col h-full">
           {/* Título de la sección */}
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">Gestión de Visitantes</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-800">Gestión de Visitantes</h2>
+            {visitantesEnEspera.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-amber-600 font-medium">
+                  {visitantesEnEspera.length} en espera
+                </span>
+                <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+              </div>
+            )}
+          </div>
           
           {/* Tab Slider */}
           <TabView 
@@ -564,6 +551,7 @@ const VisitantesTabla = ({
                 columns={getColumns}
                 data={getTabData()}
                 minTableWidth={activeTab === 'activos' ? '1100px' : '1100px'}
+                isRowInWaiting={(row) => (visitantesEnEspera || []).some(v => v.id === row.id)}
                 {...(() => {
                   const paginationProps = getPaginationProps();
                   console.log('=== PROPS DE PAGINACIÓN ENVIADAS ===');

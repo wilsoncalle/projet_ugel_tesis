@@ -35,6 +35,9 @@ const DashboardVigilantePage = () => {
   const [activeTab, setActiveTab] = useState('activos');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSalidaModal, setShowSalidaModal] = useState(false);
+  const [visitaParaSalida, setVisitaParaSalida] = useState(null);
+  const [visitanteParaSalida, setVisitanteParaSalida] = useState(null);
   
   // Estados para paginación del historial
   const [historialPagination, setHistorialPagination] = useState({
@@ -201,9 +204,15 @@ const DashboardVigilantePage = () => {
     }
   };
 
-  const handleRegisterVisit = async () => {
+  const handleRegisterVisit = async (datosVisita = null) => {
     if (visitantesEnEspera.length === 0) {
       setError('No hay visitantes en espera para registrar');
+      return;
+    }
+    
+    // Si no se proporcionan datos de visita, mostrar error
+    if (!datosVisita || !datosVisita.empleadoId || !datosVisita.motivoId || !datosVisita.lugar) {
+      setError('Debe seleccionar empleado, motivo y lugar antes de registrar las visitas');
       return;
     }
     
@@ -263,24 +272,37 @@ const DashboardVigilantePage = () => {
           console.log('Datos del lugar (nombre):', visitante.lugar);
           console.log('Datos del lugarId (ID):', visitante.lugarId);
           
+          // Si el visitante no tiene datos de visita, usar los datos proporcionados
+          let empleadoId = visitante.empleado?.id || visitante.empleadoVisitado?.id;
+          let motivoId = visitante.motivo?.id;
+          let lugarId = visitante.lugarId || visitante.lugar;
+          
+          // Si no tiene datos de visita, usar los datos proporcionados
+          if (!empleadoId || !motivoId || !lugarId) {
+            console.log('Visitante sin datos de visita, usando datos proporcionados');
+            empleadoId = datosVisita.empleadoId;
+            motivoId = datosVisita.motivoId;
+            lugarId = datosVisita.lugar;
+          }
+          
           // Validar que todos los campos requeridos estén presentes
-          if (!visitante.empleado?.id && !visitante.empleadoVisitado?.id) {
+          if (!empleadoId) {
             throw new Error(`Falta ID del empleado para visitante ${visitante.nombres} ${visitante.apellidos}`);
           }
           
-          if (!visitante.motivo?.id) {
+          if (!motivoId) {
             throw new Error(`Falta ID del motivo para visitante ${visitante.nombres} ${visitante.apellidos}`);
           }
           
-          if (!visitante.lugarId && !visitante.lugar) {
+          if (!lugarId) {
             throw new Error(`Falta lugar para visitante ${visitante.nombres} ${visitante.apellidos}`);
           }
           
           const visitaPayload = {
             visitanteId: parseInt(visitanteId),
-            personalVisitadoId: parseInt(visitante.empleado?.id || visitante.empleadoVisitado?.id), // Usar datos del visitante
-            motivoVisitaId: parseInt(visitante.motivo?.id), // Usar datos del visitante
-            areaDestinoId: parseInt(visitante.lugarId || visitante.lugar), // Usar lugarId si existe, sino lugar como fallback
+            personalVisitadoId: parseInt(empleadoId), // Usar la variable definida arriba
+            motivoVisitaId: parseInt(motivoId), // Usar la variable definida arriba
+            areaDestinoId: parseInt(lugarId), // Usar la variable definida arriba
             usuarioIngresoId: user?.id ? parseInt(user.id) : 1, // ID del usuario autenticado o valor por defecto
             // Usar la fecha y hora actual para evitar problemas con fechas futuras
             fechaIngreso: currentDate.toISOString().split('T')[0],
@@ -442,21 +464,43 @@ const DashboardVigilantePage = () => {
     }));
   };
 
-  const handleRegistrarSalida = async (visitaId) => {
+  const handleRegistrarSalida = (visitaId, visitanteData = null) => {
+    console.log('=== MOSTRAR MODAL DE CONFIRMACIÓN ===');
+    console.log('Visita ID:', visitaId);
+    console.log('Datos del visitante:', visitanteData);
+    setVisitaParaSalida(visitaId);
+    setVisitanteParaSalida(visitanteData);
+    setShowSalidaModal(true);
+  };
+
+  const handleEliminarVisitanteEspera = (visitanteId) => {
+    console.log('=== ELIMINANDO VISITANTE DE ESPERA ===');
+    console.log('visitanteId:', visitanteId);
+    
+    // Filtrar el visitante de la lista de espera
+    setVisitantesEnEspera(prev => prev.filter(v => v.id !== visitanteId));
+    
+    console.log('Visitante eliminado de la lista de espera');
+  };
+
+  const confirmarRegistrarSalida = async () => {
+    if (!visitaParaSalida) return;
+    
     try {
       console.log('=== INICIO REGISTRO DE SALIDA ===');
-      console.log('Visita ID:', visitaId);
-      console.log('Tipo de ID:', typeof visitaId);
+      console.log('Visita ID:', visitaParaSalida);
+      console.log('Tipo de ID:', typeof visitaParaSalida);
       console.log('Usuario autenticado:', user);
       console.log('Estado de autenticación:', isAuthenticated);
       
       setLoading(true);
       setError('');
+      setShowSalidaModal(false);
       
       console.log('Llamando al servicio visitasService.registrarSalida...');
-      console.log('URL que se llamará:', `/visitas/${visitaId}/salida`);
+      console.log('URL que se llamará:', `/visitas/${visitaParaSalida}/salida`);
       
-      const response = await visitasService.registrarSalida(visitaId);
+      const response = await visitasService.registrarSalida(visitaParaSalida);
       
       console.log('Respuesta del servicio:', response);
       console.log('Respuesta exitosa:', response.data.success);
@@ -465,7 +509,7 @@ const DashboardVigilantePage = () => {
         // Recargar visitantes activos para reflejar el cambio
         console.log('Recargando visitantes activos...');
         await cargarVisitantesActivos();
-        console.log('Salida registrada exitosamente para visita:', visitaId);
+        console.log('Salida registrada exitosamente para visita:', visitaParaSalida);
         console.log('=== FIN REGISTRO DE SALIDA (EXITOSO) ===');
       } else {
         console.error('Error en la respuesta del servicio:', response.data);
@@ -484,7 +528,14 @@ const DashboardVigilantePage = () => {
       setError(`Error al registrar la salida: ${err.response?.data?.message || err.message}`);
     } finally {
       setLoading(false);
+      setVisitaParaSalida(null);
     }
+  };
+
+  const cancelarRegistrarSalida = () => {
+    setShowSalidaModal(false);
+    setVisitaParaSalida(null);
+    setVisitanteParaSalida(null);
   };
 
   return (
@@ -528,6 +579,7 @@ const DashboardVigilantePage = () => {
               onTabChange={setActiveTab}
               onBuscarHistorial={handleBuscarHistorial}
               onRegistrarSalida={handleRegistrarSalida}
+              onEliminarVisitanteEspera={handleEliminarVisitanteEspera}
               filtros={filtros}
               vistaPreviaVisitante={vistaPreviaVisitante}
               vistaPreviaVisita={vistaPreviaVisita}
@@ -562,6 +614,58 @@ const DashboardVigilantePage = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmación para registrar salida */}
+      {showSalidaModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0">
+                  <svg className="h-6 w-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Confirmar Registro de Salida
+                  </h3>
+                </div>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-sm text-gray-500">
+                  ¿Está seguro de que desea registrar la salida de este visitante?
+                </p>
+                {visitanteParaSalida ? (
+                  <p className="text-sm font-medium text-gray-700 mt-2">
+                    <strong>{visitanteParaSalida.visitante_nombres || visitanteParaSalida.nombres || ''} {visitanteParaSalida.visitante_apellidos || visitanteParaSalida.apellidos || ''}</strong>
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-1">
+                    ID de Visita: {visitaParaSalida}
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={cancelarRegistrarSalida}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarRegistrarSalida}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Confirmar Salida
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -18,6 +18,7 @@ const TableGenerica = ({
   totalPages: externalTotalPages,
   totalItems: externalTotalItems,
   onPageChange: externalOnPageChange,
+  isRowInWaiting = null, // Nueva prop para determinar si una fila está en espera
   ...props
 }) => {
   const [internalCurrentPage, setInternalCurrentPage] = useState(1);
@@ -160,12 +161,17 @@ const TableGenerica = ({
                   </td>
                 </tr>
               ) : (
-                currentData.map((row, rowIndex) => (
-                  <tr
-                    key={row.id || rowIndex}
-                    className={onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  >
+                currentData.map((row, rowIndex) => {
+                  const isWaiting = isRowInWaiting ? isRowInWaiting(row) : false;
+                  return (
+                    <tr
+                      key={row.id || rowIndex}
+                      className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} ${
+                        isWaiting ? 'bg-amber-50' : ''
+                      }`}
+                      style={isWaiting ? { backgroundColor: '#fffbeb' } : {}}
+                      onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    >
                     {columns.map((column, colIndex) => (
                       <td
                         key={`${rowIndex}-${column.key || colIndex}`}
@@ -179,8 +185,9 @@ const TableGenerica = ({
                           : row[column.key]}
                       </td>
                     ))}
-                  </tr>
-                ))
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

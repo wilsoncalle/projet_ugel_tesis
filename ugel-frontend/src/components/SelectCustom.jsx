@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import Select from 'react-select';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
 const SelectCustom = ({
   options = [],
@@ -7,7 +6,6 @@ const SelectCustom = ({
   onChange,
   placeholder = "Seleccionar...",
   isClearable = false,
-  isSearchable = true,
   isDisabled = false,
   isLoading = false,
   className = "",
@@ -15,383 +13,374 @@ const SelectCustom = ({
   error = false,
   label,
   required = false,
-  menuWidth = 'auto',
   noOptionsMessage = "No se encontraron resultados",
-  keepFocusOnSelect = true, // nueva prop: si true, fuerza foco al seleccionar
+  menuWidth = 'auto',
   ...props
 }) => {
-  const wrapperRef = useRef(null);
-  const reactSelectRef = useRef(null); // ref al componente react-select
-  const [menuPlacement, setMenuPlacement] = useState('auto');
-  const [calculatedMenuWidth, setCalculatedMenuWidth] = useState(menuWidth);
-  const [menuPosition, setMenuPosition] = useState('left');
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [calculatedMenuWidth, setCalculatedMenuWidth] = useState('250px');
+  const [menuPosition, setMenuPosition] = useState({ openUpwards: false, alignRight: false });
+  const [focusedIndex, setFocusedIndex] = useState(-1);
 
-  // --- Helper que enfoca el input y pone el caret AL FINAL ---
-  const focusInputAndSetCaretEnd = useCallback((forceFocus = true) => {
-    if (!isSearchable) return;
+  const inputRef = useRef(null);
+  const containerRef = useRef(null);
+  const optionRefs = useRef([]);
 
-    try {
-      if (reactSelectRef.current && typeof reactSelectRef.current.focus === 'function' && forceFocus) {
-        reactSelectRef.current.focus(); // hace focus en el input interno
-      }
-    } catch (e) {
-      // ignore
+  // Memoizar las opciones filtradas para evitar recálculos innecesarios
+  const filteredOptions = useMemo(() => {
+    if (!query) return options;
+    return options.filter((option) => 
+      option.label.toLowerCase().includes(query.toLowerCase())
+    );
+  }, [options, query]);
+
+  // Función optimizada para calcular posición y ancho
+  const calculatePositionAndWidth = useCallback(() => {
+    if (!containerRef.current) {
+      return { width: '250px', openUpwards: false, alignRight: false };
     }
 
-    const input = wrapperRef.current?.querySelector('input[type="text"], input');
-    if (!input) return;
-    try {
-      setTimeout(() => {
-        try {
-          // calculamos longitud real del valor visible (si react-select usa input.value o attribute)
-          const len = (input.value && input.value.length) || ((input.getAttribute && input.getAttribute('value')) || '').length || 0;
-          if (typeof input.setSelectionRange === 'function') {
-            input.setSelectionRange(len, len);
-          } else {
-            input.selectionStart = input.selectionEnd = len;
-          }
-          // también intentamos desplazar scroll del input para mostrar el final del texto
-          if (typeof input.scrollLeft !== 'undefined') {
-            input.scrollLeft = input.scrollWidth;
-          }
-        } catch (e) {
-          try {
-            input.selectionStart = input.selectionEnd = input.value.length;
-          } catch (_e) {}
-        }
-      }, 0);
-    } catch (e) {}
-  }, [isSearchable]);
-
-  // --- cálculo de ancho/posición (tu lógica, reduje repetición) ---
-  const calculateMenuWidth = useCallback(() => {
-    if (menuWidth !== 'auto') return menuWidth;
-    if (!wrapperRef.current) return '250px';
-    const selectElement = wrapperRef.current.querySelector('.react-select__control');
-    if (!selectElement) return '250px';
-    const rect = selectElement.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const controlWidth = rect.width;
-
-    const tempElement = document.createElement('div');
-    tempElement.style.position = 'absolute';
-    tempElement.style.visibility = 'hidden';
-    tempElement.style.whiteSpace = 'nowrap';
-    tempElement.style.fontSize = '14px';
-    tempElement.style.fontFamily = 'inherit';
-    document.body.appendChild(tempElement);
-
-    let maxTextWidth = 250;
-    options.forEach(option => {
-      if (option.label) {
-        tempElement.textContent = option.label;
-        const textWidth = tempElement.offsetWidth;
-        maxTextWidth = Math.max(maxTextWidth, textWidth + 40);
-      }
-    });
-    document.body.removeChild(tempElement);
-
-    const spaceRight = viewportWidth - rect.right;
-    const spaceLeft = rect.left;
-
-    if (spaceRight >= Math.max(controlWidth, maxTextWidth)) {
-      return Math.max(controlWidth, maxTextWidth) + 'px';
-    }
-    if (spaceLeft >= controlWidth) {
-      return controlWidth + 'px';
-    }
-    return Math.min(maxTextWidth, 450) + 'px';
-  }, [menuWidth, options]);
-
-  const calculateMenuHorizontalPosition = useCallback(() => {
-    if (!wrapperRef.current) return 'left';
-    const selectElement = wrapperRef.current.querySelector('.react-select__control');
-    if (!selectElement) return 'left';
-    const rect = selectElement.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const neededWidth = parseInt(calculatedMenuWidth, 10) || 200;
-    const spaceRight = viewportWidth - rect.right;
-    const spaceLeft = rect.left;
-    if (spaceRight >= neededWidth) return 'left';
-    if (spaceLeft >= neededWidth) return 'right';
-    return spaceRight > spaceLeft ? 'left' : 'right';
-  }, [calculatedMenuWidth]);
-
-  const calculateMenuPlacement = useCallback(() => {
-    if (!wrapperRef.current) return 'auto';
-    const selectElement = wrapperRef.current.querySelector('.react-select__control');
-    if (!selectElement) return 'auto';
-    const rect = selectElement.getBoundingClientRect();
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
-    const menuHeight = 200;
-    const spaceBelow = viewportHeight - rect.bottom;
-    const spaceAbove = rect.top;
-    if (spaceBelow >= menuHeight) return 'bottom';
-    if (spaceAbove >= menuHeight) return 'top';
-    return spaceBelow > spaceAbove ? 'bottom' : 'top';
+    const viewportWidth = window.innerWidth;
+
+    let width = menuWidth;
+    if (menuWidth === 'auto') {
+      // Optimización: usar canvas para medir texto más rápido
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      context.font = '14px system-ui, -apple-system, sans-serif';
+      
+      let maxTextWidth = 250;
+      options.forEach(option => {
+        if (option.label) {
+          const textWidth = context.measureText(option.label).width;
+          maxTextWidth = Math.max(maxTextWidth, textWidth + 40);
+        }
+      });
+      width = `${Math.max(rect.width, maxTextWidth, 250)}px`;
+    }
+
+    const menuHeight = 240;
+    const spaceBelow = viewportHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const openUpwards = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+
+    const menuWidthNumber = parseInt(width);
+    const spaceRight = viewportWidth - rect.left;
+    const alignRight = spaceRight < menuWidthNumber && rect.right > menuWidthNumber;
+
+    return { width, openUpwards, alignRight };
+  }, [options, menuWidth]);
+
+  // Función para hacer scroll al elemento enfocado
+  const scrollToOption = useCallback((index) => {
+    if (optionRefs.current[index]) {
+      optionRefs.current[index].scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth'
+      });
+    }
   }, []);
 
-  // --- listeners para scroll/resize ---
+  // Manejar navegación con teclado
+  const handleKeyDown = useCallback((e) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        e.preventDefault();
+        handleInputClick();
+        return;
+      }
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex(prev => {
+          const newIndex = prev < filteredOptions.length - 1 ? prev + 1 : 0;
+          setTimeout(() => scrollToOption(newIndex), 0);
+          return newIndex;
+        });
+        break;
+        
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex(prev => {
+          const newIndex = prev > 0 ? prev - 1 : filteredOptions.length - 1;
+          setTimeout(() => scrollToOption(newIndex), 0);
+          return newIndex;
+        });
+        break;
+        
+      case 'Enter':
+        e.preventDefault();
+        if (isOpen && focusedIndex >= 0 && filteredOptions[focusedIndex]) {
+          handleOptionSelect(filteredOptions[focusedIndex]);
+        } else if (!isOpen) {
+          handleInputClick();
+        }
+        break;
+        
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        setIsTyping(false);
+        setQuery('');
+        setFocusedIndex(-1);
+        inputRef.current?.blur();
+        break;
+        
+      case 'Tab':
+        if (isOpen) {
+          setIsOpen(false);
+          setIsTyping(false);
+          setQuery('');
+          setFocusedIndex(-1);
+        }
+        break;
+    }
+  }, [isOpen, focusedIndex, filteredOptions]);
+
+  // useEffect para eventos de scroll y resize (throttled)
   useEffect(() => {
-    const updatePlacement = () => setMenuPlacement(calculateMenuPlacement());
-    const updateMenuWidth = () => setCalculatedMenuWidth(calculateMenuWidth());
-    const updateMenuPosition = () => setMenuPosition(calculateMenuHorizontalPosition());
-    updatePlacement();
-    updateMenuWidth();
-    updateMenuPosition();
-
-    const handleScroll = () => {
-      updatePlacement();
-      updateMenuPosition();
-    };
-    const handleResize = () => {
-      updatePlacement();
-      updateMenuWidth();
-      updateMenuPosition();
+    if (!isOpen) return;
+    
+    let timeoutId;
+    const handleRecalculate = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const { width, openUpwards, alignRight } = calculatePositionAndWidth();
+        setCalculatedMenuWidth(width);
+        setMenuPosition({ openUpwards, alignRight });
+      }, 16); // ~60fps
     };
 
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleRecalculate, true);
+    window.addEventListener('resize', handleRecalculate);
+    
     return () => {
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+      window.removeEventListener('scroll', handleRecalculate, true);
+      window.removeEventListener('resize', handleRecalculate);
     };
-  }, [options, menuWidth, calculateMenuPlacement, calculateMenuWidth, calculateMenuHorizontalPosition]);
+  }, [isOpen, calculatePositionAndWidth]);
 
-  // --- Cuando cambie el value desde fuera, también queremos mostrar caret al FINAL (opcional) ---
+  // Cerrar dropdown al hacer click fuera
   useEffect(() => {
-    if (!keepFocusOnSelect) return;
-    const t = setTimeout(() => {
-      focusInputAndSetCaretEnd(true);
-    }, 0);
-    return () => clearTimeout(t);
-  }, [value, focusInputAndSetCaretEnd, keepFocusOnSelect]);
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setIsTyping(false);
+        setQuery('');
+        setFocusedIndex(-1);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  // --- onFocus: deja caret al FINAL ---
-  const handleFocus = () => {
-    setTimeout(() => focusInputAndSetCaretEnd(false), 10);
-  };
+  // Reset focused index cuando cambian las opciones filtradas
+  useEffect(() => {
+    if (isOpen && filteredOptions.length > 0 && focusedIndex >= filteredOptions.length) {
+      setFocusedIndex(0);
+    }
+  }, [filteredOptions.length, focusedIndex, isOpen]);
 
-  // --- wrapper del onChange: forzamos foco y caret al FINAL luego de seleccionar ---
-  const handleChange = (selected, actionMeta) => {
-    if (typeof onChange === 'function') onChange(selected, actionMeta);
+  const handleInputClick = useCallback(() => {
+    if (isDisabled) return;
 
-    if (!keepFocusOnSelect) return;
+    if (isOpen) {
+      setIsOpen(false);
+      setFocusedIndex(-1);
+      return;
+    }
+    
+    const { width, openUpwards, alignRight } = calculatePositionAndWidth();
+    setCalculatedMenuWidth(width);
+    setMenuPosition({ openUpwards, alignRight });
+    setIsOpen(true);
+    setIsTyping(true);
+    setQuery('');
+    setFocusedIndex(-1);
+        
     setTimeout(() => {
-      focusInputAndSetCaretEnd(true);
+      inputRef.current?.focus();
     }, 0);
-  };
+  }, [isDisabled, isOpen, calculatePositionAndWidth]);
+  
+  const handleInputChange = useCallback((e) => {
+    const newValue = e.target.value;
+    setQuery(newValue);
+    setIsTyping(true);
+    setFocusedIndex(-1);
 
-  // --- estilos: soluciones adicionales para evitar que el caret baje a 2a linea ---
-  // - flexWrap: 'nowrap' en valueContainer
-  // - singleValue se oculta cuando el input tiene contenido (input visible al enfocar)
-  // - input tiene minWidth pequeño y alignSelf:'center', se fuerza scrollLeft para mostrar final
-  const customStyles = {
-    control: (provided, state) => ({
-      ...provided,
-      minHeight: '40px',
-      height: '40px',
-      border: error
-        ? '1px solid #ef4444'
-        : state.isFocused
-          ? '1px solid #2563eb'
-          : '1px solid #d1d5db',
-      borderRadius: '6px',
-      boxShadow: state.isFocused
-        ? '0 0 0 3px rgba(37, 99, 235, 0.1)'
-        : 'none',
-      backgroundColor: isDisabled ? '#f9fafb' : '#ffffff',
-      cursor: isDisabled ? 'not-allowed' : 'pointer',
-      overflow: 'hidden'
-    }),
-    // valueContainer: NO wrap, allow children to shrink
-    valueContainer: (provided) => ({
-      ...provided,
-      padding: '0 12px',
-      fontSize: '14px',
-      height: '38px',
-      display: 'flex',
-      alignItems: 'center',
-      overflow: 'hidden',
-      whiteSpace: 'nowrap',
-      flexWrap: 'nowrap',
-      minWidth: 0
-    }),
-    // singleValue: truncates, y se oculta si el input tiene contenido (evita doble linea con caret)
-    singleValue: (provided, state) => ({
-      ...provided,
-      color: state.selectProps.menuIsOpen ? '#9ca3af' : '#111827',
-      fontSize: '14px',
-      opacity: state.selectProps.menuIsOpen ? 0.6 : 1,
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      flex: '0 1 auto',
-      minWidth: 0,
-      maxWidth: '100%',
-      paddingRight: '6px',
-      alignSelf: 'center',
-      // hide when user is typing so the input shows the caret on single line
-      visibility: state.selectProps.inputValue ? 'hidden' : 'visible'
-    }),
-    // input: small minWidth, centered vertically, allow it to take remaining space
-    input: (provided) => ({
-      ...provided,
-      margin: '0',
-      padding: '0',
-      fontSize: '14px',
-      flex: '1 1 auto',
-      minWidth: 2,
-      width: 'auto',
-      alignSelf: 'center',
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      position: 'relative',
-      zIndex: 2,
-      lineHeight: '20px'
-    }),
-    placeholder: (provided) => ({
-      ...provided,
-      color: '#9ca3af',
-      fontSize: '14px',
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis'
-    }),
+    if (!isOpen) {
+      const { width, openUpwards, alignRight } = calculatePositionAndWidth();
+      setCalculatedMenuWidth(width);
+      setMenuPosition({ openUpwards, alignRight });
+      setIsOpen(true);
+    }
+  }, [isOpen, calculatePositionAndWidth]);
 
-    /* resto de estilos (sin cambios relevantes) */
-    multiValue: (provided) => ({
-      ...provided,
-      backgroundColor: '#e5e7eb',
-      borderRadius: '6px'
-    }),
-    multiValueLabel: (provided) => ({
-      ...provided,
-      color: '#374151',
-      fontSize: '14px',
-      padding: '2px 6px'
-    }),
-    multiValueRemove: (provided) => ({
-      ...provided,
-      color: '#6b7280',
-      '&:hover': {
-        backgroundColor: '#d1d5db',
-        color: '#374151'
-      }
-    }),
-    indicatorSeparator: (provided) => ({
-      ...provided,
-      backgroundColor: '#d1d5db'
-    }),
-    dropdownIndicator: (provided, state) => ({
-      ...provided,
-      color: '#6b7280',
-      padding: '8px',
-      '&:hover': {
-        color: '#374151'
-      }
-    }),
-    clearIndicator: (provided) => ({
-      ...provided,
-      color: '#6b7280',
-      padding: '8px',
-      '&:hover': {
-        color: '#374151'
-      }
-    }),
-    menu: (provided) => ({
-      ...provided,
-      borderRadius: '8px',
-      border: '1px solid #e5e7eb',
-      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-      zIndex: 2147483647, // very high z-index to avoid click-through
-      minWidth: '250px',
-      width: calculatedMenuWidth,
-      maxWidth: '450px',
-      pointerEvents: 'auto',
-      ...(menuPosition === 'right' && {
-        right: 0,
-        left: 'auto'
-      })
-    }),
-    menuPortal: (provided) => ({
-      ...provided,
-      zIndex: 2147483647 // ensure portal container is on top
-    }),
-    menuList: (provided) => ({
-      ...provided,
-      padding: '4px',
-      borderRadius: '8px'
-    }),
-    option: (provided, state) => ({
-      ...provided,
-      backgroundColor: state.isSelected
-        ? '#2563eb'
-        : state.isFocused
-          ? '#f3f4f6'
-          : 'transparent',
-      color: state.isSelected
-        ? '#ffffff'
-        : '#374151',
-      fontSize: '14px',
-      padding: '8px 12px',
-      borderRadius: '6px',
-      margin: '2px 0',
-      cursor: 'pointer',
-      '&:hover': {
-        backgroundColor: state.isSelected
-          ? '#2563eb'
-          : '#f3f4f6'
-      }
-    }),
-    noOptionsMessage: (provided) => ({
-      ...provided,
-      color: '#6b7280',
-      fontSize: '14px',
-      padding: '16px 12px',
-      textAlign: 'center',
-      fontStyle: 'italic'
-    }),
-    loadingMessage: (provided) => ({
-      ...provided,
-      color: '#6b7280',
-      fontSize: '14px',
-      padding: '12px'
-    })
-  };
+  const handleOptionSelect = useCallback((option) => {
+    onChange?.(option);
+    setQuery('');
+    setIsOpen(false);
+    setIsTyping(false);
+    setFocusedIndex(-1);
+  }, [onChange]);
+
+  const handleOptionHover = useCallback((index) => {
+    setFocusedIndex(index);
+  }, []);
+
+  const handleClear = useCallback((e) => {
+    e.stopPropagation();
+    onChange?.(null);
+    setQuery('');
+    setIsTyping(false);
+    setFocusedIndex(-1);
+    inputRef.current?.focus();
+  }, [onChange]);
+
+  const getInputValue = useCallback(() => {
+    if (isTyping) return query;
+    return value ? value.label : '';
+  }, [isTyping, query, value]);
+
+  const getPlaceholder = useCallback(() => {
+    if (isTyping || !value) return placeholder;
+    return '';
+  }, [isTyping, value, placeholder]);
 
   return (
-    <div className={`w-full ${className}`} ref={wrapperRef}>
+    <div className={`w-full ${className}`} ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-3">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
+      <div className="relative">
+        <div
+          className={`
+            relative w-full cursor-text rounded-lg border h-10 flex items-center
+            transition-all duration-200
+            ${error
+              ? 'border-red-500 focus-within:border-red-500'
+              : (isOpen || isTyping)
+                ? 'border-blue-500 ring-2 ring-blue-100'
+                : 'border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100'
+            }
+            ${isDisabled ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}
+            ${(isOpen || isTyping) ? '' : 'hover:border-gray-400'}
+          `}
+          onClick={handleInputClick}
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            className={`
+              w-full h-full px-3 pr-10 text-sm bg-transparent border-none outline-none
+              ${isDisabled ? 'cursor-not-allowed text-gray-500' : 'text-gray-900'}
+            `}
+            value={getInputValue()}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            placeholder={getPlaceholder()}
+            disabled={isDisabled}
+            name={name}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={isOpen}
+            aria-haspopup="listbox"
+            aria-activedescendant={focusedIndex >= 0 ? `option-${focusedIndex}` : undefined}
+            {...props}
+          />
 
-      <Select
-        ref={reactSelectRef}
-        name={name}
-        value={value}
-        onChange={handleChange}
-        options={options}
-        placeholder={placeholder}
-        isClearable={isClearable}
-        isSearchable={isSearchable}
-        isDisabled={isDisabled}
-        isLoading={isLoading}
-        styles={customStyles}
-        className="react-select-container"
-        classNamePrefix="react-select"
-        menuPlacement={menuPlacement}
-        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-        menuPosition="fixed"
-        onFocus={handleFocus}
-        onMenuOpen={() => focusInputAndSetCaretEnd(false)}
-        noOptionsMessage={() => noOptionsMessage}
-        {...props}
-      />
+          <div className="absolute right-2 flex items-center space-x-1">
+            {isClearable && value && !isDisabled && (
+              <button
+                onClick={handleClear}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-full transition-colors"
+                type="button"
+                aria-label="Limpiar selección"
+                tabIndex={-1}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
 
+            <div className={`text-gray-400 p-1 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {isOpen && (
+          <div
+            className={`
+              absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto
+              ${menuPosition.openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'}
+              ${menuPosition.alignRight ? 'right-0' : 'left-0'}
+            `}
+            style={{
+              width: calculatedMenuWidth,
+              minWidth: '250px',
+              maxWidth: '450px'
+            }}
+            role="listbox"
+            aria-label="Opciones"
+          >
+            {isLoading ? (
+              <div className="px-3 py-2 text-sm text-gray-500">
+                Cargando...
+              </div>
+            ) : filteredOptions.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500 italic">
+                {noOptionsMessage}
+              </div>
+            ) : (
+              filteredOptions.map((option, index) => (
+                <div
+                  key={option.value}
+                  ref={el => optionRefs.current[index] = el}
+                  id={`option-${index}`}
+                  className={`
+                    px-3 py-2 text-sm cursor-pointer border-b border-gray-100 last:border-b-0
+                    transition-colors duration-100
+                    ${focusedIndex === index 
+                      ? 'bg-blue-50 text-blue-900' 
+                      : 'hover:bg-blue-50 hover:text-blue-900'
+                    }
+                    ${value?.value === option.value ? 'bg-blue-100 text-blue-900 font-medium' : 'text-gray-900'}
+                  `}
+                  onClick={() => handleOptionSelect(option)}
+                  onMouseEnter={() => handleOptionHover(index)}
+                  role="option"
+                  aria-selected={value?.value === option.value}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>{option.label}</span>
+                    {value?.value === option.value && (
+                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
       {error && (
         <p className="mt-1 text-sm text-red-600">
           {typeof error === 'string' ? error : 'Este campo es requerido'}

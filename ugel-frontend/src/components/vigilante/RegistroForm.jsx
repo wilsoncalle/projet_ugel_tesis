@@ -5,7 +5,7 @@ import Input from '../Input';
 import SelectCustom from '../SelectCustom';
 import Badge from '../Badge';
 import { PlusIcon, ClipboardDocumentListIcon, UserGroupIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { tiposDocumentoService, motivosVisitaService, personalService, areasService, visitantesService } from '../../services/api';
+import { tiposDocumentoService, motivosVisitaService, personalService, areasService, visitantesService, registrarVisitaCompleta } from '../../services/api';
 
 const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange, activeTab = 'activos', onTabChange }) => {
   // Estados del formulario de visitante (compartido entre tabs)
@@ -74,6 +74,35 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
 
   // Estado para rastrear el tab anterior
   const [previousTab, setPreviousTab] = useState(activeTab);
+
+  // Buscar visitante automáticamente cuando se complete el número de documento
+  useEffect(() => {
+    console.log('=== USEEFFECT BÚSQUEDA AUTOMÁTICA ===');
+    console.log('tipoDocumentoId:', formVisitante.tipoDocumentoId);
+    console.log('numeroDocumento:', formVisitante.numeroDocumento);
+    console.log('longitud numeroDocumento:', formVisitante.numeroDocumento?.length);
+    
+    // Solo buscar si tenemos ambos datos y el número de documento tiene al menos 8 caracteres
+    if (formVisitante.tipoDocumentoId && 
+        formVisitante.numeroDocumento && 
+        formVisitante.numeroDocumento.length >= 8 &&
+        !buscandoVisitante) {
+      console.log('=== EJECUTANDO BÚSQUEDA AUTOMÁTICA ===');
+      // Usar setTimeout para evitar múltiples llamadas
+      const timeoutId = setTimeout(() => {
+        buscarVisitante();
+      }, 500); // Esperar 500ms después del último cambio
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      console.log('=== NO SE EJECUTA BÚSQUEDA AUTOMÁTICA ===');
+      console.log('Condiciones no cumplidas:');
+      console.log('- tipoDocumentoId:', !!formVisitante.tipoDocumentoId);
+      console.log('- numeroDocumento:', !!formVisitante.numeroDocumento);
+      console.log('- longitud >= 8:', formVisitante.numeroDocumento?.length >= 8);
+      console.log('- no buscando:', !buscandoVisitante);
+    }
+  }, [formVisitante.tipoDocumentoId, formVisitante.numeroDocumento, buscandoVisitante]);
 
   // Limpiar formularios al cambiar de tab
   useEffect(() => {
@@ -222,30 +251,67 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
 
   // Buscar visitante por documento
   const buscarVisitante = async () => {
-    if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento) return;
+    console.log('=== BUSCAR VISITANTE ===');
+    console.log('tipoDocumentoId:', formVisitante.tipoDocumentoId);
+    console.log('numeroDocumento:', formVisitante.numeroDocumento);
+    
+    if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento) {
+      console.log('Faltan datos para buscar visitante');
+      return;
+    }
 
     setBuscandoVisitante(true);
     setMensajeVisitante('');
     setVisitanteEncontrado(null);
 
     try {
-      const response = await visitantesService.buscarPorDocumento(
+      console.log('Llamando a visitantesService.getByDocumento...');
+      const response = await visitantesService.getByDocumento(
         formVisitante.tipoDocumentoId,
         formVisitante.numeroDocumento
       );
+      console.log('Respuesta de getByDocumento:', response);
 
       if (response.data.success && response.data.data) {
         const visitante = response.data.data;
+        
+        // Verificar si el visitante ya está en la lista de espera
+        const yaEnEspera = visitantesEnEspera.find(v => 
+          v.tipoDocumentoId === formVisitante.tipoDocumentoId && 
+          v.numeroDocumento === formVisitante.numeroDocumento
+        );
+        
+        if (yaEnEspera) {
+          setMensajeVisitante('Este visitante ya está en la lista de espera');
+          setTipoMensaje('error');
+          return;
+        }
+        
         setVisitanteEncontrado(visitante);
+        console.log('Visitante encontrado en BD:', visitante);
+        console.log('Estableciendo visitanteId:', visitante.id);
         setFormVisitante(prev => ({
           ...prev,
           nombres: visitante.nombres || '',
           apellidos: visitante.apellidos || '',
           visitanteId: visitante.id
         }));
-        setMensajeVisitante('Visitante encontrado en el sistema');
-        setTipoMensaje('success');
+        // No mostrar mensaje - se sobreentiende que se encontró al llenar los datos
+        setMensajeVisitante('');
+        setTipoMensaje('');
       } else {
+        // Verificar si el visitante ya está en la lista de espera (incluso si no está en la BD)
+        const yaEnEspera = visitantesEnEspera.find(v => 
+          v.tipoDocumentoId === formVisitante.tipoDocumentoId && 
+          v.numeroDocumento === formVisitante.numeroDocumento
+        );
+        
+        if (yaEnEspera) {
+          setMensajeVisitante('Este visitante ya está en la lista de espera');
+          setTipoMensaje('error');
+          return;
+        }
+        
         setMensajeVisitante('Visitante no encontrado. Complete los datos para registrar uno nuevo.');
         setTipoMensaje('info');
         setFormVisitante(prev => ({
@@ -254,7 +320,10 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
         }));
       }
     } catch (error) {
-      console.error('Error al buscar visitante:', error);
+      console.error('=== ERROR AL BUSCAR VISITANTE ===');
+      console.error('Error completo:', error);
+      console.error('Error response:', error.response);
+      console.error('Error data:', error.response?.data);
       setMensajeVisitante('Error al buscar visitante. Intente nuevamente.');
       setTipoMensaje('error');
     } finally {
@@ -273,6 +342,25 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     // Limpiar búsqueda cuando cambie tipo de documento o número de documento
     if (field === 'tipoDocumentoId' || field === 'numeroDocumento') {
       limpiarBusqueda();
+    }
+    
+    // Validar duplicados cuando se cambie el número de documento
+    if (field === 'numeroDocumento' && value && newFormVisitante.tipoDocumentoId) {
+      const documentoDuplicado = visitantesEnEspera.find(visitante => 
+        visitante.tipoDocumentoId === newFormVisitante.tipoDocumentoId && 
+        visitante.numeroDocumento === value
+      );
+      
+      if (documentoDuplicado) {
+        setMensajeVisitante('Ya existe un visitante con el mismo documento en la lista de espera');
+        setTipoMensaje('error');
+      } else {
+        // Limpiar mensaje de error si no hay duplicado
+        if (tipoMensaje === 'error' && mensajeVisitante.includes('mismo documento')) {
+          setMensajeVisitante('');
+          setTipoMensaje('');
+        }
+      }
     }
     
     // Enviar datos actualizados en tiempo real al componente padre
@@ -297,11 +385,27 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
       filtrarEmpleadosPorAreaActivos(value);
     }
     
+    // Obtener los datos completos de los selects usando la función robusta
+    const { empleado, motivo, lugar } = obtenerDatosVisita(newFormVisita, true);
+
+    // Crear objeto de visita con datos completos
+    const visitaCompleta = {
+      ...newFormVisita,
+      empleado: empleado,
+      motivo: motivo,
+      lugar: lugar?.label || '',
+      lugarId: lugar?.value || '',
+      personal_nombres: empleado?.label?.split(' ')[0] || '',
+      personal_apellidos: empleado?.label?.split(' ').slice(1).join(' ') || '',
+      nombre_motivo: motivo?.label || '',
+      nombre_area: lugar?.label || ''
+    };
+
     // Enviar datos actualizados en tiempo real al componente padre
     if (onFormChange) {
       onFormChange({
         visitante: formVisitante,
-        visita: newFormVisita
+        visita: visitaCompleta
       });
     }
   };
@@ -319,39 +423,217 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
       filtrarEmpleadosPorAreaHistorial(value);
     }
     
+    // Obtener los datos completos de los selects usando la función robusta
+    const { empleado, motivo, lugar } = obtenerDatosVisita(newFormVisita, false);
+
+    // Crear objeto de visita con datos completos
+    const visitaCompleta = {
+      ...newFormVisita,
+      empleado: empleado,
+      motivo: motivo,
+      lugar: lugar?.label || '',
+      lugarId: lugar?.value || '',
+      personal_nombres: empleado?.label?.split(' ')[0] || '',
+      personal_apellidos: empleado?.label?.split(' ').slice(1).join(' ') || '',
+      nombre_motivo: motivo?.label || '',
+      nombre_area: lugar?.label || ''
+    };
+
     // Enviar datos actualizados en tiempo real al componente padre
     if (onFormChange) {
       onFormChange({
         visitante: formVisitante,
-        visita: newFormVisita
+        visita: visitaCompleta
       });
     }
   };
 
   // Agregar visitante
-  const handleAddVisitor = () => {
-    if (!isVisitanteFormValid) return;
-
-    const visitanteData = {
-      tipoDocumentoId: formVisitante.tipoDocumentoId,
-      numeroDocumento: formVisitante.numeroDocumento,
-      nombres: formVisitante.nombres,
-      apellidos: formVisitante.apellidos,
-      visitanteId: formVisitante.visitanteId,
-      tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId)
-    };
-
-    onAddVisitor(visitanteData);
+  const handleAddVisitor = async () => {
+    console.log('=== INICIO HANDLE ADD VISITOR ===');
+    console.log('isVisitanteFormValid:', isVisitanteFormValid);
+    console.log('formVisitante completo:', formVisitante);
+    console.log('formVisitante.visitanteId:', formVisitante.visitanteId);
+    console.log('formVisitaActivos:', formVisitaActivos);
+    console.log('visitanteEncontrado:', visitanteEncontrado);
     
-    // Limpiar solo el formulario de visitante y la búsqueda
-    setFormVisitante({
-      tipoDocumentoId: '',
-      numeroDocumento: '',
-      nombres: '',
-      apellidos: '',
-      visitanteId: null
-    });
-    limpiarBusqueda();
+    if (!isVisitanteFormValid) {
+      console.warn('Formulario de visitante no es válido');
+      return;
+    }
+
+    // Si no tenemos visitanteId, intentar buscar el visitante primero
+    if (!formVisitante.visitanteId && formVisitante.tipoDocumentoId && formVisitante.numeroDocumento) {
+      console.log('=== NO HAY VISITANTE ID, INTENTANDO BÚSQUEDA ===');
+      try {
+        await buscarVisitante();
+        // Esperar un momento para que se actualice el estado
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error('Error al buscar visitante:', error);
+      }
+    }
+
+    // Validar que no exista un visitante duplicado con el mismo documento
+    const documentoDuplicado = visitantesEnEspera.find(visitante => 
+      visitante.tipoDocumentoId === formVisitante.tipoDocumentoId && 
+      visitante.numeroDocumento === formVisitante.numeroDocumento
+    );
+    
+    if (documentoDuplicado) {
+      console.warn('Ya existe un visitante con el mismo documento en la lista de espera');
+      setMensajeVisitante('Ya existe un visitante con el mismo documento en la lista de espera');
+      setTipoMensaje('error');
+      return;
+    }
+
+    // No validar motivo y lugar aquí - se validarán al registrar la visita completa
+    console.log('Agregando visitante sin validar datos de visita');
+    console.log('motivoId:', formVisitaActivos.motivoId);
+    console.log('lugar:', formVisitaActivos.lugar);
+    console.log('empleadoId:', formVisitaActivos.empleadoId);
+
+    // Verificar si hay datos de visita seleccionados
+    const tieneDatosVisita = formVisitaActivos.motivoId && formVisitaActivos.lugar;
+    
+    if (tieneDatosVisita) {
+      // Si hay datos de visita, registrar la visita completa
+      console.log('Registrando visita completa con datos de visita');
+      
+      // Obtener los datos de la visita actual usando la función robusta
+      console.log('Obteniendo datos de visita...');
+      const { empleado, motivo, lugar } = obtenerDatosVisita(formVisitaActivos, true);
+      console.log('Datos obtenidos:', { empleado, motivo, lugar });
+
+      // Preparar datos para la API del backend
+      const datosVisita = {
+        // Datos de la visita (usar IDs numéricos)
+        lugarId: parseInt(formVisitaActivos.lugar), // areaDestinoId
+        motivoId: parseInt(formVisitaActivos.motivoId) // motivoVisitaId
+      };
+
+      // Si el visitante ya existe en la BD, usar su ID
+      if (formVisitante.visitanteId) {
+        datosVisita.visitanteId = parseInt(formVisitante.visitanteId);
+        console.log('Usando visitante existente con ID:', datosVisita.visitanteId);
+      } else {
+        // Si es un visitante nuevo, incluir sus datos
+        datosVisita.tipoDocumentoId = parseInt(formVisitante.tipoDocumentoId);
+        datosVisita.numeroDocumento = formVisitante.numeroDocumento;
+        datosVisita.nombres = formVisitante.nombres;
+        datosVisita.apellidos = formVisitante.apellidos;
+        console.log('Creando nuevo visitante');
+      }
+
+      // Solo agregar empleadoId si está seleccionado
+      if (formVisitaActivos.empleadoId) {
+        datosVisita.empleadoId = parseInt(formVisitaActivos.empleadoId); // personalVisitadoId
+      }
+
+      console.log('=== DATOS PARA REGISTRAR VISITA ===');
+      console.log('formVisitante.visitanteId:', formVisitante.visitanteId);
+      console.log('Datos de la visita:', datosVisita);
+
+      try {
+        console.log('Llamando a registrarVisitaCompleta...');
+        // Registrar la visita usando la nueva función
+        const response = await registrarVisitaCompleta(datosVisita);
+        console.log('Respuesta recibida:', response);
+        
+        if (response.data.success) {
+          console.log('Visita registrada exitosamente:', response.data.data);
+          
+          // Crear objeto de visitante para la UI
+          const visitanteData = {
+            tipoDocumentoId: formVisitante.tipoDocumentoId,
+            numeroDocumento: formVisitante.numeroDocumento,
+            nombres: formVisitante.nombres,
+            apellidos: formVisitante.apellidos,
+            visitanteId: formVisitante.visitanteId,
+            tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId),
+            // Incluir datos de la visita
+            empleado: empleado,
+            motivo: motivo,
+            lugar: lugar?.label || '',
+            lugarId: lugar?.value || '',
+            nombre_area: lugar?.label || '',
+            nombre_motivo: motivo?.label || '',
+            personal_nombres: empleado?.label?.split(' ')[0] || '',
+            personal_apellidos: empleado?.label?.split(' ').slice(1).join(' ') || '',
+            empleadoVisitado: empleado
+          };
+
+          onAddVisitor(visitanteData);
+          
+          // Limpiar formularios después de registrar visita exitosamente
+          // Preservar el tipo de documento seleccionado
+          const tipoDocumentoActual = formVisitante.tipoDocumentoId;
+          setFormVisitante({
+            tipoDocumentoId: tipoDocumentoActual, // Preservar tipo de documento
+            numeroDocumento: '',
+            nombres: '',
+            apellidos: '',
+            visitanteId: null
+          });
+          
+          // Limpiar formulario de visita
+          setFormVisitaActivos({
+            empleadoId: '',
+            motivoId: '',
+            lugar: ''
+          });
+          
+          // Limpiar búsqueda
+          limpiarBusqueda();
+        } else {
+          console.error('Error al registrar visita:', response.data.message);
+        }
+      } catch (error) {
+        console.error('Error al registrar visita:', error);
+      }
+    } else {
+      // Si no hay datos de visita, solo agregar el visitante a la lista de espera
+      console.log('=== AGREGANDO VISITANTE A LISTA DE ESPERA ===');
+      console.log('formVisitante.visitanteId:', formVisitante.visitanteId);
+      console.log('visitanteEncontrado:', visitanteEncontrado);
+      
+      // Crear objeto de visitante para la UI (sin datos de visita)
+      const visitanteData = {
+        tipoDocumentoId: formVisitante.tipoDocumentoId,
+        numeroDocumento: formVisitante.numeroDocumento,
+        nombres: formVisitante.nombres,
+        apellidos: formVisitante.apellidos,
+        visitanteId: formVisitante.visitanteId,
+        tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId),
+        // Sin datos de visita - se asignarán después
+        empleado: null,
+        motivo: null,
+        lugar: '',
+        lugarId: '',
+        nombre_area: '',
+        nombre_motivo: '',
+        personal_nombres: '',
+        personal_apellidos: '',
+        empleadoVisitado: null
+      };
+      
+      console.log('visitanteData creado:', visitanteData);
+
+      onAddVisitor(visitanteData);
+      
+      // Limpiar solo el formulario de visitante (preservar tipo de documento)
+      const tipoDocumentoActual = formVisitante.tipoDocumentoId;
+      setFormVisitante({
+        tipoDocumentoId: tipoDocumentoActual, // Preservar tipo de documento
+        numeroDocumento: '',
+        nombres: '',
+        apellidos: '',
+        visitanteId: null
+      });
+      
+      // Limpiar búsqueda
+      limpiarBusqueda();
+    }
   };
 
   // Registrar visita
@@ -396,6 +678,30 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     setMensajeVisitante('');
     setTipoMensaje('');
     setVisitanteEncontrado(null);
+  };
+
+  // Función para obtener datos de visita de manera robusta
+  const obtenerDatosVisita = (formVisita, esActivos = true) => {
+    const empleadosArray = esActivos ? empleadosActivos : empleadosHistorial;
+    const motivosArray = esActivos ? motivosActivos : motivosHistorial;
+    const lugaresArray = esActivos ? lugaresActivos : lugaresHistorial;
+    
+    // Buscar en arrays específicos primero, luego en arrays principales como fallback
+    const empleado = empleadosArray.find(emp => emp.value === formVisita.empleadoId) || 
+                     empleados.find(emp => emp.value === formVisita.empleadoId);
+    const motivo = motivosArray.find(mot => mot.value === formVisita.motivoId) || 
+                   motivos.find(mot => mot.value === formVisita.motivoId);
+    const lugar = lugaresArray.find(lug => lug.value === formVisita.lugar) || 
+                  lugares.find(lug => lug.value === formVisita.lugar);
+    
+    console.log('=== OBTENER DATOS VISITA ===');
+    console.log('formVisita:', formVisita);
+    console.log('esActivos:', esActivos);
+    console.log('empleado encontrado:', empleado);
+    console.log('motivo encontrado:', motivo);
+    console.log('lugar encontrado:', lugar);
+    
+    return { empleado, motivo, lugar };
   };
 
   // Función corregida para limpiar visitante
@@ -647,41 +953,16 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
             </div>
           </div>
 
-          {/* Lista de Visitantes en Espera */}
-          {visitantesEnEspera.length > 0 && (
-            <div className="flex-shrink-0 border-b border-gray-200 pb-3 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-semibold text-gray-800">
-                  Visitantes en Espera
-                </h3>
-                <Badge variant="warning">
-                  {visitantesEnEspera.length}
-                </Badge>
-              </div>
-              <div className="space-y-2 max-h-20 overflow-y-auto">
-                {visitantesEnEspera.map((visitante, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-amber-50 rounded-lg border border-amber-200"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900 text-xs">
-                        {visitante.nombres} {visitante.apellidos}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {visitante.tipoDocumento?.nombre || 'DNI'}: {visitante.numeroDocumento}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Sección de datos de la visita */}
-          <div className="flex-1 flex flex-col overflow-visible border border-gray-200 rounded-xl p-3">
+          <div className={`flex-1 flex flex-col overflow-visible border border-gray-200 rounded-xl p-3 ${
+            activeTab === 'activos' && visitantesEnEspera.length === 0 ? 'opacity-50 pointer-events-none' : ''
+          }`}>
             <h3 className="text-base font-semibold text-gray-800 mb-3">
               {activeTab === 'activos' ? 'Datos de la Visita' : 'Buscar Visita'}
+              {activeTab === 'activos' && visitantesEnEspera.length === 0 && (
+                <span className="text-sm text-gray-500 ml-2">(Agregue un visitante primero)</span>
+              )}
             </h3>
             
             {activeTab === 'activos' ? (
@@ -762,7 +1043,7 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
             <div className="flex gap-3">
               <Button
                 onClick={activeTab === 'activos' ? handleRegisterVisit : () => console.log('Buscar visita')}
-                disabled={!isVisitaFormValid}
+                disabled={!isVisitaFormValid || (activeTab === 'activos' && visitantesEnEspera.length === 0)}
                 variant="primary"
                 size="lg"
                 leftIcon={<ClipboardDocumentListIcon className="h-5 w-5" />}

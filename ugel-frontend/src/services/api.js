@@ -262,5 +262,152 @@ export const motivosSalidaService = {
   restore: (id) => api.put(`/motivos-salida/${id}/restore`),
 };
 
+// --- Funciones para el Dashboard del Vigilante ---
+
+/**
+ * Registra una visita completa (incluyendo la creación del visitante si es nuevo).
+ * Llama a: POST /api/visitas
+ * @param {object} datosVisita - Objeto con los datos del visitante y la visita.
+ * @returns {Promise<object>} La respuesta de la API.
+ */
+export const registrarVisitaCompleta = (datosVisita) => {
+  // Mapear los nombres de campos del frontend al backend
+  const datosMapeados = {
+    // Datos de la visita (mapear nombres)
+    areaDestinoId: datosVisita.lugarId || datosVisita.lugar, // lugar -> areaDestinoId
+    personalVisitadoId: datosVisita.empleadoId, // empleadoId -> personalVisitadoId
+    motivoVisitaId: datosVisita.motivoId // motivoId -> motivoVisitaId
+  };
+
+  // Si es un visitante existente, incluir visitanteId
+  if (datosVisita.visitanteId && datosVisita.visitanteId !== null) {
+    datosMapeados.visitanteId = datosVisita.visitanteId;
+  } else {
+    // Si es un visitante nuevo, incluir datos del visitante
+    datosMapeados.tipoDocumentoId = datosVisita.tipoDocumentoId;
+    datosMapeados.numeroDocumento = datosVisita.numeroDocumento;
+    datosMapeados.nombres = datosVisita.nombres;
+    datosMapeados.apellidos = datosVisita.apellidos;
+  }
+  
+  console.log('=== REGISTRAR VISITA COMPLETA ===');
+  console.log('Datos originales:', datosVisita);
+  console.log('Datos mapeados:', datosMapeados);
+  
+  return api.post('/visitas', datosMapeados);
+};
+
+/**
+ * Obtiene la lista de visitantes actualmente dentro de la institución.
+ * Llama a: GET /api/visitas/activas
+ * @returns {Promise<object>} La lista de visitantes activos.
+ */
+export const getVisitantesActivos = (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.page) params.append('page', filters.page);
+  if (filters.limit) params.append('limit', filters.limit);
+  if (filters.q) params.append('q', filters.q);
+  
+  return api.get(`/visitas/activas?${params.toString()}`);
+};
+
+/**
+ * Obtiene el historial de visitas, permitiendo filtros.
+ * Llama a: GET /api/visitas
+ * @param {object} filtros - Un objeto con los filtros a aplicar.
+ * @returns {Promise<object>} La lista de visitas filtrada.
+ */
+export const getHistorialDeVisitas = (filtros = {}) => {
+  const params = new URLSearchParams();
+  
+  // Mapear filtros del frontend al backend
+  if (filtros.busqueda) params.append('q', filtros.busqueda);
+  if (filtros.empleadoId) params.append('personalVisitadoId', filtros.empleadoId);
+  if (filtros.motivoId) params.append('motivoVisitaId', filtros.motivoId);
+  if (filtros.lugar) params.append('areaId', filtros.lugar);
+  if (filtros.fechaDesde) params.append('fechaInicio', filtros.fechaDesde);
+  if (filtros.fechaHasta) params.append('fechaFin', filtros.fechaHasta);
+  if (filtros.page) params.append('page', filtros.page);
+  if (filtros.limit) params.append('limit', filtros.limit);
+  
+  return api.get(`/visitas?${params.toString()}`);
+};
+
+/**
+ * Registra la salida de un visitante.
+ * Llama a: PUT /api/visitas/:id/salida
+ * @param {number} registroVisitaId - El ID del registro de la visita.
+ * @returns {Promise<object>} La respuesta de la API.
+ */
+export const registrarSalidaVisitante = (registroVisitaId) => {
+  return api.put(`/visitas/${registroVisitaId}/salida`);
+};
+
+// --- Funciones para rellenar los Dropdowns del Formulario ---
+
+/**
+ * Obtiene todos los tipos de documento
+ * @returns {Promise<object>} Lista de tipos de documento
+ */
+export const getTiposDocumento = (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.activo !== undefined) {
+    params.append('activo', filters.activo);
+  }
+  if (filters.q) {
+    params.append('q', filters.q);
+  }
+  return api.get(`/tipos-documento?${params.toString()}`);
+};
+
+/**
+ * Obtiene todos los motivos de visita
+ * @returns {Promise<object>} Lista de motivos de visita
+ */
+export const getMotivosVisita = (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.activo !== undefined) {
+    params.append('activo', filters.activo);
+  }
+  if (filters.q) {
+    params.append('q', filters.q);
+  }
+  return api.get(`/motivos-visita?${params.toString()}`);
+};
+
+/**
+ * Obtiene todo el personal
+ * @param {object} filtros - Filtros opcionales
+ * @returns {Promise<object>} Lista de personal
+ */
+export const getPersonal = (filtros = {}) => {
+  const params = new URLSearchParams();
+  if (filtros.activo !== undefined) {
+    params.append('activo', filtros.activo);
+  }
+  if (filtros.q) {
+    params.append('q', filtros.q);
+  }
+  if (filtros.areaId) {
+    params.append('areaId', filtros.areaId);
+  }
+  return api.get(`/personal?${params.toString()}`);
+};
+
+/**
+ * Obtiene todas las áreas
+ * @returns {Promise<object>} Lista de áreas
+ */
+export const getAreas = (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.activo !== undefined) {
+    params.append('activo', filters.activo);
+  }
+  if (filters.q) {
+    params.append('q', filters.q);
+  }
+  return api.get(`/areas?${params.toString()}`);
+};
+
 // Export the axios instance for direct use
 export default api;
