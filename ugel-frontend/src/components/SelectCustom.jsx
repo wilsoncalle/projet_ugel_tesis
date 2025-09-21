@@ -15,6 +15,7 @@ const SelectCustom = ({
   required = false,
   noOptionsMessage = "No se encontraron resultados",
   menuWidth = 'auto',
+  isSearchable = true, // Agregar isSearchable como prop válida
   ...props
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -212,6 +213,8 @@ const SelectCustom = ({
   }, [isDisabled, isOpen, calculatePositionAndWidth]);
   
   const handleInputChange = useCallback((e) => {
+    if (!isSearchable) return;
+    
     const newValue = e.target.value;
     setQuery(newValue);
     setIsTyping(true);
@@ -223,7 +226,7 @@ const SelectCustom = ({
       setMenuPosition({ openUpwards, alignRight });
       setIsOpen(true);
     }
-  }, [isOpen, calculatePositionAndWidth]);
+  }, [isOpen, calculatePositionAndWidth, isSearchable]);
 
   const handleOptionSelect = useCallback((option) => {
     onChange?.(option);
@@ -286,12 +289,14 @@ const SelectCustom = ({
             className={`
               w-full h-full px-3 pr-10 text-sm bg-transparent border-none outline-none
               ${isDisabled ? 'cursor-not-allowed text-gray-500' : 'text-gray-900'}
+              ${!isSearchable ? 'cursor-pointer' : ''}
             `}
             value={getInputValue()}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder={getPlaceholder()}
             disabled={isDisabled}
+            readOnly={!isSearchable}
             name={name}
             autoComplete="off"
             role="combobox"

@@ -25,12 +25,6 @@ const VisitantesTabla = ({
   activosPagination,
   onActivosPageChange
 }) => {
-  console.log('=== VISITANTES TABLA RENDERIZANDO ===');
-  console.log('onRegistrarSalida es función:', typeof onRegistrarSalida);
-  console.log('onRegistrarSalida:', onRegistrarSalida);
-  console.log('Visitantes activos:', visitantesActivos);
-  console.log('Visitantes en espera:', visitantesEnEspera);
-  console.log('=== FIN VISITANTES TABLA ===');
   const [filtrosExpanded, setFiltrosExpanded] = useState(false);
 
   const handleTabClick = (tab) => {
@@ -43,12 +37,7 @@ const VisitantesTabla = ({
   const getTabData = useCallback(() => {
     switch (activeTab) {
       case 'activos': {
-        console.log('=== DATOS DE VISITANTES ACTIVOS ===');
-        console.log('visitantesActivos:', visitantesActivos);
-        console.log('visitantesEnEspera:', visitantesEnEspera);
-        
         let data = [...(visitantesActivos || []), ...(visitantesEnEspera || [])];
-        console.log('Data combinada:', data);
         
         // Solo agregar vista previa si tiene datos válidos
         if (vistaPreviaVisitante && 
@@ -74,12 +63,9 @@ const VisitantesTabla = ({
           data = [previewData, ...data];
         }
         
-        console.log('Data final retornada:', data);
         return data;
       }
       case 'historial':
-        console.log('=== DATOS DE HISTORIAL ===');
-        console.log('historialVisitas:', historialVisitas);
         return historialVisitas || [];
       default:
         return [];
@@ -99,10 +85,6 @@ const VisitantesTabla = ({
           totalItems: totalItems, // Usar el total real de datos
           onPageChange: onActivosPageChange
         };
-        console.log('=== PAGINACIÓN ACTIVOS ===');
-        console.log('activosPagination:', activosPagination);
-        console.log('data.length (totalItems):', totalItems);
-        console.log('activosProps:', activosProps);
         return activosProps;
       case 'historial':
         const historialProps = {
@@ -112,10 +94,6 @@ const VisitantesTabla = ({
           totalItems: totalItems, // Usar el total real de datos
           onPageChange: onHistorialPageChange
         };
-        console.log('=== PAGINACIÓN HISTORIAL ===');
-        console.log('historialPagination:', historialPagination);
-        console.log('data.length (totalItems):', totalItems);
-        console.log('historialProps:', historialProps);
         return historialProps;
       default:
         return { pagination: false };
@@ -131,7 +109,6 @@ const VisitantesTabla = ({
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
-            console.warn('Row is undefined/null in visitante render function');
             return (
               <div>
                 <div className="font-medium text-gray-900">-</div>
@@ -139,8 +116,6 @@ const VisitantesTabla = ({
               </div>
             );
           }
-          
-          console.log('Renderizando visitante, row:', row);
           
           // Verificar si estamos en visitantes activos o historial
           let nombres = '';
@@ -193,11 +168,8 @@ const VisitantesTabla = ({
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
-            console.warn('Row is undefined/null in empleado render function');
             return <div className="text-sm">-</div>;
           }
-          
-          console.log('Renderizando empleado, row:', row);
           
           let empleadoNombre = '';
           let empleadoApellido = '';
@@ -240,11 +212,8 @@ const VisitantesTabla = ({
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
-            console.warn('Row is undefined/null in motivo render function');
             return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">-</span>;
           }
-          
-          console.log('Renderizando motivo, row:', row);
           
           let motivoNombre = '';
           
@@ -280,11 +249,8 @@ const VisitantesTabla = ({
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
-            console.warn('Row is undefined/null in lugar render function');
             return <div className="text-sm text-gray-900">-</div>;
           }
-          
-          console.log('Renderizando lugar, row:', row);
           
           let lugar = '';
           
@@ -310,11 +276,8 @@ const VisitantesTabla = ({
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
-            console.warn('Row is undefined/null in hora ingreso render function');
             return <div className="text-sm text-gray-900">-</div>;
           }
-          
-          console.log('Renderizando hora ingreso, row:', row);
           
           let horaFormateada = '';
           
@@ -376,11 +339,8 @@ const VisitantesTabla = ({
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
-            console.warn('Row is undefined/null in fecha render function');
             return <div className="text-sm text-gray-900">-</div>;
           }
-          
-          console.log('Renderizando fecha, row:', row);
           
           let fechaStr = '';
           
@@ -413,11 +373,8 @@ const VisitantesTabla = ({
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
-            console.warn('Row is undefined/null in hora salida render function');
             return <div className="text-sm text-gray-900">-</div>;
           }
-          
-          console.log('Renderizando hora salida, row:', row);
           
           // Extraer la hora de la fecha_salida
           let horaFormateada = '';
@@ -451,7 +408,6 @@ const VisitantesTabla = ({
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
-            console.warn('Row is undefined/null in actions render function');
             return null;
           }
           
@@ -468,9 +424,6 @@ const VisitantesTabla = ({
               {enEspera ? (
                 <button
                   onClick={() => {
-                    console.log('=== BOTÓN ELIMINAR CLICKEADO ===');
-                    console.log('Row ID:', row.id);
-                    console.log('Row data:', row);
                     if (onEliminarVisitanteEspera) {
                       onEliminarVisitanteEspera(row.id);
                     }
@@ -482,10 +435,6 @@ const VisitantesTabla = ({
               ) : (
                 <button
                   onClick={() => {
-                    console.log('=== BOTÓN REGISTRAR SALIDA CLICKEADO ===');
-                    console.log('Row ID:', row.id);
-                    console.log('Row data:', row);
-                    console.log('Llamando a onRegistrarSalida...');
                     onRegistrarSalida(row.id, row);
                   }}
                   className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-2xl hover:bg-primary-700 transition-colors"
@@ -552,12 +501,7 @@ const VisitantesTabla = ({
                 data={getTabData()}
                 minTableWidth={activeTab === 'activos' ? '1100px' : '1100px'}
                 isRowInWaiting={(row) => (visitantesEnEspera || []).some(v => v.id === row.id)}
-                {...(() => {
-                  const paginationProps = getPaginationProps();
-                  console.log('=== PROPS DE PAGINACIÓN ENVIADAS ===');
-                  console.log('paginationProps:', paginationProps);
-                  return paginationProps;
-                })()}
+                {...getPaginationProps()}
                 emptyMessage={
                   activeTab === 'activos'
                     ? 'No hay visitantes activos en este momento'

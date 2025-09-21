@@ -289,7 +289,8 @@ const schemas = {
       personalVisitadoId: Joi.number()
         .integer()
         .positive()
-        .allow(null),
+        .allow(null)
+        .optional(),
       motivoVisitaId: Joi.number()
         .integer()
         .positive()

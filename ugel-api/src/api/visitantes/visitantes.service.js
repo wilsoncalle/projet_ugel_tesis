@@ -143,8 +143,8 @@ const createVisitante = async (visitanteData) => {
     
     // Crear el visitante
     const newVisitante = await repository.create({
-      tipo_documento_id: tipoDocumentoId,
-      numero_documento: numeroDocumento,
+      tipoDocumentoId,
+      numeroDocumento,
       nombres,
       apellidos
     });

@@ -10,8 +10,6 @@ const DashboardVigilantePage = () => {
   // Hook de autenticación
   const { user, isAuthenticated } = useAuth();
   
-  // Log del estado de autenticación
-  console.log('Estado de autenticación:', { isAuthenticated, user });
   
   // Estados principales del dashboard
   const [visitantesEnEspera, setVisitantesEnEspera] = useState([]);
@@ -72,11 +70,8 @@ const DashboardVigilantePage = () => {
       setError('');
       const response = await visitasService.getActivas();
       
-      console.log('Respuesta completa de visitantes activos:', response);
-      
       if (response.data.success) {
         const activosData = response.data.data || [];
-        console.log('Número de visitantes activos:', activosData.length);
         
         // Transformar los datos de la API para que coincidan con la estructura esperada por el frontend
         const activosTransformados = activosData.map(visita => ({
@@ -97,11 +92,6 @@ const DashboardVigilantePage = () => {
           lugarNombre: visita.nombre_area || ''
         }));
         
-        // Mostrar estructura completa del primer elemento para depuración
-        if (activosTransformados.length > 0) {
-          console.log('Estructura completa del primer visitante activo transformado:', JSON.stringify(activosTransformados[0], null, 2));
-          console.log('Todas las claves disponibles en el objeto transformado:', Object.keys(activosTransformados[0]));
-        }
         
         setVisitantesActivos(activosTransformados);
         
@@ -141,11 +131,6 @@ const DashboardVigilantePage = () => {
   
   // Handler para cambios en tiempo real en el formulario
   const handleFormChange = (formData) => {
-    console.log('=== HANDLE FORM CHANGE ===');
-    console.log('formData recibido:', formData);
-    console.log('formData.visita:', formData.visita);
-    console.log('formData.visita.lugar:', formData.visita?.lugar);
-    console.log('formData.visita.lugarId:', formData.visita?.lugarId);
     
     // Actualizar los visitantes en espera con los datos de la visita
     if (formData.visita && Object.values(formData.visita).some(val => val) && visitantesEnEspera.length > 0) {
@@ -168,9 +153,6 @@ const DashboardVigilantePage = () => {
         ...visitaData
       }));
       
-      console.log('=== VISITANTES ACTUALIZADOS ===');
-      console.log('visitaData aplicado:', visitaData);
-      console.log('Primer visitante actualizado:', visitantesActualizados[0]);
       
       setVisitantesEnEspera(visitantesActualizados);
     }
@@ -229,10 +211,6 @@ const DashboardVigilantePage = () => {
       
       for (const visitante of visitantesEnEspera) {
         try {
-          console.log('=== PROCESANDO VISITANTE ===');
-          console.log('Visitante completo:', visitante);
-          console.log('lugar (nombre):', visitante.lugar);
-          console.log('lugarId (ID):', visitante.lugarId);
           
           // Primero crear o buscar el visitante
           let visitanteId = visitante.id;
@@ -240,7 +218,6 @@ const DashboardVigilantePage = () => {
           // Si el visitante ya existe en la base de datos, usar su ID
           if (visitante.visitanteId) {
             visitanteId = visitante.visitanteId;
-            console.log('Usando visitante existente con ID:', visitanteId);
           }
           // Si el ID es temporal (generado con Date.now()), crear el visitante
           else if (typeof visitanteId === 'number' && visitanteId > 1000000000000) {
@@ -252,7 +229,6 @@ const DashboardVigilantePage = () => {
               apellidos: visitante.apellidos
             };
             
-            console.log('Enviando visitante al backend:', visitantePayload);
             const responseVisitante = await visitantesService.create(visitantePayload);
             
             if (responseVisitante.data.success) {
@@ -265,12 +241,6 @@ const DashboardVigilantePage = () => {
           // Crear la visita (utilizando la fecha actual en lugar de la fecha de la visita)
           const currentDate = new Date();
           
-          console.log('Datos del visitante para crear visita:', visitante);
-          console.log('ID del visitante:', visitanteId);
-          console.log('Datos del empleado:', visitante.empleado);
-          console.log('Datos del motivo:', visitante.motivo);
-          console.log('Datos del lugar (nombre):', visitante.lugar);
-          console.log('Datos del lugarId (ID):', visitante.lugarId);
           
           // Si el visitante no tiene datos de visita, usar los datos proporcionados
           let empleadoId = visitante.empleado?.id || visitante.empleadoVisitado?.id;
@@ -279,7 +249,6 @@ const DashboardVigilantePage = () => {
           
           // Si no tiene datos de visita, usar los datos proporcionados
           if (!empleadoId || !motivoId || !lugarId) {
-            console.log('Visitante sin datos de visita, usando datos proporcionados');
             empleadoId = datosVisita.empleadoId;
             motivoId = datosVisita.motivoId;
             lugarId = datosVisita.lugar;
@@ -309,8 +278,6 @@ const DashboardVigilantePage = () => {
             horaIngreso: currentDate.toTimeString().substring(0, 8)
           };
           
-          console.log('Payload de la visita a enviar:', visitaPayload);
-          console.log('areaDestinoId que se enviará:', visitaPayload.areaDestinoId);
 
           const responseVisita = await visitasService.create(visitaPayload);
           
@@ -340,7 +307,6 @@ const DashboardVigilantePage = () => {
       setVisitantesEnEspera([]);
       await cargarVisitantesActivos();
       
-      console.log('Visitas registradas exitosamente:', visitasRegistradas);
       
     } catch (err) {
       console.error('Error al registrar visitas:', err);
@@ -370,64 +336,11 @@ const DashboardVigilantePage = () => {
       if (filtrosData.fechaDesde) params.fechaDesde = filtrosData.fechaDesde;
       if (filtrosData.fechaHasta) params.fechaHasta = filtrosData.fechaHasta;
       
-      console.log('Enviando parámetros de búsqueda:', params);
       const response = await visitasService.getAll(params);
-      
-      console.log('Respuesta completa del historial:', response);
-      console.log('Datos del historial:', response.data);
       
       if (response.data.success) {
         const historialData = response.data.data || [];
         
-        console.log('Número de registros en historial:', historialData.length);
-        
-        // Mostrar estructura completa del primer elemento para depuración
-        if (historialData.length > 0) {
-          console.log('Estructura completa del primer elemento del historial:', JSON.stringify(historialData[0], null, 2));
-          
-          // Mostrar todas las claves disponibles en el objeto
-          const primerElemento = historialData[0];
-          console.log('Todas las claves disponibles en el objeto:', Object.keys(primerElemento));
-          
-          // Verificar campos específicos
-          console.log('Campos individuales del primer elemento:');
-          console.log('- ID:', primerElemento.id);
-          
-          // Visitante
-          console.log('- Visitante (objeto completo):', primerElemento.visitante);
-          console.log('- visitante_id:', primerElemento.visitante_id);
-          console.log('- visitante_nombres:', primerElemento.visitante_nombres);
-          console.log('- visitante_apellidos:', primerElemento.visitante_apellidos);
-          console.log('- visitante_numero_documento:', primerElemento.visitante_numero_documento);
-          
-          // Empleado
-          console.log('- empleadoVisitado:', primerElemento.empleadoVisitado);
-          console.log('- empleado_visitado:', primerElemento.empleado_visitado);
-          console.log('- empleado_visitado_id:', primerElemento.empleado_visitado_id);
-          console.log('- empleado_nombres:', primerElemento.empleado_nombres);
-          console.log('- empleado_apellidos:', primerElemento.empleado_apellidos);
-          console.log('- empleado_nombre_completo:', primerElemento.empleado_nombre_completo);
-          
-          // Motivo
-          console.log('- motivo:', primerElemento.motivo);
-          console.log('- motivo_id:', primerElemento.motivo_id);
-          console.log('- motivo_nombre:', primerElemento.motivo_nombre);
-          console.log('- motivo_visita_nombre:', primerElemento.motivo_visita_nombre);
-          
-          // Lugar
-          console.log('- lugar:', primerElemento.lugar);
-          
-          // Fechas y horas
-          console.log('- fechaIngreso:', primerElemento.fechaIngreso);
-          console.log('- fecha_ingreso:', primerElemento.fecha_ingreso);
-          console.log('- horaIngreso:', primerElemento.horaIngreso);
-          console.log('- hora_ingreso:', primerElemento.hora_ingreso);
-          console.log('- horaSalida:', primerElemento.horaSalida);
-          console.log('- hora_salida:', primerElemento.hora_salida);
-          
-          // Mostrar el objeto completo para referencia
-          console.log('Objeto completo:', primerElemento);
-        }
         
         setHistorialVisitas(historialData);
         
@@ -465,66 +378,33 @@ const DashboardVigilantePage = () => {
   };
 
   const handleRegistrarSalida = (visitaId, visitanteData = null) => {
-    console.log('=== MOSTRAR MODAL DE CONFIRMACIÓN ===');
-    console.log('Visita ID:', visitaId);
-    console.log('Datos del visitante:', visitanteData);
     setVisitaParaSalida(visitaId);
     setVisitanteParaSalida(visitanteData);
     setShowSalidaModal(true);
   };
 
   const handleEliminarVisitanteEspera = (visitanteId) => {
-    console.log('=== ELIMINANDO VISITANTE DE ESPERA ===');
-    console.log('visitanteId:', visitanteId);
-    
     // Filtrar el visitante de la lista de espera
     setVisitantesEnEspera(prev => prev.filter(v => v.id !== visitanteId));
-    
-    console.log('Visitante eliminado de la lista de espera');
   };
 
   const confirmarRegistrarSalida = async () => {
     if (!visitaParaSalida) return;
     
     try {
-      console.log('=== INICIO REGISTRO DE SALIDA ===');
-      console.log('Visita ID:', visitaParaSalida);
-      console.log('Tipo de ID:', typeof visitaParaSalida);
-      console.log('Usuario autenticado:', user);
-      console.log('Estado de autenticación:', isAuthenticated);
-      
       setLoading(true);
       setError('');
       setShowSalidaModal(false);
       
-      console.log('Llamando al servicio visitasService.registrarSalida...');
-      console.log('URL que se llamará:', `/visitas/${visitaParaSalida}/salida`);
-      
       const response = await visitasService.registrarSalida(visitaParaSalida);
-      
-      console.log('Respuesta del servicio:', response);
-      console.log('Respuesta exitosa:', response.data.success);
       
       if (response.data.success) {
         // Recargar visitantes activos para reflejar el cambio
-        console.log('Recargando visitantes activos...');
         await cargarVisitantesActivos();
-        console.log('Salida registrada exitosamente para visita:', visitaParaSalida);
-        console.log('=== FIN REGISTRO DE SALIDA (EXITOSO) ===');
       } else {
-        console.error('Error en la respuesta del servicio:', response.data);
         setError('Error al registrar la salida');
-        console.log('=== FIN REGISTRO DE SALIDA (ERROR EN RESPUESTA) ===');
       }
     } catch (err) {
-      console.error('=== ERROR EN REGISTRO DE SALIDA ===');
-      console.error('Error completo:', err);
-      console.error('Mensaje del error:', err.message);
-      console.error('Respuesta del servidor:', err.response?.data);
-      console.error('Estado HTTP:', err.response?.status);
-      console.error('Headers de respuesta:', err.response?.headers);
-      console.error('=== FIN ERROR ===');
-      
       setError(`Error al registrar la salida: ${err.response?.data?.message || err.message}`);
     } finally {
       setLoading(false);

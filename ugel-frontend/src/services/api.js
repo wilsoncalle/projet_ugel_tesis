@@ -12,22 +12,12 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    console.log('=== INTERCEPTOR DE PETICIÓN ===');
-    console.log('URL de la petición:', config.url);
-    console.log('Método HTTP:', config.method?.toUpperCase());
-    console.log('Token encontrado:', token ? 'SÍ' : 'NO');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('Token agregado a headers:', token.substring(0, 20) + '...');
-      console.log('Headers completos:', config.headers);
-    } else {
-      console.log('No hay token disponible');
     }
-    console.log('=== FIN INTERCEPTOR ===');
     return config;
   },
   (error) => {
-    console.error('Error en interceptor de petición:', error);
     return Promise.reject(error);
   }
 );
@@ -35,16 +25,9 @@ api.interceptors.request.use(
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => {
-    console.log('=== INTERCEPTOR DE RESPUESTA ===');
-    console.log('Respuesta exitosa:', response.config.url, response.status);
-    console.log('=== FIN INTERCEPTOR RESPUESTA ===');
     return response;
   },
   (error) => {
-    console.error('=== INTERCEPTOR DE ERROR ===');
-    console.error('Error en respuesta:', error.config?.url, error.response?.status);
-    console.error('Detalles del error:', error.response?.data);
-    console.error('=== FIN INTERCEPTOR ERROR ===');
     
     // Handle 401 Unauthorized errors
     if (error.response && error.response.status === 401) {
@@ -275,24 +258,25 @@ export const registrarVisitaCompleta = (datosVisita) => {
   const datosMapeados = {
     // Datos de la visita (mapear nombres)
     areaDestinoId: datosVisita.lugarId || datosVisita.lugar, // lugar -> areaDestinoId
-    personalVisitadoId: datosVisita.empleadoId, // empleadoId -> personalVisitadoId
     motivoVisitaId: datosVisita.motivoId // motivoId -> motivoVisitaId
   };
+
+  // Solo agregar personalVisitadoId si existe y es válido
+  if (datosVisita.empleadoId && datosVisita.empleadoId !== null && datosVisita.empleadoId !== '') {
+    datosMapeados.personalVisitadoId = datosVisita.empleadoId;
+  }
 
   // Si es un visitante existente, incluir visitanteId
   if (datosVisita.visitanteId && datosVisita.visitanteId !== null) {
     datosMapeados.visitanteId = datosVisita.visitanteId;
   } else {
     // Si es un visitante nuevo, incluir datos del visitante
-    datosMapeados.tipoDocumentoId = datosVisita.tipoDocumentoId;
+    datosMapeados.tipoDocumentoId = parseInt(datosVisita.tipoDocumentoId); // Convertir a número
     datosMapeados.numeroDocumento = datosVisita.numeroDocumento;
     datosMapeados.nombres = datosVisita.nombres;
     datosMapeados.apellidos = datosVisita.apellidos;
   }
   
-  console.log('=== REGISTRAR VISITA COMPLETA ===');
-  console.log('Datos originales:', datosVisita);
-  console.log('Datos mapeados:', datosMapeados);
   
   return api.post('/visitas', datosMapeados);
 };
