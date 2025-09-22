@@ -62,8 +62,8 @@ const DashboardVigilantePage = () => {
       fechaDesde: '',
       fechaHasta: ''
     };
-    setFiltros(filtrosIniciales);
-    handleBuscarHistorial(filtrosIniciales, 1);
+    // Usar la función centralizada para evitar conflictos
+    ejecutarBusqueda(filtrosIniciales, 1);
   }, []);
 
   const cargarVisitantesActivos = async () => {
@@ -330,14 +330,19 @@ const DashboardVigilantePage = () => {
         limit: 15 // Usar 15 elementos por página
       };
       
+      // Debug: Log de los filtros recibidos
+      console.log('Filtros recibidos en handleBuscarHistorial:', filtrosData);
       
       // CORRECCIÓN: Usar los nombres correctos que espera el backend
       if (filtrosData.busqueda) params.q = filtrosData.busqueda;
       if (filtrosData.empleadoId) params.personalVisitadoId = filtrosData.empleadoId;
       if (filtrosData.motivoId) params.motivoVisitaId = filtrosData.motivoId;
-      if (filtrosData.lugar) params.areaId = filtrosData.lugar; // CAMBIO: usar areaId en lugar de areaDestinoId
+      if (filtrosData.lugar) params.areaId = filtrosData.lugar;
       if (filtrosData.fechaDesde) params.fechaInicio = filtrosData.fechaDesde;
       if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
+      
+      // Debug: Log de los parámetros que se envían al backend
+      console.log('Parámetros enviados al backend:', params);
       
       const response = await visitasService.getAll(params);
       
@@ -377,18 +382,56 @@ const DashboardVigilantePage = () => {
 
   // Función para manejar cambios de página en el historial
   const handleHistorialPageChange = (newPage) => {
+    // Solo cambiar página, no resetear filtros
+    setHistorialPagination(prev => ({
+      ...prev,
+      currentPage: newPage
+    }));
     handleBuscarHistorial(filtros, newPage);
   };
 
-  // NUEVO: Función para manejar cambios en filtros (resetea la paginación)
-  const handleFiltrosChange = (nuevosFiltros) => {
+  // Función centralizada para ejecutar búsqueda con todos los filtros
+  const ejecutarBusqueda = async (filtrosCompletos, page = 1) => {
     // Resetear la paginación al cambiar filtros
     setHistorialPagination(prev => ({
       ...prev,
       currentPage: 1
     }));
-    // Buscar con los nuevos filtros desde la página 1
-    handleBuscarHistorial(nuevosFiltros, 1);
+    
+    // Actualizar el estado de filtros
+    setFiltros(filtrosCompletos);
+    
+    // Ejecutar la búsqueda
+    await handleBuscarHistorial(filtrosCompletos, page);
+  };
+
+  // Función para manejar cambios en filtros del formulario
+  const handleFiltrosChange = (nuevosFiltros) => {
+    // Combinar los filtros del formulario con las fechas actuales
+    const filtrosCompletos = {
+      ...filtros, // Mantener fechas actuales
+      ...nuevosFiltros // Aplicar nuevos filtros del formulario
+    };
+    
+    ejecutarBusqueda(filtrosCompletos, 1);
+  };
+
+  // Función específica para manejar cambios de fecha desde
+  const handleFechaDesdeChange = (fecha) => {
+    const filtrosCompletos = {
+      ...filtros,
+      fechaDesde: fecha
+    };
+    ejecutarBusqueda(filtrosCompletos, 1);
+  };
+
+  // Función específica para manejar cambios de fecha hasta
+  const handleFechaHastaChange = (fecha) => {
+    const filtrosCompletos = {
+      ...filtros,
+      fechaHasta: fecha
+    };
+    ejecutarBusqueda(filtrosCompletos, 1);
   };
   
   // Función para manejar cambios de página en los activos
@@ -458,14 +501,6 @@ const DashboardVigilantePage = () => {
           </div>
         )}
         
-        {loading && (
-          <div className="mx-2 mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg shadow-sm">
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-              <p className="text-sm text-blue-600">Procesando...</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Main Content - Fixed Height */}
@@ -499,8 +534,8 @@ const DashboardVigilantePage = () => {
               <DateRangeFilter
                 fechaDesde={filtros.fechaDesde}
                 fechaHasta={filtros.fechaHasta}
-                onFechaDesdeChange={(fecha) => setFiltros(prev => ({ ...prev, fechaDesde: fecha }))}
-                onFechaHastaChange={(fecha) => setFiltros(prev => ({ ...prev, fechaHasta: fecha }))}
+                onFechaDesdeChange={handleFechaDesdeChange}
+                onFechaHastaChange={handleFechaHastaChange}
                 className="mb-4"
               />
             )}

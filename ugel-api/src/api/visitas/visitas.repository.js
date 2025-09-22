@@ -87,8 +87,13 @@ const findAll = async (options = {}) => {
     }
     
     if (fechaFin) {
-      whereConditions.push(`rv.fecha_ingreso <= $${paramCounter}`);
-      queryParams.push(fechaFin);
+      // Agregar un día a fechaFin para incluir todo el día
+      const fechaFinDate = new Date(fechaFin);
+      fechaFinDate.setDate(fechaFinDate.getDate() + 1);
+      const fechaFinMasUnDia = fechaFinDate.toISOString().split('T')[0];
+      
+      whereConditions.push(`rv.fecha_ingreso < $${paramCounter}`);
+      queryParams.push(fechaFinMasUnDia);
       paramCounter++;
     }
     
@@ -448,8 +453,13 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
     }
     
     if (fechaFin) {
-      whereCondition.push(`fecha_ingreso <= $${paramCounter++}`);
-      params.push(fechaFin);
+      // Agregar un día a fechaFin para incluir todo el día
+      const fechaFinDate = new Date(fechaFin);
+      fechaFinDate.setDate(fechaFinDate.getDate() + 1);
+      const fechaFinMasUnDia = fechaFinDate.toISOString().split('T')[0];
+      
+      whereCondition.push(`fecha_ingreso < $${paramCounter++}`);
+      params.push(fechaFinMasUnDia);
     }
     
     const whereClause = whereCondition.length > 0 ? `WHERE ${whereCondition.join(' AND ')}` : '';
@@ -560,4 +570,3 @@ module.exports = {
   getEstadisticas,
   findVisitaActivaPorVisitante
 };
-
