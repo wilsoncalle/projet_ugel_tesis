@@ -6,7 +6,7 @@ import Popover from '../Popover';
 import TabView from '../TabView';
 import FiltrosVisitas from './FiltrosVisitas';
 import TableGenerica from '../TableGenerica';
-import { UsersIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 const VisitantesTabla = ({
   visitantesActivos,
@@ -105,7 +105,8 @@ const VisitantesTabla = ({
       {
         key: 'visitante',
         label: 'Visitante',
-        className: 'min-w-[200px]',
+        minWidth: '180px',
+        width: '25%',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -164,7 +165,8 @@ const VisitantesTabla = ({
       {
         key: 'empleado',
         label: 'Empleado Visitado',
-        className: 'w-[150px] max-w-[150px]',
+        minWidth: '120px',
+        width: '20%',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -208,7 +210,8 @@ const VisitantesTabla = ({
       {
         key: 'motivo',
         label: 'Motivo',
-        className: 'min-w-[150px]',
+        minWidth: '120px',
+        width: '20%',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -245,7 +248,8 @@ const VisitantesTabla = ({
       {
         key: 'lugar',
         label: 'Lugar',
-        className: 'min-w-[150px]',
+        minWidth: '120px',
+        width: '20%',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -272,7 +276,9 @@ const VisitantesTabla = ({
       {
         key: 'horaIngreso',
         label: 'Hora Ingreso',
-        className: 'min-w-[80px]',
+        minWidth: '60px',
+        maxWidth: '80px',
+        width: '70px',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -322,7 +328,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="text-sm text-gray-900 px-2">
+            <div className="text-sm text-gray-900 px-1">
               {horaFormateada || '-'}
             </div>
           );
@@ -335,7 +341,9 @@ const VisitantesTabla = ({
       baseColumns.push({
         key: 'fecha',
         label: 'Fecha',
-        className: 'min-w-[80px]',
+        minWidth: '70px',
+        maxWidth: '90px',
+        width: '80px',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -359,7 +367,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="text-sm text-gray-900 px-2">
+            <div className="text-sm text-gray-900 px-1">
               {fechaStr || '-'}
             </div>
           );
@@ -369,7 +377,9 @@ const VisitantesTabla = ({
       baseColumns.push({
         key: 'horaSalida',
         label: 'Hora Salida',
-        className: 'min-w-[80px]',
+        minWidth: '60px',
+        maxWidth: '80px',
+        width: '70px',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -391,7 +401,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="text-sm text-gray-900 px-2">
+            <div className="text-sm text-gray-900 px-1">
               {horaFormateada || '-'}
             </div>
           );
@@ -404,7 +414,9 @@ const VisitantesTabla = ({
       baseColumns.push({
         key: 'actions',
         label: 'Acciones',
-        className: 'min-w-[150px]',
+        minWidth: '80px',
+        maxWidth: '100px',
+        width: '90px',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -420,7 +432,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="relative">
+            <div className="flex justify-center">
               {enEspera ? (
                 <button
                   onClick={() => {
@@ -428,18 +440,20 @@ const VisitantesTabla = ({
                       onEliminarVisitanteEspera(row.id);
                     }
                   }}
-                  className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors"
+                  className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                  title="Eliminar Visitante"
                 >
-                  Eliminar
+                  <TrashIcon className="h-4 w-4" />
                 </button>
               ) : (
                 <button
                   onClick={() => {
                     onRegistrarSalida(row.id, row);
                   }}
-                  className="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-2xl hover:bg-primary-700 transition-colors"
+                  className="p-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors"
+                  title="Registrar Salida"
                 >
-                  Registrar Salida
+                  <ArrowRightOnRectangleIcon className="h-4 w-4" />
                 </button>
               )}
             </div>
@@ -499,7 +513,6 @@ const VisitantesTabla = ({
               <TableGenerica
                 columns={getColumns}
                 data={getTabData()}
-                minTableWidth={activeTab === 'activos' ? '1100px' : '1100px'}
                 isRowInWaiting={(row) => (visitantesEnEspera || []).some(v => v.id === row.id)}
                 {...getPaginationProps()}
                 emptyMessage={

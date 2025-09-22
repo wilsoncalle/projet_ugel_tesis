@@ -93,7 +93,7 @@ const TableGenerica = ({
       )}
 
       {/* Table Container - Solo la tabla con scroll */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow overflow-hidden border border-gray-200">
         <div 
           className="overflow-x-auto" 
           style={{ 
@@ -102,17 +102,22 @@ const TableGenerica = ({
             WebkitOverflowScrolling: 'touch'
           }}
         >
-          <table className="divide-y divide-gray-200" style={{ width: minTableWidth, minWidth: minTableWidth }}>
+          <table className="divide-y divide-gray-200 w-full">
             <thead className="bg-gray-50">
               <tr>
                 {columns.map((column, index) => (
                   <th
                     key={column.key || index}
                     scope="col"
-                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                    className={`px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                       column.className || ''
                     }`}
-                    style={column.style}
+                    style={{
+                      ...column.style,
+                      minWidth: column.minWidth || 'auto',
+                      maxWidth: column.maxWidth || 'none',
+                      width: column.width || 'auto'
+                    }}
                   >
                     {column.label || column.title}
                   </th>
@@ -124,7 +129,7 @@ const TableGenerica = ({
                 <tr>
                   <td
                     colSpan={columns.length}
-                    className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500"
+                    className="px-3 py-2 whitespace-nowrap text-center text-sm text-gray-500"
                   >
                     <div className="flex justify-center items-center">
                       <svg
@@ -155,7 +160,7 @@ const TableGenerica = ({
                 <tr>
                   <td
                     colSpan={columns.length}
-                    className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500"
+                    className="px-3 py-2 whitespace-nowrap text-center text-sm text-gray-500"
                   >
                     {searchTerm ? 'No se encontraron resultados para tu búsqueda' : emptyMessage}
                   </td>
@@ -175,7 +180,7 @@ const TableGenerica = ({
                     {columns.map((column, colIndex) => (
                       <td
                         key={`${rowIndex}-${column.key || colIndex}`}
-                        className={`px-6 py-4 whitespace-nowrap text-sm ${
+                        className={`px-3 py-2 whitespace-nowrap text-sm ${
                           column.cellClassName || ''
                         }`}
                         style={column.cellStyle}

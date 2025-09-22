@@ -224,9 +224,9 @@ const DashboardVigilantePage = () => {
             // Asegurar que estamos enviando exactamente lo que espera la API
             const visitantePayload = {
               tipoDocumentoId: parseInt(visitante.tipoDocumentoId), // Convertir a número
-              numeroDocumento: visitante.numeroDocumento,
-              nombres: visitante.nombres,
-              apellidos: visitante.apellidos
+              numeroDocumento: visitante.numeroDocumento.slice(0, 20), // VARCHAR(20)
+              nombres: visitante.nombres.slice(0, 150), // VARCHAR(150)
+              apellidos: visitante.apellidos.slice(0, 150) // VARCHAR(150)
             };
             
             const responseVisitante = await visitantesService.create(visitantePayload);

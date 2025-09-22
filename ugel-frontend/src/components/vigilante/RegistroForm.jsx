@@ -353,9 +353,26 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
 
   // Manejar cambios en el formulario de visitante
   const handleVisitanteChange = (field, value) => {
+    // Validar límites de caracteres según la BD
+    let validatedValue = value;
+    
+    switch (field) {
+      case 'numeroDocumento':
+        validatedValue = value.slice(0, 20); // VARCHAR(20)
+        break;
+      case 'nombres':
+        validatedValue = value.slice(0, 150); // VARCHAR(150)
+        break;
+      case 'apellidos':
+        validatedValue = value.slice(0, 150); // VARCHAR(150)
+        break;
+      default:
+        validatedValue = value;
+    }
+    
     const newFormVisitante = {
       ...formVisitante,
-      [field]: value
+      [field]: validatedValue
     };
     setFormVisitante(newFormVisitante);
     
@@ -868,7 +885,7 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
                   value={formVisitante.numeroDocumento}
                   onChange={(e) => handleVisitanteChange('numeroDocumento', e.target.value)}
                         placeholder=""
-                  maxLength="12"
+                  maxLength="20"
                   className="rounded-r-none border-r-0"
                         style={{ borderTopRightRadius: '0', borderBottomRightRadius: '0' }}
                 />
@@ -894,12 +911,14 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
               value={formVisitante.nombres}
               onChange={(e) => handleVisitanteChange('nombres', e.target.value)}
                     placeholder=""
+              maxLength="150"
             />
             <Input
               label="Apellidos *"
               value={formVisitante.apellidos}
               onChange={(e) => handleVisitanteChange('apellidos', e.target.value)}
                     placeholder=""
+              maxLength="150"
                   />
                 </div>
               </>
