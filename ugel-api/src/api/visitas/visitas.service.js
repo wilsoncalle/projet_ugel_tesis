@@ -29,7 +29,6 @@ const getAllVisitas = async (options = {}) => {
     documentoVisitante
   } = options;
   
-  
   try {
     // Obtener visitas con paginación
     const result = await repository.findAll({

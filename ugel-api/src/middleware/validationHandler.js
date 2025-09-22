@@ -17,8 +17,8 @@ const validate = (schema, property = 'body') => {
   return asyncHandler(async (req, res, next) => {
     const { error, value } = schema.validate(req[property], {
       abortEarly: false, // Mostrar todos los errores
-      allowUnknown: false, // No permitir campos desconocidos
-      stripUnknown: true // Remover campos desconocidos
+      allowUnknown: true, // Permitir campos desconocidos
+      stripUnknown: false // No remover campos desconocidos
     });
     
     if (error) {
@@ -45,14 +45,30 @@ const commonSchemas = {
     page: Joi.number().integer().min(1).default(config.pagination.defaultPage),
     limit: Joi.number().integer().min(1).max(config.pagination.maxLimit).default(config.pagination.defaultLimit),
     sortBy: Joi.string().optional(),
-    sortOrder: Joi.string().valid('asc', 'desc').default('asc')
+    sortOrder: Joi.string().valid('asc', 'desc').default('asc'),
+    // Permitir parámetros adicionales para filtros
+    q: Joi.string().optional(),
+    areaId: Joi.number().integer().positive().optional(),
+    motivoVisitaId: Joi.number().integer().positive().optional(),
+    personalVisitadoId: Joi.number().integer().positive().optional(),
+    documentoVisitante: Joi.string().optional(),
+    fechaInicio: Joi.date().iso().optional(),
+    fechaFin: Joi.date().iso().optional()
   }),
   
   // Schema para fechas
   dateRange: Joi.object({
     fechaInicio: Joi.date().iso().optional(),
-    fechaFin: Joi.date().iso().min(Joi.ref('fechaInicio')).optional(),
-    fecha: Joi.date().iso().optional()
+    fechaFin: Joi.date().iso().optional(),
+    fecha: Joi.date().iso().optional(),
+    // Permitir parámetros adicionales para filtros
+    q: Joi.string().optional(),
+    areaId: Joi.number().integer().positive().optional(),
+    motivoVisitaId: Joi.number().integer().positive().optional(),
+    personalVisitadoId: Joi.number().integer().positive().optional(),
+    documentoVisitante: Joi.string().optional(),
+    page: Joi.number().integer().min(1).optional(),
+    limit: Joi.number().integer().min(1).max(100).optional()
   }),
   
   // Schema para búsqueda

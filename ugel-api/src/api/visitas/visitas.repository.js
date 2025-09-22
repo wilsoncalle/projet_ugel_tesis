@@ -27,7 +27,6 @@ const findAll = async (options = {}) => {
   
   const offset = (page - 1) * limit;
   
-  
   try {
     // Construir la consulta base
     let query = `

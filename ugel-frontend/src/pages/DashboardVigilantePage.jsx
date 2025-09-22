@@ -21,14 +21,7 @@ const DashboardVigilantePage = () => {
     motivoId: '',
     lugar: '',
     fechaDesde: '',
-    fechaHasta: (() => {
-      // Crear fecha local sin problemas de zona horaria
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    })()
+    fechaHasta: '' // Sin filtro de fecha por defecto para mostrar todos los registros
   });
   const [activeTab, setActiveTab] = useState('activos');
   const [loading, setLoading] = useState(false);
@@ -60,20 +53,14 @@ const DashboardVigilantePage = () => {
   // Cargar visitantes activos al montar el componente
   useEffect(() => {
     cargarVisitantesActivos();
-    // Cargar historial inicial con filtros por defecto
+    // Cargar historial inicial sin filtros para mostrar todos los registros
     const filtrosIniciales = {
       busqueda: '',
       empleadoId: '',
       motivoId: '',
       lugar: '',
       fechaDesde: '',
-      fechaHasta: (() => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      })()
+      fechaHasta: ''
     };
     setFiltros(filtrosIniciales);
     handleBuscarHistorial(filtrosIniciales, 1);
@@ -364,8 +351,16 @@ const DashboardVigilantePage = () => {
           setHistorialPagination({
             currentPage: response.data.pagination.page || page,
             totalPages: response.data.pagination.totalPages || 1,
-            totalItems: response.data.pagination.total || historialData.length,
+            totalItems: response.data.pagination.total || 0,
             itemsPerPage: response.data.pagination.limit || 15
+          });
+        } else {
+          // Si no hay información de paginación del backend, usar los datos locales
+          setHistorialPagination({
+            currentPage: 1,
+            totalPages: 1,
+            totalItems: historialData.length,
+            itemsPerPage: 15
           });
         }
         

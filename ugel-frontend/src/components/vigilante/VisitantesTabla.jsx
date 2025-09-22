@@ -91,8 +91,8 @@ const VisitantesTabla = ({
           pagination: true,
           itemsPerPage: historialPagination?.itemsPerPage || 15,
           currentPage: historialPagination?.currentPage || 1,
-          totalItems: historialPagination?.totalItems || 0, // Solo usar el total del backend
-          totalPages: historialPagination?.totalPages || 1, // Solo usar el total del backend
+          totalItems: historialPagination?.totalItems || data.length, // Usar total del backend o datos locales
+          totalPages: historialPagination?.totalPages || Math.ceil(data.length / (historialPagination?.itemsPerPage || 15)), // Calcular si no hay totalPages
           onPageChange: onHistorialPageChange
         };
         return historialProps;
@@ -393,9 +393,9 @@ const VisitantesTabla = ({
       baseColumns.push({
         key: 'fecha',
         label: 'Fecha',
-        minWidth: '100px',
-        maxWidth: '110px',
-        width: '110px',
+        minWidth: '120px',
+        maxWidth: '120px',
+        width: '120px',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
