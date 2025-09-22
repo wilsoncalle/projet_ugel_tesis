@@ -512,6 +512,7 @@ const DashboardVigilantePage = () => {
               onFormChange={handleFormChange}
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              onBuscarHistorial={handleFiltrosChange}
             />
           </div>
         </div>
