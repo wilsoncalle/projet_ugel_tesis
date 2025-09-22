@@ -223,15 +223,6 @@ const DateRangeFilter = ({
     return date > today;
   };
 
-  // Función para obtener el día laboral anterior si la fecha cae en fin de semana
-  const getPreviousWorkday = (date) => {
-    let d = new Date(date);
-    while (d.getDay() === 0 || d.getDay() === 6) {
-      d.setDate(d.getDate() - 1);
-    }
-    return d;
-  };
-
   // Generar días del calendario (empezando por lunes)
   const generateCalendarDays = (month, year) => {
     const firstDay = new Date(year, month, 1);
