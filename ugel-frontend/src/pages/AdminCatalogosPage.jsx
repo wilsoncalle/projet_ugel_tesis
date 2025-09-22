@@ -6,13 +6,16 @@ import TiposContratoPage from './TiposContratoPage';
 import MotivosVisitaPage from './MotivosVisitaPage';
 import TiposDocumentoPage from './TiposDocumentoPage';
 import MotivosSalidaPage from './MotivosSalidaPage';
+import PersonalPage from './PersonalPage';
 
 const AdminCatalogosPage = () => {
-  const [activeTab, setActiveTab] = useState('areas');
+  const [activeTab, setActiveTab] = useState('personal');
   
   // Función para renderizar el catálogo activo
   const renderCatalogo = () => {
     switch (activeTab) {
+      case 'personal':
+        return <PersonalPage />;
       case 'areas':
         return <AreasPage />;
       case 'tiposContrato':
@@ -36,7 +39,7 @@ const AdminCatalogosPage = () => {
           </Card>
         );
       default:
-        return <AreasPage />;
+        return <PersonalPage />;
     }
   };
 
@@ -52,6 +55,15 @@ const AdminCatalogosPage = () => {
       {/* Tabs para los diferentes catálogos */}
       <TabView
         tabs={[
+          {
+            key: 'personal',
+            label: 'Gestión de Personal',
+            icon: (
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            )
+          },
           {
             key: 'areas',
             label: 'Áreas',

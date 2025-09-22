@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS Personal (
     tipo_contrato_id INT NOT NULL,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     UNIQUE(tipo_documento, numero_documento),
+    cargo VARCHAR(100) NOT NULL DEFAULT 'Sin asignar',
     FOREIGN KEY (area_destino_id) REFERENCES AreasDestino(id),
     FOREIGN KEY (tipo_contrato_id) REFERENCES TiposContrato(id)
 );

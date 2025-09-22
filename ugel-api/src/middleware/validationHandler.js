@@ -196,6 +196,11 @@ const schemas = {
         .min(2)
         .max(150)
         .required(),
+      cargo: Joi.string()
+        .min(2)
+        .max(100)
+        .default('Sin asignar')
+        .optional(),
       areaDestinoId: Joi.number()
         .integer()
         .positive()
@@ -221,6 +226,10 @@ const schemas = {
       apellidos: Joi.string()
         .min(2)
         .max(150)
+        .optional(),
+      cargo: Joi.string()
+        .min(2)
+        .max(100)
         .optional(),
       areaDestinoId: Joi.number()
         .integer()

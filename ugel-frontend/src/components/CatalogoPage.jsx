@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import Card from './Card';
-import TableGenerica from './TableGenerica';
+import AdaptiveTable from './AdaptiveTable';
 import ModalGenerico from './ModalGenerico';
 import FormularioGenerico from './FormularioGenerico';
 import Button from './Button';
@@ -317,9 +317,9 @@ const CatalogoPage = ({
   // Generate actions column for active items
   const actions = (_, row) => (
     <div className="flex space-x-2">
-      <Button
-        size="sm"
-        variant="outline"
+      <button
+        type="button"
+        className="w-8 h-8 rounded-full border border-blue-600 bg-blue-600 hover:bg-blue-700 hover:border-blue-700 flex items-center justify-center transition-colors duration-200"
         onClick={() => {
           if (onEditClick) {
             // Si hay una función personalizada, llamarla
@@ -328,34 +328,52 @@ const CatalogoPage = ({
           }
           openEditModal(row);
         }}
+        title="Editar"
       >
-        Editar
-      </Button>
-      <Button
-        size="sm"
-        variant="danger"
+        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="w-8 h-8 rounded-full border border-red-600 bg-red-600 hover:bg-red-700 hover:border-red-700 flex items-center justify-center transition-colors duration-200"
         onClick={() => openDeleteModal(row)}
+        title="Eliminar"
       >
-        Eliminar
-      </Button>
+        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      </button>
     </div>
   );
 
   // Generate actions column for deleted items
   const deletedActions = (_, row) => (
     <div className="flex space-x-2">
-      <Button
-        size="sm"
-        variant="outline"
+      <button
+        type="button"
+        className="w-8 h-8 rounded-full border border-green-600 bg-green-600 hover:bg-green-700 hover:border-green-700 flex items-center justify-center transition-colors duration-200"
         onClick={() => handleRestore(row)}
+        title="Restaurar"
       >
-        Restaurar
-      </Button>
+        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
     </div>
   );
 
   // Get final columns with actions
-  const finalColumns = tableColumns ? [...tableColumns, { key: 'acciones', title: 'Acciones', render: actions }] : [];
+  const finalColumns = tableColumns ? [...tableColumns, { 
+    key: 'acciones', 
+    title: 'Acciones', 
+    render: actions,
+    minWidth: '100px',
+    maxWidth: '120px',
+    width: '100px',
+    sticky: 'right',
+    stickyOffset: '0px'
+  }] : [];
 
   return (
     <div className="space-y-6">
@@ -420,7 +438,7 @@ const CatalogoPage = ({
         >
           {activeTab === 'active' ? (
             <Card>
-              <TableGenerica
+              <AdaptiveTable
                 columns={finalColumns}
                 data={items}
                 isLoading={loading}
@@ -433,10 +451,19 @@ const CatalogoPage = ({
             </Card>
           ) : (
             <Card>
-              <TableGenerica
+              <AdaptiveTable
                 columns={[
                   ...tableColumns,
-                  { key: 'acciones', title: 'Acciones', render: deletedActions }
+                  { 
+                    key: 'acciones', 
+                    title: 'Acciones', 
+                    render: deletedActions,
+                    minWidth: '80px',
+                    maxWidth: '100px',
+                    width: '80px',
+                    sticky: 'right',
+                    stickyOffset: '0px'
+                  }
                 ]}
                 data={deletedItems}
                 isLoading={deletedItemsLoading}
@@ -451,7 +478,7 @@ const CatalogoPage = ({
         </TabView>
       ) : (
         <Card>
-          <TableGenerica
+          <AdaptiveTable
             columns={finalColumns}
             data={items}
             isLoading={loading}

@@ -92,6 +92,14 @@ export const personalFormFields = [
     placeholder: 'Ingrese apellidos'
   },
   {
+    name: 'cargo',
+    label: 'Cargo',
+    type: 'text',
+    required: false,
+    placeholder: 'Ingrese cargo (opcional)',
+    defaultValue: 'Sin asignar'
+  },
+  {
     name: 'areaDestinoId',
     label: 'Área',
     type: 'select',
@@ -264,6 +272,7 @@ export const transformPersonal = (data) => {
       numeroDocumento: item.numero_documento,
       nombres: item.nombres,
       apellidos: item.apellidos,
+      cargo: item.cargo || 'Sin asignar',
       areaDestinoId: item.area_destino_id,
       tipoContratoId: item.tipo_contrato_id,
       area_nombre: item.area_nombre || 'No asignado',
@@ -285,6 +294,7 @@ export const transformPersonalToBackend = (data) => {
     numeroDocumento: data.numeroDocumento,
     nombres: data.nombres,
     apellidos: data.apellidos,
+    cargo: data.cargo || 'Sin asignar',
     areaDestinoId: parseInt(data.areaDestinoId),
     tipoContratoId: parseInt(data.tipoContratoId),
     activo: data.activo
@@ -293,24 +303,35 @@ export const transformPersonalToBackend = (data) => {
   return transformed;
 };
 
-// Configuración de columnas para las tablas
+// Configuración de columnas para las tablas - OPTIMIZADA
 export const getTableColumns = (moduleName) => {
   const baseColumns = [
     {
       key: 'id',
       title: 'ID',
-      className: 'w-16',
+      minWidth: '50px',
+      maxWidth: '60px',
+      width: '50px'
     },
   ];
 
   const moduleColumns = {
     areas: [
-      { key: 'nombre_area', title: 'Nombre del Área' },
+      { 
+        key: 'nombre_area', 
+        title: 'Nombre del Área',
+        minWidth: '200px',
+        maxWidth: '500px',
+        width: 'auto'
+      },
       { 
         key: 'activa', 
         title: 'Estado',
+        minWidth: '90px',
+        maxWidth: '100px',
+        width: '90px',
         render: (value) => (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
             value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
             {value ? 'Activa' : 'Inactiva'}
@@ -319,13 +340,28 @@ export const getTableColumns = (moduleName) => {
       },
     ],
     tiposDocumento: [
-      { key: 'codigo', title: 'Código' },
-      { key: 'nombre_completo', title: 'Nombre Completo' },
+      { 
+        key: 'codigo', 
+        title: 'Código',
+        minWidth: '80px',
+        maxWidth: '100px',
+        width: '80px'
+      },
+      { 
+        key: 'nombre_completo', 
+        title: 'Nombre Completo',
+        minWidth: '250px',
+        maxWidth: '500px',
+        width: 'auto'
+      },
       { 
         key: 'activo', 
         title: 'Estado',
+        minWidth: '90px',
+        maxWidth: '100px',
+        width: '90px',
         render: (value) => (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
             value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
             {value ? 'Activo' : 'Inactivo'}
@@ -334,12 +370,21 @@ export const getTableColumns = (moduleName) => {
       },
     ],
     motivosVisita: [
-      { key: 'nombre_motivo', title: 'Nombre del Motivo' },
+      { 
+        key: 'nombre_motivo', 
+        title: 'Nombre del Motivo',
+        minWidth: '200px',
+        maxWidth: '500px',
+        width: 'auto'
+      },
       { 
         key: 'activo', 
         title: 'Estado',
+        minWidth: '90px',
+        maxWidth: '100px',
+        width: '90px',
         render: (value) => (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
             value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
             {value ? 'Activo' : 'Inactivo'}
@@ -348,12 +393,21 @@ export const getTableColumns = (moduleName) => {
       },
     ],
     tiposContrato: [
-      { key: 'nombre_tipo', title: 'Nombre del Tipo' },
+      { 
+        key: 'nombre_tipo', 
+        title: 'Nombre del Tipo',
+        minWidth: '200px',
+        maxWidth: '500px',
+        width: 'auto'
+      },
       { 
         key: 'activo', 
         title: 'Estado',
+        minWidth: '90px',
+        maxWidth: '100px',
+        width: '90px',
         render: (value) => (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
             value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
             {value ? 'Activo' : 'Inactivo'}
@@ -362,12 +416,21 @@ export const getTableColumns = (moduleName) => {
       },
     ],
     motivosSalida: [
-      { key: 'nombre_motivo', title: 'Nombre del Motivo' },
+      { 
+        key: 'nombre_motivo', 
+        title: 'Nombre del Motivo',
+        minWidth: '200px',
+        maxWidth: '500px',
+        width: 'auto'
+      },
       { 
         key: 'activo', 
         title: 'Estado',
+        minWidth: '90px',
+        maxWidth: '100px',
+        width: '90px',
         render: (value) => (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
             value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
             {value ? 'Activo' : 'Inactivo'}
@@ -376,17 +439,63 @@ export const getTableColumns = (moduleName) => {
       },
     ],
     personal: [
-      { key: 'tipoDocumento', title: 'Tipo Doc.' },
-      { key: 'numeroDocumento', title: 'Número Doc.' },
-      { key: 'nombres', title: 'Nombres' },
-      { key: 'apellidos', title: 'Apellidos' },
-      { key: 'area_nombre', title: 'Área' },
-      { key: 'tipo_contrato_nombre', title: 'Tipo de Contrato' },
+      { 
+        key: 'tipoDocumento', 
+        title: 'Tipo',
+        minWidth: '60px',
+        maxWidth: '70px',
+        width: '60px'
+      },
+      { 
+        key: 'numeroDocumento', 
+        title: 'Documento',
+        minWidth: '100px',
+        maxWidth: '120px',
+        width: '100px'
+      },
+      { 
+        key: 'nombres', 
+        title: 'Nombres',
+        minWidth: '150px',
+        maxWidth: '150px',
+        width: '150px'
+      },
+      { 
+        key: 'apellidos', 
+        title: 'Apellidos',
+        minWidth: '150px',
+        maxWidth: '150px',
+        width: '150px'
+      },
+      { 
+        key: 'cargo', 
+        title: 'Cargo',
+        minWidth: '150px',
+        maxWidth: '150px',
+        width: '150px'
+      },
+      { 
+        key: 'area_nombre', 
+        title: 'Área',
+        minWidth: '190px',
+        maxWidth: '190px',
+        width: '190px'
+      },
+      { 
+        key: 'tipo_contrato_nombre', 
+        title: 'Contrato',
+        minWidth: '150px',
+        maxWidth: '150px',
+        width: '150px'
+      },
       { 
         key: 'activo', 
         title: 'Estado',
+        minWidth: '80px',
+        maxWidth: '90px',
+        width: '80px',
         render: (value) => (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
             value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
             {value ? 'Activo' : 'Inactivo'}

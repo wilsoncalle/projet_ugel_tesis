@@ -102,6 +102,7 @@ const createPersonal = async (personalData, userId) => {
       numeroDocumento, 
       nombres, 
       apellidos, 
+      cargo,
       areaDestinoId, 
       tipoContratoId 
     } = personalData;
@@ -141,6 +142,7 @@ const createPersonal = async (personalData, userId) => {
       numero_documento: numeroDocumento,
       nombres,
       apellidos,
+      cargo,
       area_destino_id: areaDestinoId,
       tipo_contrato_id: tipoContratoId,
       activo: true
@@ -176,6 +178,7 @@ const updatePersonal = async (id, personalData, userId) => {
       numeroDocumento, 
       nombres, 
       apellidos, 
+      cargo,
       areaDestinoId, 
       tipoContratoId,
       activo
@@ -215,6 +218,10 @@ const updatePersonal = async (id, personalData, userId) => {
     
     if (apellidos !== undefined) {
       updateData.apellidos = apellidos;
+    }
+    
+    if (cargo !== undefined) {
+      updateData.cargo = cargo;
     }
     
     if (areaDestinoId !== undefined) {

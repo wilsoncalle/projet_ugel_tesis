@@ -35,6 +35,7 @@ const findAll = async (options = {}) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.cargo,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -141,6 +142,7 @@ const findById = async (id) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.cargo,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -176,6 +178,7 @@ const findByDocumento = async (tipoDocumento, numeroDocumento) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.cargo,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -208,6 +211,7 @@ const create = async (personalData) => {
       numero_documento, 
       nombres, 
       apellidos, 
+      cargo,
       area_destino_id, 
       tipo_contrato_id,
       activo = true
@@ -219,11 +223,12 @@ const create = async (personalData) => {
         numero_documento, 
         nombres, 
         apellidos, 
+        cargo,
         area_destino_id, 
         tipo_contrato_id,
         activo
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id
     `;
     
@@ -232,6 +237,7 @@ const create = async (personalData) => {
       numero_documento, 
       nombres, 
       apellidos, 
+      cargo,
       area_destino_id, 
       tipo_contrato_id,
       activo
@@ -297,6 +303,11 @@ const update = async (id, personalData) => {
     if (personalData.apellidos !== undefined) {
       updateFields.push(`apellidos = $${paramCounter++}`);
       queryParams.push(personalData.apellidos);
+    }
+    
+    if (personalData.cargo !== undefined) {
+      updateFields.push(`cargo = $${paramCounter++}`);
+      queryParams.push(personalData.cargo);
     }
     
     if (personalData.area_destino_id !== undefined) {
@@ -399,6 +410,7 @@ const findByArea = async (areaId) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.cargo,
         p.activo
       FROM Personal p
       WHERE p.area_destino_id = $1 AND p.activo = true
@@ -453,6 +465,7 @@ const findDeleted = async (options = {}) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.cargo,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -527,6 +540,7 @@ const findByIdIncludingDeleted = async (id) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.cargo,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
