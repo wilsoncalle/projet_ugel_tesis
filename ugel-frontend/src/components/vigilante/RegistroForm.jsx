@@ -5,7 +5,7 @@ import Input from '../Input';
 import SelectCustom from '../SelectCustom';
 import Badge from '../Badge';
 import { PlusIcon, ClipboardDocumentListIcon, UserGroupIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { tiposDocumentoService, motivosVisitaService, personalService, areasService, visitantesService, registrarVisitaCompleta } from '../../services/api';
+import { tiposDocumentoService, motivosVisitaService, personalService, areasService, visitantesService, registrarVisitaCompleta, getVisitantesActivos } from '../../services/api';
 
 const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange, activeTab = 'activos', onTabChange }) => {
   // Estados del formulario de visitante (compartido entre tabs)
@@ -235,6 +235,24 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...empleados]);
   };
 
+  // Verificar si el visitante ya tiene una visita activa
+  const verificarVisitaActiva = async (visitanteId) => {
+    try {
+      const response = await getVisitantesActivos();
+      if (response.data.success && response.data.data) {
+        const visitasActivas = response.data.data;
+        const visitaActiva = visitasActivas.find(visita => 
+          visita.visitante_id === visitanteId
+        );
+        return visitaActiva;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error verificando visita activa:', error);
+      return null;
+    }
+  };
+
   // Buscar visitante por documento
   const buscarVisitante = async () => {
     if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento) {
@@ -267,6 +285,15 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
           setMensajeVisitante('Este visitante ya está en la lista de espera');
           setTipoMensaje('error');
           setDocumentoYaBuscado(documentoActual); // Marcar como ya buscado
+          return;
+        }
+        
+        // Verificar si el visitante ya tiene una visita activa
+        const visitaActiva = await verificarVisitaActiva(visitante.id);
+        if (visitaActiva) {
+          setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
+          setTipoMensaje('error');
+          setDocumentoYaBuscado(documentoActual);
           return;
         }
         
@@ -454,6 +481,16 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
         await buscarVisitante();
         // Esperar un momento para que se actualice el estado
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Si después de buscar tenemos un visitanteId, verificar si tiene visita activa
+        if (formVisitante.visitanteId) {
+          const visitaActiva = await verificarVisitaActiva(formVisitante.visitanteId);
+          if (visitaActiva) {
+            setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
+            setTipoMensaje('error');
+            return;
+          }
+        }
       } catch (error) {
         console.error('Error al buscar visitante:', error);
       }
@@ -556,6 +593,17 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
         }
       } catch (error) {
         console.error('Error al registrar visita:', error);
+        
+        // Manejar específicamente el error de visita activa duplicada (409)
+        if (error.response && error.response.status === 409) {
+          setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
+          setTipoMensaje('error');
+          return; // No continuar con el proceso
+        }
+        
+        // Manejar otros errores
+        setMensajeVisitante('Error al registrar la visita. Intente nuevamente.');
+        setTipoMensaje('error');
       }
     } else {
       // Si no hay datos de visita, solo agregar el visitante a la lista de espera

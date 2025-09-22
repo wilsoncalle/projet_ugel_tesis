@@ -519,29 +519,29 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
 };
 
 /**
- * Buscar visita activa de un visitante en un área específica
+ * Buscar si un visitante tiene alguna visita activa (sin salida) - SIN importar el área
  * @param {number} visitanteId - ID del visitante
- * @param {number} areaDestinoId - ID del área de destino
  * @returns {Object|null} Visita activa encontrada o null
  */
-const findVisitaActivaPorVisitante = async (visitanteId, areaDestinoId) => {
+const findVisitaActivaPorVisitante = async (visitanteId) => {
   try {
     const query = `
       SELECT 
         rv.id,
         rv.visitante_id,
         rv.area_destino_id,
+        a.nombre_area,
         rv.fecha_ingreso,
         rv.fecha_salida
       FROM RegistrosVisitas rv
+      JOIN AreasDestino a ON rv.area_destino_id = a.id
       WHERE rv.visitante_id = $1 
-        AND rv.area_destino_id = $2 
         AND rv.fecha_salida IS NULL
       ORDER BY rv.fecha_ingreso DESC
       LIMIT 1
     `;
     
-    const result = await db.query(query, [visitanteId, areaDestinoId]);
+    const result = await db.query(query, [visitanteId]);
     return result.rows[0] || null;
     
   } catch (error) {
@@ -559,3 +559,4 @@ module.exports = {
   getEstadisticas,
   findVisitaActivaPorVisitante
 };
+

@@ -191,10 +191,13 @@ const createVisita = async (visitaData) => {
     }
     
     // Verificar si el visitante ya tiene una visita activa (sin salida) en la misma área
-    const visitaActiva = await repository.findVisitaActivaPorVisitante(visitante.id, areaDestinoId);
-    if (visitaActiva) {
-      throw new AppError('El visitante ya tiene una visita activa en esta área. Debe registrar su salida antes de una nueva entrada.', 409);
-    }
+    const visitaActiva = await repository.findVisitaActivaPorVisitante(visitante.id);
+if (visitaActiva) {
+  throw new AppError(
+    `El visitante ya tiene una visita activa en el área "${visitaActiva.nombre_area}" desde ${new Date(visitaActiva.fecha_ingreso).toLocaleString()}. Debe registrar su salida antes de una nueva entrada.`, 
+    409
+  );
+}
     
     // Crear la visita
     const newVisita = await repository.create({
