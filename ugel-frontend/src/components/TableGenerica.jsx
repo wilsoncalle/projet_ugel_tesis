@@ -38,13 +38,18 @@ const TableGenerica = ({
   // Usar paginación externa si está disponible, sino usar interna
   const currentPage = externalCurrentPage !== undefined ? externalCurrentPage : internalCurrentPage;
   const totalItems = externalTotalItems !== undefined ? externalTotalItems : filteredData.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage); // Siempre calcular correctamente
+  const totalPages = externalTotalPages !== undefined ? externalTotalPages : Math.ceil(totalItems / itemsPerPage);
   const onPageChange = externalOnPageChange || setInternalCurrentPage;
 
   // Pagination logic
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentData = pagination ? filteredData.slice(startIndex, endIndex) : filteredData;
+  
+  // Si tenemos paginación externa (del backend), usar los datos tal como vienen
+  // Si es paginación interna, hacer slice
+  const currentData = pagination 
+    ? (externalTotalItems !== undefined ? filteredData : filteredData.slice(startIndex, endIndex))
+    : filteredData;
 
   const handlePageChange = (page) => {
     onPageChange(page);
@@ -111,12 +116,24 @@ const TableGenerica = ({
                     scope="col"
                     className={`px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                       column.className || ''
-                    }`}
+                    } ${column.sticky ? 'sticky bg-white z-10' : ''}`}
                     style={{
                       ...column.style,
                       minWidth: column.minWidth || 'auto',
-                      maxWidth: column.maxWidth || 'none',
-                      width: column.width || 'auto'
+                      maxWidth: column.maxWidth || '250px',
+                      width: column.width || 'auto',
+                      ...(column.sticky === 'right' && {
+                        position: 'sticky',
+                        right: column.stickyOffset || '0px',
+                        backgroundColor: '#f9fafb',
+                        zIndex: 10
+                      }),
+                      ...(column.sticky === 'left' && {
+                        position: 'sticky',
+                        left: column.stickyOffset || '0px',
+                        backgroundColor: '#f9fafb',
+                        zIndex: 10
+                      })
                     }}
                   >
                     {column.label || column.title}
@@ -180,10 +197,28 @@ const TableGenerica = ({
                     {columns.map((column, colIndex) => (
                       <td
                         key={`${rowIndex}-${column.key || colIndex}`}
-                        className={`px-3 py-2 whitespace-nowrap text-sm ${
+                        className={`px-3 py-2 text-sm ${
                           column.cellClassName || ''
-                        }`}
-                        style={column.cellStyle}
+                        } ${column.sticky ? 'sticky bg-white z-10' : ''}`}
+                        style={{
+                          ...column.cellStyle,
+                          maxWidth: column.maxWidth || '250px',
+                          wordWrap: 'break-word',
+                          wordBreak: 'break-word',
+                          overflowWrap: 'break-word',
+                          ...(column.sticky === 'right' && {
+                            position: 'sticky',
+                            right: column.stickyOffset || '0px',
+                            backgroundColor: isWaiting ? '#fffbeb' : 'white',
+                            zIndex: 10
+                          }),
+                          ...(column.sticky === 'left' && {
+                            position: 'sticky',
+                            left: column.stickyOffset || '0px',
+                            backgroundColor: isWaiting ? '#fffbeb' : 'white',
+                            zIndex: 10
+                          })
+                        }}
                       >
                         {column.render
                           ? column.render(row, rowIndex)

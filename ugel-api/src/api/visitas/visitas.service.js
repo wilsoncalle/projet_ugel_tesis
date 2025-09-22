@@ -19,7 +19,7 @@ const logger = require('../../utils/logger');
 const getAllVisitas = async (options = {}) => {
   const { 
     page = 1, 
-    limit = 20, 
+    limit = 15, 
     q = '',
     fechaInicio,
     fechaFin,
@@ -29,22 +29,23 @@ const getAllVisitas = async (options = {}) => {
     documentoVisitante
   } = options;
   
+  
   try {
     // Obtener visitas con paginación
     const result = await repository.findAll({
-      page,
-      limit,
+      page: parseInt(page), // Asegurar que sea número
+      limit: parseInt(limit), // Asegurar que sea número
       search: q,
       fechaInicio,
       fechaFin,
-      areaId: areaId ? parseInt(areaId) : undefined,
+      areaId: areaId ? parseInt(areaId) : undefined, // CAMBIO: usar areaId
       motivoVisitaId: motivoVisitaId ? parseInt(motivoVisitaId) : undefined,
       personalVisitadoId: personalVisitadoId ? parseInt(personalVisitadoId) : undefined,
       documentoVisitante
     });
     
     // Formatear respuesta
-    return {
+    const response = {
       visitas: result.visitas,
       pagination: {
         page: parseInt(page),
@@ -53,6 +54,9 @@ const getAllVisitas = async (options = {}) => {
         totalPages: Math.ceil(result.total / limit)
       }
     };
+    
+    
+    return response;
     
   } catch (error) {
     logger.error('Error obteniendo visitas:', error);
@@ -66,7 +70,7 @@ const getAllVisitas = async (options = {}) => {
  * @returns {Object} Visitas activas y datos de paginación
  */
 const getVisitasActivas = async (options = {}) => {
-  const { page = 1, limit = 20, q = '' } = options;
+  const { page = 1, limit = 15, q = '' } = options;
   
   try {
     // Obtener visitas activas con paginación

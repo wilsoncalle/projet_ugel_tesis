@@ -14,7 +14,7 @@ const logger = require('../../utils/logger');
  * @returns {Object} Visitantes y datos de paginación
  */
 const getAllVisitantes = async (options = {}) => {
-  const { page = 1, limit = 20, q = '' } = options;
+  const { page = 1, limit = 15, q = '' } = options;
   
   try {
     // Obtener visitantes con paginación

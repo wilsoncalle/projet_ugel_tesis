@@ -13,7 +13,7 @@ const logger = require('../../utils/logger');
  * @returns {Object} Visitantes encontrados y total
  */
 const findAll = async (options = {}) => {
-  const { page = 1, limit = 20, search = '' } = options;
+  const { page = 1, limit = 15, search = '' } = options;
   const offset = (page - 1) * limit;
   
   try {

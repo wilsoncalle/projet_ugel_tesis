@@ -101,12 +101,12 @@ export const papeletasSalidaService = {
 export const visitasService = {
   getAll: (filters = {}) => {
     const params = new URLSearchParams();
-    if (filters.busqueda) params.append('busqueda', filters.busqueda);
-    if (filters.empleadoId) params.append('personalVisitadoId', filters.empleadoId);
-    if (filters.motivoId) params.append('motivoVisitaId', filters.motivoId);
-    if (filters.lugar) params.append('areaDestinoId', filters.lugar);
-    if (filters.fechaDesde) params.append('fechaDesde', filters.fechaDesde);
-    if (filters.fechaHasta) params.append('fechaHasta', filters.fechaHasta);
+    if (filters.q) params.append('q', filters.q);
+    if (filters.personalVisitadoId) params.append('personalVisitadoId', filters.personalVisitadoId);
+    if (filters.motivoVisitaId) params.append('motivoVisitaId', filters.motivoVisitaId);
+    if (filters.areaId) params.append('areaId', filters.areaId);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
     if (filters.page) params.append('page', filters.page);
     if (filters.limit) params.append('limit', filters.limit);
     return api.get(`/visitas?${params.toString()}`);

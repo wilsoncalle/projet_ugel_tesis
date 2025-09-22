@@ -89,9 +89,10 @@ const VisitantesTabla = ({
       case 'historial':
         const historialProps = {
           pagination: true,
-          itemsPerPage: historialPagination?.itemsPerPage || 10,
+          itemsPerPage: historialPagination?.itemsPerPage || 15,
           currentPage: historialPagination?.currentPage || 1,
-          totalItems: totalItems, // Usar el total real de datos
+          totalItems: historialPagination?.totalItems || 0, // Solo usar el total del backend
+          totalPages: historialPagination?.totalPages || 1, // Solo usar el total del backend
           onPageChange: onHistorialPageChange
         };
         return historialProps;
@@ -101,12 +102,18 @@ const VisitantesTabla = ({
   }, [activeTab, activosPagination, historialPagination, onActivosPageChange, onHistorialPageChange, getTabData]);
 
   const getColumns = useMemo(() => {
+    // Función para obtener anchos según el tab activo
+    const getColumnWidths = (baseWidth, historialWidth) => {
+      return activeTab === 'historial' ? historialWidth : baseWidth;
+    };
+
     const baseColumns = [
       {
         key: 'visitante',
         label: 'Visitante',
-        minWidth: '180px',
-        width: '25%',
+        minWidth: getColumnWidths('180px', '220px'),
+        maxWidth: getColumnWidths('200px', '260px'),
+        width: getColumnWidths('25%', '30%'),
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -150,13 +157,16 @@ const VisitantesTabla = ({
             numDoc = row.numero_documento || '';
           }
           
+          const nombreCompleto = `${nombres} ${apellidos}`.trim();
+          const documentoCompleto = `${tipoDoc}: ${numDoc}`;
+          
           return (
-            <div>
-              <div className="font-medium text-gray-900">
-                {nombres} {apellidos}
+            <div className="max-w-full">
+              <div className="font-medium text-gray-900 break-words" title={nombreCompleto}>
+                {nombreCompleto}
               </div>
-              <div className="text-sm text-gray-500">
-                {tipoDoc}: {numDoc}
+              <div className="text-sm text-gray-500 break-words" title={documentoCompleto}>
+                {documentoCompleto}
               </div>
             </div>
           );
@@ -165,8 +175,9 @@ const VisitantesTabla = ({
       {
         key: 'empleado',
         label: 'Empleado Visitado',
-        minWidth: '120px',
-        width: '20%',
+        minWidth: getColumnWidths('120px', '200px'),
+        maxWidth: getColumnWidths('180px', '280px'),
+        width: getColumnWidths('20%', '35%'),
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -200,9 +211,21 @@ const VisitantesTabla = ({
             empleadoApellido = row.personal_apellidos || '';
           }
           
+          const empleadoCompleto = `${empleadoNombre} ${empleadoApellido}`.trim();
+          
           return (
-            <div className="text-sm truncate" title={`${empleadoNombre} ${empleadoApellido}`}>
-              {`${empleadoNombre} ${empleadoApellido}` || '-'}
+            <div 
+              className="text-sm line-clamp-2" 
+              title={empleadoCompleto}
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word'
+              }}
+            >
+              {empleadoCompleto || '-'}
             </div>
           );
         }
@@ -210,8 +233,9 @@ const VisitantesTabla = ({
       {
         key: 'motivo',
         label: 'Motivo',
-        minWidth: '120px',
-        width: '20%',
+        minWidth: getColumnWidths('120px', '200px'),
+        maxWidth: getColumnWidths('180px', '280px'),
+        width: getColumnWidths('20%', '35%'),
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -239,17 +263,33 @@ const VisitantesTabla = ({
           }
           
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              {motivoNombre || '-'}
-            </span>
+            <div className="inline-block max-w-full">
+              <span 
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                title={motivoNombre}
+                style={{
+                  maxWidth: '100%',
+                  wordBreak: 'break-word',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  lineHeight: '1.2',
+                  width: 'fit-content'
+                }}
+              >
+                {motivoNombre || '-'}
+              </span>
+            </div>
           );
         }
       },
       {
         key: 'lugar',
         label: 'Lugar',
-        minWidth: '120px',
-        width: '20%',
+        minWidth: getColumnWidths('120px', '200px'),
+        maxWidth: getColumnWidths('180px', '280px'),
+        width: getColumnWidths('20%', '35%'),
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -269,16 +309,28 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="text-sm text-gray-900">{lugar || '-'}</div>
+            <div 
+              className="text-sm text-gray-900" 
+              title={lugar}
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word'
+              }}
+            >
+              {lugar || '-'}
+            </div>
           );
         }
       },
       {
         key: 'horaIngreso',
-        label: 'Hora Ingreso',
-        minWidth: '60px',
-        maxWidth: '80px',
-        width: '70px',
+        label: 'Ingreso',
+        minWidth: getColumnWidths('60px', '60px'),
+        maxWidth: getColumnWidths('80px', '80px'),
+        width: getColumnWidths('80px', '80px'),
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -341,9 +393,9 @@ const VisitantesTabla = ({
       baseColumns.push({
         key: 'fecha',
         label: 'Fecha',
-        minWidth: '70px',
-        maxWidth: '90px',
-        width: '80px',
+        minWidth: '100px',
+        maxWidth: '110px',
+        width: '110px',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -376,10 +428,10 @@ const VisitantesTabla = ({
       
       baseColumns.push({
         key: 'horaSalida',
-        label: 'Hora Salida',
-        minWidth: '60px',
-        maxWidth: '80px',
-        width: '70px',
+        label: 'Salida',
+        minWidth: getColumnWidths('60px', '80px'),
+        maxWidth: getColumnWidths('80px', '80px'),
+        width: getColumnWidths('80px', '80px'),
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {
@@ -416,7 +468,9 @@ const VisitantesTabla = ({
         label: 'Acciones',
         minWidth: '80px',
         maxWidth: '100px',
-        width: '90px',
+        width: '100px',
+        sticky: 'right',
+        stickyOffset: '0px',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {

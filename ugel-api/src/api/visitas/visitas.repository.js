@@ -15,7 +15,7 @@ const logger = require('../../utils/logger');
 const findAll = async (options = {}) => {
   const { 
     page = 1, 
-    limit = 20, 
+    limit = 15, 
     search = '',
     fechaInicio,
     fechaFin,
@@ -26,6 +26,7 @@ const findAll = async (options = {}) => {
   } = options;
   
   const offset = (page - 1) * limit;
+  
   
   try {
     // Construir la consulta base
@@ -150,6 +151,7 @@ const findAll = async (options = {}) => {
       db.query(countQuery, queryParams.slice(0, paramCounter - 1))
     ]);
     
+    
     return {
       visitas: visitasResult.rows,
       total: parseInt(countResult.rows[0].total)
@@ -167,7 +169,7 @@ const findAll = async (options = {}) => {
  * @returns {Object} Visitas activas encontradas y total
  */
 const findActivas = async (options = {}) => {
-  const { page = 1, limit = 20, search = '' } = options;
+  const { page = 1, limit = 15, search = '' } = options;
   const offset = (page - 1) * limit;
   
   try {

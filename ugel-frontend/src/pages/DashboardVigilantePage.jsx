@@ -42,7 +42,7 @@ const DashboardVigilantePage = () => {
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
-    itemsPerPage: 10
+    itemsPerPage: 15
   });
   
   // Estados para paginación de visitantes activos
@@ -60,8 +60,23 @@ const DashboardVigilantePage = () => {
   // Cargar visitantes activos al montar el componente
   useEffect(() => {
     cargarVisitantesActivos();
-    // Cargar historial inicial con paginación
-    handleBuscarHistorial(filtros, 1);
+    // Cargar historial inicial con filtros por defecto
+    const filtrosIniciales = {
+      busqueda: '',
+      empleadoId: '',
+      motivoId: '',
+      lugar: '',
+      fechaDesde: '',
+      fechaHasta: (() => {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      })()
+    };
+    setFiltros(filtrosIniciales);
+    handleBuscarHistorial(filtrosIniciales, 1);
   }, []);
 
   const cargarVisitantesActivos = async () => {
@@ -325,34 +340,35 @@ const DashboardVigilantePage = () => {
       // Construir parámetros de búsqueda con paginación
       const params = {
         page: page,
-        limit: historialPagination.itemsPerPage // Usar 10 elementos por página
+        limit: 15 // Usar 15 elementos por página
       };
       
-      // Añadir filtros si existen (usar los mismos nombres que en el registro)
-      if (filtrosData.busqueda) params.busqueda = filtrosData.busqueda; // Cambiar de 'q' a 'busqueda' para que coincida con el backend
-      if (filtrosData.empleadoId) params.personalVisitadoId = filtrosData.empleadoId; // Usar el mismo campo que en el registro
-      if (filtrosData.motivoId) params.motivoVisitaId = filtrosData.motivoId; // Usar el mismo campo que en el registro
-      if (filtrosData.lugar) params.areaDestinoId = filtrosData.lugar; // Usar el mismo campo que en el registro
-      if (filtrosData.fechaDesde) params.fechaDesde = filtrosData.fechaDesde;
-      if (filtrosData.fechaHasta) params.fechaHasta = filtrosData.fechaHasta;
+      
+      // CORRECCIÓN: Usar los nombres correctos que espera el backend
+      if (filtrosData.busqueda) params.q = filtrosData.busqueda;
+      if (filtrosData.empleadoId) params.personalVisitadoId = filtrosData.empleadoId;
+      if (filtrosData.motivoId) params.motivoVisitaId = filtrosData.motivoId;
+      if (filtrosData.lugar) params.areaId = filtrosData.lugar; // CAMBIO: usar areaId en lugar de areaDestinoId
+      if (filtrosData.fechaDesde) params.fechaInicio = filtrosData.fechaDesde;
+      if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
       
       const response = await visitasService.getAll(params);
       
       if (response.data.success) {
         const historialData = response.data.data || [];
         
-        
         setHistorialVisitas(historialData);
         
         // Actualizar paginación si la respuesta incluye información de paginación
         if (response.data.pagination) {
-          setHistorialPagination(prev => ({
-            ...prev,
-            currentPage: page,
+          setHistorialPagination({
+            currentPage: response.data.pagination.page || page,
             totalPages: response.data.pagination.totalPages || 1,
-            totalItems: response.data.pagination.totalItems || historialData.length
-          }));
+            totalItems: response.data.pagination.total || historialData.length,
+            itemsPerPage: response.data.pagination.limit || 15
+          });
         }
+        
       } else {
         setError('Error al buscar en el historial');
       }
@@ -367,6 +383,17 @@ const DashboardVigilantePage = () => {
   // Función para manejar cambios de página en el historial
   const handleHistorialPageChange = (newPage) => {
     handleBuscarHistorial(filtros, newPage);
+  };
+
+  // NUEVO: Función para manejar cambios en filtros (resetea la paginación)
+  const handleFiltrosChange = (nuevosFiltros) => {
+    // Resetear la paginación al cambiar filtros
+    setHistorialPagination(prev => ({
+      ...prev,
+      currentPage: 1
+    }));
+    // Buscar con los nuevos filtros desde la página 1
+    handleBuscarHistorial(nuevosFiltros, 1);
   };
   
   // Función para manejar cambios de página en los activos
@@ -457,7 +484,7 @@ const DashboardVigilantePage = () => {
               historialVisitas={historialVisitas}
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              onBuscarHistorial={handleBuscarHistorial}
+              onBuscarHistorial={handleFiltrosChange} // CAMBIO: usar handleFiltrosChange
               onRegistrarSalida={handleRegistrarSalida}
               onEliminarVisitanteEspera={handleEliminarVisitanteEspera}
               filtros={filtros}
