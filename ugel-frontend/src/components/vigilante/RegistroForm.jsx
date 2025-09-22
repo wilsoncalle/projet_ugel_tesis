@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Card from '../Card';
 import Button from '../Button';
 import Input from '../Input';
@@ -7,7 +7,7 @@ import Badge from '../Badge';
 import { PlusIcon, ClipboardDocumentListIcon, UserGroupIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { tiposDocumentoService, motivosVisitaService, personalService, areasService, visitantesService, registrarVisitaCompleta, getVisitantesActivos } from '../../services/api';
 
-const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange, activeTab = 'activos', onTabChange, onBuscarHistorial }) => {
+const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange, activeTab = 'activos', onTabChange, onBuscarHistorial, refs = {} }, ref) => {
   // Estados del formulario de visitante (compartido entre tabs)
   const [formVisitante, setFormVisitante] = useState({
     tipoDocumentoId: '',
@@ -57,6 +57,36 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
 
   // Estados de carga
   const [loadingData, setLoadingData] = useState(false);
+
+  // Referencias para atajos de teclado
+  const { documentoInput, busquedaInput } = refs;
+
+  // Exponer métodos al componente padre
+  useImperativeHandle(ref, () => ({
+    getCurrentFormData: () => {
+      if (activeTab === 'activos') {
+        return {
+          empleadoId: formVisitaActivos.empleadoId,
+          motivoId: formVisitaActivos.motivoId,
+          lugar: formVisitaActivos.lugar
+        };
+      } else {
+        return {
+          empleadoId: formVisitaHistorial.empleadoId,
+          motivoId: formVisitaHistorial.motivoId,
+          lugar: formVisitaHistorial.lugar,
+          busqueda: formVisitaHistorial.busqueda
+        };
+      }
+    },
+    triggerRegisterVisit: () => {
+      if (activeTab === 'activos') {
+        handleRegisterVisit();
+      } else {
+        handleBuscarHistorial();
+      }
+    }
+  }));
 
 
   // Función para actualizar el formulario de visita de ACTIVOS
@@ -160,7 +190,12 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
         }));
         setTiposDocumento(tiposData);
         
-        const tipoDNI = tiposData.find(tipo => tipo.label?.toLowerCase().includes('dni'));
+        // Buscar DNI por código o nombre (priorizar código)
+        const tipoDNI = tiposData.find(tipo => 
+          tipo.value === '1' || // ID del DNI (primer registro)
+          tipo.label?.toLowerCase().includes('dni') ||
+          tipo.label?.toLowerCase().includes('documento nacional')
+        );
         if (tipoDNI && !formVisitante.tipoDocumentoId) {
           setFormVisitante(prev => ({ ...prev, tipoDocumentoId: tipoDNI.value }));
         }
@@ -850,10 +885,11 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
     let tipoPorDefecto = '1'; // Fallback
     if (tiposDocumento.length > 0) {
       const tipoDNI = tiposDocumento.find(tipo => 
-        tipo.label && (
+        tipo.value === '1' || // ID del DNI (primer registro)
+        (tipo.label && (
           tipo.label.toLowerCase().includes('dni') || 
-          tipo.label.toLowerCase().includes('nacional')
-        )
+          tipo.label.toLowerCase().includes('documento nacional')
+        ))
       );
       tipoPorDefecto = tipoDNI ? tipoDNI.value : tiposDocumento[0].value;
     }
@@ -918,6 +954,17 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
           visita: newFormVisitaHistorial
         });
       }
+      
+      // Ejecutar búsqueda con filtros vacíos para mostrar todos los registros
+      if (onBuscarHistorial) {
+        const filtrosVacios = {
+          busqueda: '',
+          empleadoId: '',
+          motivoId: '',
+          lugar: ''
+        };
+        onBuscarHistorial(filtrosVacios);
+      }
     }
   };
 
@@ -980,6 +1027,17 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
           visita: newFormVisitaHistorial
         });
       }
+      
+      // Ejecutar búsqueda inicial con filtros vacíos para mostrar todos los registros
+      if (onBuscarHistorial) {
+        const filtrosVacios = {
+          busqueda: '',
+          empleadoId: '',
+          motivoId: '',
+          lugar: ''
+        };
+        onBuscarHistorial(filtrosVacios);
+      }
     }
   };
 
@@ -1022,6 +1080,7 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
                   </label>
                   <div className="flex">
                     <Input
+                      ref={documentoInput}
                       value={formVisitante.numeroDocumento}
                       onChange={(e) => handleVisitanteChange('numeroDocumento', e.target.value)}
                       placeholder=""
@@ -1158,6 +1217,7 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
               <div className="space-y-4 flex-1">
                 {/* Campo de búsqueda general */}
                 <Input
+                  ref={busquedaInput}
                   label="Buscar Visitante"
                   value={formVisitaHistorial.busqueda}
                   onChange={(e) => handleVisitaChangeHistorial('busqueda', e.target.value)}
@@ -1231,6 +1291,8 @@ const RegistroForm = ({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFor
       </Card>
     </div>
   );
-};
+});
+
+RegistroForm.displayName = 'RegistroForm';
 
 export default RegistroForm;

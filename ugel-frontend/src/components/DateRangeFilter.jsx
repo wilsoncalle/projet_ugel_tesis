@@ -177,34 +177,6 @@ const DateRangeFilter = ({
     setToCalendarYear(today.getFullYear());
   };
 
-  // Función para verificar si el botón "Hoy" está activo
-  const isTodayActive = () => {
-    if (!fechaDesde || !fechaHasta) return false;
-    const today = dateToString(new Date());
-    const isActive = fechaDesde === today && fechaHasta === today;
-    return isActive;
-  };
-
-  // Función para verificar si el botón "Última semana" está activo
-  const isLastWeekActive = () => {
-    if (!fechaDesde || !fechaHasta) return false;
-    const today = new Date();
-    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const expectedFrom = dateToString(weekAgo);
-    const expectedTo = dateToString(today);
-    return fechaDesde === expectedFrom && fechaHasta === expectedTo;
-  };
-
-  // Función para verificar si el botón "Último mes" está activo
-  const isLastMonthActive = () => {
-    if (!fechaDesde || !fechaHasta) return false;
-    const today = new Date();
-    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const expectedFrom = dateToString(monthAgo);
-    const expectedTo = dateToString(today);
-    return fechaDesde === expectedFrom && fechaHasta === expectedTo;
-  };
-
   // Función para obtener la fecha actual sin tiempo
   const getTodayDate = () => {
     const today = new Date();
@@ -550,63 +522,6 @@ const DateRangeFilter = ({
             </Transition>
           </Popover>
         </div>
-      </div>
-
-      {/* Botones de acceso rápido */}
-      <div className="mt-3 flex gap-2 flex-wrap">
-        <button
-          onClick={() => {
-            const today = dateToString(new Date());
-            onFechaDesdeChange(today);
-            onFechaHastaChange(today);
-            // Actualizar estados internos
-            setFromInput(format(new Date(), 'dd/MM/yyyy'));
-            setToInput(format(new Date(), 'dd/MM/yyyy'));
-          }}
-          className={`px-3 py-1.5 text-xs border rounded-md transition-colors ${
-            isTodayActive()
-              ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200'
-              : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-          }`}
-        >
-          Hoy
-        </button>
-        <button
-          onClick={() => {
-            const today = new Date();
-            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-            onFechaDesdeChange(dateToString(weekAgo));
-            onFechaHastaChange(dateToString(today));
-            // Actualizar estados internos
-            setFromInput(format(weekAgo, 'dd/MM/yyyy'));
-            setToInput(format(today, 'dd/MM/yyyy'));
-          }}
-          className={`px-3 py-1.5 text-xs border rounded-md transition-colors ${
-            isLastWeekActive()
-              ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200'
-              : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-          }`}
-        >
-          Última semana
-        </button>
-        <button
-          onClick={() => {
-            const today = new Date();
-            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-            onFechaDesdeChange(dateToString(monthAgo));
-            onFechaHastaChange(dateToString(today));
-            // Actualizar estados internos
-            setFromInput(format(monthAgo, 'dd/MM/yyyy'));
-            setToInput(format(today, 'dd/MM/yyyy'));
-          }}
-          className={`px-3 py-1.5 text-xs border rounded-md transition-colors ${
-            isLastMonthActive()
-              ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200'
-              : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-          }`}
-        >
-          Último mes
-        </button>
       </div>
     </div>
   );

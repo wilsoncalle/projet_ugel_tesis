@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Card from '../components/Card';
 import RegistroForm from '../components/vigilante/RegistroForm';
 import VisitantesTabla from '../components/vigilante/VisitantesTabla';
 import DateRangeFilter from '../components/DateRangeFilter';
 import { visitasService, visitantesService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
+import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp';
 
 const DashboardVigilantePage = () => {
   // Hook de autenticación
@@ -49,6 +51,14 @@ const DashboardVigilantePage = () => {
   // Estado para la vista previa en tiempo real
   const [vistaPreviaVisitante, setVistaPreviaVisitante] = useState(null);
   const [vistaPreviaVisita, setVistaPreviaVisita] = useState(null);
+
+  // Estado para la confirmación de doble Enter
+  const [showDoubleEnterConfirm, setShowDoubleEnterConfirm] = useState(false);
+
+  // Referencias para los atajos de teclado
+  const documentoInputRef = useRef(null);
+  const busquedaInputRef = useRef(null);
+  const registroFormRef = useRef(null);
 
   // Cargar visitantes activos al montar el componente
   useEffect(() => {
@@ -194,7 +204,22 @@ const DashboardVigilantePage = () => {
       return;
     }
     
-    // Si no se proporcionan datos de visita, mostrar error
+    // Si no se proporcionan datos de visita, intentar obtenerlos del formulario actual
+    if (!datosVisita) {
+      // Obtener datos del formulario actual desde el estado de vista previa
+      if (vistaPreviaVisita && vistaPreviaVisita.empleadoId && vistaPreviaVisita.motivoId && vistaPreviaVisita.lugarId) {
+        datosVisita = {
+          empleadoId: vistaPreviaVisita.empleadoId,
+          motivoId: vistaPreviaVisita.motivoId,
+          lugar: vistaPreviaVisita.lugarId
+        };
+      } else {
+        setError('Debe seleccionar empleado, motivo y lugar antes de registrar las visitas');
+        return;
+      }
+    }
+    
+    // Validar que los datos de visita estén completos
     if (!datosVisita || !datosVisita.empleadoId || !datosVisita.motivoId || !datosVisita.lugar) {
       setError('Debe seleccionar empleado, motivo y lugar antes de registrar las visitas');
       return;
@@ -483,6 +508,72 @@ const DashboardVigilantePage = () => {
     setVisitanteParaSalida(null);
   };
 
+  // Función para manejar submit con Enter
+  const handleEnterSubmit = (enterType = 'normal') => {
+    if (activeTab === 'activos') {
+      // Si hay visitantes en espera, registrar visita
+      if (visitantesEnEspera.length > 0) {
+        // Obtener datos del formulario actual
+        if (registroFormRef.current) {
+          const formData = registroFormRef.current.getCurrentFormData();
+          if (formData.empleadoId && formData.motivoId && formData.lugar) {
+            if (enterType === 'first_enter') {
+              // Mostrar confirmación de doble Enter
+              setShowDoubleEnterConfirm(true);
+              setError(''); // Limpiar errores anteriores
+              
+              // Ocultar la confirmación después de 3 segundos
+              setTimeout(() => {
+                setShowDoubleEnterConfirm(false);
+              }, 3000);
+            } else {
+              // Segundo Enter - proceder con el registro
+              setShowDoubleEnterConfirm(false);
+              handleRegisterVisit(formData);
+            }
+          } else {
+            setError('Debe seleccionar empleado, motivo y lugar antes de registrar las visitas');
+            setShowDoubleEnterConfirm(false);
+          }
+        }
+      }
+    } else if (activeTab === 'historial') {
+      // Ejecutar búsqueda de historial usando el formulario
+      if (registroFormRef.current) {
+        registroFormRef.current.triggerRegisterVisit();
+      }
+    }
+  };
+
+  // Función para manejar cambio de pestaña
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    
+    // Si se cambia a historial, ejecutar búsqueda inicial con filtros vacíos
+    if (newTab === 'historial') {
+      const filtrosVacios = {
+        busqueda: '',
+        empleadoId: '',
+        motivoId: '',
+        lugar: '',
+        fechaDesde: '',
+        fechaHasta: ''
+      };
+      ejecutarBusqueda(filtrosVacios, 1);
+    }
+  };
+
+  // Configurar atajos de teclado
+  useKeyboardShortcuts({
+    activeTab,
+    onSubmit: handleEnterSubmit,
+    refs: {
+      documentoInput: documentoInputRef,
+      busquedaInput: busquedaInputRef
+    },
+    enabled: isAuthenticated
+  });
+
   return (
     <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
       {/* Error and Loading Messages */}
@@ -494,6 +585,32 @@ const DashboardVigilantePage = () => {
               <button
                 onClick={() => setError('')}
                 className="text-red-400 hover:text-red-600"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Confirmación de doble Enter */}
+        {showDoubleEnterConfirm && (
+          <div className="mx-2 mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-yellow-800">
+                    Presione Enter nuevamente para confirmar el registro de visita
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDoubleEnterConfirm(false)}
+                className="text-yellow-400 hover:text-yellow-600"
               >
                 ✕
               </button>
@@ -513,7 +630,7 @@ const DashboardVigilantePage = () => {
               visitantesEnEspera={visitantesEnEspera}
               historialVisitas={historialVisitas}
               activeTab={activeTab}
-              onTabChange={setActiveTab}
+              onTabChange={handleTabChange}
               onBuscarHistorial={handleFiltrosChange} // CAMBIO: usar handleFiltrosChange
               onRegistrarSalida={handleRegistrarSalida}
               onEliminarVisitanteEspera={handleEliminarVisitanteEspera}
@@ -541,13 +658,18 @@ const DashboardVigilantePage = () => {
             )}
             
             <RegistroForm
+              ref={registroFormRef}
               visitantesEnEspera={visitantesEnEspera}
               onAddVisitor={handleAddVisitor}
               onRegisterVisit={handleRegisterVisit}
               onFormChange={handleFormChange}
               activeTab={activeTab}
-              onTabChange={setActiveTab}
+              onTabChange={handleTabChange}
               onBuscarHistorial={handleFiltrosChange}
+              refs={{
+                documentoInput: documentoInputRef,
+                busquedaInput: busquedaInputRef
+              }}
             />
           </div>
         </div>
@@ -604,6 +726,9 @@ const DashboardVigilantePage = () => {
           </div>
         </div>
       )}
+
+      {/* Componente de ayuda para atajos de teclado */}
+      <KeyboardShortcutsHelp activeTab={activeTab} />
     </div>
   );
 };
