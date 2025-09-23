@@ -6,7 +6,8 @@ import Popover from '../Popover';
 import TabView from '../TabView';
 import FiltrosVisitas from './FiltrosVisitas';
 import TableGenerica from '../TableGenerica';
-import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import ModalDetalles from '../ModalDetalles';
+import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
 
 const VisitantesTabla = ({
   visitantesActivos,
@@ -26,6 +27,10 @@ const VisitantesTabla = ({
   onActivosPageChange
 }) => {
   const [filtrosExpanded, setFiltrosExpanded] = useState(false);
+  
+  // Estados para el modal de detalles
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
 
   const handleTabClick = (tab) => {
     onTabChange(tab);
@@ -33,6 +38,21 @@ const VisitantesTabla = ({
       setFiltrosExpanded(true);
     }
   };
+
+  // Funciones para manejar el modal de detalles
+  const handleOpenModal = useCallback((item) => {
+    console.log('Abriendo modal para item:', item);
+    setSelectedItem(item);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setIsModalOpen(false);
+    // Limpiar selectedItem después de un delay para que la animación termine
+    setTimeout(() => {
+      setSelectedItem(null);
+    }, 300); // 300ms coincide con la duración de la animación
+  }, []);
 
   const getTabData = useCallback(() => {
     switch (activeTab) {
@@ -542,7 +562,17 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="flex justify-center">
+            <div className="flex justify-center space-x-1">
+              {/* Botón Ver Detalles - siempre visible */}
+              <button
+                onClick={() => handleOpenModal(row)}
+                className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                title="Ver Detalles"
+              >
+                <EyeIcon className="h-4 w-4" />
+              </button>
+              
+              {/* Botones específicos según el estado */}
               {enEspera ? (
                 <button
                   onClick={() => {
@@ -572,8 +602,39 @@ const VisitantesTabla = ({
       });
     }
 
+    // Add actions column for historial
+    if (activeTab === 'historial') {
+      baseColumns.push({
+        key: 'actions',
+        label: 'Ver',
+        minWidth: '60px',
+        maxWidth: '80px',
+        width: '80px',
+        sticky: 'right',
+        stickyOffset: '0px',
+        render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            return null;
+          }
+          
+          return (
+            <div className="flex justify-center">
+              <button
+                onClick={() => handleOpenModal(row)}
+                className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                title="Ver Detalles"
+              >
+                <EyeIcon className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        }
+      });
+    }
+
     return baseColumns;
-  }, [activeTab, visitantesEnEspera, onRegistrarSalida]);
+  }, [activeTab, visitantesEnEspera, onRegistrarSalida, handleOpenModal]);
 
   const countActivos = visitantesActivos.length;
 
@@ -635,6 +696,78 @@ const VisitantesTabla = ({
           </TabView>
         </div>
       </Card>
+      
+      {/* Modal de detalles */}
+      <ModalDetalles
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        data={selectedItem}
+        title={`Detalles de ${activeTab === 'activos' ? 'Visitante Activo' : 'Visita'}`}
+        size="lg"
+        fields={[
+          {
+            key: 'visitante_nombres',
+            label: 'Visitante',
+            render: (value, data) => `${data.visitante_nombres || ''} ${data.visitante_apellidos || ''}`.trim()
+          },
+          {
+            key: 'numero_documento',
+            label: 'Documento',
+            render: (value, data) => `${data.tipo_documento_codigo || 'DNI'}: ${value || ''}`
+          },
+          {
+            key: 'personal_nombres',
+            label: 'Empleado Visitado',
+            render: (value, data) => `${data.personal_nombres || ''} ${data.personal_apellidos || ''}`.trim()
+          },
+          {
+            key: 'personal_cargo',
+            label: 'Cargo del Empleado',
+            render: (value) => value || 'Sin cargo asignado'
+          },
+          {
+            key: 'nombre_motivo',
+            label: 'Motivo de Visita',
+            render: (value) => value || 'No especificado'
+          },
+          {
+            key: 'nombre_area',
+            label: 'Área de Destino',
+            render: (value) => value || 'No especificada'
+          },
+          {
+            key: 'fecha_ingreso',
+            label: 'Fecha y Hora de Ingreso',
+            render: (value) => {
+              if (!value) return 'No especificada';
+              try {
+                const fecha = new Date(value);
+                return fecha.toLocaleString('es-PE');
+              } catch {
+                return value;
+              }
+            }
+          },
+          {
+            key: 'fecha_salida',
+            label: 'Fecha y Hora de Salida',
+            render: (value) => {
+              if (!value) return 'Visita activa';
+              try {
+                const fecha = new Date(value);
+                return fecha.toLocaleString('es-PE');
+              } catch {
+                return value;
+              }
+            }
+          },
+          {
+            key: 'usuario_ingreso',
+            label: 'Registrado por',
+            render: (value) => value || 'No especificado'
+          }
+        ]}
+      />
     </div>
   );
 };

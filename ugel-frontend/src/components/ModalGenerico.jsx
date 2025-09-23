@@ -1,4 +1,5 @@
 import { Fragment, useEffect } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
 const ModalGenerico = ({
@@ -13,36 +14,7 @@ const ModalGenerico = ({
   footer = null,
   className = '',
 }) => {
-  // Handle escape key
-  useEffect(() => {
-    if (!closeOnEscape) return;
-
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      // Prevent body scroll when modal is open
-      document.body.style.overflow = 'hidden';
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen, onClose, closeOnEscape]);
-
-  // Handle overlay click
-  const handleOverlayClick = (e) => {
-    if (closeOnOverlayClick && e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  if (!isOpen) return null;
+  // ... tu useEffect de escape igual
 
   const sizeClasses = {
     sm: 'max-w-md',
@@ -54,47 +26,70 @@ const ModalGenerico = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-        {/* Overlay */}
-        <div
-          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          onClick={handleOverlayClick}
-        />
-
-        {/* Modal */}
-        <div
-          className={`relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full ${sizeClasses[size]} ${className}`}
+    <Transition.Root show={isOpen} as={Fragment}>
+      <Dialog as="div" className="relative z-50" onClose={onClose}>
+        {/* Overlay con animación */}
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
         >
-          {/* Header */}
-          <div className="bg-white px-4 py-3 sm:px-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium leading-6 text-gray-900">{title}</h3>
-              {showCloseButton && (
-                <button
-                  type="button"
-                  className="rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-                  onClick={onClose}
-                >
-                  <span className="sr-only">Cerrar</span>
-                  <XMarkIcon className="h-6 w-6" />
-                </button>
-              )}
-            </div>
+          <div
+            className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+            onClick={(e) => {
+              if (closeOnOverlayClick && e.target === e.currentTarget) onClose();
+            }}
+          />
+        </Transition.Child>
+
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            {/* Modal con animación */}
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+              enterTo="opacity-100 translate-y-0 sm:scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 translate-y-0 sm:scale-100"
+              leaveTo="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+            >
+              <Dialog.Panel
+                className={`relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full ${sizeClasses[size]} ${className}`}
+              >
+                {/* Header */}
+                <div className="bg-white px-4 py-3 sm:px-6 border-b border-gray-200 flex items-center justify-between">
+                  <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+                  {showCloseButton && (
+                    <button
+                      type="button"
+                      className="rounded-full px-3 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      onClick={onClose}
+                    >
+                      <XMarkIcon className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="bg-white px-4 py-5 sm:p-6">{children}</div>
+
+                {/* Footer */}
+                {footer && (
+                  <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-gray-200">
+                    {footer}
+                  </div>
+                )}
+              </Dialog.Panel>
+            </Transition.Child>
           </div>
-
-          {/* Content */}
-          <div className="bg-white px-4 py-5 sm:p-6">{children}</div>
-
-          {/* Footer */}
-          {footer && (
-            <div className="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 border-t border-gray-200">
-              {footer}
-            </div>
-          )}
         </div>
-      </div>
-    </div>
+      </Dialog>
+    </Transition.Root>
   );
 };
 

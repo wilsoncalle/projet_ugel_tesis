@@ -263,10 +263,13 @@ const useCrud = (service, options = {}) => {
 
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
-    setCurrentItem(null);
-    setCrudError(null); // Limpiar error de CRUD
-    // Notify parent component to clear form errors
-    if (onSuccess) onSuccess('closeModal', null);
+    // Limpiar currentItem después de un delay para que la animación termine
+    setTimeout(() => {
+      setCurrentItem(null);
+      setCrudError(null); // Limpiar error de CRUD
+      // Notify parent component to clear form errors
+      if (onSuccess) onSuccess('closeModal', null);
+    }, 300); // 300ms coincide con la duración de la animación
   }, [onSuccess]);
 
   const openDeleteModal = useCallback((item) => {
@@ -276,7 +279,10 @@ const useCrud = (service, options = {}) => {
 
   const closeDeleteModal = useCallback(() => {
     setIsDeleteModalOpen(false);
-    setItemToDelete(null);
+    // Limpiar itemToDelete después de un delay para que la animación termine
+    setTimeout(() => {
+      setItemToDelete(null);
+    }, 300); // 300ms coincide con la duración de la animación
   }, []);
 
   // Reset all state
