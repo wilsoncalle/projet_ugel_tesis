@@ -22,8 +22,8 @@ const DashboardVigilantePage = () => {
     empleadoId: '',
     motivoId: '',
     lugar: '',
-    fechaDesde: '',
-    fechaHasta: '' // Sin filtro de fecha por defecto para mostrar todos los registros
+    fechaDesde: null, // Sin filtro de fecha por defecto para mostrar todos los registros
+    fechaHasta: null  // Sin filtro de fecha por defecto para mostrar todos los registros
   });
   const [activeTab, setActiveTab] = useState('activos');
   const [loading, setLoading] = useState(false);
@@ -59,6 +59,9 @@ const DashboardVigilantePage = () => {
   const documentoInputRef = useRef(null);
   const busquedaInputRef = useRef(null);
   const registroFormRef = useRef(null);
+  
+  // Referencia para debounce de búsquedas
+  const searchTimeout = useRef(null);
 
   // Cargar visitantes activos al montar el componente
   useEffect(() => {
@@ -69,11 +72,18 @@ const DashboardVigilantePage = () => {
       empleadoId: '',
       motivoId: '',
       lugar: '',
-      fechaDesde: '',
-      fechaHasta: ''
+      fechaDesde: null,
+      fechaHasta: null
     };
     // Usar la función centralizada para evitar conflictos
     ejecutarBusqueda(filtrosIniciales, 1);
+    
+    // Limpieza del timeout al desmontar el componente
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
+    };
   }, []);
 
   const cargarVisitantesActivos = async () => {
@@ -84,25 +94,34 @@ const DashboardVigilantePage = () => {
       
       if (response.data.success) {
         const activosData = response.data.data || [];
+        console.log('DashboardVigilantePage - Datos recibidos del backend:', activosData);
         
         // Transformar los datos de la API para que coincidan con la estructura esperada por el frontend
-        const activosTransformados = activosData.map(visita => ({
-          ...visita,
-          // Mapear empleadoVisitado para que coincida con la estructura esperada
-          empleadoVisitado: {
-            id: visita.personal_visitado_id,
-            nombres: visita.personal_nombres || '',
-            apellidos: visita.personal_apellidos || ''
-          },
-          // Mapear motivo para que coincida con la estructura esperada
-          motivo: {
-            id: visita.motivo_visita_id,
-            label: visita.nombre_motivo || ''
-          },
-          // Mapear lugar para que coincida con la estructura esperada
-          lugar: visita.area_destino_id,
-          lugarNombre: visita.nombre_area || ''
-        }));
+        const activosTransformados = activosData.map(visita => {
+          console.log('DashboardVigilantePage - Visita individual:', visita);
+          console.log('DashboardVigilantePage - personal_cargo:', visita.personal_cargo);
+          
+          return {
+            ...visita,
+            // Mapear empleadoVisitado para que coincida con la estructura esperada
+            empleadoVisitado: {
+              id: visita.personal_visitado_id,
+              nombres: visita.personal_nombres || '',
+              apellidos: visita.personal_apellidos || '',
+              cargo: visita.personal_cargo || ''
+            },
+            // Mapear motivo para que coincida con la estructura esperada
+            motivo: {
+              id: visita.motivo_visita_id,
+              label: visita.nombre_motivo || ''
+            },
+            // Mapear lugar para que coincida con la estructura esperada
+            lugar: visita.area_destino_id,
+            lugarNombre: visita.nombre_area || ''
+          };
+        });
+        
+        console.log('DashboardVigilantePage - Datos transformados:', activosTransformados);
         
         
         setVisitantesActivos(activosTransformados);
@@ -426,8 +445,15 @@ const DashboardVigilantePage = () => {
     // Actualizar el estado de filtros
     setFiltros(filtrosCompletos);
     
-    // Ejecutar la búsqueda
-    await handleBuscarHistorial(filtrosCompletos, page);
+    // Limpiar timeout anterior si existe
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+    
+    // Ejecutar la búsqueda con debounce
+    searchTimeout.current = setTimeout(() => {
+      handleBuscarHistorial(filtrosCompletos, page);
+    }, 300);  // Espera 300ms para batch cambios
   };
 
   // Función para manejar cambios en filtros del formulario
@@ -556,8 +582,8 @@ const DashboardVigilantePage = () => {
         empleadoId: '',
         motivoId: '',
         lugar: '',
-        fechaDesde: '',
-        fechaHasta: ''
+        fechaDesde: null, // Usar null en lugar de cadena vacía
+        fechaHasta: null  // Usar null en lugar de cadena vacía
       };
       ejecutarBusqueda(filtrosVacios, 1);
     }
@@ -653,6 +679,14 @@ const DashboardVigilantePage = () => {
                 fechaHasta={filtros.fechaHasta}
                 onFechaDesdeChange={handleFechaDesdeChange}
                 onFechaHastaChange={handleFechaHastaChange}
+                onClear={() => {  // Nuevo handler para limpieza atómica
+                  const filtrosCompletos = {
+                    ...filtros,
+                    fechaDesde: null,  // Usa null para consistencia con el estado inicial de filtros
+                    fechaHasta: null
+                  };
+                  ejecutarBusqueda(filtrosCompletos, 1);  // Ejecuta una sola búsqueda con ambos limpios
+                }}
                 className="mb-4"
               />
             )}

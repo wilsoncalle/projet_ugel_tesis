@@ -23,6 +23,7 @@ const visitantesRoutes = require('./src/api/visitantes/visitantes.routes');
 const visitasRoutes = require('./src/api/visitas/visitas.routes');
 const papeletasSalidaRoutes = require('./src/api/papeletas-salida/papeletassalida.routes');
 const asistenciaPersonalRoutes = require('./src/api/asistencia-personal/asistenciapersonal.routes');
+const cargosRoutes = require('./src/api/cargos/cargos.routes');
 const healthRoutes = require('./src/api/health/health.routes');
 
 const app = express();
@@ -61,6 +62,7 @@ app.use('/api/visitantes', visitantesRoutes);
 app.use('/api/visitas', visitasRoutes);
 app.use('/api/papeletas-salida', papeletasSalidaRoutes);
 app.use('/api/asistencia-personal', asistenciaPersonalRoutes);
+app.use('/api/cargos', cargosRoutes);
 app.use('/api/health', healthRoutes);
 
 // Ruta raíz

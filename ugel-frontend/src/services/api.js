@@ -81,8 +81,30 @@ export const areasService = {
 };
 
 export const personalService = {
-  getAll: () => api.get('/personal'),
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.activo !== undefined) {
+      params.append('activo', filters.activo);
+    }
+    if (filters.q) {
+      params.append('q', filters.q);
+    }
+    if (filters.page) {
+      params.append('page', filters.page);
+    }
+    if (filters.limit) {
+      params.append('limit', filters.limit);
+    }
+    if (filters.areaId) {
+      params.append('areaId', filters.areaId);
+    }
+    if (filters.tipoContratoId) {
+      params.append('tipoContratoId', filters.tipoContratoId);
+    }
+    return api.get(`/personal?${params.toString()}`);
+  },
   getById: (id) => api.get(`/personal/${id}`),
+  getByDocumento: (tipoDocumento, numeroDocumento) => api.get(`/personal/documento/${tipoDocumento}/${numeroDocumento}`),
   create: (personal) => api.post('/personal', personal),
   update: (id, personal) => api.put(`/personal/${id}`, personal),
   delete: (id) => api.delete(`/personal/${id}`),
@@ -245,6 +267,32 @@ export const motivosSalidaService = {
   restore: (id) => api.put(`/motivos-salida/${id}/restore`),
 };
 
+export const cargosService = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.activo !== undefined) {
+      params.append('activo', filters.activo);
+    }
+    if (filters.q) {
+      params.append('q', filters.q);
+    }
+    if (filters.page) {
+      params.append('page', filters.page);
+    }
+    if (filters.limit) {
+      params.append('limit', filters.limit);
+    }
+    if (filters.areaDestinoId) {
+      params.append('areaDestinoId', filters.areaDestinoId);
+    }
+    return api.get(`/cargos?${params.toString()}`);
+  },
+  getById: (id) => api.get(`/cargos/${id}`),
+  create: (cargo) => api.post('/cargos', cargo),
+  update: (id, cargo) => api.put(`/cargos/${id}`, cargo),
+  delete: (id) => api.delete(`/cargos/${id}`),
+};
+
 // --- Funciones para el Dashboard del Vigilante ---
 
 /**
@@ -391,6 +439,25 @@ export const getAreas = (filters = {}) => {
     params.append('q', filters.q);
   }
   return api.get(`/areas?${params.toString()}`);
+};
+
+/**
+ * Obtiene todos los cargos
+ * @param {object} filtros - Filtros opcionales
+ * @returns {Promise<object>} Lista de cargos
+ */
+export const getCargos = (filtros = {}) => {
+  const params = new URLSearchParams();
+  if (filtros.activo !== undefined) {
+    params.append('activo', filtros.activo);
+  }
+  if (filtros.q) {
+    params.append('q', filtros.q);
+  }
+  if (filtros.areaDestinoId) {
+    params.append('areaDestinoId', filtros.areaDestinoId);
+  }
+  return api.get(`/cargos?${params.toString()}`);
 };
 
 // Export the axios instance for direct use

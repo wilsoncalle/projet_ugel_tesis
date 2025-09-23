@@ -60,6 +60,32 @@ export const motivosSalidaFormFields = [
   },
 ];
 
+// Configuración de campos para el módulo de Cargos
+export const cargosFormFields = [
+  {
+    name: 'nombre_cargo',
+    label: 'Nombre del Cargo',
+    type: 'text',
+    placeholder: 'Ingrese el nombre del cargo',
+    required: true,
+  },
+  {
+    name: 'descripcion',
+    label: 'Descripción',
+    type: 'textarea',
+    placeholder: 'Ingrese una descripción del cargo (opcional)',
+    required: false,
+  },
+  {
+    name: 'area_destino_id',
+    label: 'Área de Destino',
+    type: 'select',
+    required: true,
+    placeholder: 'Seleccione un área',
+    options: [] // Se llena dinámicamente
+  },
+];
+
 // Configuración de campos para el módulo de Personal
 export const personalFormFields = [
   {
@@ -92,12 +118,12 @@ export const personalFormFields = [
     placeholder: 'Ingrese apellidos'
   },
   {
-    name: 'cargo',
+    name: 'cargoId',
     label: 'Cargo',
-    type: 'text',
-    required: false,
-    placeholder: 'Ingrese cargo (opcional)',
-    defaultValue: 'Sin asignar'
+    type: 'select',
+    required: true,
+    placeholder: 'Seleccione un cargo',
+    options: [] // Se llena dinámicamente
   },
   {
     name: 'areaDestinoId',
@@ -262,6 +288,52 @@ export const transformMotivosSalidaToBackend = (data) => {
   return transformed;
 };
 
+// Transformación de datos para el módulo de Cargos
+export const transformCargos = (data) => {
+  console.log('transformCargos - Datos de entrada:', data);
+  if (Array.isArray(data)) {
+    const transformed = data.map(item => ({
+      id: item.id,
+      nombre_cargo: item.nombre_cargo,
+      descripcion: item.descripcion,
+      area_destino_id: item.area_destino_id ? item.area_destino_id.toString() : '',
+      area_nombre: item.area_nombre || 'No asignado',
+      activo: item.activo,
+      fecha_creacion: item.fecha_creacion
+    }));
+    console.log('transformCargos - Datos transformados (array):', transformed);
+    return transformed;
+  } else if (data && typeof data === 'object') {
+    // Manejar objeto individual (para edición)
+    const transformed = {
+      id: data.id,
+      nombre_cargo: data.nombre_cargo,
+      descripcion: data.descripcion,
+      area_destino_id: data.area_destino_id ? data.area_destino_id.toString() : '',
+      area_nombre: data.area_nombre || 'No asignado',
+      activo: data.activo,
+      fecha_creacion: data.fecha_creacion
+    };
+    console.log('transformCargos - Datos transformados (objeto):', transformed);
+    return transformed;
+  }
+  console.log('transformCargos - No es un array ni objeto, retornando datos originales:', data);
+  return data;
+};
+
+// Función para transformar datos del frontend al backend
+export const transformCargosToBackend = (data) => {
+  console.log('transformCargosToBackend - Datos de entrada:', data);
+  const transformed = {
+    nombre_cargo: data.nombre_cargo,
+    descripcion: data.descripcion,
+    area_destino_id: parseInt(data.area_destino_id),
+    activo: data.activo !== undefined ? data.activo : true // Valor por defecto si no se especifica
+  };
+  console.log('transformCargosToBackend - Datos transformados:', transformed);
+  return transformed;
+};
+
 // Transformación de datos para el módulo de Personal
 export const transformPersonal = (data) => {
   console.log('transformPersonal - Datos de entrada:', data);
@@ -272,17 +344,36 @@ export const transformPersonal = (data) => {
       numeroDocumento: item.numero_documento,
       nombres: item.nombres,
       apellidos: item.apellidos,
-      cargo: item.cargo || 'Sin asignar',
-      areaDestinoId: item.area_destino_id,
-      tipoContratoId: item.tipo_contrato_id,
+      cargoId: item.cargo_id ? item.cargo_id.toString() : '',
+      cargo_nombre: item.cargo_nombre || 'Sin asignar',
+      areaDestinoId: item.area_destino_id ? item.area_destino_id.toString() : '',
+      tipoContratoId: item.tipo_contrato_id ? item.tipo_contrato_id.toString() : '',
       area_nombre: item.area_nombre || 'No asignado',
       tipo_contrato_nombre: item.tipo_contrato_nombre || 'No asignado',
       activo: item.activo
     }));
-    console.log('transformPersonal - Datos transformados:', transformed);
+    console.log('transformPersonal - Datos transformados (array):', transformed);
+    return transformed;
+  } else if (data && typeof data === 'object') {
+    // Manejar objeto individual (para edición)
+    const transformed = {
+      id: data.id,
+      tipoDocumento: data.tipo_documento,
+      numeroDocumento: data.numero_documento,
+      nombres: data.nombres,
+      apellidos: data.apellidos,
+      cargoId: data.cargo_id ? data.cargo_id.toString() : '',
+      cargo_nombre: data.cargo_nombre || 'Sin asignar',
+      areaDestinoId: data.area_destino_id ? data.area_destino_id.toString() : '',
+      tipoContratoId: data.tipo_contrato_id ? data.tipo_contrato_id.toString() : '',
+      area_nombre: data.area_nombre || 'No asignado',
+      tipo_contrato_nombre: data.tipo_contrato_nombre || 'No asignado',
+      activo: data.activo
+    };
+    console.log('transformPersonal - Datos transformados (objeto):', transformed);
     return transformed;
   }
-  console.log('transformPersonal - No es un array, retornando datos originales:', data);
+  console.log('transformPersonal - No es un array ni objeto, retornando datos originales:', data);
   return data;
 };
 
@@ -294,7 +385,7 @@ export const transformPersonalToBackend = (data) => {
     numeroDocumento: data.numeroDocumento,
     nombres: data.nombres,
     apellidos: data.apellidos,
-    cargo: data.cargo || 'Sin asignar',
+    cargoId: parseInt(data.cargoId),
     areaDestinoId: parseInt(data.areaDestinoId),
     tipoContratoId: parseInt(data.tipoContratoId),
     activo: data.activo
@@ -438,6 +529,43 @@ export const getTableColumns = (moduleName) => {
         ),
       },
     ],
+    cargos: [
+      { 
+        key: 'nombre_cargo', 
+        title: 'Nombre del Cargo',
+        minWidth: '200px',
+        maxWidth: '300px',
+        width: 'auto'
+      },
+      { 
+        key: 'descripcion', 
+        title: 'Descripción',
+        minWidth: '250px',
+        maxWidth: '400px',
+        width: 'auto'
+      },
+      { 
+        key: 'area_nombre', 
+        title: 'Área',
+        minWidth: '150px',
+        maxWidth: '200px',
+        width: 'auto'
+      },
+      { 
+        key: 'activo', 
+        title: 'Estado',
+        minWidth: '90px',
+        maxWidth: '100px',
+        width: '90px',
+        render: (value) => (
+          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+            value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {value ? 'Activo' : 'Inactivo'}
+          </span>
+        ),
+      },
+    ],
     personal: [
       { 
         key: 'tipoDocumento', 
@@ -468,7 +596,7 @@ export const getTableColumns = (moduleName) => {
         width: '150px'
       },
       { 
-        key: 'cargo', 
+        key: 'cargo_nombre', 
         title: 'Cargo',
         minWidth: '150px',
         maxWidth: '150px',

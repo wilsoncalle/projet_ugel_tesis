@@ -9,6 +9,7 @@ const DateRangeFilter = ({
   fechaHasta, 
   onFechaDesdeChange, 
   onFechaHastaChange,
+  onClear,  // Nuevo prop para manejar la limpieza atómica
   className = '' 
 }) => {
   const [fromInput, setFromInput] = useState('');
@@ -165,8 +166,6 @@ const DateRangeFilter = ({
   };
 
   const clearRange = () => {
-    onFechaDesdeChange('');
-    onFechaHastaChange('');
     setFromInput('');
     setToInput('');
     // Resetear calendarios a fecha actual
@@ -175,6 +174,10 @@ const DateRangeFilter = ({
     setFromCalendarYear(today.getFullYear());
     setToCalendarMonth(today.getMonth());
     setToCalendarYear(today.getFullYear());
+
+    if (onClear) {
+      onClear();  // Llama al handler del padre para limpiar filtros y trigger búsqueda única
+    }
   };
 
   // Función para obtener la fecha actual sin tiempo

@@ -22,6 +22,9 @@ const FormularioGenerico = ({
 
   // Reset form when initialData changes (but not when fields change)
   useEffect(() => {
+    console.log('FormularioGenerico - initialData recibido:', initialData);
+    console.log('FormularioGenerico - fields:', fields);
+    
     // Combinar initialData con valores por defecto de los campos
     const defaultValues = {};
     fields.forEach(field => {
@@ -30,7 +33,10 @@ const FormularioGenerico = ({
       }
     });
     
-    setFormData({ ...defaultValues, ...initialData });
+    const finalFormData = { ...defaultValues, ...initialData };
+    console.log('FormularioGenerico - finalFormData:', finalFormData);
+    
+    setFormData(finalFormData);
     setErrors({});
   }, [initialData]); // Removed 'fields' from dependencies
 

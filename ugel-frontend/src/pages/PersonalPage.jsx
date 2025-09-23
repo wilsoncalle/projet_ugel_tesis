@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import CatalogoPage from '../components/CatalogoPage';
-import { personalService, areasService, tiposContratoService, tiposDocumentoService } from '../services/api';
+import { personalService, areasService, tiposContratoService, tiposDocumentoService, cargosService } from '../services/api';
 import { personalFormFields, getTableColumns, transformPersonal, transformPersonalToBackend } from '../config/formFields.jsx';
 
 const PersonalPage = () => {
   const [formFields, setFormFields] = useState(personalFormFields);
   const tableColumns = getTableColumns('personal');
 
-  // Cargar áreas, tipos de contrato y tipos de documento para llenar los campos select
+  // Cargar áreas, tipos de contrato, tipos de documento y cargos para llenar los campos select
   useEffect(() => {
     const loadOptions = async () => {
       try {
@@ -35,6 +35,14 @@ const PersonalPage = () => {
           label: tipo.nombre_tipo || tipo.nombre
         })) : [];
 
+        // Cargar cargos (solo activos por defecto)
+        const cargosResp = await cargosService.getAll();
+        const cargosData = cargosResp?.data?.data || cargosResp?.data || [];
+        const cargosOptions = Array.isArray(cargosData) ? cargosData.map(cargo => ({
+          value: cargo.id,
+          label: cargo.nombre_cargo
+        })) : [];
+
         // Actualizar los campos del formulario con las opciones cargadas
         const updatedFields = formFields.map(field => {
           if (field.name === 'tipoDocumento') {
@@ -48,6 +56,9 @@ const PersonalPage = () => {
           }
           if (field.name === 'tipoContratoId') {
             return { ...field, options: tiposContratoOptions };
+          }
+          if (field.name === 'cargoId') {
+            return { ...field, options: cargosOptions };
           }
           return field;
         });

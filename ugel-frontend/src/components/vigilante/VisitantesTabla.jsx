@@ -53,6 +53,7 @@ const VisitantesTabla = ({
             numero_documento: vistaPreviaVisitante.numeroDocumento,
             personal_nombres: vistaPreviaVisita?.empleado?.nombres || '',
             personal_apellidos: vistaPreviaVisita?.empleado?.apellidos || '',
+            personal_cargo: vistaPreviaVisita?.empleado?.cargo || '',
             nombre_motivo: vistaPreviaVisita?.motivo?.label || '',
             nombre_area: vistaPreviaVisita?.lugar || '',
             fecha_ingreso: new Date().toLocaleDateString(),
@@ -285,6 +286,61 @@ const VisitantesTabla = ({
         }
       },
       {
+        key: 'cargo',
+        label: 'Cargo',
+        minWidth: getColumnWidths('120px', '200px'),
+        maxWidth: getColumnWidths('180px', '280px'),
+        width: getColumnWidths('20%', '35%'),
+        render: (row) => {
+          // Safety check: if row is undefined/null, return empty content
+          if (!row) {
+            return <div className="text-sm text-gray-900">-</div>;
+          }
+          
+          let cargo = '';
+          
+          // Para visitantes activos (estructura diferente)
+          if (activeTab === 'activos') {
+            console.log('VisitantesTabla - Row completo para activos:', row);
+            // Si es un visitante en espera (local)
+            if ((visitantesEnEspera || []).some(v => v.id === row.id)) {
+              console.log('VisitantesTabla - Es visitante en espera, cargo:', row.empleado?.cargo);
+              cargo = row.empleado?.cargo || '';
+            } 
+            // Si es un visitante activo (de la API)
+            else {
+              console.log('VisitantesTabla - Es visitante activo, personal_cargo:', row.personal_cargo);
+              console.log('VisitantesTabla - empleadoVisitado:', row.empleadoVisitado);
+              // Usar la estructura transformada del dashboard
+              cargo = row.personal_cargo || row.empleadoVisitado?.cargo || '';
+            }
+          } 
+          // Para historial (formato plano)
+          else {
+            console.log('VisitantesTabla - Row completo para historial:', row);
+            cargo = row.personal_cargo || '';
+          }
+          
+          console.log('VisitantesTabla - Cargo final:', cargo);
+          
+          return (
+            <div 
+              className="text-sm text-gray-900" 
+              title={cargo}
+              style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                wordBreak: 'break-word'
+              }}
+            >
+              {cargo || '-'}
+            </div>
+          );
+        }
+      },
+      {
         key: 'lugar',
         label: 'Lugar',
         minWidth: getColumnWidths('120px', '200px'),
@@ -393,9 +449,9 @@ const VisitantesTabla = ({
       baseColumns.push({
         key: 'fecha',
         label: 'Fecha',
-        minWidth: '120px',
-        maxWidth: '120px',
-        width: '120px',
+        minWidth: '110px',
+        maxWidth: '110px',
+        width: '110px',
         render: (row) => {
           // Safety check: if row is undefined/null, return empty content
           if (!row) {

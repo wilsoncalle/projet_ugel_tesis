@@ -35,7 +35,8 @@ const findAll = async (options = {}) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
-        p.cargo,
+        p.cargo_id,
+        c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -44,6 +45,7 @@ const findAll = async (options = {}) => {
       FROM Personal p
       LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
       LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
     `;
     
     // Construir la cláusula WHERE
@@ -142,7 +144,8 @@ const findById = async (id) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
-        p.cargo,
+        p.cargo_id,
+        c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -151,6 +154,7 @@ const findById = async (id) => {
       FROM Personal p
       LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
       LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       WHERE p.id = $1
     `;
     
@@ -178,7 +182,8 @@ const findByDocumento = async (tipoDocumento, numeroDocumento) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
-        p.cargo,
+        p.cargo_id,
+        c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -187,6 +192,7 @@ const findByDocumento = async (tipoDocumento, numeroDocumento) => {
       FROM Personal p
       LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
       LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       WHERE p.tipo_documento = $1 AND p.numero_documento = $2
     `;
     
@@ -211,7 +217,7 @@ const create = async (personalData) => {
       numero_documento, 
       nombres, 
       apellidos, 
-      cargo,
+      cargo_id,
       area_destino_id, 
       tipo_contrato_id,
       activo = true
@@ -223,7 +229,7 @@ const create = async (personalData) => {
         numero_documento, 
         nombres, 
         apellidos, 
-        cargo,
+        cargo_id,
         area_destino_id, 
         tipo_contrato_id,
         activo
@@ -237,7 +243,7 @@ const create = async (personalData) => {
       numero_documento, 
       nombres, 
       apellidos, 
-      cargo,
+      cargo_id,
       area_destino_id, 
       tipo_contrato_id,
       activo
@@ -305,9 +311,9 @@ const update = async (id, personalData) => {
       queryParams.push(personalData.apellidos);
     }
     
-    if (personalData.cargo !== undefined) {
-      updateFields.push(`cargo = $${paramCounter++}`);
-      queryParams.push(personalData.cargo);
+    if (personalData.cargo_id !== undefined) {
+      updateFields.push(`cargo_id = $${paramCounter++}`);
+      queryParams.push(personalData.cargo_id);
     }
     
     if (personalData.area_destino_id !== undefined) {
@@ -410,7 +416,8 @@ const findByArea = async (areaId) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
-        p.cargo,
+        p.cargo_id,
+        c.nombre_cargo as cargo_nombre,
         p.activo
       FROM Personal p
       WHERE p.area_destino_id = $1 AND p.activo = true
@@ -465,7 +472,8 @@ const findDeleted = async (options = {}) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
-        p.cargo,
+        p.cargo_id,
+        c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -474,6 +482,7 @@ const findDeleted = async (options = {}) => {
       FROM Personal p
       LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
       LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       WHERE p.activo = false
     `;
     
@@ -540,7 +549,8 @@ const findByIdIncludingDeleted = async (id) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
-        p.cargo,
+        p.cargo_id,
+        c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
@@ -549,6 +559,7 @@ const findByIdIncludingDeleted = async (id) => {
       FROM Personal p
       LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
       LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       WHERE p.id = $1
     `;
     

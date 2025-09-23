@@ -216,7 +216,8 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           value: empleado.id.toString(),
           label: `${empleado.nombres} ${empleado.apellidos}`,
           areaId: empleado.area_destino_id, // Corregir el campo del área
-          areaNombre: empleado.area_nombre || 'Sin área'
+          areaNombre: empleado.area_nombre || 'Sin área',
+          cargo: empleado.cargo_nombre || 'Sin cargo'
         }));
         setEmpleados(empleadosData);
         setEmpleadosActivos(empleadosData);
@@ -961,7 +962,9 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           busqueda: '',
           empleadoId: '',
           motivoId: '',
-          lugar: ''
+          lugar: '',
+          fechaDesde: null, // Usar null para limpiar fechas
+          fechaHasta: null  // Usar null para limpiar fechas
         };
         onBuscarHistorial(filtrosVacios);
       }
@@ -1034,7 +1037,9 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           busqueda: '',
           empleadoId: '',
           motivoId: '',
-          lugar: ''
+          lugar: '',
+          fechaDesde: null, // Usar null para limpiar fechas
+          fechaHasta: null  // Usar null para limpiar fechas
         };
         onBuscarHistorial(filtrosVacios);
       }

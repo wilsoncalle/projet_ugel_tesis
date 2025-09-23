@@ -43,6 +43,7 @@ const findAll = async (options = {}) => {
         rv.personal_visitado_id,
         CASE WHEN p.id IS NOT NULL THEN p.nombres ELSE NULL END as personal_nombres,
         CASE WHEN p.id IS NOT NULL THEN p.apellidos ELSE NULL END as personal_apellidos,
+        CASE WHEN c.id IS NOT NULL THEN c.nombre_cargo ELSE NULL END as personal_cargo,
         rv.motivo_visita_id,
         mv.nombre_motivo,
         rv.fecha_ingreso,
@@ -56,6 +57,7 @@ const findAll = async (options = {}) => {
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
       JOIN AreasDestino a ON rv.area_destino_id = a.id
       LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
       JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
       LEFT JOIN Usuarios u2 ON rv.usuario_salida_id = u2.id
@@ -192,6 +194,7 @@ const findActivas = async (options = {}) => {
         rv.personal_visitado_id,
         CASE WHEN p.id IS NOT NULL THEN p.nombres ELSE NULL END as personal_nombres,
         CASE WHEN p.id IS NOT NULL THEN p.apellidos ELSE NULL END as personal_apellidos,
+        CASE WHEN c.id IS NOT NULL THEN c.nombre_cargo ELSE NULL END as personal_cargo,
         rv.motivo_visita_id,
         mv.nombre_motivo,
         rv.fecha_ingreso,
@@ -203,6 +206,7 @@ const findActivas = async (options = {}) => {
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
       JOIN AreasDestino a ON rv.area_destino_id = a.id
       LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
       JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
       WHERE rv.fecha_salida IS NULL
@@ -287,6 +291,7 @@ const findById = async (id) => {
         rv.personal_visitado_id,
         CASE WHEN p.id IS NOT NULL THEN p.nombres ELSE NULL END as personal_nombres,
         CASE WHEN p.id IS NOT NULL THEN p.apellidos ELSE NULL END as personal_apellidos,
+        CASE WHEN c.id IS NOT NULL THEN c.nombre_cargo ELSE NULL END as personal_cargo,
         rv.motivo_visita_id,
         mv.nombre_motivo,
         rv.fecha_ingreso,
@@ -300,6 +305,7 @@ const findById = async (id) => {
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
       JOIN AreasDestino a ON rv.area_destino_id = a.id
       LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
       JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
       LEFT JOIN Usuarios u2 ON rv.usuario_salida_id = u2.id

@@ -32,6 +32,7 @@ import TiposDocumentoPage from './pages/TiposDocumentoPage';
 import MotivosVisitaPage from './pages/MotivosVisitaPage';
 import TiposContratoPage from './pages/TiposContratoPage';
 import MotivosSalidaPage from './pages/MotivosSalidaPage';
+import CargosPage from './pages/CargosPage';
 import PersonalPage from './pages/PersonalPage';
 import CrearPersonalPage from './pages/CrearPersonalPage';
 import PapeletasPage from './pages/PapeletasPage';
@@ -65,6 +66,7 @@ function App() {
             <Route path="motivos-visita" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosVisitaPage />} />} />
             <Route path="tipos-contrato" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposContratoPage />} />} />
             <Route path="motivos-salida" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosSalidaPage />} />} />
+            <Route path="cargos" element={<ProtectedRoute allowedRoles={['admin']} element={<CargosPage />} />} />
             <Route path="catalogos" element={<ProtectedRoute allowedRoles={['admin']} element={<AdminCatalogosPage />} />} />
             
             <Route path="usuarios" element={<ProtectedRoute allowedRoles={['admin']} element={<div>Página de Usuarios</div>} />} />

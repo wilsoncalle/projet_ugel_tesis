@@ -395,6 +395,67 @@ const schemas = {
         .optional(),
       activo: Joi.boolean().optional()
     }).min(1)
+  },
+
+  // Cargos específicos
+  cargos: {
+    create: Joi.object({
+      nombre_cargo: Joi.string()
+        .min(2)
+        .max(150)
+        .required()
+        .messages({
+          'string.min': 'El nombre del cargo debe tener al menos 2 caracteres',
+          'string.max': 'El nombre del cargo no puede exceder 150 caracteres',
+          'any.required': 'El nombre del cargo es requerido'
+        }),
+      descripcion: Joi.string()
+        .max(500)
+        .allow('')
+        .optional()
+        .messages({
+          'string.max': 'La descripción no puede exceder 500 caracteres'
+        }),
+      area_destino_id: Joi.number()
+        .integer()
+        .positive()
+        .required()
+        .messages({
+          'number.base': 'El área de destino debe ser un número válido',
+          'number.integer': 'El área de destino debe ser un número entero',
+          'number.positive': 'El área de destino debe ser un número positivo',
+          'any.required': 'El área de destino es requerida'
+        }),
+      activo: Joi.boolean().optional()
+    }),
+    
+    update: Joi.object({
+      nombre_cargo: Joi.string()
+        .min(2)
+        .max(150)
+        .optional()
+        .messages({
+          'string.min': 'El nombre del cargo debe tener al menos 2 caracteres',
+          'string.max': 'El nombre del cargo no puede exceder 150 caracteres'
+        }),
+      descripcion: Joi.string()
+        .max(500)
+        .allow('')
+        .optional()
+        .messages({
+          'string.max': 'La descripción no puede exceder 500 caracteres'
+        }),
+      area_destino_id: Joi.number()
+        .integer()
+        .positive()
+        .optional()
+        .messages({
+          'number.base': 'El área de destino debe ser un número válido',
+          'number.integer': 'El área de destino debe ser un número entero',
+          'number.positive': 'El área de destino debe ser un número positivo'
+        }),
+      activo: Joi.boolean().optional()
+    }).min(1)
   }
 };
 
@@ -444,7 +505,11 @@ const validationMiddleware = {
   
   // Catálogos
   validateCreateCatalogo: validate(schemas.catalogo.create),
-  validateUpdateCatalogo: validate(schemas.catalogo.update)
+  validateUpdateCatalogo: validate(schemas.catalogo.update),
+  
+  // Cargos
+  validateCreateCargo: validate(schemas.cargos.create),
+  validateUpdateCargo: validate(schemas.cargos.update)
 };
 
 module.exports = {

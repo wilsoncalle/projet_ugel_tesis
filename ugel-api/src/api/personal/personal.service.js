@@ -6,6 +6,7 @@
 const repository = require('./personal.repository');
 const areasRepository = require('../areas/areas.repository');
 const tiposContratoRepository = require('../tipos-contrato/tiposcontrato.repository');
+const cargosRepository = require('../cargos/cargos.repository');
 const { AppError } = require('../../middleware/errorHandler');
 const config = require('../../config');
 const logger = require('../../utils/logger');
@@ -102,7 +103,7 @@ const createPersonal = async (personalData, userId) => {
       numeroDocumento, 
       nombres, 
       apellidos, 
-      cargo,
+      cargoId,
       areaDestinoId, 
       tipoContratoId 
     } = personalData;
@@ -136,13 +137,22 @@ const createPersonal = async (personalData, userId) => {
       throw new AppError('Tipo de contrato inactivo', 400);
     }
     
+    // Verificar que el cargo exista y esté activo
+    const cargo = await cargosRepository.findById(cargoId);
+    if (!cargo) {
+      throw new AppError('Cargo no encontrado', 404);
+    }
+    if (!cargo.activo) {
+      throw new AppError('Cargo inactivo', 400);
+    }
+    
     // Crear el personal
     const newPersonal = await repository.create({
       tipo_documento: tipoDocumento,
       numero_documento: numeroDocumento,
       nombres,
       apellidos,
-      cargo,
+      cargo_id: cargoId,
       area_destino_id: areaDestinoId,
       tipo_contrato_id: tipoContratoId,
       activo: true
@@ -178,7 +188,7 @@ const updatePersonal = async (id, personalData, userId) => {
       numeroDocumento, 
       nombres, 
       apellidos, 
-      cargo,
+      cargoId,
       areaDestinoId, 
       tipoContratoId,
       activo
@@ -220,8 +230,17 @@ const updatePersonal = async (id, personalData, userId) => {
       updateData.apellidos = apellidos;
     }
     
-    if (cargo !== undefined) {
-      updateData.cargo = cargo;
+    if (cargoId !== undefined) {
+      // Verificar que el cargo exista y esté activo
+      const cargo = await cargosRepository.findById(cargoId);
+      if (!cargo) {
+        throw new AppError('Cargo no encontrado', 404);
+      }
+      if (!cargo.activo) {
+        throw new AppError('Cargo inactivo', 400);
+      }
+      
+      updateData.cargo_id = cargoId;
     }
     
     if (areaDestinoId !== undefined) {

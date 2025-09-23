@@ -315,7 +315,7 @@ const CatalogoPage = ({
   };
 
   // Generate actions column for active items
-  const actions = (_, row) => (
+  const actions = (row) => (
     <div className="flex space-x-2">
       <button
         type="button"
@@ -326,6 +326,7 @@ const CatalogoPage = ({
             const shouldUseDefaultAction = onEditClick(row);
             if (shouldUseDefaultAction === false) return; // Si devuelve false, no abrir el modal
           }
+          console.log('CatalogoPage - Abriendo modal de edición con row:', row);
           openEditModal(row);
         }}
         title="Editar"
@@ -348,7 +349,7 @@ const CatalogoPage = ({
   );
 
   // Generate actions column for deleted items
-  const deletedActions = (_, row) => (
+  const deletedActions = (row) => (
     <div className="flex space-x-2">
       <button
         type="button"

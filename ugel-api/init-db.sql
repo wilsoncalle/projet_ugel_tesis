@@ -43,20 +43,32 @@ CREATE TABLE IF NOT EXISTS MotivosVisita (
     activo BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+-- GESTIÓN DE CARGOS
+CREATE TABLE IF NOT EXISTS Cargos (
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    nombre_cargo VARCHAR(150) NOT NULL UNIQUE,
+    descripcion TEXT NULL,
+    area_destino_id INT NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (area_destino_id) REFERENCES AreasDestino(id)
+);
+
 -- GESTIÓN DE PERSONAL INTERNO
 CREATE TABLE IF NOT EXISTS Personal (
-    id SERIAL PRIMARY KEY,
-    tipo_documento VARCHAR(10) NOT NULL,
+    id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    tipo_documento VARCHAR(10) NOT NULL, -- "DNI", "CE"
     numero_documento VARCHAR(20) NOT NULL,
     nombres VARCHAR(150) NOT NULL,
     apellidos VARCHAR(150) NOT NULL,
     area_destino_id INT NOT NULL,
     tipo_contrato_id INT NOT NULL,
+    cargo_id INT NOT NULL,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
     UNIQUE(tipo_documento, numero_documento),
-    cargo VARCHAR(100) NOT NULL DEFAULT 'Sin asignar',
     FOREIGN KEY (area_destino_id) REFERENCES AreasDestino(id),
-    FOREIGN KEY (tipo_contrato_id) REFERENCES TiposContrato(id)
+    FOREIGN KEY (tipo_contrato_id) REFERENCES TiposContrato(id),
+    FOREIGN KEY (cargo_id) REFERENCES Cargos(id)
 );
 
 -- GESTIÓN DE VISITANTES
@@ -141,6 +153,23 @@ SELECT 'Permanente' WHERE NOT EXISTS (SELECT 1 FROM TiposContrato WHERE nombre_t
 
 INSERT INTO TiposContrato (nombre_tipo)
 SELECT 'Contratado' WHERE NOT EXISTS (SELECT 1 FROM TiposContrato WHERE nombre_tipo = 'Contratado');
+
+-- Insertar cargos básicos
+INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id)
+SELECT 'Director', 'Director de la UGEL', (SELECT id FROM AreasDestino WHERE nombre_area = 'Dirección' LIMIT 1)
+WHERE NOT EXISTS (SELECT 1 FROM Cargos WHERE nombre_cargo = 'Director');
+
+INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id)
+SELECT 'Secretario', 'Secretario de Dirección', (SELECT id FROM AreasDestino WHERE nombre_area = 'Dirección' LIMIT 1)
+WHERE NOT EXISTS (SELECT 1 FROM Cargos WHERE nombre_cargo = 'Secretario');
+
+INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id)
+SELECT 'Jefe de Administración', 'Jefe del Área de Administración', (SELECT id FROM AreasDestino WHERE nombre_area = 'Administración' LIMIT 1)
+WHERE NOT EXISTS (SELECT 1 FROM Cargos WHERE nombre_cargo = 'Jefe de Administración');
+
+INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id)
+SELECT 'Jefe de RRHH', 'Jefe del Área de Recursos Humanos', (SELECT id FROM AreasDestino WHERE nombre_area = 'Recursos Humanos' LIMIT 1)
+WHERE NOT EXISTS (SELECT 1 FROM Cargos WHERE nombre_cargo = 'Jefe de RRHH');
 
 -- Insertar tipos de documento básicos
 INSERT INTO TiposDocumento (codigo, nombre_completo)

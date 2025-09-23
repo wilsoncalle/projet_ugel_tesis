@@ -225,10 +225,41 @@ const useCrud = (service, options = {}) => {
     setIsModalOpen(true);
   }, []);
 
-  const openEditModal = useCallback((item) => {
-    setCurrentItem(item);
-    setIsModalOpen(true);
-  }, []);
+  const openEditModal = useCallback(async (item) => {
+    console.log('useCrud - openEditModal - Item recibido:', item);
+    try {
+      // Hacer una consulta individual para obtener los datos completos
+      const response = await service.getById(item.id);
+      console.log('useCrud - openEditModal - Respuesta completa:', response);
+      
+      // Extraer los datos reales de la respuesta
+      let fullItem;
+      if (response?.data?.data) {
+        // Si la respuesta tiene estructura {success, message, data: {datos}}
+        fullItem = response.data.data;
+      } else if (response?.data) {
+        // Si la respuesta tiene estructura {datos}
+        fullItem = response.data;
+      } else {
+        // Si la respuesta es directamente los datos
+        fullItem = response;
+      }
+      
+      console.log('useCrud - openEditModal - Datos extraídos:', fullItem);
+      
+      // Aplicar transformación si está disponible
+      const transformedItem = transformData ? transformData(fullItem) : fullItem;
+      console.log('useCrud - openEditModal - Datos transformados:', transformedItem);
+      
+      setCurrentItem(transformedItem);
+      setIsModalOpen(true);
+    } catch (error) {
+      console.error('Error obteniendo datos del elemento:', error);
+      // Si falla la consulta individual, usar el item de la tabla como fallback
+      setCurrentItem(item);
+      setIsModalOpen(true);
+    }
+  }, [service, transformData]);
 
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
