@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from "framer-motion";
 import Card from '../components/Card';
 import RegistroForm from '../components/vigilante/RegistroForm';
 import VisitantesTabla from '../components/vigilante/VisitantesTabla';
@@ -7,6 +8,40 @@ import { visitasService, visitantesService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp';
+
+// Variantes de animación
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15, // Escalonado entre hijos
+    },
+  },
+  exit: { opacity: 0 },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 350, // más alto = más rápido
+      damping: 25,    // controla el rebote, más alto = menos rebote
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -20,
+    transition: {
+      duration: 0.2,
+      ease: "easeIn",
+    },
+  },
+};
+
 
 const DashboardVigilantePage = () => {
   // Hook de autenticación
@@ -647,7 +682,7 @@ const DashboardVigilantePage = () => {
       </div>
 
       {/* Main Content - Fixed Height */}
-      <div className="flex-1 p-4 mt-4 overflow-y-auto">
+      <div className="flex-1 p-4 mt-4 overflow-y-scroll">
         <div className="flex gap-4 min-h-0">
           {/* Columna Izquierda - Tabla (70%) */}
           <div className="w-[70%] overflow-x-auto">
@@ -672,39 +707,75 @@ const DashboardVigilantePage = () => {
 
           {/* Columna Derecha - Registro (30%) */}
           <div className="w-[30%] pt-0">
-            {/* Filtro de fechas para historial */}
-            {activeTab === 'historial' && (
-              <DateRangeFilter
-                fechaDesde={filtros.fechaDesde}
-                fechaHasta={filtros.fechaHasta}
-                onFechaDesdeChange={handleFechaDesdeChange}
-                onFechaHastaChange={handleFechaHastaChange}
-                onClear={() => {  // Nuevo handler para limpieza atómica
-                  const filtrosCompletos = {
-                    ...filtros,
-                    fechaDesde: null,  // Usa null para consistencia con el estado inicial de filtros
-                    fechaHasta: null
-                  };
-                  ejecutarBusqueda(filtrosCompletos, 1);  // Ejecuta una sola búsqueda con ambos limpios
-                }}
-                className="mb-4"
-              />
-            )}
-            
-            <RegistroForm
-              ref={registroFormRef}
-              visitantesEnEspera={visitantesEnEspera}
-              onAddVisitor={handleAddVisitor}
-              onRegisterVisit={handleRegisterVisit}
-              onFormChange={handleFormChange}
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-              onBuscarHistorial={handleFiltrosChange}
-              refs={{
-                documentoInput: documentoInputRef,
-                busquedaInput: busquedaInputRef
-              }}
-            />
+            <AnimatePresence mode="wait">
+              {/* Key cambia cuando cambias de tab => dispara animación */}
+              <motion.div
+                key={activeTab}
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                exit="exit"
+              >
+                {activeTab === "historial" ? (
+                  <>
+                    {/* Item 1: DateRangeFilter */}
+                    <motion.div variants={itemVariants}>
+                      <DateRangeFilter
+                        fechaDesde={filtros.fechaDesde}
+                        fechaHasta={filtros.fechaHasta}
+                        onFechaDesdeChange={handleFechaDesdeChange}
+                        onFechaHastaChange={handleFechaHastaChange}
+                        onClear={() => {
+                          const filtrosCompletos = {
+                            ...filtros,
+                            fechaDesde: null,
+                            fechaHasta: null,
+                          };
+                          ejecutarBusqueda(filtrosCompletos, 1);
+                        }}
+                        className="mb-4"
+                      />
+                    </motion.div>
+
+                    {/* Item 2: RegistroForm */}
+                    <motion.div variants={itemVariants}>
+                      <RegistroForm
+                        ref={registroFormRef}
+                        visitantesEnEspera={visitantesEnEspera}
+                        onAddVisitor={handleAddVisitor}
+                        onRegisterVisit={handleRegisterVisit}
+                        onFormChange={handleFormChange}
+                        activeTab={activeTab}
+                        onTabChange={handleTabChange}
+                        onBuscarHistorial={handleFiltrosChange}
+                        refs={{
+                          documentoInput: documentoInputRef,
+                          busquedaInput: busquedaInputRef,
+                        }}
+                      />
+                    </motion.div>
+                  </>
+                ) : (
+                  // Tab "activos": solo animamos RegistroForm
+                  <motion.div variants={itemVariants}>
+                    <RegistroForm
+                      ref={registroFormRef}
+                      visitantesEnEspera={visitantesEnEspera}
+                      onAddVisitor={handleAddVisitor}
+                      onRegisterVisit={handleRegisterVisit}
+                      onFormChange={handleFormChange}
+                      activeTab={activeTab}
+                      onTabChange={handleTabChange}
+                      onBuscarHistorial={handleFiltrosChange}
+                      refs={{
+                        documentoInput: documentoInputRef,
+                        busquedaInput: busquedaInputRef,
+                      }}
+                    />
+                  </motion.div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </div>

@@ -437,45 +437,48 @@ const CatalogoPage = ({
           activeTab={activeTab}
           onTabChange={setActiveTab}
         >
-          {activeTab === 'active' ? (
-            <Card>
-              <AdaptiveTable
-                columns={finalColumns}
-                data={items}
-                isLoading={loading}
-                emptyMessage={`No hay ${moduleName.toLowerCase()} registrados`}
-                searchable={searchable}
-                searchPlaceholder={`Buscar ${moduleName.toLowerCase()}...`}
-                pagination={pagination}
-                itemsPerPage={itemsPerPage}
-              />
-            </Card>
-          ) : (
-            <Card>
-              <AdaptiveTable
-                columns={[
-                  ...tableColumns,
-                  { 
-                    key: 'acciones', 
-                    title: 'Acciones', 
-                    render: deletedActions,
-                    minWidth: '80px',
-                    maxWidth: '100px',
-                    width: '80px',
-                    sticky: 'right',
-                    stickyOffset: '0px'
-                  }
-                ]}
-                data={deletedItems}
-                isLoading={deletedItemsLoading}
-                emptyMessage={`No hay ${moduleName.toLowerCase()} eliminados`}
-                searchable={searchable}
-                searchPlaceholder={`Buscar ${moduleName.toLowerCase()} eliminados...`}
-                pagination={pagination}
-                itemsPerPage={itemsPerPage}
-              />
-            </Card>
-          )}
+          {{
+            active: (
+              <Card>
+                <AdaptiveTable
+                  columns={finalColumns}
+                  data={items}
+                  isLoading={loading}
+                  emptyMessage={`No hay ${moduleName.toLowerCase()} registrados`}
+                  searchable={searchable}
+                  searchPlaceholder={`Buscar ${moduleName.toLowerCase()}...`}
+                  pagination={pagination}
+                  itemsPerPage={itemsPerPage}
+                />
+              </Card>
+            ),
+            deleted: (
+              <Card>
+                <AdaptiveTable
+                  columns={[
+                    ...tableColumns,
+                    { 
+                      key: 'acciones', 
+                      title: 'Acciones', 
+                      render: deletedActions,
+                      minWidth: '80px',
+                      maxWidth: '100px',
+                      width: '80px',
+                      sticky: 'right',
+                      stickyOffset: '0px'
+                    }
+                  ]}
+                  data={deletedItems}
+                  isLoading={deletedItemsLoading}
+                  emptyMessage={`No hay ${moduleName.toLowerCase()} eliminados`}
+                  searchable={searchable}
+                  searchPlaceholder={`Buscar ${moduleName.toLowerCase()} eliminados...`}
+                  pagination={pagination}
+                  itemsPerPage={itemsPerPage}
+                />
+              </Card>
+            ),
+          }}
         </TabView>
       ) : (
         <Card>

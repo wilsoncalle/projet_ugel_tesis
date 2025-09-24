@@ -1068,6 +1068,8 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
               </h3>
               
               <div className="grid grid-cols-2 gap-3">
+                {/* Columna 1: Tipo de Documento. La dejamos como está,
+                    asumiendo que tu componente SelectCustom maneja bien su altura. */}
                 <div>
                   <SelectCustom
                     label="Tipo de Documento *"
@@ -1079,11 +1081,18 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
                     isClearable={false}
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                
+                {/* Columna 2: Número de Documento */}
+                {/* ¡AQUÍ ESTÁ LA MAGIA! */}
+                {/* flex: convierte el div en un contenedor flex. */}
+                {/* flex-col: lo orienta verticalmente. */}
+                <div className="flex flex-col">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Número de Documento *
                   </label>
-                  <div className="flex">
+                  
+                  {/* mt-auto: empuja este div hacia abajo, ocupando todo el espacio vertical disponible. */}
+                  <div className="flex mt-auto">
                     <Input
                       ref={documentoInput}
                       value={formVisitante.numeroDocumento}

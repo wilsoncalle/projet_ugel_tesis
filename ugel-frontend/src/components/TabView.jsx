@@ -1,61 +1,85 @@
-import { useState } from 'react';
+import React from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
-const TabView = ({ tabs, activeTab, onTabChange, children, className = '' }) => {
-  
+const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => {
   const handleTabClick = (tabKey, event) => {
-    // Cambiar la pestaña
     onTabChange(tabKey);
-    
-    // Buscar el elemento button más cercano (ya sea el target o su parent)
-    const buttonElement = event.target.closest('button') || event.currentTarget;
-    
-    // Quitar el foco del botón
-    if (buttonElement && typeof buttonElement.blur === 'function') {
+
+    const buttonElement = event.target.closest("button") || event.currentTarget;
+    if (buttonElement && typeof buttonElement.blur === "function") {
       buttonElement.blur();
     }
   };
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {/* Tab List - Pill Style Slider */}
-      <div className="bg-muted rounded-full p-1 grid grid-cols-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={(event) => handleTabClick(tab.key, event)}
-            className={`px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${
-              activeTab === tab.key
-                ? 'bg-background text-foreground shadow-md'
-                : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-            }`}
-            // Agregar tabIndex={-1} para que no sea seleccionable por teclado
-            // si no quieres que sea accesible por teclado
-            // tabIndex={-1}
-          >
-            <div className="flex items-center justify-center gap-2">
+      {/* Botones de tabs con pill animado */}
+      <div className="bg-muted rounded-full p-1 grid grid-cols-2 relative">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={(event) => handleTabClick(tab.key, event)}
+              className={`relative z-10 px-4 py-2 rounded-full font-medium text-sm transition-colors duration-300 flex items-center justify-center gap-2 ${
+                isActive
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
               {tab.icon && (
-                <span className="h-4 w-4 flex-shrink-0">
-                  {tab.icon}
-                </span>
+                <span className="h-4 w-4 flex-shrink-0">{tab.icon}</span>
               )}
               <span>{tab.label}</span>
               {tab.count !== undefined && tab.count > 0 && (
-                <span className={`py-0.5 px-1.5 rounded-full text-xs font-medium ${
-                  activeTab === tab.key
-                    ? 'bg-primary-100 text-primary-800'
-                    : 'bg-gray-200 text-gray-700'
-                }`}>
+                <span
+                  className={`py-0.5 px-1.5 rounded-full text-xs font-medium ${
+                    isActive
+                      ? "bg-primary-100 text-primary-800"
+                      : "bg-gray-200 text-gray-700"
+                  }`}
+                >
                   {tab.count}
                 </span>
               )}
-            </div>
-          </button>
-        ))}
+              {/* Fondo animado del tab activo */}
+              {isActive && (
+                <motion.span
+                  layoutId="active-pill"
+                  className="absolute inset-0 bg-background rounded-full shadow-md -z-10"
+                  transition={{
+                    type: "spring",
+                    stiffness: 500,
+                    damping: 30,
+                  }}
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Tab Content */}
-      <div className="mt-6 flex-1 flex flex-col overflow-hidden">
-        {children}
+      {/* Contenido animado */}
+      <div className="mt-6 flex-1 flex flex-col">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ 
+              duration: 0.2, 
+              ease: "easeInOut" 
+            }}
+            className="w-full"
+          >
+            {/* Soporte para ambos patrones: children como objeto o como elemento React */}
+            {typeof children === 'object' && !React.isValidElement(children) 
+              ? children[activeTab] 
+              : children
+            }
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
