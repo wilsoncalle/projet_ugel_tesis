@@ -5,11 +5,39 @@
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
-    scrollbar-gutter: auto; /* Solo reserva espacio cuando hay scroll real */
+    overflow-y: scroll; /* Forzar scrollbar siempre visible */
+    scrollbar-gutter: stable; /* Reservar espacio siempre para evitar saltos */
   }
   
   body {
     @apply bg-gray-50 text-gray-900;
+  }
+
+  /* Estilo personalizado para el scrollbar que coincida con el fondo */
+  html::-webkit-scrollbar {
+    width: 17px; /* Ancho del scrollbar */
+  }
+
+  html::-webkit-scrollbar-track {
+    background: #f9fafb; /* bg-gray-50 - mismo color del body */
+    backdrop-filter: blur(8px); /* Efecto de difuminado */
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  html::-webkit-scrollbar-thumb {
+    background: #e5e7eb; /* bg-gray-200 - color sutil para el thumb */
+    border-radius: 8px;
+    border: 2px solid #f9fafb; /* borde del mismo color del track */
+  }
+
+  html::-webkit-scrollbar-thumb:hover {
+    background: #d1d5db; /* bg-gray-300 - más oscuro al hover */
+  }
+
+  /* Para Firefox */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #e5e7eb #f9fafb; /* thumb track */
   }
 }
 

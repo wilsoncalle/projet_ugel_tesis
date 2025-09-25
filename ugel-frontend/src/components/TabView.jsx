@@ -14,7 +14,7 @@ const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => 
   return (
     <div className={`space-y-2 ${className}`}>
       {/* Botones de tabs con pill animado */}
-      <div className="bg-muted rounded-full p-1 grid grid-cols-2 relative">
+      <div className="bg-muted rounded-full p-1 grid grid-cols-2 relative overflow-hidden">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -47,6 +47,7 @@ const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => 
                 <motion.span
                   layoutId="active-pill"
                   className="absolute inset-0 bg-background rounded-full shadow-md -z-10"
+                  style={{ pointerEvents: 'none' }}
                   transition={{
                     type: "spring",
                     stiffness: 500,
