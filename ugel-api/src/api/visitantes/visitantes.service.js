@@ -7,6 +7,7 @@ const repository = require('./visitantes.repository');
 const tiposDocumentoRepository = require('../tipos-documento/tiposdocumento.repository');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const axios = require('axios');
 
 /**
  * Obtener todos los visitantes con paginación y filtros
@@ -235,11 +236,113 @@ const updateVisitante = async (id, visitanteData) => {
   }
 };
 
+/**
+ * Obtener visitante por DNI
+ * @param {string} dni - Número de DNI
+ * @returns {Object} Visitante encontrado
+ */
+const getVisitanteByDNI = async (dni) => {
+  try {
+    const visitante = await repository.findByDNI(dni);
+    return visitante;
+  } catch (error) {
+    logger.error(`Error obteniendo visitante por DNI ${dni}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Consultar DNI en API externa
+ * @param {string} dni - Número de DNI
+ * @returns {Object} Datos de la persona
+ */
+const consultarDNIExterno = async (dni) => {
+  try {
+    const token = 'apis-token-14158.uFeMfwK5k9el9LYH7077UJJuzuFqsebv';
+    
+    const response = await axios.get(`https://api.apis.net.pe/v2/reniec/dni?numero=${dni}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      },
+      timeout: 10000 // 10 segundos de timeout
+    });
+    
+    if (response.data && response.data.nombres) {
+      logger.info(`DNI ${dni} consultado exitosamente en API externa`);
+      return response.data;
+    } else {
+      logger.warn(`DNI ${dni} no encontrado en API externa`);
+      return null;
+    }
+    
+  } catch (error) {
+    logger.error(`Error consultando DNI ${dni} en API externa:`, error.message);
+    
+    // Manejar errores específicos
+    if (error.response) {
+      const status = error.response.status;
+      if (status === 404) {
+        throw new AppError('No se encontraron datos para este DNI', 404);
+      } else if (status === 429) {
+        throw new AppError('Demasiadas consultas. Intente nuevamente en unos minutos', 429);
+      } else {
+        throw new AppError('Error en la consulta externa', status);
+      }
+    } else if (error.code === 'ECONNABORTED') {
+      throw new AppError('Timeout en la consulta externa', 408);
+    } else {
+      throw new AppError('Error de conexión con el servicio externo', 500);
+    }
+  }
+};
+
+/**
+ * Crear visitante desde datos de DNI
+ * @param {Object} visitanteData - Datos del visitante
+ * @param {number} userId - ID del usuario que crea
+ * @returns {Object} Visitante creado
+ */
+const createVisitanteFromDNI = async (visitanteData, userId) => {
+  try {
+    const { numero_documento, nombres, apellidos, tipo_documento_id } = visitanteData;
+    
+    // Verificar que el tipo de documento exista y esté activo
+    const tipoDocumento = await tiposDocumentoRepository.findById(tipo_documento_id);
+    if (!tipoDocumento) {
+      throw new AppError('Tipo de documento no encontrado', 404);
+    }
+    if (!tipoDocumento.activo) {
+      throw new AppError('Tipo de documento inactivo', 400);
+    }
+    
+    // Crear el visitante
+    const newVisitante = await repository.create({
+      tipoDocumentoId: tipo_documento_id,
+      numeroDocumento: numero_documento,
+      nombres,
+      apellidos,
+      fechaUltimaActualizacionApi: new Date()
+    });
+    
+    logger.info(`Visitante creado desde DNI: ${nombres} ${apellidos} (${numero_documento})`);
+    
+    return newVisitante;
+    
+  } catch (error) {
+    logger.error('Error creando visitante desde DNI:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllVisitantes,
   getVisitanteById,
   getVisitanteByDocumento,
   getHistorialVisitas,
   createVisitante,
-  updateVisitante
+  updateVisitante,
+  getVisitanteByDNI,
+  consultarDNIExterno,
+  createVisitanteFromDNI
 };

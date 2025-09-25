@@ -682,7 +682,7 @@ const DashboardVigilantePage = () => {
       </div>
 
       {/* Main Content - Fixed Height */}
-      <div className="flex-1 p-4 mt-4">
+      <div className="flex-1 p-4 mt-4 bg-gray-50">
         <div className="flex gap-4 min-h-0">
           {/* Columna Izquierda - Tabla (70%) */}
           <div className="w-[70%] overflow-x-auto">

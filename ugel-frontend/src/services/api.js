@@ -240,6 +240,7 @@ export const visitantesService = {
   },
   create: (visitante) => api.post('/visitantes', visitante),
   update: (id, visitante) => api.put(`/visitantes/${id}`, visitante),
+  consultarDNI: (dni) => api.post('/visitantes/consultar-dni', { dni }),
 };
 
 export const motivosSalidaService = {

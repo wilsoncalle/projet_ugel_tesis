@@ -281,7 +281,17 @@ const schemas = {
         .min(2)
         .max(150)
         .optional()
-    }).min(1)
+    }).min(1),
+    
+    consultarDNI: Joi.object({
+      dni: Joi.string()
+        .pattern(/^\d{8}$/)
+        .required()
+        .messages({
+          'string.pattern.base': 'El DNI debe tener exactamente 8 dígitos',
+          'any.required': 'El DNI es requerido'
+        })
+    })
   },
   
   // Visitas
@@ -491,6 +501,7 @@ const validationMiddleware = {
   // Visitantes
   validateCreateVisitante: validate(schemas.visitantes.create),
   validateUpdateVisitante: validate(schemas.visitantes.update),
+  validateConsultarDNI: validate(schemas.visitantes.consultarDNI),
   
   // Visitas
   validateCreateVisita: validate(schemas.visitas.create),

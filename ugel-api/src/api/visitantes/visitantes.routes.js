@@ -84,4 +84,16 @@ router.put('/:id',
   controller.update
 );
 
+/**
+ * @route   POST /api/visitantes/consultar-dni
+ * @desc    Consultar DNI en API externa y base de datos local
+ * @access  Private
+ */
+router.post('/consultar-dni', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateConsultarDNI,
+  controller.consultarDNI
+);
+
 module.exports = router;

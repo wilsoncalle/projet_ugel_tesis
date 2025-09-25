@@ -333,10 +333,42 @@ const getHistorialVisitas = async (id, options = {}) => {
   }
 };
 
+/**
+ * Buscar visitante por DNI (asumiendo tipo_documento_id = 1 para DNI)
+ * @param {string} dni - Número de DNI
+ * @returns {Object|null} Visitante encontrado o null
+ */
+const findByDNI = async (dni) => {
+  try {
+    const query = `
+      SELECT 
+        v.id,
+        v.tipo_documento_id,
+        td.codigo as tipo_documento_codigo,
+        td.nombre_completo as tipo_documento_nombre,
+        v.numero_documento,
+        v.nombres,
+        v.apellidos,
+        v.fecha_ultima_actualizacion_api
+      FROM Visitantes v
+      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+      WHERE v.numero_documento = $1 AND td.codigo = 'DNI'
+    `;
+    
+    const result = await db.query(query, [dni]);
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando visitante por DNI ${dni}:`, error);
+    throw new AppError('Error obteniendo visitante', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
   findByDocumento,
+  findByDNI,
   create,
   update,
   getHistorialVisitas

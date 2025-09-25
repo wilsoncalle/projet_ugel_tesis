@@ -190,9 +190,8 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
         }));
         setTiposDocumento(tiposData);
         
-        // Buscar DNI por código o nombre (priorizar código)
+        // Buscar DNI por nombre
         const tipoDNI = tiposData.find(tipo => 
-          tipo.value === '1' || // ID del DNI (primer registro)
           tipo.label?.toLowerCase().includes('dni') ||
           tipo.label?.toLowerCase().includes('documento nacional')
         );
@@ -367,6 +366,62 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
     setVisitanteEncontrado(null);
 
     try {
+      // Si es DNI, intentar autocompletado con API externa
+      const tipoDNI = tiposDocumento.find(tipo => 
+        tipo.label?.toLowerCase().includes('dni') ||
+        tipo.label?.toLowerCase().includes('documento nacional')
+      );
+      
+      if (tipoDNI && formVisitante.tipoDocumentoId === tipoDNI.value && formVisitante.numeroDocumento.length === 8) {
+        try {
+          const dniResponse = await visitantesService.consultarDNI(formVisitante.numeroDocumento);
+          
+          if (dniResponse.data.success && dniResponse.data.data) {
+            const datosDNI = dniResponse.data.data;
+            
+            // Verificar si el visitante ya está en la lista de espera
+            const yaEnEspera = visitantesEnEspera.find(v => 
+              v.tipoDocumentoId === formVisitante.tipoDocumentoId && 
+              v.numeroDocumento === formVisitante.numeroDocumento
+            );
+            
+            if (yaEnEspera) {
+              setMensajeVisitante('Este visitante ya está en la lista de espera');
+              setTipoMensaje('error');
+              setDocumentoYaBuscado(documentoActual);
+              return;
+            }
+            
+            // Autocompletar campos del formulario con datos de la API externa
+            setFormVisitante(prev => ({
+              ...prev,
+              nombres: datosDNI.nombres,
+              apellidos: datosDNI.apellidos,
+              visitanteId: datosDNI.id // Usar el ID del visitante (ya sea local o recién creado)
+            }));
+
+            setMensajeVisitante('');
+            setTipoMensaje('');
+            setVisitanteEncontrado(datosDNI);
+            setDocumentoYaBuscado(documentoActual);
+            return;
+          }
+        } catch (dniError) {
+          console.log('Error consultando DNI externo, continuando con búsqueda local:', dniError.message);
+          
+          // Si es error 404 (DNI no encontrado), mostrar mensaje específico
+          if (dniError.response && dniError.response.status === 404) {
+            setMensajeVisitante('DNI no encontrado en la base de datos nacional. Complete los datos manualmente.');
+            setTipoMensaje('info');
+            setDocumentoYaBuscado(documentoActual);
+            return;
+          }
+          
+          // Para otros errores, continuar con búsqueda local
+        }
+      }
+
+      // Búsqueda local tradicional
       const response = await visitantesService.getByDocumento(
         formVisitante.tipoDocumentoId,
         formVisitante.numeroDocumento
@@ -384,7 +439,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
         if (yaEnEspera) {
           setMensajeVisitante('Este visitante ya está en la lista de espera');
           setTipoMensaje('error');
-          setDocumentoYaBuscado(documentoActual); // Marcar como ya buscado
+          setDocumentoYaBuscado(documentoActual);
           return;
         }
         
@@ -404,10 +459,9 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           apellidos: visitante.apellidos || '',
           visitanteId: visitante.id
         }));
-        // No mostrar mensaje - se sobreentiende que se encontró al llenar los datos
         setMensajeVisitante('');
         setTipoMensaje('');
-        setDocumentoYaBuscado(documentoActual); // Marcar como ya buscado
+        setDocumentoYaBuscado(documentoActual);
       } else {
         // Verificar si el visitante ya está en la lista de espera (incluso si no está en la BD)
         const yaEnEspera = visitantesEnEspera.find(v => 
@@ -418,23 +472,23 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
         if (yaEnEspera) {
           setMensajeVisitante('Este visitante ya está en la lista de espera');
           setTipoMensaje('error');
-          setDocumentoYaBuscado(documentoActual); // Marcar como ya buscado
+          setDocumentoYaBuscado(documentoActual);
           return;
         }
         
-        setMensajeVisitante('Visitante no encontrado. Complete los datos para registrar uno nuevo.');
+        setMensajeVisitante('Visitante no encontrado. Complete los datos manualmente para registrar uno nuevo.');
         setTipoMensaje('info');
         setFormVisitante(prev => ({
           ...prev,
           visitanteId: null
         }));
-        setDocumentoYaBuscado(documentoActual); // Marcar como ya buscado
+        setDocumentoYaBuscado(documentoActual);
       }
     } catch (error) {
       
       // Manejar específicamente el caso 404 (visitante no encontrado)
       if (error.response && error.response.status === 404) {
-        setMensajeVisitante('Visitante no encontrado. Complete los datos para registrar uno nuevo.');
+        setMensajeVisitante('Visitante no encontrado. Complete los datos manualmente para registrar uno nuevo.');
         setTipoMensaje('info');
         setFormVisitante(prev => ({
           ...prev,
@@ -445,7 +499,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
         setTipoMensaje('error');
       }
       
-      setDocumentoYaBuscado(documentoActual); // Marcar como ya buscado para evitar bucle
+      setDocumentoYaBuscado(documentoActual);
     } finally {
       setBuscandoVisitante(false);
     }
@@ -883,14 +937,13 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
   // Función corregida para limpiar visitante
   const handleLimpiarVisitante = () => {
     // Buscar DNI en los tipos disponibles o usar el primer tipo
-    let tipoPorDefecto = '1'; // Fallback
+    let tipoPorDefecto = tiposDocumento[0]?.value || '1'; // Fallback
     if (tiposDocumento.length > 0) {
       const tipoDNI = tiposDocumento.find(tipo => 
-        tipo.value === '1' || // ID del DNI (primer registro)
-        (tipo.label && (
+        tipo.label && (
           tipo.label.toLowerCase().includes('dni') || 
           tipo.label.toLowerCase().includes('documento nacional')
-        ))
+        )
       );
       tipoPorDefecto = tipoDNI ? tipoDNI.value : tiposDocumento[0].value;
     }
