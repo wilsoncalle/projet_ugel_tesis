@@ -10,9 +10,10 @@ const logger = require('../../utils/logger');
 /**
  * Buscar todas las visitas con filtros y paginación
  * @param {Object} options - Opciones de búsqueda
+ * @param {boolean} usePagination - Si es false, devuelve todos los resultados sin paginación
  * @returns {Object} Visitas encontradas y total
  */
-const findAll = async (options = {}) => {
+const findAll = async (options = {}, usePagination = true) => {
   const { 
     page = 1, 
     limit = 15, 
@@ -142,14 +143,14 @@ const findAll = async (options = {}) => {
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
-    // Agregar ordenamiento y paginación
-    query += `
-      ORDER BY rv.fecha_ingreso DESC
-      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
-    `;
+    // Agregar ordenamiento
+    query += ` ORDER BY rv.fecha_ingreso DESC`;
     
-    // Agregar parámetros de paginación
-    queryParams.push(limit, offset);
+    // Agregar paginación solo si está habilitada
+    if (usePagination) {
+      query += ` LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`;
+      queryParams.push(limit, offset);
+    }
     
     // Ejecutar consultas en paralelo
     const [visitasResult, countResult] = await Promise.all([

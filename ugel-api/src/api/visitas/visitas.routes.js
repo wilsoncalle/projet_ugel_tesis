@@ -24,6 +24,28 @@ router.get('/',
 );
 
 /**
+ * @route   GET /api/visitas/export/excel
+ * @desc    Exportar visitas a Excel
+ * @access  Private
+ */
+router.get('/export/excel',
+  authenticateToken,
+  requireActiveUser,
+  controller.exportarAExcel
+);
+
+/**
+ * @route   GET /api/visitas/export/pdf
+ * @desc    Exportar visitas a PDF
+ * @access  Private
+ */
+router.get('/export/pdf',
+  authenticateToken,
+  requireActiveUser,
+  controller.exportarAPDF
+);
+
+/**
  * @route   GET /api/visitas/activas
  * @desc    Obtener visitas activas (sin salida)
  * @access  Private

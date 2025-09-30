@@ -7,7 +7,7 @@ import TabView from '../TabView';
 import FiltrosVisitas from './FiltrosVisitas';
 import TableGenerica from '../TableGenerica';
 import ModalDetalles from '../ModalDetalles';
-import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon, DocumentTextIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 
 const VisitantesTabla = ({
   visitantesActivos,
@@ -638,6 +638,72 @@ const VisitantesTabla = ({
 
   const countActivos = visitantesActivos.length;
 
+  // Función para exportar a Excel o PDF
+  const handleExport = (format) => {
+    try {
+      // Obtener el token de autenticación
+      const token = localStorage.getItem('token');
+      
+      // Construir los query params a partir de los filtros actuales
+      const params = new URLSearchParams();
+      
+      if (filtros.busqueda) params.append('q', filtros.busqueda);
+      if (filtros.empleadoId) params.append('personalVisitadoId', filtros.empleadoId);
+      if (filtros.motivoId) params.append('motivoVisitaId', filtros.motivoId);
+      if (filtros.lugar) params.append('areaId', filtros.lugar);
+      if (filtros.fechaDesde) params.append('fechaInicio', filtros.fechaDesde);
+      if (filtros.fechaHasta) params.append('fechaFin', filtros.fechaHasta);
+      
+      // Construir la URL completa del endpoint de exportación
+      const queryString = params.toString();
+      const url = `http://localhost:3000/api/visitas/export/${format}${queryString ? '?' + queryString : ''}`;
+      
+      // Crear un enlace temporal para la descarga con autenticación
+      const link = document.createElement('a');
+      link.style.display = 'none';
+      
+      // Hacer la petición con fetch para incluir el token
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Error al exportar el archivo');
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        // Crear URL temporal para el blob
+        const blobUrl = window.URL.createObjectURL(blob);
+        link.href = blobUrl;
+        
+        // Establecer el nombre del archivo
+        const fecha = new Date().toISOString().slice(0, 10);
+        const extension = format === 'excel' ? 'xlsx' : 'pdf';
+        link.download = `Reporte_Visitas_${fecha}.${extension}`;
+        
+        // Agregar al DOM, hacer clic y remover
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Liberar la URL del blob
+        window.URL.revokeObjectURL(blobUrl);
+      })
+      .catch(error => {
+        console.error('Error al exportar:', error);
+        alert('Error al exportar el archivo. Por favor, intente nuevamente.');
+      });
+      
+    } catch (error) {
+      console.error('Error al construir la URL de exportación:', error);
+      alert('Error al exportar el archivo. Por favor, intente nuevamente.');
+    }
+  };
+
   // Configuración de las pestañas
   const tabs = [
     {
@@ -660,14 +726,38 @@ const VisitantesTabla = ({
           {/* Título de la sección */}
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-800">Gestión de Visitantes</h2>
-            {visitantesEnEspera.length > 0 && (
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-amber-600 font-medium">
-                  {visitantesEnEspera.length} en espera
-                </span>
-                <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-              </div>
-            )}
+            <div className="flex items-center space-x-3">
+              {/* Botones de exportación - Solo visible en historial */}
+              {activeTab === 'historial' && (
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleExport('excel')}
+                    className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                    title="Exportar a Excel"
+                  >
+                    <DocumentTextIcon className="h-5 w-5" />
+                    <span className="text-xs font-medium">Excel</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                    title="Exportar a PDF"
+                  >
+                    <DocumentArrowDownIcon className="h-5 w-5" />
+                    <span className="text-xs font-medium">PDF</span>
+                  </button>
+                </div>
+              )}
+              
+              {visitantesEnEspera.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-amber-600 font-medium">
+                    {visitantesEnEspera.length} en espera
+                  </span>
+                  <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                </div>
+              )}
+            </div>
           </div>
           
           {/* Tab Slider */}

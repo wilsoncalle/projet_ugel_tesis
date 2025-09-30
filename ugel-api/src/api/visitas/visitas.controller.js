@@ -128,10 +128,69 @@ const registrarSalida = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Exportar visitas a Excel
+ * @route GET /api/visitas/export/excel
+ */
+const exportarAExcel = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de exportación a Excel con filtros:', req.query);
+  
+  // Pasamos los filtros desde query params
+  const filtros = req.query;
+  
+  // Llamar al servicio para generar el archivo
+  const buffer = await service.exportarAExcel(filtros);
+  
+  // Configurar las cabeceras de respuesta para descarga
+  const fecha = new Date().toISOString().slice(0, 10);
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename=Reporte_Visitas_${fecha}.xlsx`
+  );
+  
+  logger.info('Archivo Excel generado exitosamente');
+  
+  // Enviar el archivo
+  res.send(buffer);
+});
+
+/**
+ * Exportar visitas a PDF
+ * @route GET /api/visitas/export/pdf
+ */
+const exportarAPDF = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de exportación a PDF con filtros:', req.query);
+  
+  // Pasamos los filtros desde query params
+  const filtros = req.query;
+  
+  // Llamar al servicio para generar el archivo
+  const buffer = await service.exportarAPDF(filtros);
+  
+  // Configurar las cabeceras de respuesta para descarga
+  const fecha = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename=Reporte_Visitas_${fecha}.pdf`
+  );
+  
+  logger.info('Archivo PDF generado exitosamente');
+  
+  // Enviar el archivo
+  res.send(buffer);
+});
+
 module.exports = {
   getAll,
   getActivas,
   getById,
   create,
-  registrarSalida
+  registrarSalida,
+  exportarAExcel,
+  exportarAPDF
 };

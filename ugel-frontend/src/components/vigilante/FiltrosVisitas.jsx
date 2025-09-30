@@ -3,7 +3,7 @@ import Button from '../Button';
 import Input from '../Input';
 import SelectCustom from '../SelectCustom';
 import Pagination from '../Pagination';
-import { MagnifyingGlassIcon, ChevronUpIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ChevronUpIcon, ChevronDownIcon, XMarkIcon, DocumentArrowDownIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { motivosVisitaService, personalService, areasService } from '../../services/api';
 
 const FiltrosVisitas = ({ 
@@ -116,15 +116,81 @@ const FiltrosVisitas = ({
 
   const hasActiveFilters = Object.values(formFiltros).some(value => value !== '');
 
+  // Función para exportar a Excel o PDF
+  const handleExport = (format) => {
+    try {
+      // Obtener el token de autenticación
+      const token = localStorage.getItem('token');
+      
+      // Construir los query params a partir del estado de los filtros
+      const params = new URLSearchParams();
+      
+      if (formFiltros.busqueda) params.append('q', formFiltros.busqueda);
+      if (formFiltros.empleadoId) params.append('personalVisitadoId', formFiltros.empleadoId);
+      if (formFiltros.motivoId) params.append('motivoVisitaId', formFiltros.motivoId);
+      if (formFiltros.lugar) params.append('areaId', formFiltros.lugar);
+      if (formFiltros.fechaDesde) params.append('fechaInicio', formFiltros.fechaDesde);
+      if (formFiltros.fechaHasta) params.append('fechaFin', formFiltros.fechaHasta);
+      
+      // Construir la URL completa del endpoint de exportación
+      const queryString = params.toString();
+      const url = `http://localhost:3000/api/visitas/export/${format}${queryString ? '?' + queryString : ''}`;
+      
+      // Crear un enlace temporal para la descarga con autenticación
+      const link = document.createElement('a');
+      link.style.display = 'none';
+      
+      // Hacer la petición con fetch para incluir el token
+      fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Error al exportar el archivo');
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        // Crear URL temporal para el blob
+        const blobUrl = window.URL.createObjectURL(blob);
+        link.href = blobUrl;
+        
+        // Establecer el nombre del archivo
+        const fecha = new Date().toISOString().slice(0, 10);
+        const extension = format === 'excel' ? 'xlsx' : 'pdf';
+        link.download = `Reporte_Visitas_${fecha}.${extension}`;
+        
+        // Agregar al DOM, hacer clic y remover
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Liberar la URL del blob
+        window.URL.revokeObjectURL(blobUrl);
+      })
+      .catch(error => {
+        console.error('Error al exportar:', error);
+        alert('Error al exportar el archivo. Por favor, intente nuevamente.');
+      });
+      
+    } catch (error) {
+      console.error('Error al construir la URL de exportación:', error);
+      alert('Error al exportar el archivo. Por favor, intente nuevamente.');
+    }
+  };
+
   return (
     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm">
       {/* Header del filtro */}
       <div className="px-6 py-4 border-b border-blue-200/50">
-        <button
-          onClick={() => onToggleExpanded(!isExpanded)}
-          className="flex items-center justify-between w-full text-left group transition-all duration-200 hover:scale-[1.02]"
-        >
-          <div className="flex items-center space-x-3">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => onToggleExpanded(!isExpanded)}
+            className="flex items-center space-x-3 text-left group transition-all duration-200 hover:scale-[1.02] flex-1"
+          >
             <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
               <MagnifyingGlassIcon className="h-5 w-5 text-blue-600" />
             </div>
@@ -138,15 +204,39 @@ const FiltrosVisitas = ({
                 </div>
               )}
             </div>
+          </button>
+          
+          {/* Botones de Exportación */}
+          <div className="flex items-center space-x-2 ml-4">
+            <button
+              onClick={() => handleExport('excel')}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+              title="Exportar a Excel"
+            >
+              <DocumentTextIcon className="h-5 w-5" />
+              <span className="text-sm font-medium">Excel</span>
+            </button>
+            <button
+              onClick={() => handleExport('pdf')}
+              className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+              title="Exportar a PDF"
+            >
+              <DocumentArrowDownIcon className="h-5 w-5" />
+              <span className="text-sm font-medium">PDF</span>
+            </button>
+            
+            <button
+              onClick={() => onToggleExpanded(!isExpanded)}
+              className="p-2 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              {isExpanded ? (
+                <ChevronUpIcon className="h-5 w-5 text-blue-600" />
+              ) : (
+                <ChevronDownIcon className="h-5 w-5 text-blue-600" />
+              )}
+            </button>
           </div>
-          <div className="p-2 rounded-lg group-hover:bg-blue-100 transition-colors">
-            {isExpanded ? (
-              <ChevronUpIcon className="h-5 w-5 text-blue-600" />
-            ) : (
-              <ChevronDownIcon className="h-5 w-5 text-blue-600" />
-            )}
-          </div>
-        </button>
+        </div>
       </div>
 
       {/* Contenido del filtro */}

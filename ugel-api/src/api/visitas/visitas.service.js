@@ -10,6 +10,9 @@ const personalRepository = require('../personal/personal.repository');
 const motivosVisitaRepository = require('../motivos-visita/motivosvisita.repository');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const ExcelJS = require('exceljs');
+const PDFDocument = require('pdfkit');
+const { getTheme } = require('../../config/exportStyles');
 
 /**
  * Obtener todas las visitas con paginación y filtros
@@ -280,11 +283,454 @@ const getEstadisticas = async (options = {}) => {
   }
 };
 
+/**
+ * Exportar visitas a Excel
+ * @param {Object} filtros - Filtros para la consulta
+ * @returns {Buffer} Buffer del archivo Excel
+ */
+const exportarAExcel = async (filtros = {}, themeName = 'corporate') => {
+  try {
+    // Obtener configuración de estilos
+    const theme = getTheme(themeName);
+    const styles = theme.excel;
+    
+    // Obtener todos los datos sin paginación
+    const result = await repository.findAll({
+      search: filtros.q || '',
+      fechaInicio: filtros.fechaInicio,
+      fechaFin: filtros.fechaFin,
+      areaId: filtros.areaId ? parseInt(filtros.areaId) : undefined,
+      motivoVisitaId: filtros.motivoVisitaId ? parseInt(filtros.motivoVisitaId) : undefined,
+      personalVisitadoId: filtros.personalVisitadoId ? parseInt(filtros.personalVisitadoId) : undefined,
+      documentoVisitante: filtros.documentoVisitante
+    }, false); // false = sin paginación
+    
+    const visitas = result.visitas;
+    
+    // Crear el libro de Excel
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Sistema de Control de Acceso UGEL';
+    workbook.created = new Date();
+    
+    const worksheet = workbook.addWorksheet('Historial de Visitas');
+    
+    // Definir las columnas usando configuración
+    worksheet.columns = [
+      { header: 'N°', key: 'numero', width: styles.dimensions.columnWidths.numero },
+      { header: 'Visitante', key: 'visitante', width: styles.dimensions.columnWidths.visitante },
+      { header: 'Documento', key: 'documento', width: styles.dimensions.columnWidths.documento },
+      { header: 'Empleado Visitado', key: 'empleado', width: styles.dimensions.columnWidths.empleado },
+      { header: 'Cargo', key: 'cargo', width: styles.dimensions.columnWidths.cargo },
+      { header: 'Motivo', key: 'motivo', width: styles.dimensions.columnWidths.motivo },
+      { header: 'Lugar', key: 'lugar', width: styles.dimensions.columnWidths.lugar },
+      { header: 'Fecha Ingreso', key: 'fechaIngreso', width: styles.dimensions.columnWidths.fechaIngreso },
+      { header: 'Fecha Salida', key: 'fechaSalida', width: styles.dimensions.columnWidths.fechaSalida },
+      { header: 'Usuario Registro', key: 'usuarioRegistro', width: styles.dimensions.columnWidths.usuarioRegistro }
+    ];
+    
+    // Estilo para la cabecera usando configuración
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { 
+      bold: styles.fonts.header.bold,
+      color: { argb: styles.colors.headerText },
+      size: styles.fonts.header.size,
+      name: styles.fonts.header.name
+    };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: styles.colors.headerBackground }
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = styles.dimensions.headerHeight;
+    
+    // Agregar bordes a la cabecera
+    headerRow.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+    
+    // Agregar los datos
+    visitas.forEach((visita, index) => {
+      const row = worksheet.addRow({
+        numero: index + 1,
+        visitante: `${visita.visitante_nombres} ${visita.visitante_apellidos}`,
+        documento: visita.numero_documento,
+        empleado: visita.personal_nombres ? `${visita.personal_nombres} ${visita.personal_apellidos}` : 'N/A',
+        cargo: visita.personal_cargo || 'N/A',
+        motivo: visita.nombre_motivo,
+        lugar: visita.nombre_area,
+        fechaIngreso: visita.fecha_ingreso ? new Date(visita.fecha_ingreso).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : 'N/A',
+        fechaSalida: visita.fecha_salida ? new Date(visita.fecha_salida).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : 'Aún dentro',
+        usuarioRegistro: visita.usuario_ingreso || 'N/A'
+      });
+      
+      // Estilo alternado para las filas usando configuración
+      if (index % 2 === 0) {
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: styles.colors.alternateRow }
+        };
+      }
+      
+      // Aplicar fuente personalizada a todas las filas de datos
+      row.font = { 
+        name: styles.fonts.data.name,
+        size: styles.fonts.data.size,
+        bold: styles.fonts.data.bold,
+        color: { argb: styles.colors.dataText }
+      };
+      
+      // Agregar bordes a cada celda usando configuración
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: styles.colors.border } },
+          left: { style: 'thin', color: { argb: styles.colors.border } },
+          bottom: { style: 'thin', color: { argb: styles.colors.border } },
+          right: { style: 'thin', color: { argb: styles.colors.border } }
+        };
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      });
+      
+      // Centrar la columna de número
+      row.getCell('numero').alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+    
+    // Agregar información adicional al final
+    const footerRowNum = worksheet.rowCount + 2;
+    const footerRow = worksheet.getRow(footerRowNum);
+    footerRow.getCell(1).value = `Total de registros: ${visitas.length}`;
+    footerRow.getCell(1).font = { bold: true, size: 10 };
+    
+    const dateRow = worksheet.getRow(footerRowNum + 1);
+    dateRow.getCell(1).value = `Generado el: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}`;
+    dateRow.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF6B7280' } };
+    
+    // Generar el buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    return buffer;
+    
+  } catch (error) {
+    logger.error('Error exportando a Excel:', error);
+    throw error;
+  }
+};
+
+/**
+ * Exportar visitas a PDF
+ * @param {Object} filtros - Filtros para la consulta
+ * @returns {Buffer} Buffer del archivo PDF
+ */
+const exportarAPDF = async (filtros = {}) => {
+  try {
+    // Obtener todos los datos sin paginación
+    const result = await repository.findAll({
+      search: filtros.q || '',
+      fechaInicio: filtros.fechaInicio,
+      fechaFin: filtros.fechaFin,
+      areaId: filtros.areaId ? parseInt(filtros.areaId) : undefined,
+      motivoVisitaId: filtros.motivoVisitaId ? parseInt(filtros.motivoVisitaId) : undefined,
+      personalVisitadoId: filtros.personalVisitadoId ? parseInt(filtros.personalVisitadoId) : undefined,
+      documentoVisitante: filtros.documentoVisitante
+    }, false); // false = sin paginación
+    
+    const visitas = result.visitas;
+    
+    return new Promise((resolve, reject) => {
+      try {
+        // Crear documento PDF en orientación horizontal para más espacio
+        const doc = new PDFDocument({ 
+          size: 'A4',
+          layout: 'landscape',
+          margin: 40,
+          bufferPages: true
+        });
+        
+        const chunks = [];
+        
+        // Capturar el buffer
+        doc.on('data', chunk => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+        
+        // Configuración de colores - PERSONALIZABLE
+        const primaryColor = '#1F2937'; // Gris oscuro (antes era azul)
+        const textColor = '#374151'; // Gris medio
+        const lightGray = '#F9FAFB'; // Gris muy claro
+        const accentColor = '#059669'; // Verde para acentos
+        
+        // Encabezado del documento - PERSONALIZABLE
+        doc.fontSize(20) // Tamaño más grande
+           .fillColor(primaryColor)
+           .font('Helvetica-Bold') // Fuente: Helvetica-Bold, Times-Bold, Courier-Bold
+           .text('HISTORIAL DE VISITAS', { align: 'center' });
+        
+        doc.fontSize(11) // Tamaño más grande
+           .fillColor(textColor)
+           .font('Helvetica') // Fuente: Helvetica, Times-Roman, Courier
+           .text('Sistema de Control de Acceso - UGEL Talara', { align: 'center' });
+        
+        doc.moveDown();
+        
+        // Información de filtros aplicados
+        doc.fontSize(9)
+           .fillColor('#6B7280')
+           .text(`Generado: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}`, { align: 'right' });
+        
+        if (filtros.fechaInicio || filtros.fechaFin) {
+          let rangoText = 'Rango de fechas: ';
+          if (filtros.fechaInicio) rangoText += `Desde ${filtros.fechaInicio} `;
+          if (filtros.fechaFin) rangoText += `Hasta ${filtros.fechaFin}`;
+          doc.text(rangoText, { align: 'right' });
+        }
+        
+        doc.text(`Total de registros: ${visitas.length}`, { align: 'right' });
+        
+        doc.moveDown();
+        
+        // Configuración de la tabla
+        const tableTop = doc.y;
+        const itemHeight = 25;
+        const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+        
+        // Anchos de columnas optimizados
+        const columnWidths = {
+          num: 25,
+          visitante: 95,
+          documento: 60,
+          empleado: 95,
+          cargo: 80,
+          motivo: 75,
+          lugar: 75,
+          ingreso: 70,
+          salida: 70,
+          usuario: 65
+        };
+        
+        let currentY = tableTop;
+        
+        // Función para dibujar encabezado de tabla
+        const drawTableHeader = (y) => {
+          // Fondo del encabezado
+          doc.rect(doc.page.margins.left, y, pageWidth, itemHeight)
+             .fillAndStroke(primaryColor, primaryColor);
+          
+          // Texto del encabezado - PERSONALIZABLE
+          doc.fontSize(9) // Tamaño más grande
+             .fillColor('#FFFFFF')
+             .font('Helvetica-Bold'); // Fuente: Helvetica-Bold, Times-Bold, Courier-Bold
+          
+          let x = doc.page.margins.left + 3;
+          const headerY = y + 8;
+          
+          doc.text('N°', x, headerY, { width: columnWidths.num, align: 'center' });
+          x += columnWidths.num;
+          
+          doc.text('Visitante', x, headerY, { width: columnWidths.visitante, align: 'left' });
+          x += columnWidths.visitante;
+          
+          doc.text('Documento', x, headerY, { width: columnWidths.documento, align: 'left' });
+          x += columnWidths.documento;
+          
+          doc.text('Empleado', x, headerY, { width: columnWidths.empleado, align: 'left' });
+          x += columnWidths.empleado;
+          
+          doc.text('Cargo', x, headerY, { width: columnWidths.cargo, align: 'left' });
+          x += columnWidths.cargo;
+          
+          doc.text('Motivo', x, headerY, { width: columnWidths.motivo, align: 'left' });
+          x += columnWidths.motivo;
+          
+          doc.text('Lugar', x, headerY, { width: columnWidths.lugar, align: 'left' });
+          x += columnWidths.lugar;
+          
+          doc.text('F. Ingreso', x, headerY, { width: columnWidths.ingreso, align: 'left' });
+          x += columnWidths.ingreso;
+          
+          doc.text('F. Salida', x, headerY, { width: columnWidths.salida, align: 'left' });
+          x += columnWidths.salida;
+          
+          doc.text('Usuario', x, headerY, { width: columnWidths.usuario, align: 'left' });
+          
+          return y + itemHeight;
+        };
+        
+        // Dibujar encabezado inicial
+        currentY = drawTableHeader(currentY);
+        
+        // Dibujar filas de datos - PERSONALIZABLE
+        doc.font('Helvetica').fontSize(8).fillColor(textColor); // Fuente y tamaño personalizable
+        
+        visitas.forEach((visita, index) => {
+          // Verificar si necesitamos una nueva página
+          if (currentY + itemHeight > doc.page.height - doc.page.margins.bottom) {
+            doc.addPage();
+            currentY = doc.page.margins.top;
+            currentY = drawTableHeader(currentY);
+          }
+          
+          // Fondo alternado
+          if (index % 2 === 0) {
+            doc.rect(doc.page.margins.left, currentY, pageWidth, itemHeight)
+               .fill(lightGray);
+          }
+          
+          // Borde de la fila
+          doc.rect(doc.page.margins.left, currentY, pageWidth, itemHeight)
+             .stroke('#D1D5DB');
+          
+          let x = doc.page.margins.left + 3;
+          const textY = currentY + 5;
+          
+          // Número
+          doc.fillColor(textColor).text(index + 1, x, textY, { 
+            width: columnWidths.num, 
+            align: 'center',
+            lineBreak: false
+          });
+          x += columnWidths.num;
+          
+          // Visitante
+          const visitante = `${visita.visitante_nombres} ${visita.visitante_apellidos}`.substring(0, 30);
+          doc.text(visitante, x, textY, { 
+            width: columnWidths.visitante,
+            lineBreak: false
+          });
+          x += columnWidths.visitante;
+          
+          // Documento
+          doc.text(visita.numero_documento || 'N/A', x, textY, { 
+            width: columnWidths.documento,
+            lineBreak: false
+          });
+          x += columnWidths.documento;
+          
+          // Empleado
+          const empleado = visita.personal_nombres 
+            ? `${visita.personal_nombres} ${visita.personal_apellidos}`.substring(0, 28)
+            : 'N/A';
+          doc.text(empleado, x, textY, { 
+            width: columnWidths.empleado,
+            lineBreak: false
+          });
+          x += columnWidths.empleado;
+          
+          // Cargo
+          const cargo = (visita.personal_cargo || 'N/A').substring(0, 25);
+          doc.text(cargo, x, textY, { 
+            width: columnWidths.cargo,
+            lineBreak: false
+          });
+          x += columnWidths.cargo;
+          
+          // Motivo
+          const motivo = (visita.nombre_motivo || 'N/A').substring(0, 22);
+          doc.text(motivo, x, textY, { 
+            width: columnWidths.motivo,
+            lineBreak: false
+          });
+          x += columnWidths.motivo;
+          
+          // Lugar
+          const lugar = (visita.nombre_area || 'N/A').substring(0, 22);
+          doc.text(lugar, x, textY, { 
+            width: columnWidths.lugar,
+            lineBreak: false
+          });
+          x += columnWidths.lugar;
+          
+          // Fecha Ingreso
+          const fechaIngreso = visita.fecha_ingreso 
+            ? new Date(visita.fecha_ingreso).toLocaleString('es-PE', { 
+                timeZone: 'America/Lima',
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              })
+            : 'N/A';
+          doc.text(fechaIngreso, x, textY, { 
+            width: columnWidths.ingreso,
+            lineBreak: false
+          });
+          x += columnWidths.ingreso;
+          
+          // Fecha Salida
+          const fechaSalida = visita.fecha_salida 
+            ? new Date(visita.fecha_salida).toLocaleString('es-PE', { 
+                timeZone: 'America/Lima',
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              })
+            : 'Dentro';
+          doc.text(fechaSalida, x, textY, { 
+            width: columnWidths.salida,
+            lineBreak: false
+          });
+          x += columnWidths.salida;
+          
+          // Usuario
+          const usuario = (visita.usuario_ingreso || 'N/A').substring(0, 18);
+          doc.text(usuario, x, textY, { 
+            width: columnWidths.usuario,
+            lineBreak: false
+          });
+          
+          currentY += itemHeight;
+        });
+        
+        // Pie de página en todas las páginas
+        const range = doc.bufferedPageRange();
+        for (let i = range.start; i < range.start + range.count; i++) {
+          doc.switchToPage(i);
+          
+          // Línea separadora
+          doc.moveTo(doc.page.margins.left, doc.page.height - 50)
+             .lineTo(doc.page.width - doc.page.margins.right, doc.page.height - 50)
+             .stroke('#D1D5DB');
+          
+          // Texto del pie de página
+          doc.fontSize(8)
+             .fillColor('#6B7280')
+             .text(
+               `Sistema de Control de Acceso - UGEL Talara | Página ${i + 1} de ${range.count}`,
+               doc.page.margins.left,
+               doc.page.height - 35,
+               { align: 'center' }
+             );
+        }
+        
+        // Finalizar el documento
+        doc.end();
+        
+      } catch (error) {
+        logger.error('Error generando PDF:', error);
+        reject(error);
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Error exportando a PDF:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllVisitas,
   getVisitasActivas,
   getVisitaById,
   createVisita,
   registrarSalidaVisita,
-  getEstadisticas
+  getEstadisticas,
+  exportarAExcel,
+  exportarAPDF
 };
