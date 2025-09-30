@@ -166,6 +166,17 @@ export const transformAreas = (data) => {
     }));
     console.log('transformAreas - Datos transformados:', transformed);
     return transformed;
+  } else if (data && typeof data === 'object') {
+    // Manejar objeto individual (para edición)
+    const transformed = {
+      id: data.id,
+      // Backend puede devolver nombre_area o nombre según endpoint
+      nombre: data.nombre_area ?? data.nombre ?? '',
+      nombre_area: data.nombre_area ?? data.nombre ?? '',
+      activa: data.activa
+    };
+    console.log('transformAreas - Datos transformados (objeto):', transformed);
+    return transformed;
   }
   console.log('transformAreas - No es un array, retornando datos originales:', data);
   return data;
@@ -394,6 +405,102 @@ export const transformPersonalToBackend = (data) => {
   return transformed;
 };
 
+// Usuarios - campos y transformaciones
+export const usuariosFormFields = [
+  {
+    name: 'nombre_usuario',
+    label: 'Nombre de Usuario',
+    type: 'text',
+    placeholder: 'Ingrese nombre de usuario',
+    required: true,
+    validation: (value) => {
+      if (!value) return 'El nombre de usuario es requerido';
+      const trimmed = String(value).trim();
+      if (trimmed.length < 3) return 'Debe tener al menos 3 caracteres';
+      if (trimmed.length > 100) return 'No puede exceder 100 caracteres';
+      if (!/^[A-Za-z0-9]+$/.test(trimmed)) return 'Solo letras y números, sin espacios';
+      return null;
+    }
+  },
+  {
+    name: 'email',
+    label: 'Correo Electrónico',
+    type: 'email',
+    placeholder: 'Ingrese correo electrónico',
+    required: true,
+    validation: (value) => {
+      if (!value) return 'El correo es requerido';
+      const trimmed = String(value).trim();
+      if (trimmed.length > 150) return 'El correo no puede exceder 150 caracteres';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return 'Ingrese un correo válido';
+      return null;
+    }
+  },
+  {
+    name: 'hash_contrasena',
+    label: 'Contraseña',
+    type: 'password',
+    placeholder: 'Ingrese una contraseña segura',
+    required: true,
+    validation: (value) => {
+      if (!value) return 'La contraseña es requerida';
+      if (String(value).length < 8) return 'La contraseña debe tener al menos 8 caracteres';
+      if (String(value).length > 255) return 'La contraseña es demasiado larga';
+      return null;
+    }
+  },
+  {
+    name: 'rol',
+    label: 'Rol',
+    type: 'select',
+    required: true,
+    placeholder: 'Seleccione rol',
+    options: [
+      { value: 'Administrador', label: 'Administrador' },
+      { value: 'RRHH', label: 'RRHH' },
+      { value: 'Vigilante', label: 'Vigilante' },
+    ],
+    validation: (value) => {
+      if (!value) return 'El rol es requerido';
+      if (!['Administrador','RRHH','Vigilante'].includes(value)) return 'Rol inválido';
+      return null;
+    }
+  },
+];
+
+export const transformUsuarios = (data) => {
+  if (Array.isArray(data)) {
+    return data.map(item => ({
+      id: item.id,
+      nombre_usuario: item.nombre_usuario || item.username,
+      email: item.email,
+      rol: item.rol,
+      activo: item.activo,
+    }));
+  } else if (data && typeof data === 'object') {
+    return {
+      id: data.id,
+      nombre_usuario: data.nombre_usuario || data.username,
+      email: data.email,
+      rol: data.rol,
+      activo: data.activo,
+    };
+  }
+  return data;
+};
+
+export const transformUsuariosToBackend = (data) => {
+  const transformed = {
+    nombreUsuario: (data.nombre_usuario ?? '').trim(),
+    email: (data.email ?? '').trim(),
+    contrasena: data.hash_contrasena,
+    rol: data.rol,
+  };
+  console.log('transformUsuariosToBackend - Datos de entrada:', data);
+  console.log('transformUsuariosToBackend - Datos transformados:', transformed);
+  return transformed;
+};
+
 // Configuración de columnas para las tablas - OPTIMIZADA
 export const getTableColumns = (moduleName) => {
   const baseColumns = [
@@ -407,6 +514,43 @@ export const getTableColumns = (moduleName) => {
   ];
 
   const moduleColumns = {
+    usuarios: [
+      {
+        key: 'nombre_usuario',
+        title: 'Usuario',
+        minWidth: '200px',
+        maxWidth: '200px',
+        width: '200px'
+      },
+      {
+        key: 'email',
+        title: 'Email',
+        minWidth: '320px',
+        maxWidth: '320px',
+        width: '320px'
+      },
+      {
+        key: 'rol',
+        title: 'Rol',
+        minWidth: '120px',
+        maxWidth: '140px',
+        width: '120px'
+      },
+      {
+        key: 'activo',
+        title: 'Estado',
+        minWidth: '90px',
+        maxWidth: '100px',
+        width: '90px',
+        render: (value) => (
+          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
+            value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {value ? 'Activo' : 'Inactivo'}
+          </span>
+        ),
+      },
+    ],
     areas: [
       { 
         key: 'nombre_area', 

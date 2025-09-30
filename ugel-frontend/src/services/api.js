@@ -294,6 +294,23 @@ export const cargosService = {
   delete: (id) => api.delete(`/cargos/${id}`),
 };
 
+export const usuariosService = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.q) params.append('q', filters.q);
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.rol) params.append('rol', filters.rol);
+    return api.get(`/usuarios?${params.toString()}`);
+  },
+  getById: (id) => api.get(`/usuarios/${id}`),
+  create: (usuario) => api.post('/usuarios', usuario),
+  update: (id, usuario) => api.put(`/usuarios/${id}`, usuario),
+  delete: (id) => api.delete(`/usuarios/${id}`),
+  getDeleted: () => api.get('/usuarios/deleted'),
+  restore: (id) => api.put(`/usuarios/${id}/restore`),
+};
+
 // --- Funciones para el Dashboard del Vigilante ---
 
 /**

@@ -34,6 +34,7 @@ import TiposContratoPage from './pages/TiposContratoPage';
 import MotivosSalidaPage from './pages/MotivosSalidaPage';
 import CargosPage from './pages/CargosPage';
 import PersonalPage from './pages/PersonalPage';
+import UsuariosPage from './pages/UsuariosPage';
 import CrearPersonalPage from './pages/CrearPersonalPage';
 import PapeletasPage from './pages/PapeletasPage';
 import AdminCatalogosPage from './pages/AdminCatalogosPage';
@@ -69,7 +70,7 @@ function App() {
             <Route path="cargos" element={<ProtectedRoute allowedRoles={['admin']} element={<CargosPage />} />} />
             <Route path="catalogos" element={<ProtectedRoute allowedRoles={['admin']} element={<AdminCatalogosPage />} />} />
             
-            <Route path="usuarios" element={<ProtectedRoute allowedRoles={['admin']} element={<div>Página de Usuarios</div>} />} />
+            <Route path="usuarios" element={<ProtectedRoute allowedRoles={['admin']} element={<UsuariosPage />} />} />
           </Route>
           
           {/* RRHH Routes */}
@@ -79,6 +80,7 @@ function App() {
             <Route path="personal/crear" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
             <Route path="personal/editar/:id" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
             <Route path="papeletas" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PapeletasPage />} />} />
+            {/* Usuarios es solo para Admin; no registrar aquí */}
           </Route>
 
           {/* Vigilante Routes */}

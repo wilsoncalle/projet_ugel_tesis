@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import CatalogoPage from '../components/CatalogoPage';
+import Input from '../components/Input';
+import SelectCustom from '../components/SelectCustom';
 import { personalService, areasService, tiposContratoService, tiposDocumentoService, cargosService } from '../services/api';
 import { personalFormFields, getTableColumns, transformPersonal, transformPersonalToBackend } from '../config/formFields.jsx';
 
@@ -77,7 +79,79 @@ const PersonalPage = () => {
       title="Gestión de Personal"
       description="Administre la información del personal de la institución"
       service={personalService}
-      formFields={formFields}
+      formFields={formFields.map(field => {
+        // Campos de texto
+        if (['numeroDocumento', 'nombres', 'apellidos'].includes(field.name)) {
+          const labels = {
+            numeroDocumento: 'Número de Documento',
+            nombres: 'Nombres',
+            apellidos: 'Apellidos'
+          };
+          const maxLengths = {
+            numeroDocumento: 20,
+            nombres: 150,
+            apellidos: 150
+          };
+          return {
+            ...field,
+            render: ({ value, onChange, error }) => (
+              <Input
+                label={labels[field.name]}
+                value={value || ''}
+                onChange={(e) => onChange(e.target.value)}
+                maxLength={maxLengths[field.name]}
+              />
+            )
+          };
+        }
+
+        // Selects con SelectCustom
+        if (['tipoDocumento', 'cargoId', 'areaDestinoId', 'tipoContratoId'].includes(field.name)) {
+          return {
+            ...field,
+            render: ({ value, onChange, error, field: fullField }) => (
+              <div>
+                <SelectCustom
+                  label={field.label}
+                  value={(fullField.options || []).find(opt => opt.value?.toString() === (value ?? '').toString()) || null}
+                  onChange={(selected) => onChange(selected?.value || '')}
+                  options={fullField.options || []}
+                  placeholder={field.placeholder || 'Seleccione...'}
+                  isSearchable={true}
+                  noOptionsMessage={`No se encontraron ${field.label?.toLowerCase?.() || 'opciones'}`}
+                />
+                {error && (
+                  <p className="mt-1 text-sm text-red-600">{error}</p>
+                )}
+              </div>
+            )
+          };
+        }
+
+        // Select de estado (activo) con opciones booleanas
+        if (field.name === 'activo') {
+          return {
+            ...field,
+            render: ({ value, onChange, error, field: fullField }) => (
+              <div>
+                <SelectCustom
+                  label={field.label}
+                  value={(fullField.options || []).find(opt => String(opt.value) === String(value)) || null}
+                  onChange={(selected) => onChange(selected ? selected.value : '')}
+                  options={(fullField.options || []).map(opt => ({ value: String(opt.value), label: opt.label }))}
+                  placeholder={field.placeholder || 'Seleccione estado'}
+                  isSearchable={false}
+                />
+                {error && (
+                  <p className="mt-1 text-sm text-red-600">{error}</p>
+                )}
+              </div>
+            )
+          };
+        }
+
+        return field;
+      })}
       tableColumns={tableColumns}
       moduleName="Personal"
       transformData={transformPersonal}

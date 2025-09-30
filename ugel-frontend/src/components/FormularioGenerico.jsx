@@ -122,6 +122,21 @@ const FormularioGenerico = ({
     const fieldError = errors[name];
     const fieldValue = formData[name] || '';
 
+    // Permitir renderizado personalizado por campo
+    if (typeof field.render === 'function') {
+      return (
+        <div key={name}>
+          {field.render({
+            value: fieldValue,
+            onChange: (val) => handleChange(name, val),
+            error: fieldError,
+            field,
+            formData,
+          })}
+        </div>
+      );
+    }
+
     const baseInputClasses = `block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm ${
       fieldError ? 'border-red-300' : ''
     } ${className}`;
