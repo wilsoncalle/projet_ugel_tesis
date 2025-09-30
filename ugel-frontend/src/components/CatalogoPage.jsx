@@ -26,6 +26,7 @@ const CatalogoPage = ({
   onCreateClick = null, // Para manejar la creación de manera personalizada
   onEditClick = null,   // Para manejar la edición de manera personalizada
   showModalForm = true, // Para controlar si se muestra el modal de formulario
+  formLayout = 'vertical', // Layout del formulario: 'vertical' | 'horizontal' | 'grid'
 }) => {
   const [formError, setFormError] = useState(null);
   const [notification, setNotification] = useState(null);
@@ -526,6 +527,7 @@ const CatalogoPage = ({
             showCancelButton={false}
             externalError={crudError?.message || formError}
             onChange={handleFormChange}
+            layout={formLayout}
           />
         </ModalGenerico>
       )}

@@ -36,6 +36,7 @@ const UsuariosPage = () => {
             value={value || ''}
             onChange={(e) => onChange(e.target.value)}
             maxLength={maxLengths[field.name]}
+            placeholder={field.placeholder}
             autoComplete={
               field.name === 'hash_contrasena'
                 ? 'new-password'

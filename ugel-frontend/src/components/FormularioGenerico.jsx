@@ -79,11 +79,13 @@ const FormularioGenerico = ({
     // Validate form
     const newErrors = {};
     fields.forEach(field => {
-      if (field.required && !formData[field.name]) {
+      const rawValue = formData[field.name];
+      const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+      if (field.required && (value === undefined || value === null || value === '')) {
         newErrors[field.name] = `${field.label} es requerido`;
       }
-      if (field.validation) {
-        const validationError = field.validation(formData[field.name], formData);
+      if (!newErrors[field.name] && field.validation) {
+        const validationError = field.validation(value, formData);
         if (validationError) {
           newErrors[field.name] = validationError;
         }

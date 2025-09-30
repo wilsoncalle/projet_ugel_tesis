@@ -72,6 +72,16 @@ const create = asyncHandler(async (req, res) => {
   };
   
   const visita = await service.createVisita(visitaData);
+
+  // Emitir evento tiempo real a todos los clientes
+  try {
+    const io = req.app.get('socketio');
+    if (io && visita) {
+      io.emit('nueva_visita_registrada', visita);
+    }
+  } catch (e) {
+    logger.warn('No se pudo emitir evento de nueva visita:', e.message);
+  }
   
   logger.info(`Visita registrada exitosamente con ID: ${visita.id}`);
   
@@ -99,6 +109,17 @@ const registrarSalida = asyncHandler(async (req, res) => {
   
   logger.info(`Salida registrada exitosamente para visita ID: ${id}`);
   logger.info(`Datos de la visita actualizada:`, visita);
+  
+  // Emitir evento de salida registrada a todos los clientes
+  try {
+    const io = req.app.get('socketio');
+    if (io && visita) {
+      io.emit('salida_visita_registrada', { visitaId: parseInt(id) });
+      logger.info(`Evento 'salida_visita_registrada' emitido para visita ID: ${id}`);
+    }
+  } catch (e) {
+    logger.warn('No se pudo emitir evento de salida registrada:', e.message);
+  }
   
   res.json({
     success: true,

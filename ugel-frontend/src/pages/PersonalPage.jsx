@@ -79,6 +79,7 @@ const PersonalPage = () => {
       title="Gestión de Personal"
       description="Administre la información del personal de la institución"
       service={personalService}
+      formLayout="grid"
       formFields={formFields.map(field => {
         // Campos de texto
         if (['numeroDocumento', 'nombres', 'apellidos'].includes(field.name)) {
@@ -100,6 +101,7 @@ const PersonalPage = () => {
                 value={value || ''}
                 onChange={(e) => onChange(e.target.value)}
                 maxLength={maxLengths[field.name]}
+                className=" md:w-full"
               />
             )
           };
@@ -110,7 +112,7 @@ const PersonalPage = () => {
           return {
             ...field,
             render: ({ value, onChange, error, field: fullField }) => (
-              <div>
+              <div className="md:w-full">
                 <SelectCustom
                   label={field.label}
                   value={(fullField.options || []).find(opt => opt.value?.toString() === (value ?? '').toString()) || null}

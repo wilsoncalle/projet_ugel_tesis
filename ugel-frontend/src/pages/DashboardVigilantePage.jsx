@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { AnimatePresence, motion } from "framer-motion";
 import Card from '../components/Card';
 import RegistroForm from '../components/vigilante/RegistroForm';
@@ -99,6 +100,73 @@ const DashboardVigilantePage = () => {
   const searchTimeout = useRef(null);
 
   // Cargar visitantes activos al montar el componente
+  useEffect(() => {
+    // Conexión Socket.IO para actualizaciones en tiempo real
+    const socket = io('http://localhost:3000', {
+      transports: ['websocket']
+    });
+  
+    socket.on('connect', () => {
+      // console.log('Conectado a Socket.IO', socket.id);
+    });
+  
+    socket.on('nueva_visita_registrada', (visita) => {
+      // Si ya existe, no duplicar
+      setVisitantesActivos(prev => {
+        if (prev.some(v => String(v.id) === String(visita.id))) return prev;
+  
+        // Mapear a la estructura usada en UI
+        const mapeada = {
+          ...visita,
+          empleadoVisitado: {
+            id: visita.personal_visitado_id,
+            nombres: visita.personal_nombres || '',
+            apellidos: visita.personal_apellidos || '',
+            cargo: visita.personal_cargo || ''
+          },
+          motivo: {
+            id: visita.motivo_visita_id,
+            label: visita.nombre_motivo || ''
+          },
+          lugar: visita.area_destino_id,
+          lugarNombre: visita.nombre_area || ''
+        };
+  
+        return [mapeada, ...prev];
+      });
+    });
+  
+    // NUEVO: Listener para salidas registradas
+    socket.on('salida_visita_registrada', ({ visitaId }) => {
+      console.log(`Salida registrada para visita ID: ${visitaId}`);
+      
+      // Remover la visita de la lista de activos
+      setVisitantesActivos(prev => {
+        const nuevaLista = prev.filter(v => String(v.id) !== String(visitaId));
+        console.log(`Visitantes activos después de remover: ${nuevaLista.length}`);
+        return nuevaLista;
+      });
+      
+      // Actualizar paginación
+      setActivosPagination(prev => ({
+        ...prev,
+        totalItems: Math.max(0, prev.totalItems - 1),
+        totalPages: Math.ceil(Math.max(0, prev.totalItems - 1) / prev.itemsPerPage)
+      }));
+    });
+  
+    socket.on('disconnect', () => {
+      // console.log('Socket desconectado');
+    });
+  
+    return () => {
+      socket.off('nueva_visita_registrada');
+      socket.off('salida_visita_registrada'); // Limpiar el listener
+      socket.close();
+    };
+  }, []);
+
+  // Carga inicial
   useEffect(() => {
     cargarVisitantesActivos();
     // Cargar historial inicial sin filtros para mostrar todos los registros

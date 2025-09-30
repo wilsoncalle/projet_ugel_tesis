@@ -10,8 +10,27 @@ const logger = require('./src/utils/logger');
 
 const PORT = config.port || 3000;
 
-// Inicializar el servidor
-const server = app.listen(PORT, () => {
+// Inicializar el servidor HTTP y Socket.IO
+const http = require('http');
+const { Server } = require('socket.io');
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true,
+  },
+});
+
+app.set('socketio', io);
+
+io.on('connection', (socket) => {
+  logger.info(`Socket conectado: ${socket.id}`);
+});
+
+server.listen(PORT, () => {
   logger.info(`Servidor UGEL API ejecutándose en puerto ${PORT}`);
   logger.info(`Entorno: ${config.nodeEnv}`);
   logger.info(`Base de datos: ${config.database.host}:${config.database.port}/${config.database.database}`);
