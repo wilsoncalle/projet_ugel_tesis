@@ -136,7 +136,9 @@ const createVisita = async (visitaData) => {
       areaDestinoId, 
       personalVisitadoId, 
       motivoVisitaId,
-      usuarioIngresoId
+      usuarioIngresoId,
+      fechaIngreso,
+      horaIngreso
     } = visitaData;
     
     let visitante;
@@ -205,13 +207,25 @@ if (visitaActiva) {
   );
 }
     
+    // Construir fecha de ingreso (usar fecha/hora originales si están disponibles)
+    let fechaIngresoFinal;
+    if (fechaIngreso && horaIngreso) {
+      // Combinar fecha y hora originales del evento offline
+      fechaIngresoFinal = new Date(`${fechaIngreso}T${horaIngreso}:00`);
+      logger.info(`Usando fecha/hora originales: ${fechaIngreso} ${horaIngreso} -> ${fechaIngresoFinal.toISOString()}`);
+    } else {
+      // Usar fecha/hora actual (comportamiento normal)
+      fechaIngresoFinal = new Date();
+      logger.info(`Usando fecha/hora actual: ${fechaIngresoFinal.toISOString()}`);
+    }
+
     // Crear la visita
     const newVisita = await repository.create({
       visitante_id: visitante.id,
       area_destino_id: areaDestinoId,
       personal_visitado_id: personalVisitadoId || null,
       motivo_visita_id: motivoVisitaId,
-      fecha_ingreso: new Date(),
+      fecha_ingreso: fechaIngresoFinal,
       usuario_ingreso_id: usuarioIngresoId
     });
     

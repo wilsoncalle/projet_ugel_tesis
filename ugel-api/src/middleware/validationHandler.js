@@ -329,7 +329,15 @@ const schemas = {
       motivoVisitaId: Joi.number()
         .integer()
         .positive()
-        .required()
+        .required(),
+      
+      // Campos de fecha y hora (opcionales para compatibilidad con modo offline)
+      fechaIngreso: Joi.string()
+        .pattern(/^\d{4}-\d{2}-\d{2}$/)
+        .optional(),
+      horaIngreso: Joi.string()
+        .pattern(/^\d{2}:\d{2}$/)
+        .optional()
     }).xor('visitanteId', 'tipoDocumentoId')
       .and('tipoDocumentoId', 'numeroDocumento', 'nombres', 'apellidos')
   },

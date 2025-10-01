@@ -91,11 +91,7 @@ export async function saveVisitaOffline(visitaData, visitanteData = null) {
       needsVisitanteCreation: !!visitanteData, // Flag para saber si necesita crear visitante
       timestamp: Date.now(),
       status: 'pending',
-      syncAttempts: 0,
-      // Identificador único para evitar duplicados
-      syncId: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      // Preservar la hora original del evento
-      originalTimestamp: visitaData.horaIngreso || new Date().toISOString()
+      syncAttempts: 0
     };
 
     console.log('[IndexedDB] 📥 Guardando visita offline:', JSON.stringify(visitaOffline, null, 2));

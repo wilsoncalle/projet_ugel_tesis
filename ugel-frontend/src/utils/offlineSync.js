@@ -114,11 +114,16 @@ async function syncPendingVisitas() {
         motivoVisitaId: visita.motivoVisitaId,
         areaDestinoId: visita.areaDestinoId,
         usuarioIngresoId: visita.usuarioIngresoId,
-        // Incluir timestamp original para preservar la hora del evento
-        fechaIngreso: visita.originalTimestamp || visita.horaIngreso,
-        // Identificador único para evitar duplicados
-        syncId: visita.syncId
+        // Preservar la fecha y hora originales del evento offline
+        fechaIngreso: visita.fechaIngreso,
+        horaIngreso: visita.horaIngreso
       };
+
+      console.log('[Sync] 🕐 Enviando datos con hora original:', {
+        fechaIngreso: visitaPayload.fechaIngreso,
+        horaIngreso: visitaPayload.horaIngreso,
+        timestamp: visita.timestamp
+      });
 
       // Enviar al backend
       const response = await fetch(`${API_BASE_URL}/visitas`, {
