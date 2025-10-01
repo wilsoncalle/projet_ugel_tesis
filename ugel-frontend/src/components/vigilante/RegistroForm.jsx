@@ -786,7 +786,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
         
         if (response.data.success) {
           
-          // Crear objeto de visitante para la UI
+          // Crear objeto de visitante para la UI con datos completos
           const visitanteData = {
             tipoDocumentoId: formVisitante.tipoDocumentoId,
             numeroDocumento: formVisitante.numeroDocumento,
@@ -803,7 +803,12 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
             nombre_motivo: motivo?.label || '',
             personal_nombres: empleado?.label?.split(' ')[0] || '',
             personal_apellidos: empleado?.label?.split(' ').slice(1).join(' ') || '',
-            empleadoVisitado: empleado
+            empleadoVisitado: empleado,
+            // Datos adicionales para preservar en modo offline
+            personal_cargo: empleado?.cargo || 'Sin cargo',
+            area_destino_id: lugar?.value || '',
+            motivo_visita_id: motivo?.value || '',
+            personal_visitado_id: empleado?.value || null
           };
 
           console.log('[RegistroForm] Visitante a agregar con datos completos:', visitanteData);

@@ -89,21 +89,33 @@ export async function saveVisitaOffline(visitaData, visitanteData = null) {
         _tempId: `temp_${Date.now()}_${visitanteData.numeroDocumento}`
       } : null,
       needsVisitanteCreation: !!visitanteData, // Flag para saber si necesita crear visitante
+      // Preservar datos adicionales para la UI offline
+      personal_nombres: visitaData.personal_nombres || '',
+      personal_apellidos: visitaData.personal_apellidos || '',
+      personal_cargo: visitaData.personal_cargo || 'Sin cargo',
+      nombre_motivo: visitaData.nombre_motivo || 'Pendiente',
+      nombre_area: visitaData.nombre_area || 'Pendiente',
       timestamp: Date.now(),
       status: 'pending',
       syncAttempts: 0
     };
 
-    console.log('[IndexedDB] 📥 Guardando visita offline:', JSON.stringify(visitaOffline, null, 2));
-    console.log('[IndexedDB] 🕐 Hora de ingreso a guardar:', visitaData.horaIngreso);
+    // Log solo en modo desarrollo
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[IndexedDB] 📥 Guardando visita offline:', JSON.stringify(visitaOffline, null, 2));
+      console.log('[IndexedDB] 🕐 Hora de ingreso a guardar:', visitaData.horaIngreso);
+    }
 
     return new Promise((resolve, reject) => {
       const request = store.add(visitaOffline);
 
       request.onsuccess = () => {
         const savedData = { id: request.result, ...visitaOffline };
-        console.log('[IndexedDB] ✅ Visita guardada offline con ID:', request.result);
-        console.log('[IndexedDB] ✅ Datos completos:', savedData);
+        // Log solo en modo desarrollo
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[IndexedDB] ✅ Visita guardada offline con ID:', request.result);
+          console.log('[IndexedDB] ✅ Datos completos:', savedData);
+        }
         resolve(savedData);
       };
 
@@ -169,7 +181,10 @@ export async function getPendingVisitas() {
 
       request.onsuccess = () => {
         const pending = request.result.filter(item => item.status === 'pending');
-        console.log('[IndexedDB] Visitas pendientes encontradas:', pending.length);
+        // Solo mostrar log si hay visitas pendientes
+        if (pending.length > 0) {
+          console.log('[IndexedDB] Visitas pendientes encontradas:', pending.length);
+        }
         resolve(pending);
       };
 
@@ -197,7 +212,10 @@ export async function getPendingSalidas() {
 
       request.onsuccess = () => {
         const pending = request.result.filter(item => item.status === 'pending');
-        console.log('[IndexedDB] Salidas pendientes encontradas:', pending.length);
+        // Solo mostrar log si hay salidas pendientes
+        if (pending.length > 0) {
+          console.log('[IndexedDB] Salidas pendientes encontradas:', pending.length);
+        }
         resolve(pending);
       };
 

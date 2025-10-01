@@ -239,8 +239,16 @@ const DashboardVigilantePage = () => {
   useEffect(() => {
     // Conexión Socket.IO para actualizaciones en tiempo real
     const socket = io('http://localhost:3000', {
-      transports: ['websocket']
+      transports: ['websocket'],
+      autoConnect: false, // No conectar automáticamente
+      reconnection: false, // Deshabilitar reconexión automática
+      timeout: 5000 // Timeout más corto
     });
+
+    // Intentar conectar solo si estamos online
+    if (navigator.onLine) {
+      socket.connect();
+    }
   
     socket.on('connect', () => {
       // console.log('Conectado a Socket.IO', socket.id);
@@ -293,6 +301,12 @@ const DashboardVigilantePage = () => {
   
     socket.on('disconnect', () => {
       // console.log('Socket desconectado');
+    });
+
+    // Manejar errores de conexión silenciosamente
+    socket.on('connect_error', (error) => {
+      // No mostrar errores de conexión en consola
+      // console.log('Error de conexión Socket.IO:', error.message);
     });
   
     return () => {
@@ -366,18 +380,27 @@ const DashboardVigilantePage = () => {
       
       if (response.data.success) {
           activosData = response.data.data || [];
+          // Log solo en modo desarrollo
+        if (process.env.NODE_ENV === 'development') {
           console.log('[Online] Datos recibidos del backend:', activosData);
+        }
         
           // Verificar si hay visitas offline en el estado actual
           setVisitantesActivos(prevActivos => {
-            console.log('[Online] Estado actual de visitantes:', prevActivos);
+            // Log solo en modo desarrollo
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[Online] Estado actual de visitantes:', prevActivos);
+            }
             
             // Separar visitas offline de las normales
             const visitasOffline = prevActivos.filter(v => v._isOffline || v._isPending);
             const visitasNormales = prevActivos.filter(v => !v._isOffline && !v._isPending);
             
-            console.log('[Online] Visitas offline encontradas:', visitasOffline.length);
-            console.log('[Online] Visitas normales:', visitasNormales.length);
+            // Log solo si hay datos relevantes
+            if (visitasOffline.length > 0 || visitasNormales.length > 0) {
+              console.log('[Online] Visitas offline encontradas:', visitasOffline.length);
+              console.log('[Online] Visitas normales:', visitasNormales.length);
+            }
             
             // Crear un mapa para rastrear qué visitas de la API ya fueron procesadas
             const visitasAPIProcesadas = new Set();
@@ -464,12 +487,18 @@ const DashboardVigilantePage = () => {
               !visitasAPIProcesadas.has(visitaAPI.id)
             );
             
-            console.log('[Online] Visitas offline actualizadas:', visitasOfflineActualizadas.length);
-            console.log('[Online] Visitas de la API no usadas:', visitasAPINoUsadas.length);
+            // Log solo si hay datos relevantes
+            if (visitasOfflineActualizadas.length > 0 || visitasAPINoUsadas.length > 0) {
+              console.log('[Online] Visitas offline actualizadas:', visitasOfflineActualizadas.length);
+              console.log('[Online] Visitas de la API no usadas:', visitasAPINoUsadas.length);
+            }
             
             // Combinar: visitas offline actualizadas + visitas de la API que no tenían correspondencia offline
             const resultado = [...visitasOfflineActualizadas, ...visitasAPINoUsadas];
-            console.log('[Online] Total de visitas después de sincronización:', resultado.length);
+            // Log solo si hay datos
+            if (resultado.length > 0) {
+              console.log('[Online] Total de visitas después de sincronización:', resultado.length);
+            }
             
             return resultado;
           });
@@ -499,7 +528,10 @@ const DashboardVigilantePage = () => {
         
         // Transformar visitas pendientes al formato de visitas activas
         activosData = pendientes.map(visita => {
-          console.log('[Offline] Procesando visita pendiente:', visita);
+          // Log solo en modo desarrollo
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[Offline] Procesando visita pendiente:', visita);
+          }
           
           // Usar los datos que ya están guardados en la visita offline
           // Estos datos ya vienen completos desde el registro
@@ -588,7 +620,10 @@ const DashboardVigilantePage = () => {
   const cargarVisitasPendientes = async () => {
     try {
       const pendientes = await getPendingVisitas();
-      console.log('[Dashboard] Visitas pendientes cargadas:', pendientes);
+      // Log solo si hay visitas pendientes
+      if (pendientes.length > 0) {
+        console.log('[Dashboard] Visitas pendientes cargadas:', pendientes);
+      }
       
       // Transformar las visitas pendientes al formato esperado por la tabla
       const visitasTransformadas = pendientes.map(visita => ({
@@ -785,6 +820,14 @@ const DashboardVigilantePage = () => {
           // Si el visitante ya existe en la base de datos, usar su ID
             if (visitanteId && visitanteId !== 'preview') {
               console.log('[Dashboard] Visitante ya existe con ID:', visitanteId);
+              // Preparar datos del visitante existente para modo offline
+              visitanteDataForOffline = {
+                tipoDocumentoId: parseInt(visitante.tipoDocumentoId),
+                numeroDocumento: visitante.numeroDocumento,
+                nombres: visitante.nombres,
+                apellidos: visitante.apellidos,
+                visitanteId: visitanteId
+              };
             }
             // Si no tiene ID o es temporal, necesitamos crear el visitante
             else {
@@ -1046,8 +1089,10 @@ const DashboardVigilantePage = () => {
         limit: 15 // Usar 15 elementos por página
       };
       
-      // Debug: Log de los filtros recibidos
-      console.log('Filtros recibidos en handleBuscarHistorial:', filtrosData);
+      // Debug: Log de los filtros recibidos (solo en desarrollo)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Filtros recibidos en handleBuscarHistorial:', filtrosData);
+      }
       
       // CORRECCIÓN: Usar los nombres correctos que espera el backend
       if (filtrosData.busqueda) params.q = filtrosData.busqueda;
@@ -1058,7 +1103,10 @@ const DashboardVigilantePage = () => {
       if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
       
       // Debug: Log de los parámetros que se envían al backend
-      console.log('Parámetros enviados al backend:', params);
+      // Log solo en modo desarrollo
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Parámetros enviados al backend:', params);
+      }
       
       const response = await visitasService.getAll(params);
       

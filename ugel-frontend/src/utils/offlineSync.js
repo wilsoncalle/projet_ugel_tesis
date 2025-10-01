@@ -44,7 +44,10 @@ async function syncPendingVisitas() {
     failed: []
   };
 
-  console.log(`[Sync] Sincronizando ${pendingVisitas.length} visitas pendientes...`);
+  // Log solo si hay visitas para sincronizar
+  if (pendingVisitas.length > 0) {
+    console.log(`[Sync] Sincronizando ${pendingVisitas.length} visitas pendientes...`);
+  }
 
   for (const visita of pendingVisitas) {
     try {
@@ -170,7 +173,10 @@ async function syncPendingSalidas() {
     failed: []
   };
 
-  console.log(`[Sync] Sincronizando ${pendingSalidas.length} salidas pendientes...`);
+  // Log solo si hay salidas para sincronizar
+  if (pendingSalidas.length > 0) {
+    console.log(`[Sync] Sincronizando ${pendingSalidas.length} salidas pendientes...`);
+  }
 
   for (const salida of pendingSalidas) {
     try {
@@ -212,7 +218,12 @@ async function syncPendingSalidas() {
  * Sincroniza todos los datos pendientes
  */
 export async function syncPendingData() {
-  console.log('[Sync] 🔄 Iniciando sincronización de datos pendientes...');
+  // Log solo si hay datos para sincronizar
+  const pendingVisitas = await getPendingVisitas();
+  const pendingSalidas = await getPendingSalidas();
+  if (pendingVisitas.length > 0 || pendingSalidas.length > 0) {
+    console.log('[Sync] 🔄 Iniciando sincronización de datos pendientes...');
+  }
 
   try {
     // Sincronizar visitas y salidas
@@ -307,13 +318,10 @@ export function setupConnectivityListeners() {
 
   // Verificar conectividad al cargar
   if (isOnline()) {
-    console.log('[Sync] Aplicación online');
     // Intentar sincronizar datos pendientes al iniciar
     setTimeout(() => {
       syncPendingData();
     }, 2000);
-  } else {
-    console.log('[Sync] Aplicación offline');
   }
 }
 
