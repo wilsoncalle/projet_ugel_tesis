@@ -79,7 +79,11 @@ const VisitantesTabla = ({
             nombre_motivo: vistaPreviaVisita?.motivo?.label || '',
             nombre_area: vistaPreviaVisita?.lugar || '',
             fecha_ingreso: new Date().toLocaleDateString(),
-            hora_ingreso: new Date().toLocaleTimeString(),
+            hora_ingreso: new Date().toLocaleTimeString('es-PE', { 
+              hour12: false, 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
             isPreview: true
           };
           
@@ -428,18 +432,33 @@ const VisitantesTabla = ({
             if ((visitantesEnEspera || []).some(v => v.id === row.id)) {
               horaFormateada = row.horaIngreso || '';
             } 
-            // Si es un visitante activo (de la API)
+            // Si es un visitante activo (de la API) o visita offline
             else {
+              console.log('[VisitantesTabla] Procesando hora para fila:', {
+                id: row.id,
+                hora_ingreso: row.hora_ingreso,
+                horaIngreso: row.horaIngreso,
+                fecha_ingreso: row.fecha_ingreso,
+                _isOffline: row._isOffline
+              });
+              
               try {
-                // Intentar extraer la hora del campo horaIngreso directo
-                if (row.horaIngreso) {
-                  horaFormateada = row.horaIngreso.substring(0, 5);
+                // Prioridad 1: Usar hora_ingreso directo si existe
+                if (row.hora_ingreso) {
+                  horaFormateada = row.hora_ingreso.substring(0, 5);
+                  console.log('[VisitantesTabla] Usando hora_ingreso:', horaFormateada);
                 }
-                // O intentar extraer la hora de fecha_ingreso
-                else if (row.fecha_ingreso) {
+                // Prioridad 2: Usar horaIngreso si existe
+                else if (row.horaIngreso) {
+                  horaFormateada = row.horaIngreso.substring(0, 5);
+                  console.log('[VisitantesTabla] Usando horaIngreso:', horaFormateada);
+                }
+                // Prioridad 3: Extraer de fecha_ingreso solo si es una fecha completa con hora
+                else if (row.fecha_ingreso && row.fecha_ingreso.includes('T')) {
                   const fecha = new Date(row.fecha_ingreso);
                   if (!isNaN(fecha.getTime())) {
                     horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    console.log('[VisitantesTabla] Usando fecha_ingreso con hora:', horaFormateada);
                   }
                 }
               } catch (e) {

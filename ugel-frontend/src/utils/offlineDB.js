@@ -91,10 +91,15 @@ export async function saveVisitaOffline(visitaData, visitanteData = null) {
       needsVisitanteCreation: !!visitanteData, // Flag para saber si necesita crear visitante
       timestamp: Date.now(),
       status: 'pending',
-      syncAttempts: 0
+      syncAttempts: 0,
+      // Identificador único para evitar duplicados
+      syncId: `sync_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      // Preservar la hora original del evento
+      originalTimestamp: visitaData.horaIngreso || new Date().toISOString()
     };
 
     console.log('[IndexedDB] 📥 Guardando visita offline:', JSON.stringify(visitaOffline, null, 2));
+    console.log('[IndexedDB] 🕐 Hora de ingreso a guardar:', visitaData.horaIngreso);
 
     return new Promise((resolve, reject) => {
       const request = store.add(visitaOffline);

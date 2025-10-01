@@ -113,7 +113,11 @@ async function syncPendingVisitas() {
         personalVisitadoId: visita.personalVisitadoId,
         motivoVisitaId: visita.motivoVisitaId,
         areaDestinoId: visita.areaDestinoId,
-        usuarioIngresoId: visita.usuarioIngresoId
+        usuarioIngresoId: visita.usuarioIngresoId,
+        // Incluir timestamp original para preservar la hora del evento
+        fechaIngreso: visita.originalTimestamp || visita.horaIngreso,
+        // Identificador único para evitar duplicados
+        syncId: visita.syncId
       };
 
       // Enviar al backend

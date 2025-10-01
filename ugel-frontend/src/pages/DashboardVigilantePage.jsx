@@ -133,21 +133,40 @@ const DashboardVigilantePage = () => {
         v._originalOfflineId === visitaId
       );
       
-      // Si no encuentra por ID, buscar por coincidencia de datos
-      // (para visitas offline que ahora tienen ID real)
+      // Si no encuentra por ID, buscar por coincidencia de datos más robusta
       if (index === -1 && datosActualizados.numero_documento) {
         console.log('[Dashboard] Buscando por características únicas...', {
           numero_documento: datosActualizados.numero_documento,
-          personal_visitado_id: datosActualizados.personal_visitado_id
+          personal_visitado_id: datosActualizados.personal_visitado_id,
+          fecha_ingreso: datosActualizados.fecha_ingreso,
+          hora_ingreso: datosActualizados.hora_ingreso
         });
         
-        index = prev.findIndex(v => 
-          // Buscar visitas offline sin salida que coincidan en:
-          !v.fecha_salida && 
-          v.numero_documento === datosActualizados.numero_documento &&
-          v.personal_visitado_id === datosActualizados.personal_visitado_id &&
-          (v._isOffline || v._isPending) // Solo considerar filas offline
-        );
+        index = prev.findIndex(v => {
+          // Buscar visitas offline sin salida que coincidan en múltiples criterios
+          const mismoDocumento = v.numero_documento === datosActualizados.numero_documento;
+          const mismoPersonal = v.personal_visitado_id === datosActualizados.personal_visitado_id;
+          const sinSalida = !v.fecha_salida && !v.hora_salida;
+          const esOffline = v._isOffline || v._isPending;
+          
+          // Comparar fecha y hora si están disponibles
+          let mismaFecha = true;
+          let mismaHora = true;
+          
+          if (datosActualizados.fecha_ingreso && v.fecha_ingreso) {
+            const fechaOffline = v.fecha_ingreso?.split('T')[0] || v.fecha_ingreso;
+            const fechaActualizada = datosActualizados.fecha_ingreso?.split('T')[0] || datosActualizados.fecha_ingreso;
+            mismaFecha = fechaOffline === fechaActualizada;
+          }
+          
+          if (datosActualizados.hora_ingreso && v.hora_ingreso) {
+            const horaOffline = v.hora_ingreso?.substring(0, 5);
+            const horaActualizada = datosActualizados.hora_ingreso?.substring(0, 5);
+            mismaHora = horaOffline === horaActualizada;
+          }
+          
+          return mismoDocumento && mismoPersonal && sinSalida && esOffline && mismaFecha && mismaHora;
+        });
         
         if (index !== -1) {
           console.log('[Dashboard] ✅ Encontrada fila offline por características:', prev[index]);
@@ -161,7 +180,9 @@ const DashboardVigilantePage = () => {
           ...actualizado[index], 
           ...datosActualizados,
           _isOffline: false, // Ya no es offline
-          _isPending: false  // Ya no está pendiente
+          _isPending: false, // Ya no está pendiente
+          _wasOffline: true, // Marcar que fue offline
+          _originalOfflineId: actualizado[index]._originalId || actualizado[index].id
         };
         console.log('[Dashboard] Visita actualizada dinámicamente:', actualizado[index]);
         return actualizado;
@@ -173,6 +194,8 @@ const DashboardVigilantePage = () => {
           _originalOfflineId: v._originalOfflineId,
           numero_documento: v.numero_documento,
           personal_visitado_id: v.personal_visitado_id,
+          fecha_ingreso: v.fecha_ingreso,
+          hora_ingreso: v.hora_ingreso,
           _isOffline: v._isOffline,
           _isPending: v._isPending
         })));
@@ -339,9 +362,9 @@ const DashboardVigilantePage = () => {
       
       // Si estamos online, cargar desde la API
       if (navigator.onLine) {
-        const response = await visitasService.getActivas();
+      const response = await visitasService.getActivas();
       
-        if (response.data.success) {
+      if (response.data.success) {
           activosData = response.data.data || [];
           console.log('[Online] Datos recibidos del backend:', activosData);
         
@@ -363,13 +386,29 @@ const DashboardVigilantePage = () => {
             const visitasOfflineActualizadas = visitasOffline.map(visitaOffline => {
               // Buscar coincidencia en las visitas de la API
               const visitaAPI = activosData.find(v => {
-                // Normalizar fechas para comparación
+                // Comparación más robusta usando múltiples criterios
+                const mismoDocumento = v.numero_documento === visitaOffline.numero_documento;
+                const mismoPersonal = v.personal_visitado_id === visitaOffline.personal_visitado_id;
+                
+                // Comparar fechas (normalizar a YYYY-MM-DD)
                 const fechaOffline = visitaOffline.fecha_ingreso?.split('T')[0] || visitaOffline.fecha_ingreso;
                 const fechaAPI = v.fecha_ingreso?.split('T')[0];
+                const mismaFecha = fechaAPI === fechaOffline;
                 
-                // Normalizar hora para comparación (primeros 5 caracteres HH:MM)
-                const horaOffline = visitaOffline.hora_ingreso?.substring(0, 5);
-                const horaAPI = v.fecha_ingreso ? new Date(v.fecha_ingreso).toTimeString().substring(0, 5) : '';
+                // Comparar horas (usar hora_ingreso si está disponible, sino extraer de fecha_ingreso)
+                let horaOffline = visitaOffline.hora_ingreso?.substring(0, 5);
+                let horaAPI = '';
+                
+                if (v.hora_ingreso) {
+                  horaAPI = v.hora_ingreso.substring(0, 5);
+                } else if (v.fecha_ingreso && v.fecha_ingreso.includes('T')) {
+                  horaAPI = new Date(v.fecha_ingreso).toTimeString().substring(0, 5);
+                }
+                
+                const mismaHora = horaAPI === horaOffline;
+                
+                // También considerar visitas sin salida (activas)
+                const sinSalida = !v.fecha_salida && !v.hora_salida;
                 
                 console.log('[Online] Comparando:', {
                   offline: {
@@ -382,14 +421,20 @@ const DashboardVigilantePage = () => {
                     doc: v.numero_documento,
                     personal: v.personal_visitado_id,
                     fecha: fechaAPI,
-                    hora: horaAPI
+                    hora: horaAPI,
+                    sinSalida: sinSalida
+                  },
+                  coincidencias: {
+                    documento: mismoDocumento,
+                    personal: mismoPersonal,
+                    fecha: mismaFecha,
+                    hora: mismaHora,
+                    sinSalida: sinSalida
                   }
                 });
                 
-                return v.numero_documento === visitaOffline.numero_documento &&
-                       v.personal_visitado_id === visitaOffline.personal_visitado_id &&
-                       fechaAPI === fechaOffline &&
-                       horaAPI === horaOffline;
+                // Coincidencia si: mismo documento, mismo personal, misma fecha, misma hora Y sin salida
+                return mismoDocumento && mismoPersonal && mismaFecha && mismaHora && sinSalida;
               });
               
               if (visitaAPI) {
@@ -487,26 +532,26 @@ const DashboardVigilantePage = () => {
       }
       
       // Transformar los datos para que coincidan con la estructura esperada por el frontend
-      const activosTransformados = activosData.map(visita => {
-        console.log('DashboardVigilantePage - Visita individual:', visita);
-        console.log('DashboardVigilantePage - personal_cargo:', visita.personal_cargo);
-        
-        return {
-          ...visita,
-          // Mapear empleadoVisitado para que coincida con la estructura esperada
-          empleadoVisitado: {
-            id: visita.personal_visitado_id,
-            nombres: visita.personal_nombres || '',
-            apellidos: visita.personal_apellidos || '',
-            cargo: visita.personal_cargo || ''
-          },
-          // Mapear motivo para que coincida con la estructura esperada
-          motivo: {
-            id: visita.motivo_visita_id,
-            label: visita.nombre_motivo || ''
-          },
-          // Mapear lugar para que coincida con la estructura esperada
-          lugar: visita.area_destino_id,
+        const activosTransformados = activosData.map(visita => {
+          console.log('DashboardVigilantePage - Visita individual:', visita);
+          console.log('DashboardVigilantePage - personal_cargo:', visita.personal_cargo);
+          
+          return {
+            ...visita,
+            // Mapear empleadoVisitado para que coincida con la estructura esperada
+            empleadoVisitado: {
+              id: visita.personal_visitado_id,
+              nombres: visita.personal_nombres || '',
+              apellidos: visita.personal_apellidos || '',
+              cargo: visita.personal_cargo || ''
+            },
+            // Mapear motivo para que coincida con la estructura esperada
+            motivo: {
+              id: visita.motivo_visita_id,
+              label: visita.nombre_motivo || ''
+            },
+            // Mapear lugar para que coincida con la estructura esperada
+            lugar: visita.area_destino_id,
           lugarNombre: visita.nombre_area || '',
           // Asegurar que los campos principales estén disponibles
           visitante_nombres: visita.visitante_nombres || visita.visitante?.nombres || '',
@@ -516,24 +561,24 @@ const DashboardVigilantePage = () => {
           personal_cargo: visita.personal_cargo || '',
           nombre_motivo: visita.nombre_motivo || '',
           nombre_area: visita.nombre_area || ''
-        };
-      });
-      
-      console.log('DashboardVigilantePage - Datos transformados:', activosTransformados);
-      
-      setVisitantesActivos(activosTransformados);
-      
-      // Actualizar paginación para activos
-      setActivosPagination(prev => ({
-        ...prev,
-        totalItems: activosTransformados.length,
-        totalPages: Math.ceil(activosTransformados.length / prev.itemsPerPage),
+          };
+        });
+        
+        console.log('DashboardVigilantePage - Datos transformados:', activosTransformados);
+        
+        setVisitantesActivos(activosTransformados);
+        
+        // Actualizar paginación para activos
+        setActivosPagination(prev => ({
+          ...prev,
+          totalItems: activosTransformados.length,
+          totalPages: Math.ceil(activosTransformados.length / prev.itemsPerPage),
         currentPage: 1
-      }));
+        }));
       
     } catch (error) {
       console.error('Error al cargar visitantes activos:', error);
-      setError('Error al cargar visitantes activos');
+        setError('Error al cargar visitantes activos');
     } finally {
       setLoading(false);
     }
@@ -589,11 +634,18 @@ const DashboardVigilantePage = () => {
   // Handlers para el formulario de registro
   const handleAddVisitor = (visitanteData) => {
     const currentDate = new Date();
+    // Generar hora en formato HH:MM usando toLocaleTimeString para evitar problemas de zona horaria
+    const horaFormateada = currentDate.toLocaleTimeString('es-PE', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
     const nuevoVisitante = {
       id: Date.now(), // ID temporal
       ...visitanteData,
       fechaIngreso: currentDate.toISOString().split('T')[0],
-      horaIngreso: currentDate.toTimeString().split(' ')[0].substring(0, 5),
+      horaIngreso: horaFormateada,
       horaSalida: null
     };
     setVisitantesEnEspera(prev => [...prev, nuevoVisitante]);
@@ -653,11 +705,18 @@ const DashboardVigilantePage = () => {
       if (formData.visitante && Object.values(formData.visitante).some(val => val)) {
         // Crear una vista previa del visitante con ID temporal
         const currentDate = new Date();
+        // Generar hora en formato HH:MM usando toLocaleTimeString para evitar problemas de zona horaria
+        const horaFormateada = currentDate.toLocaleTimeString('es-PE', { 
+          hour12: false, 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+        
         const previewVisitante = {
           id: 'preview',
           ...formData.visitante,
           fechaIngreso: currentDate.toISOString().split('T')[0],
-          horaIngreso: currentDate.toTimeString().split(' ')[0].substring(0, 5),
+          horaIngreso: horaFormateada,
           horaSalida: null
         };
         setVistaPreviaVisitante(previewVisitante);
@@ -805,9 +864,12 @@ const DashboardVigilantePage = () => {
             }
           }
 
-          // Crear la visita (utilizando la fecha actual en lugar de la fecha de la visita)
-          const currentDate = new Date();
-          
+          // Extraer la hora de ingreso del visitante (que ya fue generada al agregarlo a la lista)
+          const horaIngresoOriginal = visitante.horaIngreso || new Date().toLocaleTimeString('es-PE', { 
+            hour12: false, 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          });
           
           // Extraer los datos de visita del visitante (priorizando los que ya tiene guardados)
           // Los datos vienen de SelectCustom que usa 'value' en lugar de 'id'
@@ -820,7 +882,9 @@ const DashboardVigilantePage = () => {
             visitante,
             empleadoId,
             motivoId,
-            lugarId
+            lugarId,
+            horaIngresoOriginal,
+            fechaIngresoOriginal: visitante.fechaIngreso
           });
           
           // Si no tiene datos de visita guardados, usar los datos proporcionados como fallback
@@ -857,8 +921,8 @@ const DashboardVigilantePage = () => {
             motivoVisitaId: parseInt(motivoId),
             areaDestinoId: parseInt(lugarId),
             usuarioIngresoId: user?.id ? parseInt(user.id) : 1,
-            fechaIngreso: currentDate.toISOString().split('T')[0],
-            horaIngreso: currentDate.toTimeString().substring(0, 8),
+            fechaIngreso: visitante.fechaIngreso || new Date().toISOString().split('T')[0],
+            horaIngreso: horaIngresoOriginal, // Usar la hora original del visitante
             // Datos adicionales para completar la información
             personal_nombres: empleadoNombre,
             personal_apellidos: empleadoApellido,
@@ -874,6 +938,7 @@ const DashboardVigilantePage = () => {
             visitanteDataForOffline,
             hasVisitanteData: !!visitanteDataForOffline
           });
+          console.log('[Dashboard] 🕐 Hora de ingreso a enviar:', visitaPayload.horaIngreso);
 
           // Usar el servicio con soporte offline, pasando datos del visitante si es necesario
           const responseVisita = await createVisitaWithOfflineSupport(
