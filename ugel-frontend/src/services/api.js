@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { createVisitaWithOfflineSupport } from './offlineApiService';
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -315,11 +316,11 @@ export const usuariosService = {
 
 /**
  * Registra una visita completa (incluyendo la creación del visitante si es nuevo).
- * Llama a: POST /api/visitas
+ * Llama a: POST /api/visitas con soporte offline
  * @param {object} datosVisita - Objeto con los datos del visitante y la visita.
- * @returns {Promise<object>} La respuesta de la API.
+ * @returns {Promise<object>} La respuesta de la API (online) o de IndexedDB (offline).
  */
-export const registrarVisitaCompleta = (datosVisita) => {
+export const registrarVisitaCompleta = async (datosVisita) => {
   // Mapear los nombres de campos del frontend al backend
   const datosMapeados = {
     // Datos de la visita (mapear nombres)
@@ -332,19 +333,36 @@ export const registrarVisitaCompleta = (datosVisita) => {
     datosMapeados.personalVisitadoId = datosVisita.empleadoId;
   }
 
+  // Preparar datos del visitante si es nuevo (para soporte offline)
+  let visitanteDataForOffline = null;
+  
   // Si es un visitante existente, incluir visitanteId
   if (datosVisita.visitanteId && datosVisita.visitanteId !== null) {
     datosMapeados.visitanteId = datosVisita.visitanteId;
   } else {
-    // Si es un visitante nuevo, incluir datos del visitante
-    datosMapeados.tipoDocumentoId = parseInt(datosVisita.tipoDocumentoId); // Convertir a número
+    // Si es un visitante nuevo, preparar sus datos para offline
+    visitanteDataForOffline = {
+      tipoDocumentoId: parseInt(datosVisita.tipoDocumentoId),
+      numeroDocumento: datosVisita.numeroDocumento,
+      nombres: datosVisita.nombres,
+      apellidos: datosVisita.apellidos
+    };
+    
+    // También incluir en datosMapeados para el caso online
+    datosMapeados.tipoDocumentoId = parseInt(datosVisita.tipoDocumentoId);
     datosMapeados.numeroDocumento = datosVisita.numeroDocumento;
     datosMapeados.nombres = datosVisita.nombres;
     datosMapeados.apellidos = datosVisita.apellidos;
   }
   
+  console.log('[API] registrarVisitaCompleta - datos:', { datosMapeados, visitanteDataForOffline });
   
-  return api.post('/visitas', datosMapeados);
+  // Usar el wrapper con soporte offline
+  return await createVisitaWithOfflineSupport(
+    datosMapeados,
+    visitanteDataForOffline,
+    (data) => api.post('/visitas', data)
+  );
 };
 
 /**

@@ -9,6 +9,40 @@ import { visitasService, visitantesService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp';
+import { createVisitaWithOfflineSupport, registrarSalidaWithOfflineSupport, isOfflineResponse, getResponseMessage } from '../services/offlineApiService';
+import { getPendingVisitas, getPendingSalidas } from '../utils/offlineDB';
+
+// Función para consultar RENIEC
+const consultarRENIEC = async (numeroDocumento) => {
+  try {
+    console.log('[RENIEC] Consultando DNI:', numeroDocumento);
+    const response = await fetch(`https://api.reniec.gob.pe/v1/dni/${numeroDocumento}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[RENIEC] Datos obtenidos:', data);
+      return {
+        success: true,
+        data: {
+          nombres: data.nombres || '',
+          apellidos: data.apellidoPaterno + ' ' + data.apellidoMaterno || '',
+          numeroDocumento: numeroDocumento
+        }
+      };
+    } else {
+      console.warn('[RENIEC] Error en respuesta:', response.status);
+      return { success: false, error: 'DNI no encontrado en RENIEC' };
+    }
+  } catch (error) {
+    console.error('[RENIEC] Error al consultar:', error);
+    return { success: false, error: 'Error al consultar RENIEC' };
+  }
+};
 
 // Variantes de animación
 const containerVariants = {
@@ -87,6 +121,51 @@ const DashboardVigilantePage = () => {
   // Estado para la vista previa en tiempo real
   const [vistaPreviaVisitante, setVistaPreviaVisitante] = useState(null);
   const [vistaPreviaVisita, setVistaPreviaVisita] = useState(null);
+  const [visitasPendientes, setVisitasPendientes] = useState([]);
+  
+  // Función para actualizar dinámicamente una visita en la tabla
+  const actualizarVisitaEnTabla = (visitaId, datosActualizados) => {
+    setVisitantesActivos(prev => {
+      // Buscar por ID directo o por ID offline original
+      const index = prev.findIndex(v => 
+        v.id === visitaId || 
+        v._originalId === visitaId ||
+        (v.id && v.id.toString().includes(visitaId.toString()))
+      );
+      
+      if (index !== -1) {
+        // Actualizar la fila existente
+        const actualizado = [...prev];
+        actualizado[index] = { ...actualizado[index], ...datosActualizados };
+        console.log('[Dashboard] Visita actualizada dinámicamente:', actualizado[index]);
+        return actualizado;
+      } else {
+        console.warn('[Dashboard] No se encontró la visita para actualizar:', visitaId);
+        console.log('[Dashboard] Visitas disponibles:', prev.map(v => ({ id: v.id, _originalId: v._originalId })));
+      }
+      return prev;
+    });
+  };
+
+  // Función para obtener datos de referencia (empleados, motivos, áreas)
+  const obtenerDatosReferencia = async () => {
+    try {
+      const [empleadosRes, motivosRes, areasRes] = await Promise.all([
+        fetch('http://localhost:3000/api/personal').then(r => r.json()).catch(() => ({data: []})),
+        fetch('http://localhost:3000/api/motivos-visita').then(r => r.json()).catch(() => ({data: []})),
+        fetch('http://localhost:3000/api/areas').then(r => r.json()).catch(() => ({data: []}))
+      ]);
+      
+      return {
+        empleados: empleadosRes.data || [],
+        motivos: motivosRes.data || [],
+        areas: areasRes.data || []
+      };
+    } catch (error) {
+      console.warn('[Dashboard] Error al obtener datos de referencia:', error);
+      return { empleados: [], motivos: [], areas: [] };
+    }
+  };
 
   // Estado para la confirmación de doble Enter
   const [showDoubleEnterConfirm, setShowDoubleEnterConfirm] = useState(false);
@@ -169,6 +248,7 @@ const DashboardVigilantePage = () => {
   // Carga inicial
   useEffect(() => {
     cargarVisitantesActivos();
+    cargarVisitasPendientes(); // Cargar visitas pendientes de IndexedDB
     // Cargar historial inicial sin filtros para mostrar todos los registros
     const filtrosIniciales = {
       busqueda: '',
@@ -193,57 +273,161 @@ const DashboardVigilantePage = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await visitasService.getActivas();
       
-      if (response.data.success) {
-        const activosData = response.data.data || [];
-        console.log('DashboardVigilantePage - Datos recibidos del backend:', activosData);
+      let activosData = [];
+      
+      // Si estamos online, cargar desde la API
+      if (navigator.onLine) {
+        const response = await visitasService.getActivas();
         
-        // Transformar los datos de la API para que coincidan con la estructura esperada por el frontend
-        const activosTransformados = activosData.map(visita => {
-          console.log('DashboardVigilantePage - Visita individual:', visita);
-          console.log('DashboardVigilantePage - personal_cargo:', visita.personal_cargo);
+        if (response.data.success) {
+          activosData = response.data.data || [];
+          console.log('DashboardVigilantePage - Datos recibidos del backend:', activosData);
+        } else {
+          setError('Error al cargar visitantes activos');
+          return;
+        }
+      } else {
+        // Si estamos offline, cargar visitas pendientes de IndexedDB
+        console.log('[Offline] Cargando visitas pendientes como activos...');
+        const pendientes = await getPendingVisitas();
+        console.log('[Offline] Visitas pendientes encontradas:', pendientes);
+        
+        // En modo offline, no necesitamos obtener datos de referencia
+        // porque los datos ya están completos en la visita guardada
+        console.log('[Offline] Usando datos ya guardados en la visita offline');
+        
+        // Transformar visitas pendientes al formato de visitas activas
+        activosData = pendientes.map(visita => {
+          console.log('[Offline] Procesando visita pendiente:', visita);
           
+          // Usar los datos que ya están guardados en la visita offline
+          // Estos datos ya vienen completos desde el registro
           return {
-            ...visita,
-            // Mapear empleadoVisitado para que coincida con la estructura esperada
-            empleadoVisitado: {
-              id: visita.personal_visitado_id,
-              nombres: visita.personal_nombres || '',
-              apellidos: visita.personal_apellidos || '',
-              cargo: visita.personal_cargo || ''
-            },
-            // Mapear motivo para que coincida con la estructura esperada
-            motivo: {
-              id: visita.motivo_visita_id,
-              label: visita.nombre_motivo || ''
-            },
-            // Mapear lugar para que coincida con la estructura esperada
-            lugar: visita.area_destino_id,
-            lugarNombre: visita.nombre_area || ''
+            id: `offline_${visita.id}`,
+            visitante_id: visita.visitanteId || 0,
+            visitante_nombres: visita.visitanteData?.nombres || '',
+            visitante_apellidos: visita.visitanteData?.apellidos || '',
+            tipo_documento_codigo: 'DNI',
+            numero_documento: visita.visitanteData?.numeroDocumento || '',
+            personal_visitado_id: visita.personalVisitadoId,
+            personal_nombres: visita.personal_nombres || '',
+            personal_apellidos: visita.personal_apellidos || '',
+            personal_cargo: visita.personal_cargo || 'Sin cargo',
+            motivo_visita_id: visita.motivoVisitaId,
+            nombre_motivo: visita.nombre_motivo || 'Pendiente',
+            area_destino_id: visita.areaDestinoId,
+            nombre_area: visita.nombre_area || 'Pendiente',
+            fecha_ingreso: visita.fechaIngreso || '',
+            hora_ingreso: visita.horaIngreso || '',
+            hora_salida: null,
+            // Campos específicos para visitas offline
+            _isOffline: true,
+            _isPending: true,
+            _originalId: visita.id,
+            _needsVisitanteCreation: visita.needsVisitanteCreation || false,
+            visitanteData: visita.visitanteData
           };
         });
-        
-        console.log('DashboardVigilantePage - Datos transformados:', activosTransformados);
-        
-        
-        setVisitantesActivos(activosTransformados);
-        
-        // Actualizar paginación para activos
-        setActivosPagination(prev => ({
-          ...prev,
-          totalItems: activosTransformados.length,
-          totalPages: Math.ceil(activosTransformados.length / prev.itemsPerPage),
-          currentPage: 1 // Resetear a la primera página
-        }));
-      } else {
-        setError('Error al cargar visitantes activos');
       }
+      
+      // Transformar los datos para que coincidan con la estructura esperada por el frontend
+      const activosTransformados = activosData.map(visita => {
+        console.log('DashboardVigilantePage - Visita individual:', visita);
+        console.log('DashboardVigilantePage - personal_cargo:', visita.personal_cargo);
+        
+        return {
+          ...visita,
+          // Mapear empleadoVisitado para que coincida con la estructura esperada
+          empleadoVisitado: {
+            id: visita.personal_visitado_id,
+            nombres: visita.personal_nombres || '',
+            apellidos: visita.personal_apellidos || '',
+            cargo: visita.personal_cargo || ''
+          },
+          // Mapear motivo para que coincida con la estructura esperada
+          motivo: {
+            id: visita.motivo_visita_id,
+            label: visita.nombre_motivo || ''
+          },
+          // Mapear lugar para que coincida con la estructura esperada
+          lugar: visita.area_destino_id,
+          lugarNombre: visita.nombre_area || '',
+          // Asegurar que los campos principales estén disponibles
+          visitante_nombres: visita.visitante_nombres || visita.visitante?.nombres || '',
+          visitante_apellidos: visita.visitante_apellidos || visita.visitante?.apellidos || '',
+          personal_nombres: visita.personal_nombres || '',
+          personal_apellidos: visita.personal_apellidos || '',
+          personal_cargo: visita.personal_cargo || '',
+          nombre_motivo: visita.nombre_motivo || '',
+          nombre_area: visita.nombre_area || ''
+        };
+      });
+      
+      console.log('DashboardVigilantePage - Datos transformados:', activosTransformados);
+      
+      setVisitantesActivos(activosTransformados);
+      
+      // Actualizar paginación para activos
+      setActivosPagination(prev => ({
+        ...prev,
+        totalItems: activosTransformados.length,
+        totalPages: Math.ceil(activosTransformados.length / prev.itemsPerPage),
+        currentPage: 1 // Resetear a la primera página
+      }));
+      
     } catch (err) {
       console.error('Error al cargar visitantes activos:', err);
       setError('Error al conectar con el servidor');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Función para cargar visitas pendientes de IndexedDB
+  const cargarVisitasPendientes = async () => {
+    try {
+      const pendientes = await getPendingVisitas();
+      console.log('[Dashboard] Visitas pendientes cargadas:', pendientes);
+      
+      // Transformar las visitas pendientes al formato esperado por la tabla
+      const visitasTransformadas = pendientes.map(visita => ({
+        id: `offline_${visita.id}`, // ID único para visitas offline
+        visitante_nombres: visita.visitanteData?.nombres || '',
+        visitante_apellidos: visita.visitanteData?.apellidos || '',
+        tipo_documento_codigo: 'DNI', // Por defecto
+        numero_documento: visita.visitanteData?.numeroDocumento || '',
+        personal_nombres: '', // Se llenará con datos del empleado
+        personal_apellidos: '',
+        personal_cargo: 'Sin cargo', // Valor por defecto
+        nombre_motivo: 'Pendiente', // Valor por defecto
+        nombre_area: 'Pendiente', // Valor por defecto
+        fecha_ingreso: visita.fechaIngreso || '',
+        hora_ingreso: visita.horaIngreso || '',
+        hora_salida: null,
+        // Campos específicos para visitas pendientes
+        _isPending: true,
+        _offline: true,
+        _needsVisitanteCreation: visita.needsVisitanteCreation || false,
+        _originalId: visita.id, // ID original de IndexedDB
+        // Datos de la visita
+        personalVisitadoId: visita.personalVisitadoId,
+        motivoVisitaId: visita.motivoVisitaId,
+        areaDestinoId: visita.areaDestinoId,
+        visitanteData: visita.visitanteData,
+        // Campos para compatibilidad con la tabla
+        personal_visitado_id: visita.personalVisitadoId,
+        motivo_visita_id: visita.motivoVisitaId,
+        area_destino_id: visita.areaDestinoId,
+        personal_cargo: 'Sin cargo',
+        nombre_motivo: 'Pendiente',
+        nombre_area: 'Pendiente'
+      }));
+      
+      setVisitasPendientes(visitasTransformadas);
+    } catch (error) {
+      console.error('[Dashboard] Error al cargar visitas pendientes:', error);
+      setVisitasPendientes([]);
     }
   };
 
@@ -265,9 +449,24 @@ const DashboardVigilantePage = () => {
   
   // Handler para cambios en tiempo real en el formulario
   const handleFormChange = (formData) => {
+    console.warn('🚀 [Dashboard] handleFormChange LLAMADO');
+    console.warn('🚀 [Dashboard] formData:', JSON.stringify(formData, null, 2));
+    console.warn('🚀 [Dashboard] visitantesEnEspera.length:', visitantesEnEspera.length);
+    console.warn('🚀 [Dashboard] visitantesEnEspera:', visitantesEnEspera);
     
     // Actualizar los visitantes en espera con los datos de la visita
-    if (formData.visita && Object.values(formData.visita).some(val => val) && visitantesEnEspera.length > 0) {
+    // IMPORTANTE: Solo actualizar si hay datos significativos (no vacíos)
+    const tieneDatosSignificativos = formData.visita && 
+      (formData.visita.empleadoId || formData.visita.motivoId || formData.visita.lugar);
+    
+    // NO actualizar si los datos están vacíos (evita sobrescribir datos existentes)
+    const datosEstanVacios = formData.visita && 
+      (!formData.visita.empleadoId && !formData.visita.motivoId && !formData.visita.lugar);
+    
+    if (tieneDatosSignificativos && visitantesEnEspera.length > 0 && !datosEstanVacios) {
+      console.warn('🚀 [Dashboard] ✅ Condición cumplida, actualizando visitantes...');
+      console.warn('🚀 [Dashboard] formData.visita:', formData.visita);
+      
       // Crear un objeto con los datos de la visita
       const visitaData = {
         empleado: formData.visita.empleado,
@@ -275,11 +474,13 @@ const DashboardVigilantePage = () => {
         lugar: formData.visita.lugar, // Nombre del área para mostrar
         lugarId: formData.visita.lugarId, // ID del área para el backend
         empleadoVisitado: formData.visita.empleado,
-        personal_nombres: formData.visita.empleado?.nombres || '',
-        personal_apellidos: formData.visita.empleado?.apellidos || '',
+        personal_nombres: formData.visita.empleado?.label?.split(' ')[0] || '',
+        personal_apellidos: formData.visita.empleado?.label?.split(' ').slice(1).join(' ') || '',
         nombre_motivo: formData.visita.motivo?.label || '',
         nombre_area: formData.visita.lugar || ''
       };
+      
+      console.log('[Dashboard] visitaData a aplicar:', visitaData);
       
       // Actualizar todos los visitantes en espera con los mismos datos de visita
       const visitantesActualizados = visitantesEnEspera.map(visitante => ({
@@ -287,6 +488,7 @@ const DashboardVigilantePage = () => {
         ...visitaData
       }));
       
+      console.log('[Dashboard] visitantesActualizados:', visitantesActualizados);
       
       setVisitantesEnEspera(visitantesActualizados);
     }
@@ -361,46 +563,133 @@ const DashboardVigilantePage = () => {
       for (const visitante of visitantesEnEspera) {
         try {
           
-          // Primero crear o buscar el visitante
-          let visitanteId = visitante.id;
-          
-          // Si el visitante ya existe en la base de datos, usar su ID
-          if (visitante.visitanteId) {
-            visitanteId = visitante.visitanteId;
-          }
-          // Si el ID es temporal (generado con Date.now()), crear el visitante
-          else if (typeof visitanteId === 'number' && visitanteId > 1000000000000) {
-            // Asegurar que estamos enviando exactamente lo que espera la API
-            const visitantePayload = {
-              tipoDocumentoId: parseInt(visitante.tipoDocumentoId), // Convertir a número
-              numeroDocumento: visitante.numeroDocumento.slice(0, 20), // VARCHAR(20)
-              nombres: visitante.nombres.slice(0, 150), // VARCHAR(150)
-              apellidos: visitante.apellidos.slice(0, 150) // VARCHAR(150)
-            };
+            // Primero crear o buscar el visitante
+            let visitanteId = visitante.visitanteId;
+            let visitanteDataForOffline = null;
+            let datosVisitanteActualizados = null;
             
-            const responseVisitante = await visitantesService.create(visitantePayload);
-            
-            if (responseVisitante.data.success) {
-              visitanteId = responseVisitante.data.data.id;
-            } else {
-              throw new Error('Error al crear visita');
+            // Si el visitante ya existe en la base de datos, usar su ID
+            if (visitanteId && visitanteId !== 'preview') {
+              console.log('[Dashboard] Visitante ya existe con ID:', visitanteId);
             }
-          }
+            // Si no tiene ID o es temporal, necesitamos crear el visitante
+            else {
+              // Preparar datos del visitante
+              const datosVisitante = {
+                tipoDocumentoId: parseInt(visitante.tipoDocumentoId),
+                numeroDocumento: visitante.numeroDocumento.slice(0, 20),
+                nombres: visitante.nombres.slice(0, 150),
+                apellidos: visitante.apellidos.slice(0, 150)
+              };
+              
+              // Si estamos online, intentar crear el visitante
+              if (navigator.onLine) {
+                try {
+                  const responseVisitante = await visitantesService.create(datosVisitante);
+                  
+                  // Verificar si la respuesta es válida y exitosa
+                  if (responseVisitante && responseVisitante.data && responseVisitante.data.success) {
+                    visitanteId = responseVisitante.data.data.id;
+                    console.log('[Online] Visitante creado con ID:', visitanteId);
+                    
+                    // Actualizar dinámicamente la fila en la tabla
+                    // Buscar la fila en visitantesActivos que corresponde a este visitante
+                    const filaEnActivos = visitantesActivos.find(v => 
+                      v.id === visitante.id || 
+                      v._originalId === visitante.id ||
+                      (v.visitante_id && v.visitante_id.toString() === visitanteId.toString())
+                    );
+                    
+                    if (filaEnActivos) {
+                      actualizarVisitaEnTabla(filaEnActivos.id, {
+                        visitanteId: visitanteId,
+                        visitante_nombres: datosVisitante.nombres,
+                        visitante_apellidos: datosVisitante.apellidos,
+                        numero_documento: datosVisitante.numeroDocumento,
+                        nombres: datosVisitante.nombres,
+                        apellidos: datosVisitante.apellidos
+                      });
+                    }
+                  }
+                } catch (visitanteError) {
+                  console.warn('[Online] Error al crear visitante, consultando RENIEC...', visitanteError.message);
+                  
+                  // Si falla, consultar RENIEC para obtener datos completos
+                  const reniecData = await consultarRENIEC(visitante.numeroDocumento);
+                  if (reniecData.success) {
+                    // Actualizar datos del visitante con información de RENIEC
+                    const datosCompletos = {
+                      ...datosVisitante,
+                      nombres: reniecData.data.nombres,
+                      apellidos: reniecData.data.apellidos
+                    };
+                    
+                    // Intentar crear nuevamente con datos de RENIEC
+                    try {
+                      const responseVisitanteRENIEC = await visitantesService.create(datosCompletos);
+                      if (responseVisitanteRENIEC && responseVisitanteRENIEC.data && responseVisitanteRENIEC.data.success) {
+                        visitanteId = responseVisitanteRENIEC.data.data.id;
+                        console.log('[RENIEC] Visitante creado con datos de RENIEC, ID:', visitanteId);
+                        
+                        // Actualizar dinámicamente la fila en la tabla
+                        // Buscar la fila en visitantesActivos que corresponde a este visitante
+                        const filaEnActivos = visitantesActivos.find(v => 
+                          v.id === visitante.id || 
+                          v._originalId === visitante.id ||
+                          (v.visitante_id && v.visitante_id.toString() === visitanteId.toString())
+                        );
+                        
+                        if (filaEnActivos) {
+                          actualizarVisitaEnTabla(filaEnActivos.id, {
+                            visitanteId: visitanteId,
+                            visitante_nombres: datosCompletos.nombres,
+                            visitante_apellidos: datosCompletos.apellidos,
+                            numero_documento: datosCompletos.numeroDocumento,
+                            nombres: datosCompletos.nombres,
+                            apellidos: datosCompletos.apellidos
+                          });
+                        }
+                      }
+                    } catch (reniecError) {
+                      console.error('[RENIEC] Error al crear visitante con datos de RENIEC:', reniecError);
+                      visitanteDataForOffline = datosCompletos;
+                    }
+                  } else {
+                    console.warn('[RENIEC] No se pudieron obtener datos de RENIEC:', reniecData.error);
+                    visitanteDataForOffline = datosVisitante;
+                  }
+                }
+              } else {
+                // Modo offline, preparar datos para sincronización
+                visitanteDataForOffline = datosVisitante;
+                console.log('[Offline] Datos del visitante preparados para sincronización');
+              }
+            }
 
           // Crear la visita (utilizando la fecha actual en lugar de la fecha de la visita)
           const currentDate = new Date();
           
           
-          // Si el visitante no tiene datos de visita, usar los datos proporcionados
-          let empleadoId = visitante.empleado?.id || visitante.empleadoVisitado?.id;
-          let motivoId = visitante.motivo?.id;
+          // Extraer los datos de visita del visitante (priorizando los que ya tiene guardados)
+          // Los datos vienen de SelectCustom que usa 'value' en lugar de 'id'
+          let empleadoId = visitante.empleado?.value || visitante.empleado?.id || 
+                          visitante.empleadoVisitado?.value || visitante.empleadoVisitado?.id;
+          let motivoId = visitante.motivo?.value || visitante.motivo?.id;
           let lugarId = visitante.lugarId || visitante.lugar;
           
-          // Si no tiene datos de visita, usar los datos proporcionados
+          console.log('[Dashboard] Datos extraídos del visitante:', {
+            visitante,
+            empleadoId,
+            motivoId,
+            lugarId
+          });
+          
+          // Si no tiene datos de visita guardados, usar los datos proporcionados como fallback
           if (!empleadoId || !motivoId || !lugarId) {
-            empleadoId = datosVisita.empleadoId;
-            motivoId = datosVisita.motivoId;
-            lugarId = datosVisita.lugar;
+            console.log('[Dashboard] Usando datos de visita proporcionados como fallback');
+            empleadoId = empleadoId || datosVisita?.empleadoId;
+            motivoId = motivoId || datosVisita?.motivoId;
+            lugarId = lugarId || datosVisita?.lugar;
           }
           
           // Validar que todos los campos requeridos estén presentes
@@ -416,24 +705,100 @@ const DashboardVigilantePage = () => {
             throw new Error(`Falta lugar para visitante ${visitante.nombres} ${visitante.apellidos}`);
           }
           
+          // Extraer datos adicionales para completar la información
+          const empleadoNombre = visitante.empleado?.label || visitante.personal_nombres || '';
+          const empleadoApellido = visitante.personal_apellidos || '';
+          const empleadoCargo = visitante.empleado?.cargo || visitante.personal_cargo || 'Sin cargo';
+          const motivoNombre = visitante.motivo?.label || visitante.nombre_motivo || '';
+          const lugarNombre = visitante.empleado?.areaNombre || visitante.nombre_area || '';
+          
           const visitaPayload = {
             visitanteId: parseInt(visitanteId),
-            personalVisitadoId: parseInt(empleadoId), // Usar la variable definida arriba
-            motivoVisitaId: parseInt(motivoId), // Usar la variable definida arriba
-            areaDestinoId: parseInt(lugarId), // Usar la variable definida arriba
-            usuarioIngresoId: user?.id ? parseInt(user.id) : 1, // ID del usuario autenticado o valor por defecto
-            // Usar la fecha y hora actual para evitar problemas con fechas futuras
+            personalVisitadoId: parseInt(empleadoId),
+            motivoVisitaId: parseInt(motivoId),
+            areaDestinoId: parseInt(lugarId),
+            usuarioIngresoId: user?.id ? parseInt(user.id) : 1,
             fechaIngreso: currentDate.toISOString().split('T')[0],
-            horaIngreso: currentDate.toTimeString().substring(0, 8)
+            horaIngreso: currentDate.toTimeString().substring(0, 8),
+            // Datos adicionales para completar la información
+            personal_nombres: empleadoNombre,
+            personal_apellidos: empleadoApellido,
+            personal_cargo: empleadoCargo,
+            nombre_motivo: motivoNombre,
+            nombre_area: lugarNombre
           };
           
 
-          const responseVisita = await visitasService.create(visitaPayload);
+          // Log para depuración
+          console.log('[Dashboard] Datos para crear visita:', {
+            visitaPayload,
+            visitanteDataForOffline,
+            hasVisitanteData: !!visitanteDataForOffline
+          });
+
+          // Usar el servicio con soporte offline, pasando datos del visitante si es necesario
+          const responseVisita = await createVisitaWithOfflineSupport(
+            visitaPayload,
+            visitanteDataForOffline, // Pasar datos del visitante si es nuevo
+            visitasService.create
+          );
           
-          if (responseVisita.data.success) {
+          console.log('[Dashboard] Respuesta de createVisitaWithOfflineSupport:', responseVisita);
+          
+          // Verificar si es una respuesta offline
+          if (isOfflineResponse(responseVisita)) {
+            const message = getResponseMessage(responseVisita);
+            setError(`${message.title} ${message.message}`);
+            console.log('[Dashboard] Respuesta offline detectada:', message);
+          }
+          
+          if (responseVisita && responseVisita.data && responseVisita.data.success) {
             visitasRegistradas.push(responseVisita.data.data);
+            console.log('[Dashboard] Visita registrada correctamente (offline o online)');
+            
+            // Actualizar dinámicamente la fila en la tabla con datos completos
+            // Buscar la fila en visitantesActivos que corresponde a este visitante
+            const filaEnActivos = visitantesActivos.find(v => 
+              v.id === visitante.id || 
+              v._originalId === visitante.id ||
+              (v.visitante_id && v.visitante_id.toString() === visitanteId.toString())
+            );
+            
+            if (filaEnActivos) {
+              actualizarVisitaEnTabla(filaEnActivos.id, {
+                visitanteId: visitanteId,
+                visitante_nombres: visitante.nombres,
+                visitante_apellidos: visitante.apellidos,
+                numero_documento: visitante.numeroDocumento,
+                personal_nombres: empleadoNombre,
+                personal_apellidos: empleadoApellido,
+                personal_cargo: empleadoCargo,
+                nombre_motivo: motivoNombre,
+                nombre_area: lugarNombre,
+                // Campos para compatibilidad
+                personal_visitado_id: parseInt(empleadoId),
+                motivo_visita_id: parseInt(motivoId),
+                area_destino_id: parseInt(lugarId),
+                // Mapear empleadoVisitado para la estructura esperada
+                empleadoVisitado: {
+                  id: parseInt(empleadoId),
+                  nombres: empleadoNombre,
+                  apellidos: empleadoApellido,
+                  cargo: empleadoCargo
+                },
+                // Mapear motivo para la estructura esperada
+                motivo: {
+                  id: parseInt(motivoId),
+                  label: motivoNombre
+                },
+                // Mapear lugar para la estructura esperada
+                lugar: parseInt(lugarId),
+                lugarNombre: lugarNombre
+              });
+            }
           } else {
-            throw new Error('Error al crear visita');
+            console.error('[Dashboard] Respuesta inválida:', responseVisita);
+            throw new Error('Error al crear visita: Respuesta inválida del servidor');
           }
         } catch (visitanteError) {
           console.error('Error al procesar visitante:', visitante, visitanteError);
@@ -452,9 +817,18 @@ const DashboardVigilantePage = () => {
         }
       }
 
-      // Si todo salió bien, actualizar el estado y recargar visitantes activos
-      setVisitantesEnEspera([]);
-      await cargarVisitantesActivos();
+        // Si todo salió bien, actualizar el estado y recargar visitantes activos
+        if (navigator.onLine) {
+          // Modo online: limpiar y recargar
+          setVisitantesEnEspera([]);
+          await cargarVisitantesActivos();
+        } else {
+          // Modo offline: limpiar visitantes en espera y recargar activos (que incluirá las visitas pendientes)
+          console.log('[Offline] Limpiando visitantes en espera y recargando activos...');
+          setVisitantesEnEspera([]);
+          // Recargar visitantes activos (que en modo offline cargará las visitas pendientes)
+          await cargarVisitantesActivos();
+        }
       
       
     } catch (err) {
@@ -597,7 +971,17 @@ const DashboardVigilantePage = () => {
   };
 
   const handleRegistrarSalida = (visitaId, visitanteData = null) => {
-    setVisitaParaSalida(visitaId);
+    // Si es una visita offline, extraer el ID original
+    let idParaSalida = visitaId;
+    if (visitaId && visitaId.toString().startsWith('offline_')) {
+      // Buscar la visita pendiente para obtener el ID original
+      const visitaPendiente = visitasPendientes.find(v => v.id === visitaId);
+      if (visitaPendiente && visitaPendiente._originalId) {
+        idParaSalida = visitaPendiente._originalId;
+      }
+    }
+    
+    setVisitaParaSalida(idParaSalida);
     setVisitanteParaSalida(visitanteData);
     setShowSalidaModal(true);
   };
@@ -615,11 +999,27 @@ const DashboardVigilantePage = () => {
       setError('');
       setShowSalidaModal(false);
       
-      const response = await visitasService.registrarSalida(visitaParaSalida);
+      // Usar el servicio con soporte offline
+      const response = await registrarSalidaWithOfflineSupport(
+        visitaParaSalida,
+        visitasService.registrarSalida
+      );
+      
+      // Verificar si es una respuesta offline
+      if (isOfflineResponse(response)) {
+        const message = getResponseMessage(response);
+        setError(`${message.title} ${message.message}`);
+      }
       
       if (response.data.success) {
         // Recargar visitantes activos para reflejar el cambio
         await cargarVisitantesActivos();
+        
+        // Si es una respuesta offline, mostrar mensaje
+        if (isOfflineResponse(response)) {
+          const message = getResponseMessage(response);
+          setError(`⚠️ ${message.title}: ${message.message}`);
+        }
       } else {
         setError('Error al registrar la salida');
       }
@@ -757,6 +1157,7 @@ const DashboardVigilantePage = () => {
             <VisitantesTabla
               visitantesActivos={visitantesActivos}
               visitantesEnEspera={visitantesEnEspera}
+              visitasPendientes={visitasPendientes}
               historialVisitas={historialVisitas}
               activeTab={activeTab}
               onTabChange={handleTabChange}

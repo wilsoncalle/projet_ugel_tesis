@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
+import OfflineIndicator from './components/OfflineIndicator';
 
 // Default Redirect Component
 const DefaultRedirect = () => {
@@ -50,54 +51,59 @@ function App() {
   }, [checkAuth]);
 
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />} />
-      
-      {/* Protected Routes */}
-      <Route element={<ProtectedRoute />}>
-        <Route element={<MainLayout />}>
-          {/* Admin Routes */}
-          <Route path="/admin">
-            <Route index element={<ProtectedRoute allowedRoles={['admin']} element={<DashboardAdminPage />} />} />
+    <>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />} />
+        
+        {/* Protected Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            {/* Admin Routes */}
+            <Route path="/admin">
+              <Route index element={<ProtectedRoute allowedRoles={['admin']} element={<DashboardAdminPage />} />} />
+              
+              {/* Catalog Routes */}
+              <Route path="areas" element={<ProtectedRoute allowedRoles={['admin']} element={<AreasPage />} />} />
+              <Route path="tipos-documento" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposDocumentoPage />} />} />
+              <Route path="motivos-visita" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosVisitaPage />} />} />
+              <Route path="tipos-contrato" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposContratoPage />} />} />
+              <Route path="motivos-salida" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosSalidaPage />} />} />
+              <Route path="cargos" element={<ProtectedRoute allowedRoles={['admin']} element={<CargosPage />} />} />
+              <Route path="catalogos" element={<ProtectedRoute allowedRoles={['admin']} element={<AdminCatalogosPage />} />} />
+              
+              <Route path="usuarios" element={<ProtectedRoute allowedRoles={['admin']} element={<UsuariosPage />} />} />
+            </Route>
             
-            {/* Catalog Routes */}
-            <Route path="areas" element={<ProtectedRoute allowedRoles={['admin']} element={<AreasPage />} />} />
-            <Route path="tipos-documento" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposDocumentoPage />} />} />
-            <Route path="motivos-visita" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosVisitaPage />} />} />
-            <Route path="tipos-contrato" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposContratoPage />} />} />
-            <Route path="motivos-salida" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosSalidaPage />} />} />
-            <Route path="cargos" element={<ProtectedRoute allowedRoles={['admin']} element={<CargosPage />} />} />
-            <Route path="catalogos" element={<ProtectedRoute allowedRoles={['admin']} element={<AdminCatalogosPage />} />} />
+            {/* RRHH Routes */}
+            <Route path="/rrhh">
+              <Route index element={<ProtectedRoute allowedRoles={['rrhh']} element={<DashboardRRHHPage />} />} />
+              <Route path="personal" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PersonalPage />} />} />
+              <Route path="personal/crear" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
+              <Route path="personal/editar/:id" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
+              <Route path="papeletas" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PapeletasPage />} />} />
+              {/* Usuarios es solo para Admin; no registrar aquí */}
+            </Route>
+
+            {/* Vigilante Routes */}
+            <Route path="/vigilante">
+              <Route index element={<ProtectedRoute allowedRoles={['vigilante']} element={<DashboardVigilantePage />} />} />
+            </Route>
             
-            <Route path="usuarios" element={<ProtectedRoute allowedRoles={['admin']} element={<UsuariosPage />} />} />
-          </Route>
-          
-          {/* RRHH Routes */}
-          <Route path="/rrhh">
-            <Route index element={<ProtectedRoute allowedRoles={['rrhh']} element={<DashboardRRHHPage />} />} />
-            <Route path="personal" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PersonalPage />} />} />
-            <Route path="personal/crear" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
-            <Route path="personal/editar/:id" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
-            <Route path="papeletas" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PapeletasPage />} />} />
-            {/* Usuarios es solo para Admin; no registrar aquí */}
-          </Route>
 
-          {/* Vigilante Routes */}
-          <Route path="/vigilante">
-            <Route index element={<ProtectedRoute allowedRoles={['vigilante']} element={<DashboardVigilantePage />} />} />
+            
+            {/* Default Redirect Based on Role */}
+            <Route path="/" element={<ProtectedRoute element={<DefaultRedirect />} />} />
           </Route>
-          
-
-          
-          {/* Default Redirect Based on Role */}
-          <Route path="/" element={<ProtectedRoute element={<DefaultRedirect />} />} />
         </Route>
-      </Route>
+        
+        {/* Fallback Route */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
       
-      {/* Fallback Route */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+      {/* Indicador de estado offline/online */}
+      {isAuthenticated && <OfflineIndicator />}
+    </>
   );
 }
 

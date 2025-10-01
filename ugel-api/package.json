@@ -20,6 +20,7 @@
     "pdfkit": "^0.17.2",
     "pdfkit-table": "^0.1.99",
     "pg": "^8.8.0",
+    "puppeteer": "^24.22.3",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {

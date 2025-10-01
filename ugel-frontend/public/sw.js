@@ -1,93 +1,128 @@
-// Service Worker for UGEL Access Control System
-const CACHE_NAME = 'ugel-access-cache-v1';
-const OFFLINE_URL = '/offline.html';
+// Service Worker Mejorado con Background Sync
+// Sistema Integral de Control de Acceso - UGEL Talara
 
-// Assets to cache immediately when the service worker is installed
+const CACHE_NAME = 'ugel-access-cache-v2';
+const OFFLINE_URL = '/offline.html';
+const API_BASE_URL = 'http://localhost:3000/api';
+
+// Assets estáticos para cachear
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/offline.html',
-  '/favicon.ico',
-  '/manifest.json',
-  '/assets/index.js',
-  '/assets/index.css',
+  '/manifest.json'
 ];
 
-// Install event - cache static assets
+// ========== INSTALL EVENT ==========
 self.addEventListener('install', (event) => {
+  console.log('[Service Worker] Instalando...');
+  
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      console.log('[Service Worker] Caching static assets');
-      await cache.addAll(STATIC_ASSETS);
-      self.skipWaiting();
+      console.log('[Service Worker] Cacheando assets estáticos');
+      
+      // Cachear assets de forma silenciosa (sin fallar si alguno no está disponible)
+      await Promise.allSettled(
+        STATIC_ASSETS.map(url => 
+          cache.add(url).catch(err => 
+            console.warn(`[Service Worker] No se pudo cachear ${url}:`, err)
+          )
+        )
+      );
+      
+      await self.skipWaiting();
+      console.log('[Service Worker] Instalación completada');
     })()
   );
 });
 
-// Activate event - clean up old caches
+// ========== ACTIVATE EVENT ==========
 self.addEventListener('activate', (event) => {
+  console.log('[Service Worker] Activando...');
+  
   event.waitUntil(
     (async () => {
+      // Limpiar caches antiguas
       const cacheNames = await caches.keys();
       await Promise.all(
         cacheNames
-          .filter((cacheName) => cacheName !== CACHE_NAME)
-          .map((cacheName) => {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
+          .filter(cacheName => cacheName !== CACHE_NAME)
+          .map(cacheName => {
+            console.log('[Service Worker] Eliminando cache antigua:', cacheName);
             return caches.delete(cacheName);
           })
       );
+      
       await self.clients.claim();
+      console.log('[Service Worker] Activación completada');
     })()
   );
 });
 
-// Fetch event - handle network requests
+// ========== FETCH EVENT ==========
 self.addEventListener('fetch', (event) => {
-  // Skip cross-origin requests
-  if (!event.request.url.startsWith(self.location.origin)) {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Ignorar peticiones cross-origin no API
+  if (url.origin !== self.location.origin && !url.href.includes(API_BASE_URL)) {
     return;
   }
 
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    // For POST/PUT requests that fail, store them in IndexedDB for later retry
-    if ((event.request.method === 'POST' || event.request.method === 'PUT') && 
-        event.request.url.includes('/api/')) {
-      event.respondWith(
-        fetch(event.request.clone())
-          .catch((error) => {
-            // Store failed requests in IndexedDB for later retry
-            storeFailedRequest(event.request.clone());
-            return new Response(JSON.stringify({ 
-              error: 'Network error. Request stored for later retry.' 
-            }), {
-              status: 503,
-              headers: { 'Content-Type': 'application/json' }
-            });
-          })
-      );
+  // Estrategia para peticiones GET
+  if (request.method === 'GET') {
+    // API: Network First (intentar red primero, luego cache)
+    if (url.href.includes('/api/')) {
+      event.respondWith(networkFirstStrategy(request));
+      return;
     }
+    
+    // Assets estáticos: Cache First (cache primero, luego red)
+    event.respondWith(cacheFirstStrategy(request));
     return;
   }
 
-  // Handle API requests with network-first strategy
-  if (event.request.url.includes('/api/')) {
-    event.respondWith(
-      networkFirst(event.request)
-    );
+  // Estrategias para POST/PUT/DELETE (operaciones de escritura)
+  if (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') {
+    event.respondWith(handleWriteOperation(request));
     return;
   }
-
-  // Handle static assets with cache-first strategy
-  event.respondWith(
-    cacheFirst(event.request)
-  );
 });
 
-// Cache-first strategy for static assets
-async function cacheFirst(request) {
+// ========== SYNC EVENT (Background Sync) ==========
+self.addEventListener('sync', (event) => {
+  console.log('[Service Worker] Sync event detectado:', event.tag);
+  
+  if (event.tag === 'offline-sync' || event.tag.startsWith('sync-')) {
+    event.waitUntil(syncOfflineData());
+  }
+});
+
+// ========== MESSAGE EVENT ==========
+self.addEventListener('message', (event) => {
+  console.log('[Service Worker] Mensaje recibido:', event.data);
+  
+  if (event.data && event.data.type === 'SYNC_NOW') {
+    syncOfflineData().then(() => {
+      // Notificar al cliente que la sincronización está completa
+      event.ports[0].postMessage({ success: true });
+    }).catch(error => {
+      event.ports[0].postMessage({ success: false, error: error.message });
+    });
+  }
+
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// ========== ESTRATEGIAS DE CACHE ==========
+
+/**
+ * Estrategia Cache First: intenta obtener del cache primero
+ */
+async function cacheFirstStrategy(request) {
   const cachedResponse = await caches.match(request);
   if (cachedResponse) {
     return cachedResponse;
@@ -95,116 +130,142 @@ async function cacheFirst(request) {
 
   try {
     const networkResponse = await fetch(request);
-    // Cache successful responses
-    if (networkResponse.ok) {
+    
+    // Solo cachear respuestas exitosas
+    if (networkResponse && networkResponse.status === 200) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
     }
+    
     return networkResponse;
   } catch (error) {
-    // If it's a navigation request, return the offline page
+    console.error('[Service Worker] Error en cache-first:', error);
+    
+    // Si es una navegación y falla, mostrar página offline
     if (request.mode === 'navigate') {
       const cache = await caches.open(CACHE_NAME);
-      return cache.match(OFFLINE_URL);
+      const offlinePage = await cache.match(OFFLINE_URL);
+      if (offlinePage) {
+        return offlinePage;
+      }
     }
-    return new Response('Network error happened', {
-      status: 408,
-      headers: { 'Content-Type': 'text/plain' },
+    
+    return new Response('Offline', {
+      status: 503,
+      statusText: 'Service Unavailable'
     });
   }
 }
 
-// Network-first strategy for API requests
-async function networkFirst(request) {
+/**
+ * Estrategia Network First: intenta la red primero, luego cache
+ */
+async function networkFirstStrategy(request) {
   try {
     const networkResponse = await fetch(request);
-    // Cache successful API responses
-    if (networkResponse.ok) {
+    
+    // Cachear respuestas GET exitosas de la API
+    if (networkResponse && networkResponse.status === 200) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, networkResponse.clone());
     }
+    
     return networkResponse;
   } catch (error) {
+    console.warn('[Service Worker] Red falló, buscando en cache:', request.url);
+    
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       return cachedResponse;
     }
-    return new Response(JSON.stringify({ error: 'Network error' }), {
+    
+    return new Response(JSON.stringify({ 
+      error: 'Sin conexión',
+      offline: true 
+    }), {
       status: 503,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }
 
-// Store failed requests in IndexedDB for later retry
-async function storeFailedRequest(request) {
-  // This is a simplified implementation
-  // In a real app, you would use IndexedDB to store the request details
-  console.log('[Service Worker] Storing failed request for later retry:', request.url);
-  
-  // You can implement the IndexedDB storage here
-  // For example:
-  /*
-  const db = await openDB('failed-requests', 1, {
-    upgrade(db) {
-      db.createObjectStore('requests', { keyPath: 'id', autoIncrement: true });
-    },
-  });
-  
-  const requestData = {
-    url: request.url,
-    method: request.method,
-    headers: Array.from(request.headers.entries()),
-    body: await request.text(),
-    timestamp: Date.now(),
-  };
-  
-  await db.add('requests', requestData);
-  */
+/**
+ * Maneja operaciones de escritura (POST/PUT/DELETE)
+ */
+async function handleWriteOperation(request) {
+  try {
+    // Intentar enviar la petición
+    const response = await fetch(request.clone());
+    return response;
+  } catch (error) {
+    console.warn('[Service Worker] Operación de escritura falló, guardando offline');
+    
+    // Guardar la petición en IndexedDB para sincronizar después
+    await storeRequestForSync(request.clone());
+    
+    // Devolver respuesta indicando que se guardó offline
+    return new Response(JSON.stringify({
+      success: false,
+      offline: true,
+      message: 'Operación guardada. Se sincronizará automáticamente cuando vuelva la conexión.'
+    }), {
+      status: 202, // Accepted
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }
 
-// Listen for online status to retry failed requests
-self.addEventListener('online', (event) => {
-  console.log('[Service Worker] Back online, retrying failed requests');
-  // Implement retry logic here
-  // For example:
-  /*
-  retryFailedRequests();
-  */
-});
+// ========== FUNCIONES AUXILIARES ==========
 
-// Sync event for background sync API
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'retry-failed-requests') {
-    event.waitUntil(retryFailedRequests());
-  }
-});
-
-// Function to retry failed requests
-async function retryFailedRequests() {
-  // Implement retry logic here
-  console.log('[Service Worker] Retrying failed requests');
-  
-  // For example:
-  /*
-  const db = await openDB('failed-requests', 1);
-  const failedRequests = await db.getAll('requests');
-  
-  for (const request of failedRequests) {
-    try {
-      const response = await fetch(request.url, {
-        method: request.method,
-        headers: new Headers(request.headers),
-        body: request.body,
-      });
-      
-      if (response.ok) {
-        // Request succeeded, remove from IndexedDB
-        await db.delete('requests', request.id);
-      }
-    } catch (error) {
-      console.error('[Service Worker] Retry failed:', error);
+/**
+ * Guarda una petición fallida para sincronizar después
+ * NOTA: Esta función ya no se usa porque manejamos offline en offlineDB.js
+ * La mantenemos para compatibilidad pero no hace nada crítico
+ */
+async function storeRequestForSync(request) {
+  try {
+    console.log('[Service Worker] Petición falló, será manejada por la app:', request.url);
+    
+    // Registrar sync si está disponible
+    if (self.registration.sync) {
+      await self.registration.sync.register('offline-sync');
     }
+  } catch (error) {
+    console.error('[Service Worker] Error en storeRequestForSync:', error);
   }
-  */
 }
+
+/**
+ * Sincroniza datos offline con el servidor
+ * NOTA: La sincronización real se maneja en offlineSync.js
+ * Este método solo notifica a los clientes para que sincronicen
+ */
+async function syncOfflineData() {
+  console.log('[Service Worker] Notificando a clientes para sincronización...');
+  
+  try {
+    // Notificar a todos los clientes para que sincronicen
+    const clients = await self.clients.matchAll();
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'SYNC_REQUESTED'
+      });
+    });
+
+    console.log('[Service Worker] Notificaciones enviadas a clientes');
+  } catch (error) {
+    console.error('[Service Worker] Error en syncOfflineData:', error);
+    throw error;
+  }
+}
+
+/**
+ * NOTA: La base de datos IndexedDB se maneja completamente en offlineDB.js
+ * No necesitamos crear/manejar stores aquí en el Service Worker
+ * Esta función se mantiene solo por compatibilidad pero no se usa
+ */
+function openDatabase() {
+  return Promise.resolve(null);
+}
+
+console.log('[Service Worker] Script cargado');

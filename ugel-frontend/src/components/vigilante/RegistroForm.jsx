@@ -565,6 +565,9 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
 
   // Manejar cambios en el formulario de visita para ACTIVOS
   const handleVisitaChangeActivos = (field, value) => {
+    console.error('🚨🚨🚨 [handleVisitaChangeActivos] LLAMADO!!! 🚨🚨🚨');
+    console.error('🚨 field:', field, 'value:', value);
+    
     let newFormVisita = {
       ...formVisitaActivos,
       [field]: value
@@ -620,11 +623,18 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
     };
 
     // Enviar datos actualizados en tiempo real al componente padre
+    console.warn('🔔 [RegistroForm-Activos] Llamando onFormChange');
+    console.warn('🔔 [RegistroForm-Activos] visitaCompleta:', JSON.stringify(visitaCompleta, null, 2));
+    console.warn('🔔 [RegistroForm-Activos] onFormChange exists:', !!onFormChange);
+    
     if (onFormChange) {
       onFormChange({
         visitante: formVisitante,
         visita: visitaCompleta
       });
+      console.warn('✅ [RegistroForm-Activos] onFormChange ejecutado');
+    } else {
+      console.error('❌ [RegistroForm-Activos] onFormChange NO está definido!');
     }
   };
 
@@ -771,6 +781,9 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
         // Registrar la visita usando la nueva función
         const response = await registrarVisitaCompleta(datosVisita);
         
+        console.log('[RegistroForm] Respuesta de registrarVisitaCompleta:', response);
+        console.log('[RegistroForm] Datos de visita obtenidos:', { empleado, motivo, lugar });
+        
         if (response.data.success) {
           
           // Crear objeto de visitante para la UI
@@ -792,6 +805,17 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
             personal_apellidos: empleado?.label?.split(' ').slice(1).join(' ') || '',
             empleadoVisitado: empleado
           };
+
+          console.log('[RegistroForm] Visitante a agregar con datos completos:', visitanteData);
+          
+          // Si es offline, mostrar mensaje especial
+          if (response.data.offline) {
+            setMensajeVisitante('✅ Visita guardada offline. Se sincronizará automáticamente cuando haya conexión.');
+            setTipoMensaje('success');
+          } else {
+            setMensajeVisitante('✅ Visita registrada correctamente');
+            setTipoMensaje('success');
+          }
 
           onAddVisitor(visitanteData);
           
@@ -817,7 +841,8 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           limpiarBusqueda();
         }
       } catch (error) {
-        console.error('Error al registrar visita:', error);
+        console.error('[RegistroForm] Error al registrar visita:', error);
+        console.error('[RegistroForm] Datos de visita en catch:', { empleado, motivo, lugar });
         
         // Manejar específicamente el error de visita activa duplicada (409)
         if (error.response && error.response.status === 409) {
@@ -826,14 +851,31 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           return; // No continuar con el proceso
         }
         
-        // Manejar otros errores
-        setMensajeVisitante('Error al registrar la visita. Intente nuevamente.');
-        setTipoMensaje('error');
+        // Para otros errores de red, NO mostrar error si puede ser offline
+        const isNetworkError = !error.response || error.message === 'Network Error' || error.code === 'ERR_NETWORK';
+        
+        if (isNetworkError) {
+          setMensajeVisitante('⚠️ Sin conexión. La visita se guardará cuando haya internet.');
+          setTipoMensaje('warning');
+        } else {
+          setMensajeVisitante('Error al registrar la visita: ' + (error.response?.data?.message || error.message));
+          setTipoMensaje('error');
+        }
       }
     } else {
-      // Si no hay datos de visita, solo agregar el visitante a la lista de espera
+      // Si no hay datos de visita completos, agregar el visitante a la lista de espera
+      // PERO preservar los datos de visita si están disponibles en el formulario
       
-      // Crear objeto de visitante para la UI (sin datos de visita)
+      // Intentar obtener los datos de visita del formulario si existen
+      let empleado = null, motivo = null, lugar = null;
+      if (formVisitaActivos.empleadoId || formVisitaActivos.motivoId || formVisitaActivos.lugar) {
+        const datosVisita = obtenerDatosVisita(formVisitaActivos, true);
+        empleado = datosVisita.empleado;
+        motivo = datosVisita.motivo;
+        lugar = datosVisita.lugar;
+      }
+      
+      // Crear objeto de visitante para la UI
       const visitanteData = {
         tipoDocumentoId: formVisitante.tipoDocumentoId,
         numeroDocumento: formVisitante.numeroDocumento,
@@ -841,18 +883,19 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
         apellidos: formVisitante.apellidos,
         visitanteId: formVisitante.visitanteId,
         tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId),
-        // Sin datos de visita - se asignarán después
-        empleado: null,
-        motivo: null,
-        lugar: '',
-        lugarId: '',
-        nombre_area: '',
-        nombre_motivo: '',
-        personal_nombres: '',
-        personal_apellidos: '',
-        empleadoVisitado: null
+        // PRESERVAR datos de visita si están disponibles
+        empleado: empleado,
+        motivo: motivo,
+        lugar: lugar?.label || '',
+        lugarId: lugar?.value || formVisitaActivos.lugar || '',
+        nombre_area: lugar?.label || '',
+        nombre_motivo: motivo?.label || '',
+        personal_nombres: empleado?.label?.split(' ')[0] || '',
+        personal_apellidos: empleado?.label?.split(' ').slice(1).join(' ') || '',
+        empleadoVisitado: empleado
       };
       
+      console.log('RegistroForm - Visitante agregado a espera CON datos de visita:', visitanteData);
 
       onAddVisitor(visitanteData);
       
@@ -1248,7 +1291,11 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
             <SelectCustom
               label="Empleado a Visitar *"
               value={formVisitaActivos.empleadoId ? empleadosActivos.find(emp => emp.value === formVisitaActivos.empleadoId) : null}
-              onChange={(selectedOption) => handleVisitaChangeActivos('empleadoId', selectedOption?.value || '')}
+              onChange={(selectedOption) => {
+                console.warn('🎯 [SelectCustom-Empleado] onChange LLAMADO!');
+                console.warn('🎯 [SelectCustom-Empleado] selectedOption:', selectedOption);
+                handleVisitaChangeActivos('empleadoId', selectedOption?.value || '');
+              }}
               options={empleadosActivos}
               placeholder="Seleccione empleado..."
               isSearchable={true}
@@ -1261,7 +1308,11 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
               <SelectCustom
                 label="Motivo de Visita *"
                 value={formVisitaActivos.motivoId ? motivosActivos.find(mot => mot.value === formVisitaActivos.motivoId) : null}
-                onChange={(selectedOption) => handleVisitaChangeActivos('motivoId', selectedOption?.value || '')}
+                onChange={(selectedOption) => {
+                  console.warn('🎯 [SelectCustom-Motivo] onChange LLAMADO!');
+                  console.warn('🎯 [SelectCustom-Motivo] selectedOption:', selectedOption);
+                  handleVisitaChangeActivos('motivoId', selectedOption?.value || '');
+                }}
                 options={motivosActivos}
                 placeholder="Seleccione motivo..."
                 isLoading={loadingData}
@@ -1271,7 +1322,11 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
               <SelectCustom
                 label="Lugar *"
                 value={formVisitaActivos.lugar ? lugaresActivos.find(lug => lug.value === formVisitaActivos.lugar) : null}
-                onChange={(selectedOption) => handleVisitaChangeActivos('lugar', selectedOption?.value || '')}
+                onChange={(selectedOption) => {
+                  console.warn('🎯 [SelectCustom-Lugar] onChange LLAMADO!');
+                  console.warn('🎯 [SelectCustom-Lugar] selectedOption:', selectedOption);
+                  handleVisitaChangeActivos('lugar', selectedOption?.value || '');
+                }}
                 options={lugaresActivos}
                 placeholder="Seleccione lugar..."
                 isClearable={false}

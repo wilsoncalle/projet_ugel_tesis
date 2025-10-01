@@ -12,6 +12,7 @@ import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon, Do
 const VisitantesTabla = ({
   visitantesActivos,
   visitantesEnEspera,
+  visitasPendientes = [], // Nueva prop para visitas pendientes de IndexedDB
   historialVisitas,
   activeTab,
   onTabChange,
@@ -57,6 +58,7 @@ const VisitantesTabla = ({
   const getTabData = useCallback(() => {
     switch (activeTab) {
       case 'activos': {
+        // En modo offline, las visitas pendientes ya están incluidas en visitantesActivos
         let data = [...(visitantesActivos || []), ...(visitantesEnEspera || [])];
         
         // Solo agregar vista previa si tiene datos válidos
@@ -327,6 +329,11 @@ const VisitantesTabla = ({
               console.log('VisitantesTabla - Es visitante en espera, cargo:', row.empleado?.cargo);
               cargo = row.empleado?.cargo || '';
             } 
+            // Si es una visita offline (incluida en activos en modo offline)
+            else if (row._isOffline || row._isPending) {
+              console.log('VisitantesTabla - Es visita offline, cargo:', row.personal_cargo);
+              cargo = row.personal_cargo || 'Sin cargo';
+            }
             // Si es un visitante activo (de la API)
             else {
               console.log('VisitantesTabla - Es visitante activo, personal_cargo:', row.personal_cargo);
@@ -555,6 +562,7 @@ const VisitantesTabla = ({
           
           const enEspera = (visitantesEnEspera || []).some(v => v.id === row.id);
           const isPreview = row.isPreview === true;
+          const isOfflinePending = row._isOffline || row._isPending;
           
           // Only show actions for active visitors (not previews)
           if (isPreview) {
@@ -573,7 +581,7 @@ const VisitantesTabla = ({
               </button>
               
               {/* Botones específicos según el estado */}
-              {enEspera ? (
+              {enEspera && !isOfflinePending ? (
                 <button
                   onClick={() => {
                     if (onEliminarVisitanteEspera) {
@@ -591,7 +599,7 @@ const VisitantesTabla = ({
                     onRegistrarSalida(row.id, row);
                   }}
                   className="p-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors"
-                  title="Registrar Salida"
+                  title={isOfflinePending ? "Registrar Salida (Offline)" : "Registrar Salida"}
                 >
                   <ArrowRightOnRectangleIcon className="h-4 w-4" />
                 </button>
@@ -636,7 +644,7 @@ const VisitantesTabla = ({
     return baseColumns;
   }, [activeTab, visitantesEnEspera, onRegistrarSalida, handleOpenModal]);
 
-  const countActivos = visitantesActivos.length;
+  const countActivos = (visitantesActivos || []).length + (visitantesEnEspera || []).length;
 
   // Función para exportar a Excel o PDF
   const handleExport = (format) => {
@@ -774,7 +782,10 @@ const VisitantesTabla = ({
               <TableGenerica
                 columns={getColumns}
                 data={getTabData()}
-                isRowInWaiting={(row) => (visitantesEnEspera || []).some(v => v.id === row.id)}
+                isRowInWaiting={(row) => 
+                  (visitantesEnEspera || []).some(v => v.id === row.id)
+                  // Las visitas pendientes NO se muestran como "en espera", sino como visitas normales
+                }
                 {...getPaginationProps()}
                 emptyMessage={
                   activeTab === 'activos'

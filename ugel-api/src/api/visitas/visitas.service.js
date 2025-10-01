@@ -11,7 +11,7 @@ const motivosVisitaRepository = require('../motivos-visita/motivosvisita.reposit
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const ExcelJS = require('exceljs');
-const PDFDocument = require('pdfkit');
+const PDFDocument = require('pdfkit-table');
 const { getTheme } = require('../../config/exportStyles');
 
 /**
@@ -464,249 +464,150 @@ const exportarAPDF = async (filtros = {}) => {
         const lightGray = '#F9FAFB'; // Gris muy claro
         const accentColor = '#059669'; // Verde para acentos
         
-        // Encabezado del documento - PERSONALIZABLE
-        doc.fontSize(20) // Tamaño más grande
-           .fillColor(primaryColor)
-           .font('Helvetica-Bold') // Fuente: Helvetica-Bold, Times-Bold, Courier-Bold
-           .text('HISTORIAL DE VISITAS', { align: 'center' });
-        
-        doc.fontSize(11) // Tamaño más grande
-           .fillColor(textColor)
-           .font('Helvetica') // Fuente: Helvetica, Times-Roman, Courier
-           .text('Sistema de Control de Acceso - UGEL Talara', { align: 'center' });
-        
-        doc.moveDown();
-        
-        // Información de filtros aplicados
-        doc.fontSize(9)
-           .fillColor('#6B7280')
-           .text(`Generado: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}`, { align: 'right' });
-        
-        if (filtros.fechaInicio || filtros.fechaFin) {
-          let rangoText = 'Rango de fechas: ';
-          if (filtros.fechaInicio) rangoText += `Desde ${filtros.fechaInicio} `;
-          if (filtros.fechaFin) rangoText += `Hasta ${filtros.fechaFin}`;
-          doc.text(rangoText, { align: 'right' });
-        }
-        
-        doc.text(`Total de registros: ${visitas.length}`, { align: 'right' });
-        
-        doc.moveDown();
-        
-        // Configuración de la tabla
-        const tableTop = doc.y;
-        const itemHeight = 25;
+        // Calcular ancho total de la tabla
+        const columnWidths = [25, 95, 60, 95, 80, 75, 75, 70, 70, 65];
+        const totalTableWidth = columnWidths.reduce((a, b) => a + b, 0);
         const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+        const tableX = doc.page.margins.left + (pageWidth - totalTableWidth) / 2;
         
-        // Anchos de columnas optimizados
-        const columnWidths = {
-          num: 25,
-          visitante: 95,
-          documento: 60,
-          empleado: 95,
-          cargo: 80,
-          motivo: 75,
-          lugar: 75,
-          ingreso: 70,
-          salida: 70,
-          usuario: 65
-        };
-        
-        let currentY = tableTop;
-        
-        // Función para dibujar encabezado de tabla
-        const drawTableHeader = (y) => {
-          // Fondo del encabezado
-          doc.rect(doc.page.margins.left, y, pageWidth, itemHeight)
-             .fillAndStroke(primaryColor, primaryColor);
+        // Función para dibujar encabezado de página
+        const drawPageHeader = () => {
+          // Título principal
+          doc.fontSize(20)
+             .fillColor(primaryColor)
+             .font('Helvetica-Bold')
+             .text('HISTORIAL DE VISITAS', doc.page.margins.left, 40, { align: 'center' });
           
-          // Texto del encabezado - PERSONALIZABLE
-          doc.fontSize(9) // Tamaño más grande
-             .fillColor('#FFFFFF')
-             .font('Helvetica-Bold'); // Fuente: Helvetica-Bold, Times-Bold, Courier-Bold
+          // Subtítulo
+          doc.fontSize(11)
+             .fillColor(textColor)
+             .font('Helvetica')
+             .text('Sistema de Control de Acceso - UGEL Talara', doc.page.margins.left, 65, { align: 'center' });
           
-          let x = doc.page.margins.left + 3;
-          const headerY = y + 8;
+          // Información de filtros
+          doc.fontSize(9)
+             .fillColor('#6B7280')
+             .text(`Generado: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}`, doc.page.margins.left, 85, { align: 'left' });
           
-          doc.text('N°', x, headerY, { width: columnWidths.num, align: 'center' });
-          x += columnWidths.num;
-          
-          doc.text('Visitante', x, headerY, { width: columnWidths.visitante, align: 'left' });
-          x += columnWidths.visitante;
-          
-          doc.text('Documento', x, headerY, { width: columnWidths.documento, align: 'left' });
-          x += columnWidths.documento;
-          
-          doc.text('Empleado', x, headerY, { width: columnWidths.empleado, align: 'left' });
-          x += columnWidths.empleado;
-          
-          doc.text('Cargo', x, headerY, { width: columnWidths.cargo, align: 'left' });
-          x += columnWidths.cargo;
-          
-          doc.text('Motivo', x, headerY, { width: columnWidths.motivo, align: 'left' });
-          x += columnWidths.motivo;
-          
-          doc.text('Lugar', x, headerY, { width: columnWidths.lugar, align: 'left' });
-          x += columnWidths.lugar;
-          
-          doc.text('F. Ingreso', x, headerY, { width: columnWidths.ingreso, align: 'left' });
-          x += columnWidths.ingreso;
-          
-          doc.text('F. Salida', x, headerY, { width: columnWidths.salida, align: 'left' });
-          x += columnWidths.salida;
-          
-          doc.text('Usuario', x, headerY, { width: columnWidths.usuario, align: 'left' });
-          
-          return y + itemHeight;
-        };
-        
-        // Dibujar encabezado inicial
-        currentY = drawTableHeader(currentY);
-        
-        // Dibujar filas de datos - PERSONALIZABLE
-        doc.font('Helvetica').fontSize(8).fillColor(textColor); // Fuente y tamaño personalizable
-        
-        visitas.forEach((visita, index) => {
-          // Verificar si necesitamos una nueva página
-          if (currentY + itemHeight > doc.page.height - doc.page.margins.bottom) {
-            doc.addPage();
-            currentY = doc.page.margins.top;
-            currentY = drawTableHeader(currentY);
+          if (filtros.fechaInicio || filtros.fechaFin) {
+            let rangoText = 'Rango de fechas: ';
+            if (filtros.fechaInicio) rangoText += `Desde ${filtros.fechaInicio} `;
+            if (filtros.fechaFin) rangoText += `Hasta ${filtros.fechaFin}`;
+            doc.text(rangoText, doc.page.margins.left, 100, { align: 'left' });
           }
           
-          // Fondo alternado
-          if (index % 2 === 0) {
-            doc.rect(doc.page.margins.left, currentY, pageWidth, itemHeight)
-               .fill(lightGray);
-          }
+          doc.text(`Total de registros: ${visitas.length}`, doc.page.margins.left, 115, { align: 'left' });
           
-          // Borde de la fila
-          doc.rect(doc.page.margins.left, currentY, pageWidth, itemHeight)
+          // Línea separadora
+          doc.moveTo(doc.page.margins.left, 135)
+             .lineTo(doc.page.width - doc.page.margins.right, 135)
              .stroke('#D1D5DB');
-          
-          let x = doc.page.margins.left + 3;
-          const textY = currentY + 5;
-          
-          // Número
-          doc.fillColor(textColor).text(index + 1, x, textY, { 
-            width: columnWidths.num, 
-            align: 'center',
-            lineBreak: false
-          });
-          x += columnWidths.num;
-          
-          // Visitante
-          const visitante = `${visita.visitante_nombres} ${visita.visitante_apellidos}`.substring(0, 30);
-          doc.text(visitante, x, textY, { 
-            width: columnWidths.visitante,
-            lineBreak: false
-          });
-          x += columnWidths.visitante;
-          
-          // Documento
-          doc.text(visita.numero_documento || 'N/A', x, textY, { 
-            width: columnWidths.documento,
-            lineBreak: false
-          });
-          x += columnWidths.documento;
-          
-          // Empleado
-          const empleado = visita.personal_nombres 
-            ? `${visita.personal_nombres} ${visita.personal_apellidos}`.substring(0, 28)
-            : 'N/A';
-          doc.text(empleado, x, textY, { 
-            width: columnWidths.empleado,
-            lineBreak: false
-          });
-          x += columnWidths.empleado;
-          
-          // Cargo
-          const cargo = (visita.personal_cargo || 'N/A').substring(0, 25);
-          doc.text(cargo, x, textY, { 
-            width: columnWidths.cargo,
-            lineBreak: false
-          });
-          x += columnWidths.cargo;
-          
-          // Motivo
-          const motivo = (visita.nombre_motivo || 'N/A').substring(0, 22);
-          doc.text(motivo, x, textY, { 
-            width: columnWidths.motivo,
-            lineBreak: false
-          });
-          x += columnWidths.motivo;
-          
-          // Lugar
-          const lugar = (visita.nombre_area || 'N/A').substring(0, 22);
-          doc.text(lugar, x, textY, { 
-            width: columnWidths.lugar,
-            lineBreak: false
-          });
-          x += columnWidths.lugar;
-          
-          // Fecha Ingreso
-          const fechaIngreso = visita.fecha_ingreso 
-            ? new Date(visita.fecha_ingreso).toLocaleString('es-PE', { 
-                timeZone: 'America/Lima',
-                day: '2-digit',
-                month: '2-digit',
-                year: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-              })
-            : 'N/A';
-          doc.text(fechaIngreso, x, textY, { 
-            width: columnWidths.ingreso,
-            lineBreak: false
-          });
-          x += columnWidths.ingreso;
-          
-          // Fecha Salida
-          const fechaSalida = visita.fecha_salida 
-            ? new Date(visita.fecha_salida).toLocaleString('es-PE', { 
-                timeZone: 'America/Lima',
-                day: '2-digit',
-                month: '2-digit',
-                year: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-              })
-            : 'Dentro';
-          doc.text(fechaSalida, x, textY, { 
-            width: columnWidths.salida,
-            lineBreak: false
-          });
-          x += columnWidths.salida;
-          
-          // Usuario
-          const usuario = (visita.usuario_ingreso || 'N/A').substring(0, 18);
-          doc.text(usuario, x, textY, { 
-            width: columnWidths.usuario,
-            lineBreak: false
-          });
-          
-          currentY += itemHeight;
+        };
+        
+        // Dibujar encabezado en la primera página
+        drawPageHeader();
+        
+        // Preparar datos para la tabla
+        const table = {
+          headers: [
+            { label: 'N°', width: 25, align: 'center' },
+            { label: 'Visitante', width: 95, align: 'left' },
+            { label: 'Documento', width: 60, align: 'left' },
+            { label: 'Empleado', width: 95, align: 'left' },
+            { label: 'Cargo', width: 80, align: 'left' },
+            { label: 'Motivo', width: 75, align: 'left' },
+            { label: 'Lugar', width: 75, align: 'left' },
+            { label: 'F. Ingreso', width: 70, align: 'left' },
+            { label: 'F. Salida', width: 70, align: 'left' },
+            { label: 'Usuario', width: 65, align: 'left' }
+          ],
+          rows: visitas.map((visita, index) => [
+            index + 1,
+            `${visita.visitante_nombres} ${visita.visitante_apellidos}`.substring(0, 30),
+            visita.numero_documento || 'N/A',
+            visita.personal_nombres ? `${visita.personal_nombres} ${visita.personal_apellidos}`.substring(0, 28) : 'N/A',
+            (visita.personal_cargo || 'N/A').substring(0, 25),
+            (visita.nombre_motivo || 'N/A').substring(0, 22),
+            (visita.nombre_area || 'N/A').substring(0, 22),
+            visita.fecha_ingreso 
+              ? new Date(visita.fecha_ingreso).toLocaleString('es-PE', { 
+                  timeZone: 'America/Lima',
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : 'N/A',
+            visita.fecha_salida 
+              ? new Date(visita.fecha_salida).toLocaleString('es-PE', { 
+                  timeZone: 'America/Lima',
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : 'Dentro',
+            (visita.usuario_ingreso || 'N/A').substring(0, 18)
+          ])
+        };
+        
+        // Dibujar la tabla usando pdfkit-table
+        doc.table(table, {
+          x: tableX,
+          y: 150, // Espacio después del encabezado
+          width: totalTableWidth,
+          padding: 5,
+          columnSpacing: 5,
+          prepareHeader: () => {
+            if (doc.y > 150) { // Si no es la primera página, dibujar encabezado
+              doc.addPage();
+              drawPageHeader();
+              doc.y = 150;
+            }
+            doc.font('Helvetica-Bold').fontSize(9).fillColor('#FFFFFF');
+          },
+          prepareRow: (row, indexColumn, indexRow, rectRow, rectCell) => {
+            doc.font('Helvetica').fontSize(8).fillColor(textColor);
+            const {x, y, width, height} = rectRow;
+            
+            // Fondo alternado
+            if (indexRow % 2 === 0) {
+              doc.addBackground(rectRow, lightGray, 0.5);
+            }
+            
+            // Bordes
+            doc.lineWidth(0.5)
+               .moveTo(x, y)
+               .lineTo(x + width, y)
+               .stroke('#D1D5DB');
+            
+            if (indexColumn === 0) {
+              doc.moveTo(x, y)
+                 .lineTo(x, y + height)
+                 .stroke('#D1D5DB');
+            }
+            
+            doc.moveTo(x + width, y)
+               .lineTo(x + width, y + height)
+               .stroke('#D1D5DB');
+            
+            if (indexColumn === table.headers.length - 1) {
+              doc.moveTo(x + width, y + height)
+                 .lineTo(x, y + height)
+                 .stroke('#D1D5DB');
+            }
+          }
         });
         
-        // Pie de página en todas las páginas
+        // Agregar números de página en el encabezado
         const range = doc.bufferedPageRange();
         for (let i = range.start; i < range.start + range.count; i++) {
           doc.switchToPage(i);
-          
-          // Línea separadora
-          doc.moveTo(doc.page.margins.left, doc.page.height - 50)
-             .lineTo(doc.page.width - doc.page.margins.right, doc.page.height - 50)
-             .stroke('#D1D5DB');
-          
-          // Texto del pie de página
-          doc.fontSize(8)
+          doc.fontSize(9)
              .fillColor('#6B7280')
-             .text(
-               `Sistema de Control de Acceso - UGEL Talara | Página ${i + 1} de ${range.count}`,
-               doc.page.margins.left,
-               doc.page.height - 35,
-               { align: 'center' }
-             );
+             .text(`Página ${i + 1} de ${range.count}`, doc.page.width - doc.page.margins.right - 100, 40, { align: 'right' });
         }
         
         // Finalizar el documento
