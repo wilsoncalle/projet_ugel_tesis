@@ -126,22 +126,56 @@ const DashboardVigilantePage = () => {
   // Función para actualizar dinámicamente una visita en la tabla
   const actualizarVisitaEnTabla = (visitaId, datosActualizados) => {
     setVisitantesActivos(prev => {
-      // Buscar por ID directo o por ID offline original
-      const index = prev.findIndex(v => 
+      // Intentar encontrar por ID primero
+      let index = prev.findIndex(v => 
         v.id === visitaId || 
         v._originalId === visitaId ||
-        (v.id && v.id.toString().includes(visitaId.toString()))
+        v._originalOfflineId === visitaId
       );
+      
+      // Si no encuentra por ID, buscar por coincidencia de datos
+      // (para visitas offline que ahora tienen ID real)
+      if (index === -1 && datosActualizados.numero_documento) {
+        console.log('[Dashboard] Buscando por características únicas...', {
+          numero_documento: datosActualizados.numero_documento,
+          personal_visitado_id: datosActualizados.personal_visitado_id
+        });
+        
+        index = prev.findIndex(v => 
+          // Buscar visitas offline sin salida que coincidan en:
+          !v.fecha_salida && 
+          v.numero_documento === datosActualizados.numero_documento &&
+          v.personal_visitado_id === datosActualizados.personal_visitado_id &&
+          (v._isOffline || v._isPending) // Solo considerar filas offline
+        );
+        
+        if (index !== -1) {
+          console.log('[Dashboard] ✅ Encontrada fila offline por características:', prev[index]);
+        }
+      }
       
       if (index !== -1) {
         // Actualizar la fila existente
         const actualizado = [...prev];
-        actualizado[index] = { ...actualizado[index], ...datosActualizados };
+        actualizado[index] = { 
+          ...actualizado[index], 
+          ...datosActualizados,
+          _isOffline: false, // Ya no es offline
+          _isPending: false  // Ya no está pendiente
+        };
         console.log('[Dashboard] Visita actualizada dinámicamente:', actualizado[index]);
         return actualizado;
       } else {
         console.warn('[Dashboard] No se encontró la visita para actualizar:', visitaId);
-        console.log('[Dashboard] Visitas disponibles:', prev.map(v => ({ id: v.id, _originalId: v._originalId })));
+        console.log('[Dashboard] Visitas disponibles:', prev.map(v => ({ 
+          id: v.id, 
+          _originalId: v._originalId, 
+          _originalOfflineId: v._originalOfflineId,
+          numero_documento: v.numero_documento,
+          personal_visitado_id: v.personal_visitado_id,
+          _isOffline: v._isOffline,
+          _isPending: v._isPending
+        })));
       }
       return prev;
     });
@@ -269,6 +303,33 @@ const DashboardVigilantePage = () => {
     };
   }, []);
 
+  // Listener para detectar cuando se vuelve online y cuando termina la sincronización
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[Dashboard] Conexión restaurada, sincronizando datos...');
+      // No cargar inmediatamente, esperar a que termine la sincronización
+    };
+
+    const handleOffline = () => {
+      console.log('[Dashboard] Conexión perdida, modo offline activado');
+    };
+
+    const handleSyncComplete = () => {
+      console.log('[Dashboard] Sincronización completada, recargando visitantes activos...');
+      cargarVisitantesActivos();
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('offline-sync-complete', handleSyncComplete);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('offline-sync-complete', handleSyncComplete);
+    };
+  }, []);
+
   const cargarVisitantesActivos = async () => {
     try {
       setLoading(true);
@@ -279,10 +340,104 @@ const DashboardVigilantePage = () => {
       // Si estamos online, cargar desde la API
       if (navigator.onLine) {
         const response = await visitasService.getActivas();
-        
+      
         if (response.data.success) {
           activosData = response.data.data || [];
-          console.log('DashboardVigilantePage - Datos recibidos del backend:', activosData);
+          console.log('[Online] Datos recibidos del backend:', activosData);
+        
+          // Verificar si hay visitas offline en el estado actual
+          setVisitantesActivos(prevActivos => {
+            console.log('[Online] Estado actual de visitantes:', prevActivos);
+            
+            // Separar visitas offline de las normales
+            const visitasOffline = prevActivos.filter(v => v._isOffline || v._isPending);
+            const visitasNormales = prevActivos.filter(v => !v._isOffline && !v._isPending);
+            
+            console.log('[Online] Visitas offline encontradas:', visitasOffline.length);
+            console.log('[Online] Visitas normales:', visitasNormales.length);
+            
+            // Crear un mapa para rastrear qué visitas de la API ya fueron procesadas
+            const visitasAPIProcesadas = new Set();
+            
+            // Actualizar visitas offline con datos de la API
+            const visitasOfflineActualizadas = visitasOffline.map(visitaOffline => {
+              // Buscar coincidencia en las visitas de la API
+              const visitaAPI = activosData.find(v => {
+                // Normalizar fechas para comparación
+                const fechaOffline = visitaOffline.fecha_ingreso?.split('T')[0] || visitaOffline.fecha_ingreso;
+                const fechaAPI = v.fecha_ingreso?.split('T')[0];
+                
+                // Normalizar hora para comparación (primeros 5 caracteres HH:MM)
+                const horaOffline = visitaOffline.hora_ingreso?.substring(0, 5);
+                const horaAPI = v.fecha_ingreso ? new Date(v.fecha_ingreso).toTimeString().substring(0, 5) : '';
+                
+                console.log('[Online] Comparando:', {
+                  offline: {
+                    doc: visitaOffline.numero_documento,
+                    personal: visitaOffline.personal_visitado_id,
+                    fecha: fechaOffline,
+                    hora: horaOffline
+                  },
+                  api: {
+                    doc: v.numero_documento,
+                    personal: v.personal_visitado_id,
+                    fecha: fechaAPI,
+                    hora: horaAPI
+                  }
+                });
+                
+                return v.numero_documento === visitaOffline.numero_documento &&
+                       v.personal_visitado_id === visitaOffline.personal_visitado_id &&
+                       fechaAPI === fechaOffline &&
+                       horaAPI === horaOffline;
+              });
+              
+              if (visitaAPI) {
+                console.log('[Online] ✅ Encontrada coincidencia para visita offline:', {
+                  offline: visitaOffline,
+                  api: visitaAPI
+                });
+                
+                // Marcar esta visita de la API como procesada
+                visitasAPIProcesadas.add(visitaAPI.id);
+                
+                // Retornar la visita actualizada con datos de la API
+                return {
+                  ...visitaAPI,
+                  _wasOffline: true,
+                  _originalOfflineId: visitaOffline._originalId || visitaOffline.id
+                };
+              }
+              
+              // Si no hay coincidencia, mantener la visita offline
+              console.log('[Online] ⚠️ No se encontró coincidencia para visita offline:', visitaOffline);
+              return visitaOffline;
+            });
+            
+            // Agregar solo las visitas de la API que NO fueron usadas para actualizar visitas offline
+            const visitasAPINoUsadas = activosData.filter(visitaAPI => 
+              !visitasAPIProcesadas.has(visitaAPI.id)
+            );
+            
+            console.log('[Online] Visitas offline actualizadas:', visitasOfflineActualizadas.length);
+            console.log('[Online] Visitas de la API no usadas:', visitasAPINoUsadas.length);
+            
+            // Combinar: visitas offline actualizadas + visitas de la API que no tenían correspondencia offline
+            const resultado = [...visitasOfflineActualizadas, ...visitasAPINoUsadas];
+            console.log('[Online] Total de visitas después de sincronización:', resultado.length);
+            
+            return resultado;
+          });
+          
+          // Actualizar paginación
+          setActivosPagination(prev => ({
+            ...prev,
+            totalItems: activosData.length,
+            totalPages: Math.ceil(activosData.length / prev.itemsPerPage),
+            currentPage: 1
+          }));
+          
+          return; // Salir aquí ya que actualizamos el estado directamente
         } else {
           setError('Error al cargar visitantes activos');
           return;
@@ -373,12 +528,12 @@ const DashboardVigilantePage = () => {
         ...prev,
         totalItems: activosTransformados.length,
         totalPages: Math.ceil(activosTransformados.length / prev.itemsPerPage),
-        currentPage: 1 // Resetear a la primera página
+        currentPage: 1
       }));
       
-    } catch (err) {
-      console.error('Error al cargar visitantes activos:', err);
-      setError('Error al conectar con el servidor');
+    } catch (error) {
+      console.error('Error al cargar visitantes activos:', error);
+      setError('Error al cargar visitantes activos');
     } finally {
       setLoading(false);
     }
@@ -563,12 +718,12 @@ const DashboardVigilantePage = () => {
       for (const visitante of visitantesEnEspera) {
         try {
           
-            // Primero crear o buscar el visitante
+          // Primero crear o buscar el visitante
             let visitanteId = visitante.visitanteId;
             let visitanteDataForOffline = null;
             let datosVisitanteActualizados = null;
-            
-            // Si el visitante ya existe en la base de datos, usar su ID
+          
+          // Si el visitante ya existe en la base de datos, usar su ID
             if (visitanteId && visitanteId !== 'preview') {
               console.log('[Dashboard] Visitante ya existe con ID:', visitanteId);
             }
@@ -589,27 +744,19 @@ const DashboardVigilantePage = () => {
                   
                   // Verificar si la respuesta es válida y exitosa
                   if (responseVisitante && responseVisitante.data && responseVisitante.data.success) {
-                    visitanteId = responseVisitante.data.data.id;
+              visitanteId = responseVisitante.data.data.id;
                     console.log('[Online] Visitante creado con ID:', visitanteId);
                     
                     // Actualizar dinámicamente la fila en la tabla
-                    // Buscar la fila en visitantesActivos que corresponde a este visitante
-                    const filaEnActivos = visitantesActivos.find(v => 
-                      v.id === visitante.id || 
-                      v._originalId === visitante.id ||
-                      (v.visitante_id && v.visitante_id.toString() === visitanteId.toString())
-                    );
-                    
-                    if (filaEnActivos) {
-                      actualizarVisitaEnTabla(filaEnActivos.id, {
-                        visitanteId: visitanteId,
-                        visitante_nombres: datosVisitante.nombres,
-                        visitante_apellidos: datosVisitante.apellidos,
-                        numero_documento: datosVisitante.numeroDocumento,
-                        nombres: datosVisitante.nombres,
-                        apellidos: datosVisitante.apellidos
-                      });
-                    }
+                    actualizarVisitaEnTabla(visitante.id, {
+                      visitanteId: visitanteId,
+                      visitante_nombres: datosVisitante.nombres,
+                      visitante_apellidos: datosVisitante.apellidos,
+                      numero_documento: datosVisitante.numeroDocumento,
+                      nombres: datosVisitante.nombres,
+                      apellidos: datosVisitante.apellidos,
+                      personal_visitado_id: visitante.personal_visitado_id || visitante.empleado?.id || visitante.empleadoVisitado?.id
+                    });
                   }
                 } catch (visitanteError) {
                   console.warn('[Online] Error al crear visitante, consultando RENIEC...', visitanteError.message);
@@ -632,29 +779,21 @@ const DashboardVigilantePage = () => {
                         console.log('[RENIEC] Visitante creado con datos de RENIEC, ID:', visitanteId);
                         
                         // Actualizar dinámicamente la fila en la tabla
-                        // Buscar la fila en visitantesActivos que corresponde a este visitante
-                        const filaEnActivos = visitantesActivos.find(v => 
-                          v.id === visitante.id || 
-                          v._originalId === visitante.id ||
-                          (v.visitante_id && v.visitante_id.toString() === visitanteId.toString())
-                        );
-                        
-                        if (filaEnActivos) {
-                          actualizarVisitaEnTabla(filaEnActivos.id, {
-                            visitanteId: visitanteId,
-                            visitante_nombres: datosCompletos.nombres,
-                            visitante_apellidos: datosCompletos.apellidos,
-                            numero_documento: datosCompletos.numeroDocumento,
-                            nombres: datosCompletos.nombres,
-                            apellidos: datosCompletos.apellidos
-                          });
-                        }
+                        actualizarVisitaEnTabla(visitante.id, {
+                          visitanteId: visitanteId,
+                          visitante_nombres: datosCompletos.nombres,
+                          visitante_apellidos: datosCompletos.apellidos,
+                          numero_documento: datosCompletos.numeroDocumento,
+                          nombres: datosCompletos.nombres,
+                          apellidos: datosCompletos.apellidos,
+                          personal_visitado_id: visitante.personal_visitado_id || visitante.empleado?.id || visitante.empleadoVisitado?.id
+                        });
                       }
                     } catch (reniecError) {
                       console.error('[RENIEC] Error al crear visitante con datos de RENIEC:', reniecError);
                       visitanteDataForOffline = datosCompletos;
                     }
-                  } else {
+            } else {
                     console.warn('[RENIEC] No se pudieron obtener datos de RENIEC:', reniecData.error);
                     visitanteDataForOffline = datosVisitante;
                   }
@@ -663,8 +802,8 @@ const DashboardVigilantePage = () => {
                 // Modo offline, preparar datos para sincronización
                 visitanteDataForOffline = datosVisitante;
                 console.log('[Offline] Datos del visitante preparados para sincronización');
-              }
             }
+          }
 
           // Crear la visita (utilizando la fecha actual en lugar de la fecha de la visita)
           const currentDate = new Date();
@@ -757,45 +896,36 @@ const DashboardVigilantePage = () => {
             console.log('[Dashboard] Visita registrada correctamente (offline o online)');
             
             // Actualizar dinámicamente la fila en la tabla con datos completos
-            // Buscar la fila en visitantesActivos que corresponde a este visitante
-            const filaEnActivos = visitantesActivos.find(v => 
-              v.id === visitante.id || 
-              v._originalId === visitante.id ||
-              (v.visitante_id && v.visitante_id.toString() === visitanteId.toString())
-            );
-            
-            if (filaEnActivos) {
-              actualizarVisitaEnTabla(filaEnActivos.id, {
-                visitanteId: visitanteId,
-                visitante_nombres: visitante.nombres,
-                visitante_apellidos: visitante.apellidos,
-                numero_documento: visitante.numeroDocumento,
-                personal_nombres: empleadoNombre,
-                personal_apellidos: empleadoApellido,
-                personal_cargo: empleadoCargo,
-                nombre_motivo: motivoNombre,
-                nombre_area: lugarNombre,
-                // Campos para compatibilidad
-                personal_visitado_id: parseInt(empleadoId),
-                motivo_visita_id: parseInt(motivoId),
-                area_destino_id: parseInt(lugarId),
-                // Mapear empleadoVisitado para la estructura esperada
-                empleadoVisitado: {
-                  id: parseInt(empleadoId),
-                  nombres: empleadoNombre,
-                  apellidos: empleadoApellido,
-                  cargo: empleadoCargo
-                },
-                // Mapear motivo para la estructura esperada
-                motivo: {
-                  id: parseInt(motivoId),
-                  label: motivoNombre
-                },
-                // Mapear lugar para la estructura esperada
-                lugar: parseInt(lugarId),
-                lugarNombre: lugarNombre
-              });
-            }
+            actualizarVisitaEnTabla(visitante.id, {
+              visitanteId: visitanteId,
+              visitante_nombres: visitante.nombres,
+              visitante_apellidos: visitante.apellidos,
+              numero_documento: visitante.numeroDocumento,
+              personal_nombres: empleadoNombre,
+              personal_apellidos: empleadoApellido,
+              personal_cargo: empleadoCargo,
+              nombre_motivo: motivoNombre,
+              nombre_area: lugarNombre,
+              // Campos para compatibilidad
+              personal_visitado_id: parseInt(empleadoId),
+              motivo_visita_id: parseInt(motivoId),
+              area_destino_id: parseInt(lugarId),
+              // Mapear empleadoVisitado para la estructura esperada
+              empleadoVisitado: {
+                id: parseInt(empleadoId),
+                nombres: empleadoNombre,
+                apellidos: empleadoApellido,
+                cargo: empleadoCargo
+              },
+              // Mapear motivo para la estructura esperada
+              motivo: {
+                id: parseInt(motivoId),
+                label: motivoNombre
+              },
+              // Mapear lugar para la estructura esperada
+              lugar: parseInt(lugarId),
+              lugarNombre: lugarNombre
+            });
           } else {
             console.error('[Dashboard] Respuesta inválida:', responseVisita);
             throw new Error('Error al crear visita: Respuesta inválida del servidor');
@@ -817,11 +947,11 @@ const DashboardVigilantePage = () => {
         }
       }
 
-        // Si todo salió bien, actualizar el estado y recargar visitantes activos
+      // Si todo salió bien, actualizar el estado y recargar visitantes activos
         if (navigator.onLine) {
           // Modo online: limpiar y recargar
-          setVisitantesEnEspera([]);
-          await cargarVisitantesActivos();
+      setVisitantesEnEspera([]);
+      await cargarVisitantesActivos();
         } else {
           // Modo offline: limpiar visitantes en espera y recargar activos (que incluirá las visitas pendientes)
           console.log('[Offline] Limpiando visitantes en espera y recargando activos...');
