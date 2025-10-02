@@ -356,14 +356,122 @@ const DashboardVigilantePage = () => {
       cargarVisitantesActivos();
     };
 
+    // Nuevo: Manejar salidas registradas offline
+    const handleOfflineSalidaRegistrada = (event) => {
+      console.log('[Dashboard] Salida registrada offline:', event.detail);
+      const { visitaId, timestamp } = event.detail;
+      
+      // Actualizar inmediatamente la UI: mover de activos a historial
+      setVisitantesActivos(prevActivos => {
+        const visitaIndex = prevActivos.findIndex(v => 
+          v.id === visitaId || 
+          v._originalId === visitaId ||
+          v._originalOfflineId === visitaId
+        );
+        
+        if (visitaIndex !== -1) {
+          const visita = prevActivos[visitaIndex];
+          
+          // Crear entrada para el historial con datos de salida
+          const entradaHistorial = {
+            ...visita,
+            // Preservar la fecha y hora de ingreso original
+            fecha_ingreso: visita.fecha_ingreso || visita.fechaIngreso || new Date().toISOString().split('T')[0],
+            hora_ingreso: visita.hora_ingreso || visita.horaIngreso || new Date().toLocaleTimeString('es-PE', { 
+              hour12: false, 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            // Agregar datos de salida
+            fecha_salida: new Date(timestamp).toISOString(),
+            hora_salida: new Date(timestamp).toLocaleTimeString('es-PE', { 
+              hour12: false, 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }),
+            _wasOfflineExit: true,
+            _offlineExitTimestamp: timestamp
+          };
+          
+          // Agregar al historial solo si no existe ya
+          setHistorialVisitas(prevHistorial => {
+            // Verificar si ya existe una entrada con el mismo ID
+            const existe = prevHistorial.some(h => 
+              h.id === entradaHistorial.id || 
+              h._originalId === entradaHistorial._originalId ||
+              (h._wasOfflineExit && h._offlineExitTimestamp === entradaHistorial._offlineExitTimestamp)
+            );
+            
+            if (!existe) {
+              console.log('[Dashboard] Agregando entrada única al historial:', entradaHistorial.id);
+              return [entradaHistorial, ...prevHistorial];
+            } else {
+              console.log('[Dashboard] Entrada ya existe en historial, evitando duplicado:', entradaHistorial.id);
+              return prevHistorial;
+            }
+          });
+          
+          // Remover de activos
+          const nuevosActivos = [...prevActivos];
+          nuevosActivos.splice(visitaIndex, 1);
+          
+          // Actualizar paginación de activos
+          setActivosPagination(prev => ({
+            ...prev,
+            totalItems: Math.max(0, prev.totalItems - 1),
+            totalPages: Math.ceil(Math.max(0, prev.totalItems - 1) / prev.itemsPerPage)
+          }));
+          
+          console.log('[Dashboard] Visitante movido de activos a historial (offline)');
+          return nuevosActivos;
+        }
+        
+        return prevActivos;
+      });
+    };
+
+    // Nuevo: Manejar salidas sincronizadas (cuando vuelve la conexión)
+    const handleOfflineSalidaSincronizada = (event) => {
+      console.log('[Dashboard] Salida sincronizada:', event.detail);
+      const { visitaId, responseData } = event.detail;
+      
+      // Actualizar la entrada en el historial con los datos correctos del servidor
+      setHistorialVisitas(prevHistorial => {
+        return prevHistorial.map(visita => {
+          if (visita._wasOfflineExit && 
+              (visita.id === visitaId || 
+               visita._originalId === visitaId ||
+               visita._originalOfflineId === visitaId)) {
+            
+            // Actualizar con datos del servidor, preservando la estructura original
+            const visitaActualizada = {
+              ...responseData, // Datos del servidor tienen prioridad
+              // Preservar campos específicos offline que son importantes
+              _wasOfflineExit: false, // Ya no es offline
+              _synced: true, // Marcar como sincronizada
+              _originalOfflineId: visita._originalOfflineId || visita.id
+            };
+            
+            console.log('[Dashboard] Datos de salida actualizados con información del servidor:', visitaActualizada.id);
+            return visitaActualizada;
+          }
+          return visita;
+        });
+      });
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('offline-sync-complete', handleSyncComplete);
+    window.addEventListener('offline-salida-registrada', handleOfflineSalidaRegistrada);
+    window.addEventListener('offline-salida-sincronizada', handleOfflineSalidaSincronizada);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('offline-sync-complete', handleSyncComplete);
+      window.removeEventListener('offline-salida-registrada', handleOfflineSalidaRegistrada);
+      window.removeEventListener('offline-salida-sincronizada', handleOfflineSalidaSincronizada);
     };
   }, []);
 
@@ -1083,59 +1191,94 @@ const DashboardVigilantePage = () => {
       setError('');
       setFiltros(filtrosData);
       
-      // Construir parámetros de búsqueda con paginación
-      const params = {
-        page: page,
-        limit: 15 // Usar 15 elementos por página
-      };
+      let historialData = [];
+      let totalItems = 0;
       
-      // Debug: Log de los filtros recibidos (solo en desarrollo)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Filtros recibidos en handleBuscarHistorial:', filtrosData);
-      }
-      
-      // CORRECCIÓN: Usar los nombres correctos que espera el backend
-      if (filtrosData.busqueda) params.q = filtrosData.busqueda;
-      if (filtrosData.empleadoId) params.personalVisitadoId = filtrosData.empleadoId;
-      if (filtrosData.motivoId) params.motivoVisitaId = filtrosData.motivoId;
-      if (filtrosData.lugar) params.areaId = filtrosData.lugar;
-      if (filtrosData.fechaDesde) params.fechaInicio = filtrosData.fechaDesde;
-      if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
-      
-      // Debug: Log de los parámetros que se envían al backend
-      // Log solo en modo desarrollo
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Parámetros enviados al backend:', params);
-      }
-      
-      const response = await visitasService.getAll(params);
-      
-      if (response.data.success) {
-        const historialData = response.data.data || [];
+      // Si estamos online, cargar desde la API
+      if (navigator.onLine) {
+        // Construir parámetros de búsqueda con paginación
+        const params = {
+          page: page,
+          limit: 15 // Usar 15 elementos por página
+        };
         
-        setHistorialVisitas(historialData);
+        // Debug: Log de los filtros recibidos (solo en desarrollo)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Filtros recibidos en handleBuscarHistorial:', filtrosData);
+        }
         
-        // Actualizar paginación si la respuesta incluye información de paginación
-        if (response.data.pagination) {
-          setHistorialPagination({
-            currentPage: response.data.pagination.page || page,
-            totalPages: response.data.pagination.totalPages || 1,
-            totalItems: response.data.pagination.total || 0,
-            itemsPerPage: response.data.pagination.limit || 15
-          });
+        // CORRECCIÓN: Usar los nombres correctos que espera el backend
+        if (filtrosData.busqueda) params.q = filtrosData.busqueda;
+        if (filtrosData.empleadoId) params.personalVisitadoId = filtrosData.empleadoId;
+        if (filtrosData.motivoId) params.motivoVisitaId = filtrosData.motivoId;
+        if (filtrosData.lugar) params.areaId = filtrosData.lugar;
+        if (filtrosData.fechaDesde) params.fechaInicio = filtrosData.fechaDesde;
+        if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
+        
+        // Debug: Log de los parámetros que se envían al backend
+        // Log solo en modo desarrollo
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Parámetros enviados al backend:', params);
+        }
+        
+        const response = await visitasService.getAll(params);
+        
+        if (response.data.success) {
+          const historialData = response.data.data || [];
+          
+          setHistorialVisitas(historialData);
+          
+          // Actualizar paginación si la respuesta incluye información de paginación
+          if (response.data.pagination) {
+            setHistorialPagination({
+              currentPage: response.data.pagination.page || page,
+              totalPages: response.data.pagination.totalPages || 1,
+              totalItems: response.data.pagination.total || 0,
+              itemsPerPage: response.data.pagination.limit || 15
+            });
+          } else {
+            // Si no hay información de paginación del backend, usar los datos locales
+            setHistorialPagination({
+              currentPage: 1,
+              totalPages: 1,
+              totalItems: historialData.length,
+              itemsPerPage: 15
+            });
+          }
         } else {
-          // Si no hay información de paginación del backend, usar los datos locales
-          setHistorialPagination({
-            currentPage: 1,
-            totalPages: 1,
-            totalItems: historialData.length,
-            itemsPerPage: 15
+          setError('Error al buscar en el historial');
+          return;
+        }
+      } else {
+        // Modo offline: usar solo los datos locales del historial
+        console.log('[Offline] Buscando en historial local...');
+        const historialData = historialVisitas || [];
+        
+        // Aplicar filtros básicos en modo offline
+        let historialFiltrado = historialData;
+        if (filtrosData.busqueda) {
+          const busqueda = filtrosData.busqueda.toLowerCase();
+          historialFiltrado = historialData.filter(visita => {
+            const nombreCompleto = `${visita.visitante_nombres || ''} ${visita.visitante_apellidos || ''}`.toLowerCase();
+            const empleadoCompleto = `${visita.personal_nombres || ''} ${visita.personal_apellidos || ''}`.toLowerCase();
+            const documento = (visita.numero_documento || '').toLowerCase();
+            
+            return nombreCompleto.includes(busqueda) || 
+                   empleadoCompleto.includes(busqueda) || 
+                   documento.includes(busqueda);
           });
         }
         
-      } else {
-        setError('Error al buscar en el historial');
+        setHistorialVisitas(historialFiltrado);
+        
+        setHistorialPagination({
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: historialFiltrado.length,
+          itemsPerPage: 15
+        });
       }
+      
     } catch (err) {
       console.error('Error al buscar historial:', err);
       setError('Error al buscar en el historial');
@@ -1242,26 +1385,26 @@ const DashboardVigilantePage = () => {
       setError('');
       setShowSalidaModal(false);
       
-      // Usar el servicio con soporte offline
+      // Usar el servicio con soporte offline, pasando datos del visitante
       const response = await registrarSalidaWithOfflineSupport(
         visitaParaSalida,
-        visitasService.registrarSalida
+        visitasService.registrarSalida,
+        visitanteParaSalida // Pasar datos del visitante para referencia offline
       );
       
-      // Verificar si es una respuesta offline
-      if (isOfflineResponse(response)) {
-        const message = getResponseMessage(response);
-        setError(`${message.title} ${message.message}`);
-      }
-      
       if (response.data.success) {
-        // Recargar visitantes activos para reflejar el cambio
-        await cargarVisitantesActivos();
-        
-        // Si es una respuesta offline, mostrar mensaje
+        // Verificar si es una respuesta offline
         if (isOfflineResponse(response)) {
           const message = getResponseMessage(response);
           setError(`⚠️ ${message.title}: ${message.message}`);
+          
+          // En modo offline, la UI ya se actualiza automáticamente via eventos
+          // No necesitamos recargar visitantes activos
+          console.log('[Dashboard] Salida registrada offline, UI actualizada automáticamente');
+        } else {
+          // En modo online, recargar visitantes activos para reflejar el cambio
+          await cargarVisitantesActivos();
+          console.log('[Dashboard] Salida registrada online, recargando datos');
         }
       } else {
         setError('Error al registrar la salida');

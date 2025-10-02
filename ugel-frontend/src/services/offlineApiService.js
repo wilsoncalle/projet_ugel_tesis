@@ -115,17 +115,27 @@ export async function createVisitaWithOfflineSupport(visitaData, visitanteData =
 /**
  * Registra una salida con soporte offline
  */
-export async function registrarSalidaWithOfflineSupport(visitaId, originalSalidaFn) {
+export async function registrarSalidaWithOfflineSupport(visitaId, originalSalidaFn, visitanteData = null) {
   // Verificar si estamos online
   if (!isOnline()) {
     console.log('[Offline API] Sin conexión, guardando salida localmente...');
     
     try {
-      // Guardar en IndexedDB
-      const savedData = await saveSalidaOffline(visitaId);
+      // Guardar en IndexedDB con datos del visitante
+      const savedData = await saveSalidaOffline(visitaId, visitanteData);
       
       // Registrar para Background Sync
       registerBackgroundSync('offline-sync');
+      
+      // Notificar inmediatamente a la UI para actualizar la interfaz
+      window.dispatchEvent(new CustomEvent('offline-salida-registrada', {
+        detail: { 
+          salidaId: savedData.id,
+          visitaId: visitaId,
+          timestamp: savedData.timestamp,
+          visitanteData: visitanteData
+        }
+      }));
       
       return {
         data: {
@@ -157,8 +167,18 @@ export async function registrarSalidaWithOfflineSupport(visitaId, originalSalida
       console.log('[Offline API] Conexión perdida durante petición de salida, guardando offline...');
       
       try {
-        const savedData = await saveSalidaOffline(visitaId);
+        const savedData = await saveSalidaOffline(visitaId, visitanteData);
         registerBackgroundSync('offline-sync');
+        
+        // Notificar inmediatamente a la UI para actualizar la interfaz
+        window.dispatchEvent(new CustomEvent('offline-salida-registrada', {
+          detail: { 
+            salidaId: savedData.id,
+            visitaId: visitaId,
+            timestamp: savedData.timestamp,
+            visitanteData: visitanteData
+          }
+        }));
         
         return {
           data: {

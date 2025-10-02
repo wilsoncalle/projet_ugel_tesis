@@ -469,15 +469,32 @@ const VisitantesTabla = ({
           // Para historial (formato plano)
           else {
             try {
-              const fechaIngreso = row.fecha_ingreso;
-              if (fechaIngreso) {
-                const fecha = new Date(fechaIngreso);
-                if (!isNaN(fecha.getTime())) {
-                  horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+              // Prioridad 1: Usar hora_ingreso directo si existe (para visitas offline)
+              if (row.hora_ingreso) {
+                horaFormateada = row.hora_ingreso.substring(0, 5);
+                console.log('[VisitantesTabla] Historial - Usando hora_ingreso:', horaFormateada);
+              }
+              // Prioridad 2: Usar horaIngreso si existe
+              else if (row.horaIngreso) {
+                horaFormateada = row.horaIngreso.substring(0, 5);
+                console.log('[VisitantesTabla] Historial - Usando horaIngreso:', horaFormateada);
+              }
+              // Prioridad 3: Extraer de fecha_ingreso solo si es una fecha completa con hora
+              else if (row.fecha_ingreso) {
+                if (row.fecha_ingreso.includes('T')) {
+                  const fecha = new Date(row.fecha_ingreso);
+                  if (!isNaN(fecha.getTime())) {
+                    horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    console.log('[VisitantesTabla] Historial - Usando fecha_ingreso con hora:', horaFormateada);
+                  }
+                } else {
+                  // Si es solo fecha (YYYY-MM-DD), usar hora por defecto
+                  horaFormateada = '00:00';
+                  console.log('[VisitantesTabla] Historial - Solo fecha, usando hora por defecto');
                 }
               }
             } catch (e) {
-              console.error('Error al formatear hora de ingreso:', e);
+              console.error('Error al formatear hora de ingreso en historial:', e);
             }
           }
           

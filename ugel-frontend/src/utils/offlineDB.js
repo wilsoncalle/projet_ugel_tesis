@@ -136,7 +136,7 @@ export async function saveVisitaOffline(visitaData, visitanteData = null) {
 /**
  * Guarda una salida pendiente en IndexedDB
  */
-export async function saveSalidaOffline(visitaId) {
+export async function saveSalidaOffline(visitaId, visitanteData = null) {
   try {
     const db = await openDB();
     const transaction = db.transaction([STORES.PENDING_SALIDAS], 'readwrite');
@@ -146,7 +146,18 @@ export async function saveSalidaOffline(visitaId) {
       visitaId,
       timestamp: Date.now(),
       status: 'pending',
-      syncAttempts: 0
+      syncAttempts: 0,
+      // Incluir datos del visitante para referencia durante sincronización
+      visitanteData: visitanteData ? {
+        nombres: visitanteData.visitante_nombres || visitanteData.nombres || '',
+        apellidos: visitanteData.visitante_apellidos || visitanteData.apellidos || '',
+        numeroDocumento: visitanteData.numero_documento || visitanteData.numeroDocumento || '',
+        personal_nombres: visitanteData.personal_nombres || '',
+        personal_apellidos: visitanteData.personal_apellidos || '',
+        personal_cargo: visitanteData.personal_cargo || '',
+        nombre_motivo: visitanteData.nombre_motivo || '',
+        nombre_area: visitanteData.nombre_area || ''
+      } : null
     };
 
     return new Promise((resolve, reject) => {

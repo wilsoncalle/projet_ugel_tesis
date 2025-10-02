@@ -197,10 +197,24 @@ async function syncPendingSalidas() {
       });
 
       if (response.ok) {
+        const responseData = await response.json();
+        
         // Éxito: eliminar de IndexedDB
         await deleteSalidaOffline(salida.id);
-        results.success.push(salida);
+        results.success.push({ 
+          ...salida, 
+          responseData: responseData.data // Incluir datos de respuesta para actualización UI
+        });
         console.log(`[Sync] ✅ Salida ${salida.id} sincronizada correctamente`);
+        
+        // Notificar a la UI sobre la salida sincronizada
+        window.dispatchEvent(new CustomEvent('offline-salida-sincronizada', {
+          detail: { 
+            salidaId: salida.id,
+            visitaId: salida.visitaId,
+            responseData: responseData.data
+          }
+        }));
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Error del servidor');
