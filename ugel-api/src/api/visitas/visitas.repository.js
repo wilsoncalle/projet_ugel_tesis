@@ -442,6 +442,87 @@ const registrarSalida = async (id, usuarioSalidaId) => {
 };
 
 /**
+ * Registrar salida de visita con fecha y hora específicas (para sincronización offline)
+ * @param {number} id - ID de la visita
+ * @param {number} usuarioSalidaId - ID del usuario que registra la salida
+ * @param {string} fechaSalida - Fecha de salida en formato YYYY-MM-DD
+ * @param {string} horaSalida - Hora de salida en formato HH:MM:SS
+ * @returns {Object} Visita actualizada
+ */
+const registrarSalidaConFechaHora = async (id, usuarioSalidaId, fechaSalida, horaSalida) => {
+  try {
+    logger.info(`Repositorio: Iniciando registro de salida con fecha/hora específica para visita ID: ${id}, usuario: ${usuarioSalidaId}, fecha: ${fechaSalida}, hora: ${horaSalida}`);
+    
+    // Validar formato de fecha (YYYY-MM-DD)
+    const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!fechaRegex.test(fechaSalida)) {
+      logger.error(`Formato de fecha inválido: ${fechaSalida}. Esperado: YYYY-MM-DD`);
+      throw new AppError('Formato de fecha inválido. Use YYYY-MM-DD', 400);
+    }
+
+    // Validar formato de hora (HH:MM:SS o HH:MM)
+    const horaRegex = /^\d{2}:\d{2}(:\d{2})?$/;
+    if (!horaRegex.test(horaSalida)) {
+      logger.error(`Formato de hora inválido: ${horaSalida}. Esperado: HH:MM:SS o HH:MM`);
+      throw new AppError('Formato de hora inválido. Use HH:MM:SS o HH:MM', 400);
+    }
+
+    // Asegurar que horaSalida tenga formato HH:MM:SS
+    let horaSalidaCompleta = horaSalida;
+    if (horaSalida.length === 5) {
+      horaSalidaCompleta = `${horaSalida}:00`; // Agregar segundos si no están presentes
+    }
+    
+    // Combinar fecha y hora en un timestamp
+    const fechaHoraSalida = `${fechaSalida} ${horaSalidaCompleta}`;
+    
+    logger.info(`Repositorio: Datos procesados:`, {
+      fechaSalida,
+      horaSalida,
+      horaSalidaCompleta,
+      fechaHoraSalida
+    });
+    
+    const query = `
+      UPDATE RegistrosVisitas 
+      SET 
+        fecha_salida = $3::timestamp,
+        usuario_salida_id = $1
+      WHERE id = $2 AND fecha_salida IS NULL
+      RETURNING id
+    `;
+    
+    logger.info(`Repositorio: Query SQL:`, query);
+    logger.info(`Repositorio: Parámetros: [${usuarioSalidaId}, ${id}, ${fechaHoraSalida}]`);
+    
+    const result = await db.query(query, [usuarioSalidaId, id, fechaHoraSalida]);
+    
+    logger.info(`Repositorio: Resultado de la consulta:`, result);
+    
+    if (result.rows.length === 0) {
+      logger.error(`Repositorio: No se encontró la visita o ya tiene salida registrada`);
+      throw new AppError('Visita no encontrada o ya tiene salida registrada', 404);
+    }
+    
+    logger.info(`Repositorio: UPDATE exitoso, obteniendo visita actualizada`);
+    
+    // Obtener la visita actualizada completa
+    const visitaActualizada = await findById(id);
+    logger.info(`Repositorio: Visita actualizada obtenida:`, visitaActualizada);
+    
+    return visitaActualizada;
+    
+  } catch (error) {
+    if (error.code === '23503' && error.constraint && error.constraint.includes('usuario_salida_id')) {
+      throw new AppError('Usuario de salida no encontrado', 404);
+    }
+    
+    logger.error(`Error en repositorio registrando salida con fecha/hora para visita ID ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error registrando salida', 500);
+  }
+};
+
+/**
  * Obtener estadísticas de visitas
  * @param {string} fechaInicio - Fecha de inicio para el filtro
  * @param {string} fechaFin - Fecha de fin para el filtro
@@ -574,6 +655,7 @@ module.exports = {
   findById,
   create,
   registrarSalida,
+  registrarSalidaConFechaHora,
   getEstadisticas,
   findVisitaActivaPorVisitante
 };

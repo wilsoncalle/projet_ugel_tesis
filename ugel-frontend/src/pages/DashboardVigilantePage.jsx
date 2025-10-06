@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp';
 import { createVisitaWithOfflineSupport, registrarSalidaWithOfflineSupport, isOfflineResponse, getResponseMessage } from '../services/offlineApiService';
-import { getPendingVisitas, getPendingSalidas } from '../utils/offlineDB';
+import { getPendingVisitas, getPendingSalidas, getVisitasActivasCompletas } from '../utils/offlineDB';
 
 // Función para consultar RENIEC
 const consultarRENIEC = async (numeroDocumento) => {
@@ -351,27 +351,83 @@ const DashboardVigilantePage = () => {
       console.log('[Dashboard] Conexión perdida, modo offline activado');
     };
 
-    const handleSyncComplete = () => {
-      console.log('[Dashboard] Sincronización completada, recargando visitantes activos...');
-      cargarVisitantesActivos();
+    const handleSyncComplete = (event) => {
+      console.log('[Dashboard] Sincronización completada:', event.detail);
+      const { successCount, failedCount } = event.detail || {};
+      
+      if (successCount > 0) {
+        console.log(`[Dashboard] ${successCount} registros sincronizados, recargando datos...`);
+        
+        // Recargar visitantes activos para reflejar los cambios del servidor
+        cargarVisitantesActivos().then(() => {
+          console.log('[Dashboard] Visitantes activos recargados después de sincronización');
+        });
+        
+        // También recargar historial si estamos en esa pestaña
+        if (activeTab === 'historial') {
+          handleBuscarHistorial(filtros, historialPagination.currentPage).then(() => {
+            console.log('[Dashboard] Historial recargado después de sincronización');
+          });
+        }
+      }
     };
 
     // Nuevo: Manejar salidas registradas offline
     const handleOfflineSalidaRegistrada = (event) => {
       console.log('[Dashboard] Salida registrada offline:', event.detail);
-      const { visitaId, timestamp } = event.detail;
+      const { visitaId, timestamp, visitanteData } = event.detail;
       
       // Actualizar inmediatamente la UI: mover de activos a historial
       setVisitantesActivos(prevActivos => {
-        const visitaIndex = prevActivos.findIndex(v => 
-          v.id === visitaId || 
-          v._originalId === visitaId ||
-          v._originalOfflineId === visitaId
-        );
+        console.log('[Dashboard] Buscando visita en activos:', { visitaId, activos: prevActivos.length });
         
+        // Buscar la visita por múltiples criterios
+        let visitaIndex = -1;
+        let visita = null;
+        
+        // Primero buscar por ID exacto
+        visitaIndex = prevActivos.findIndex(v => v.id === visitaId);
         if (visitaIndex !== -1) {
-          const visita = prevActivos[visitaIndex];
+          visita = prevActivos[visitaIndex];
+          console.log('[Dashboard] Encontrada por ID exacto:', visita.id);
+        }
+        
+        // Si no se encuentra, buscar por ID original
+        if (visitaIndex === -1) {
+          visitaIndex = prevActivos.findIndex(v => v._originalId === visitaId);
+          if (visitaIndex !== -1) {
+            visita = prevActivos[visitaIndex];
+            console.log('[Dashboard] Encontrada por ID original:', visita._originalId);
+          }
+        }
+        
+        // Si no se encuentra, buscar por ID offline
+        if (visitaIndex === -1) {
+          visitaIndex = prevActivos.findIndex(v => v._originalOfflineId === visitaId);
+          if (visitaIndex !== -1) {
+            visita = prevActivos[visitaIndex];
+            console.log('[Dashboard] Encontrada por ID offline:', visita._originalOfflineId);
+          }
+        }
+        
+        // Si aún no se encuentra, buscar por datos del visitante (para visitas offline)
+        if (visitaIndex === -1 && visitanteData) {
+          visitaIndex = prevActivos.findIndex(v => {
+            const mismoDocumento = v.numero_documento === visitanteData.numeroDocumento;
+            const mismoNombre = v.visitante_nombres === visitanteData.nombres;
+            const mismoApellido = v.visitante_apellidos === visitanteData.apellidos;
+            const esOffline = v._isOffline || v._isPending;
+            
+            return mismoDocumento && mismoNombre && mismoApellido && esOffline;
+          });
           
+          if (visitaIndex !== -1) {
+            visita = prevActivos[visitaIndex];
+            console.log('[Dashboard] Encontrada por datos del visitante:', visita);
+          }
+        }
+        
+        if (visitaIndex !== -1 && visita) {
           // Crear entrada para el historial con datos de salida
           const entradaHistorial = {
             ...visita,
@@ -390,7 +446,8 @@ const DashboardVigilantePage = () => {
               minute: '2-digit' 
             }),
             _wasOfflineExit: true,
-            _offlineExitTimestamp: timestamp
+            _offlineExitTimestamp: timestamp,
+            _originalOfflineId: visitaId
           };
           
           // Agregar al historial solo si no existe ya
@@ -424,6 +481,8 @@ const DashboardVigilantePage = () => {
           
           console.log('[Dashboard] Visitante movido de activos a historial (offline)');
           return nuevosActivos;
+        } else {
+          console.warn('[Dashboard] No se encontró la visita en activos para la salida offline:', { visitaId, visitanteData });
         }
         
         return prevActivos;
@@ -458,6 +517,15 @@ const DashboardVigilantePage = () => {
           return visita;
         });
       });
+      
+      // También asegurar que el visitante no esté en activos después de la sincronización
+      setVisitantesActivos(prevActivos => {
+        return prevActivos.filter(v => 
+          v.id !== visitaId && 
+          v._originalId !== visitaId &&
+          v._originalOfflineId !== visitaId
+        );
+      });
     };
 
     window.addEventListener('online', handleOnline);
@@ -491,6 +559,43 @@ const DashboardVigilantePage = () => {
           // Log solo en modo desarrollo
         if (process.env.NODE_ENV === 'development') {
           console.log('[Online] Datos recibidos del backend:', activosData);
+        }
+        
+        // También cargar salidas pendientes para aplicar sobre las visitas del servidor
+        const salidasPendientes = await getPendingSalidas();
+        if (salidasPendientes.length > 0) {
+          console.log('[Online] Salidas pendientes encontradas:', salidasPendientes);
+          
+          // Crear un mapa de salidas por visitaId para acceso rápido
+          const salidasPorVisita = new Map();
+          salidasPendientes.forEach(salida => {
+            salidasPorVisita.set(salida.visitaId, salida);
+          });
+          
+          // Aplicar salidas a las visitas correspondientes del servidor
+          activosData = activosData.map(visita => {
+            const salida = salidasPorVisita.get(visita.id.toString());
+            if (salida) {
+              console.log('[Online] Aplicando salida pendiente a visita del servidor:', {
+                visitaId: visita.id,
+                salidaId: salida.id,
+                fechaSalida: salida.fechaSalida,
+                horaSalida: salida.horaSalida
+              });
+              
+              return {
+                ...visita,
+                fecha_salida: salida.fechaSalida,
+                hora_salida: salida.horaSalida,
+                _hasOfflineExit: true,
+                _offlineExitId: salida.id
+              };
+            }
+            return visita;
+          });
+          
+          console.log('[Online] Salidas aplicadas sobre datos del servidor. Visitas con salida:', 
+            activosData.filter(v => v._hasOfflineExit).length);
         }
         
           // Verificar si hay visitas offline en el estado actual
@@ -625,50 +730,17 @@ const DashboardVigilantePage = () => {
           return;
         }
       } else {
-        // Si estamos offline, cargar visitas pendientes de IndexedDB
-        console.log('[Offline] Cargando visitas pendientes como activos...');
-        const pendientes = await getPendingVisitas();
-        console.log('[Offline] Visitas pendientes encontradas:', pendientes);
+        // Si estamos offline, cargar visitas activas completas (visitas + salidas)
+        console.log('[Offline] Cargando visitas activas completas...');
+        const { visitasActivas, visitasConSalida } = await getVisitasActivasCompletas();
         
-        // En modo offline, no necesitamos obtener datos de referencia
-        // porque los datos ya están completos en la visita guardada
-        console.log('[Offline] Usando datos ya guardados en la visita offline');
+        // Solo mostrar visitas que NO tienen salida (activas)
+        activosData = visitasActivas;
         
-        // Transformar visitas pendientes al formato de visitas activas
-        activosData = pendientes.map(visita => {
-          // Log solo en modo desarrollo
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[Offline] Procesando visita pendiente:', visita);
-          }
-          
-          // Usar los datos que ya están guardados en la visita offline
-          // Estos datos ya vienen completos desde el registro
-          return {
-            id: `offline_${visita.id}`,
-            visitante_id: visita.visitanteId || 0,
-            visitante_nombres: visita.visitanteData?.nombres || '',
-            visitante_apellidos: visita.visitanteData?.apellidos || '',
-            tipo_documento_codigo: 'DNI',
-            numero_documento: visita.visitanteData?.numeroDocumento || '',
-            personal_visitado_id: visita.personalVisitadoId,
-            personal_nombres: visita.personal_nombres || '',
-            personal_apellidos: visita.personal_apellidos || '',
-            personal_cargo: visita.personal_cargo || 'Sin cargo',
-            motivo_visita_id: visita.motivoVisitaId,
-            nombre_motivo: visita.nombre_motivo || 'Pendiente',
-            area_destino_id: visita.areaDestinoId,
-            nombre_area: visita.nombre_area || 'Pendiente',
-            fecha_ingreso: visita.fechaIngreso || '',
-            hora_ingreso: visita.horaIngreso || '',
-            hora_salida: null,
-            // Campos específicos para visitas offline
-            _isOffline: true,
-            _isPending: true,
-            _originalId: visita.id,
-            _needsVisitanteCreation: visita.needsVisitanteCreation || false,
-            visitanteData: visita.visitanteData
-          };
-        });
+        // Las visitas con salida se manejarán en el historial
+        if (visitasConSalida.length > 0) {
+          console.log('[Offline] Visitas con salida encontradas (se mostrarán en historial):', visitasConSalida.length);
+        }
       }
       
       // Transformar los datos para que coincidan con la estructura esperada por el frontend

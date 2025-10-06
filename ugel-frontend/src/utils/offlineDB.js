@@ -142,9 +142,32 @@ export async function saveSalidaOffline(visitaId, visitanteData = null) {
     const transaction = db.transaction([STORES.PENDING_SALIDAS], 'readwrite');
     const store = transaction.objectStore(STORES.PENDING_SALIDAS);
 
+    // Extraer ID numérico si el visitaId tiene prefijo 'offline_'
+    let visitaIdToSave = visitaId;
+    if (typeof visitaIdToSave === 'string' && visitaIdToSave.startsWith('offline_')) {
+      visitaIdToSave = parseInt(visitaIdToSave.split('_')[1], 10);
+      console.log(`[IndexedDB] 🔄 Convirtiendo visitaId de string a número: '${visitaId}' -> ${visitaIdToSave}`);
+    }
+
+    const now = new Date();
+    const fechaSalida = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const horaSalida = now.toTimeString().substring(0, 8); // HH:MM:SS
+    
+    console.log('[IndexedDB] Generando datos de salida offline:', {
+      now: now.toISOString(),
+      fechaSalida,
+      horaSalida,
+      visitaIdOriginal: visitaId,
+      visitaIdToSave,
+      tipoVisitaId: typeof visitaIdToSave
+    });
+    
     const salidaOffline = {
-      visitaId,
+      visitaId: visitaIdToSave,
       timestamp: Date.now(),
+      // Guardar la fecha y hora de salida capturada offline
+      fechaSalida,
+      horaSalida,
       status: 'pending',
       syncAttempts: 0,
       // Incluir datos del visitante para referencia durante sincronización
@@ -241,6 +264,115 @@ export async function getPendingSalidas() {
 }
 
 /**
+ * Obtiene todas las visitas activas combinando visitas pendientes con salidas pendientes
+ * Esta función es la solución principal para el problema de salidas offline
+ */
+export async function getVisitasActivasCompletas() {
+  try {
+    console.log('[IndexedDB] Obteniendo visitas activas completas (visitas + salidas)...');
+    
+    // Obtener visitas y salidas pendientes en paralelo
+    const [visitasPendientes, salidasPendientes] = await Promise.all([
+      getPendingVisitas(),
+      getPendingSalidas()
+    ]);
+    
+    console.log('[IndexedDB] Datos obtenidos:', {
+      visitas: visitasPendientes.length,
+      salidas: salidasPendientes.length
+    });
+    
+    // Crear un mapa de salidas por visitaId para acceso rápido
+    const salidasPorVisita = new Map();
+    salidasPendientes.forEach(salida => {
+      salidasPorVisita.set(salida.visitaId, salida);
+    });
+    
+    // Transformar visitas pendientes al formato de visitas activas
+    const visitasActivas = visitasPendientes.map(visita => {
+      // Buscar salida correspondiente
+      const salida = salidasPorVisita.get(visita.id);
+      
+      // Crear objeto base de visita activa
+      const visitaActiva = {
+        id: `offline_${visita.id}`,
+        visitante_id: visita.visitanteId || 0,
+        visitante_nombres: visita.visitanteData?.nombres || '',
+        visitante_apellidos: visita.visitanteData?.apellidos || '',
+        tipo_documento_codigo: 'DNI',
+        numero_documento: visita.visitanteData?.numeroDocumento || '',
+        personal_visitado_id: visita.personalVisitadoId,
+        personal_nombres: visita.personal_nombres || '',
+        personal_apellidos: visita.personal_apellidos || '',
+        personal_cargo: visita.personal_cargo || 'Sin cargo',
+        motivo_visita_id: visita.motivoVisitaId,
+        nombre_motivo: visita.nombre_motivo || 'Pendiente',
+        area_destino_id: visita.areaDestinoId,
+        nombre_area: visita.nombre_area || 'Pendiente',
+        fecha_ingreso: visita.fechaIngreso || '',
+        hora_ingreso: visita.horaIngreso || '',
+        // Campos específicos para visitas offline
+        _isOffline: true,
+        _isPending: true,
+        _originalId: visita.id,
+        _needsVisitanteCreation: visita.needsVisitanteCreation || false,
+        visitanteData: visita.visitanteData
+      };
+      
+      // Si hay salida pendiente, aplicarla
+      if (salida) {
+        console.log('[IndexedDB] Aplicando salida a visita:', {
+          visitaId: visita.id,
+          salidaId: salida.id,
+          fechaSalida: salida.fechaSalida,
+          horaSalida: salida.horaSalida
+        });
+        
+        return {
+          ...visitaActiva,
+          fecha_salida: salida.fechaSalida,
+          hora_salida: salida.horaSalida,
+          _hasOfflineExit: true,
+          _offlineExitId: salida.id
+        };
+      }
+      
+      // Si no hay salida, es una visita activa normal
+      return {
+        ...visitaActiva,
+        fecha_salida: null,
+        hora_salida: null,
+        _hasOfflineExit: false
+      };
+    });
+    
+    // Separar visitas activas de las que tienen salida
+    const visitasConSalida = visitasActivas.filter(v => v._hasOfflineExit);
+    const visitasSinSalida = visitasActivas.filter(v => !v._hasOfflineExit);
+    
+    console.log('[IndexedDB] Visitas activas completas:', {
+      total: visitasActivas.length,
+      conSalida: visitasConSalida.length,
+      sinSalida: visitasSinSalida.length
+    });
+    
+    return {
+      visitasActivas: visitasSinSalida, // Solo las que NO tienen salida
+      visitasConSalida: visitasConSalida, // Las que SÍ tienen salida (para historial)
+      salidasPendientes: salidasPendientes
+    };
+    
+  } catch (error) {
+    console.error('[IndexedDB] Error obteniendo visitas activas completas:', error);
+    return {
+      visitasActivas: [],
+      visitasConSalida: [],
+      salidasPendientes: []
+    };
+  }
+}
+
+/**
  * Elimina una visita pendiente después de sincronizarla
  */
 export async function deleteVisitaOffline(id) {
@@ -290,6 +422,62 @@ export async function deleteSalidaOffline(id) {
     });
   } catch (error) {
     console.error('[IndexedDB] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Actualiza el visitaId de una salida pendiente
+ */
+export async function updateSalidaVisitaId(salidaId, nuevaVisitaId) {
+  try {
+    console.log(`[IndexedDB] 🔄 Actualizando salida ${salidaId} con nuevo visitaId: ${nuevaVisitaId}`);
+    
+    const db = await openDB();
+    const transaction = db.transaction([STORES.PENDING_SALIDAS], 'readwrite');
+    const store = transaction.objectStore(STORES.PENDING_SALIDAS);
+    
+    return new Promise((resolve, reject) => {
+      // Primero obtener la salida actual
+      const getRequest = store.get(salidaId);
+      getRequest.onsuccess = () => {
+        const salida = getRequest.result;
+        if (salida) {
+          console.log(`[IndexedDB] 📋 Salida encontrada:`, {
+            id: salida.id,
+            visitaId: salida.visitaId,
+            timestamp: salida.timestamp
+          });
+          
+          const visitaIdAnterior = salida.visitaId;
+          
+          // Actualizar el visitaId
+          salida.visitaId = nuevaVisitaId;
+          
+          console.log(`[IndexedDB] 🔄 Cambiando visitaId: ${visitaIdAnterior} -> ${nuevaVisitaId}`);
+          
+          // Guardar la salida actualizada
+          const putRequest = store.put(salida);
+          putRequest.onsuccess = () => {
+            console.log(`[IndexedDB] ✅ Salida ${salidaId} actualizada exitosamente con nuevo visitaId: ${nuevaVisitaId}`);
+            resolve();
+          };
+          putRequest.onerror = (error) => {
+            console.error(`[IndexedDB] ❌ Error al guardar salida actualizada:`, error);
+            reject(new Error('Error al actualizar salida offline'));
+          };
+        } else {
+          console.error(`[IndexedDB] ❌ Salida ${salidaId} no encontrada`);
+          reject(new Error('Salida no encontrada'));
+        }
+      };
+      getRequest.onerror = (error) => {
+        console.error(`[IndexedDB] ❌ Error al obtener salida ${salidaId}:`, error);
+        reject(new Error('Error al obtener salida offline'));
+      };
+    });
+  } catch (error) {
+    console.error('[IndexedDB] ❌ Error general:', error);
     throw error;
   }
 }

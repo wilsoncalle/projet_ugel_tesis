@@ -280,6 +280,48 @@ const registrarSalidaVisita = async (id, usuarioSalidaId) => {
 };
 
 /**
+ * Registrar salida de visita con fecha y hora específicas (para sincronización offline)
+ * @param {number} id - ID de la visita
+ * @param {number} usuarioSalidaId - ID del usuario que registra la salida
+ * @param {string} fechaSalida - Fecha de salida en formato YYYY-MM-DD
+ * @param {string} horaSalida - Hora de salida en formato HH:MM:SS
+ * @returns {Object} Visita actualizada
+ */
+const registrarSalidaVisitaConFechaHora = async (id, usuarioSalidaId, fechaSalida, horaSalida) => {
+  try {
+    logger.info(`Servicio: Verificando si la visita ID ${id} existe para registro con fecha/hora específica`);
+    
+    // Verificar si la visita existe
+    const visita = await repository.findById(id);
+    if (!visita) {
+      throw new AppError('Visita no encontrada', 404);
+    }
+    
+    logger.info(`Servicio: Visita encontrada:`, visita);
+    
+    // Verificar si la visita ya tiene salida registrada
+    if (visita.fecha_salida) {
+      logger.info(`Servicio: La visita ya tiene salida registrada: ${visita.fecha_salida}`);
+      throw new AppError('La visita ya tiene salida registrada', 400);
+    }
+    
+    logger.info(`Servicio: Llamando al repositorio para registrar salida con fecha/hora específica`);
+    
+    // Registrar salida con fecha y hora específicas
+    const updatedVisita = await repository.registrarSalidaConFechaHora(id, usuarioSalidaId, fechaSalida, horaSalida);
+    
+    logger.info(`Servicio: Salida registrada exitosamente para visita ID: ${id} con fecha: ${fechaSalida}, hora: ${horaSalida}`);
+    logger.info(`Servicio: Visita actualizada:`, updatedVisita);
+    
+    return updatedVisita;
+    
+  } catch (error) {
+    logger.error(`Error registrando salida con fecha/hora para visita ID ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
  * Obtener estadísticas de visitas
  * @param {Object} options - Opciones de filtrado
  * @returns {Object} Estadísticas de visitas
@@ -645,6 +687,7 @@ module.exports = {
   getVisitaById,
   createVisita,
   registrarSalidaVisita,
+  registrarSalidaVisitaConFechaHora,
   getEstadisticas,
   exportarAExcel,
   exportarAPDF

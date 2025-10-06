@@ -98,14 +98,41 @@ const create = asyncHandler(async (req, res) => {
  */
 const registrarSalida = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const { fechaSalida, horaSalida } = req.body; // Parámetros opcionales para sincronización offline
   logger.info(`Registrando salida para visita ID: ${id}`);
+  logger.info(`Datos recibidos en el cuerpo de la petición:`, { fechaSalida, horaSalida, body: req.body });
   
   // Agregar el ID del usuario que registra la salida
   const usuarioSalidaId = req.user.id;
   logger.info(`Usuario que registra la salida ID: ${usuarioSalidaId}`);
   
-  logger.info(`Llamando al servicio registrarSalidaVisita con ID: ${id}, usuarioSalidaId: ${usuarioSalidaId}`);
-  const visita = await service.registrarSalidaVisita(id, usuarioSalidaId);
+  let visita;
+  
+  // Si se proporcionan fecha y hora específicas (sincronización offline)
+  if (fechaSalida && horaSalida) {
+    logger.info(`Registrando salida con fecha/hora específica: ${fechaSalida} ${horaSalida}`);
+    logger.info(`Tipo de datos: fechaSalida=${typeof fechaSalida}, horaSalida=${typeof horaSalida}`);
+    logger.info(`Valores exactos recibidos:`, { 
+      fechaSalida: JSON.stringify(fechaSalida), 
+      horaSalida: JSON.stringify(horaSalida),
+      fechaSalidaLength: fechaSalida?.length,
+      horaSalidaLength: horaSalida?.length
+    });
+    
+    // Validar formato básico
+    if (typeof fechaSalida !== 'string' || typeof horaSalida !== 'string') {
+      logger.error(`Tipos de datos incorrectos: fechaSalida=${typeof fechaSalida}, horaSalida=${typeof horaSalida}`);
+      throw new AppError('Formato de fecha/hora inválido', 400);
+    }
+    
+    visita = await service.registrarSalidaVisitaConFechaHora(id, usuarioSalidaId, fechaSalida, horaSalida);
+  } else {
+    // Registro normal con fecha/hora actual
+    logger.info(`Llamando al servicio registrarSalidaVisita con ID: ${id}, usuarioSalidaId: ${usuarioSalidaId}`);
+    logger.info(`No se proporcionaron fecha/hora específicas, usando fecha/hora actual`);
+    logger.info(`Valores recibidos: fechaSalida=${fechaSalida}, horaSalida=${horaSalida}`);
+    visita = await service.registrarSalidaVisita(id, usuarioSalidaId);
+  }
   
   logger.info(`Salida registrada exitosamente para visita ID: ${id}`);
   logger.info(`Datos de la visita actualizada:`, visita);

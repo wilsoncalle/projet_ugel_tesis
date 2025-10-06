@@ -8,7 +8,8 @@ import {
   getPendingSalidas,
   deleteVisitaOffline,
   deleteSalidaOffline,
-  updateVisitaStatus
+  updateVisitaStatus,
+  updateSalidaVisitaId
 } from './offlineDB';
 
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -139,10 +140,22 @@ async function syncPendingVisitas() {
       });
 
       if (response.ok) {
+        const responseData = await response.json();
+        const nuevaVisitaId = responseData.data?.id;
+        
         // Éxito: eliminar de IndexedDB
         await deleteVisitaOffline(visita.id);
         results.success.push(visita);
-        console.log(`[Sync] Visita ${visita.id} sincronizada correctamente`);
+        console.log(`[Sync] Visita ${visita.id} sincronizada correctamente con nuevo ID: ${nuevaVisitaId}`);
+        
+        // Si se obtuvo un nuevo ID del servidor, actualizar salidas pendientes
+        if (nuevaVisitaId) {
+          console.log(`[Sync] 🔄 Actualizando salidas pendientes para visita ${visita.id} -> ${nuevaVisitaId}`);
+          await actualizarSalidasPendientesConNuevoId(visita.id, nuevaVisitaId);
+          console.log(`[Sync] ✅ Salidas pendientes actualizadas para visita ${visita.id}`);
+        } else {
+          console.warn(`[Sync] ⚠️ No se obtuvo nuevo ID del servidor para visita ${visita.id}`);
+        }
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Error del servidor');
@@ -175,7 +188,12 @@ async function syncPendingSalidas() {
 
   // Log solo si hay salidas para sincronizar
   if (pendingSalidas.length > 0) {
-    console.log(`[Sync] Sincronizando ${pendingSalidas.length} salidas pendientes...`);
+    console.log(`[Sync] 🔄 Sincronizando ${pendingSalidas.length} salidas pendientes...`);
+    console.log(`[Sync] 📋 IDs de visitas en salidas pendientes:`, pendingSalidas.map(s => ({
+      salidaId: s.id,
+      visitaId: s.visitaId,
+      timestamp: s.timestamp
+    })));
   }
 
   for (const salida of pendingSalidas) {
@@ -187,13 +205,38 @@ async function syncPendingSalidas() {
         continue;
       }
 
+      // Preparar datos para enviar al backend
+      const salidaData = {
+        fechaSalida: salida.fechaSalida,
+        horaSalida: salida.horaSalida
+      };
+      
+      console.log('[Sync] 📋 Datos de salida offline completos:', {
+        salidaId: salida.id,
+        visitaId: salida.visitaId,
+        fechaSalida: salida.fechaSalida,
+        horaSalida: salida.horaSalida,
+        timestamp: salida.timestamp,
+        visitanteData: salida.visitanteData
+      });
+      
+      console.log('[Sync] 📤 Enviando salida con fecha/hora específica:', salidaData);
+      console.log('[Sync] 🌐 URL de la petición:', `${API_BASE_URL}/visitas/${salida.visitaId}/salida`);
+      
       // Enviar al backend
       const response = await fetch(`${API_BASE_URL}/visitas/${salida.visitaId}/salida`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify(salidaData)
+      });
+      
+      console.log('[Sync] 📡 Respuesta del servidor:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
       });
 
       if (response.ok) {
@@ -216,8 +259,25 @@ async function syncPendingSalidas() {
           }
         }));
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error del servidor');
+        let errorMessage = 'Error del servidor';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+          console.error('[Sync] ❌ Error del servidor:', errorData);
+        } catch (parseError) {
+          console.error('[Sync] ❌ Error parseando respuesta de error:', parseError);
+          errorMessage = `Error HTTP ${response.status}: ${response.statusText}`;
+        }
+        
+        console.error('[Sync] ❌ Fallo en sincronización de salida:', {
+          salidaId: salida.id,
+          visitaId: salida.visitaId,
+          status: response.status,
+          statusText: response.statusText,
+          errorMessage
+        });
+        
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error(`[Sync] ❌ Error sincronizando salida ${salida.id}:`, error);
@@ -226,6 +286,72 @@ async function syncPendingSalidas() {
   }
 
   return results;
+}
+
+/**
+ * Actualizar salidas pendientes con el nuevo ID de visita del servidor
+ */
+async function actualizarSalidasPendientesConNuevoId(visitaIdOffline, nuevaVisitaId) {
+  try {
+    console.log(`[Sync] 🔄 Actualizando salidas pendientes: ${visitaIdOffline} -> ${nuevaVisitaId}`);
+    
+    // Obtener todas las salidas pendientes
+    const salidasPendientes = await getPendingSalidas();
+    console.log(`[Sync] 📋 Total de salidas pendientes: ${salidasPendientes.length}`);
+    
+    // Buscar salidas que correspondan a esta visita offline
+    // Manejar comparación entre tipos (string vs number)
+    const salidasParaActualizar = salidasPendientes.filter(salida => {
+      const salidaVisitaId = salida.visitaId;
+      const offlineVisitaId = visitaIdOffline;
+      
+      // Comparación directa
+      if (salidaVisitaId === offlineVisitaId) {
+        return true;
+      }
+      
+      // Comparación numérica si uno es string y otro number
+      if (typeof salidaVisitaId === 'number' && typeof offlineVisitaId === 'string') {
+        return salidaVisitaId === parseInt(offlineVisitaId, 10);
+      }
+      
+      if (typeof salidaVisitaId === 'string' && typeof offlineVisitaId === 'number') {
+        return parseInt(salidaVisitaId, 10) === offlineVisitaId;
+      }
+      
+      return false;
+    });
+    
+    console.log(`[Sync] 🔍 Salidas encontradas para actualizar: ${salidasParaActualizar.length}`);
+    console.log(`[Sync] 📝 Detalles de salidas a actualizar:`, salidasParaActualizar.map(s => ({
+      id: s.id,
+      visitaId: s.visitaId,
+      timestamp: s.timestamp
+    })));
+    
+    if (salidasParaActualizar.length > 0) {
+      console.log(`[Sync] ✅ Encontradas ${salidasParaActualizar.length} salidas para actualizar`);
+      
+      // Actualizar cada salida con el nuevo ID
+      for (const salida of salidasParaActualizar) {
+        try {
+          await updateSalidaVisitaId(salida.id, nuevaVisitaId);
+          console.log(`[Sync] ✅ Salida ${salida.id} actualizada con nuevo visitaId: ${nuevaVisitaId}`);
+        } catch (updateError) {
+          console.error(`[Sync] ❌ Error actualizando salida ${salida.id}:`, updateError);
+        }
+      }
+      
+      // Verificar que las actualizaciones se aplicaron correctamente
+      const salidasActualizadas = await getPendingSalidas();
+      const salidasVerificadas = salidasActualizadas.filter(s => s.visitaId === nuevaVisitaId);
+      console.log(`[Sync] ✅ Verificación: ${salidasVerificadas.length} salidas ahora tienen el nuevo ID`);
+    } else {
+      console.log(`[Sync] ⚠️ No se encontraron salidas para actualizar con visitaId: ${visitaIdOffline}`);
+    }
+  } catch (error) {
+    console.error('[Sync] ❌ Error actualizando salidas pendientes:', error);
+  }
 }
 
 /**
@@ -240,11 +366,19 @@ export async function syncPendingData() {
   }
 
   try {
-    // Sincronizar visitas y salidas
-    const [visitasResults, salidasResults] = await Promise.all([
-      syncPendingVisitas(),
-      syncPendingSalidas()
-    ]);
+    // Sincronizar visitas primero
+    console.log('[Sync] 🔄 Sincronizando visitas primero...');
+    const visitasResults = await syncPendingVisitas();
+    
+    // Esperar un momento para que las actualizaciones de ID se completen
+    if (visitasResults.success.length > 0) {
+      console.log('[Sync] ⏳ Esperando 1 segundo para que se completen las actualizaciones de ID...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    // Luego sincronizar salidas
+    console.log('[Sync] 🔄 Sincronizando salidas...');
+    const salidasResults = await syncPendingSalidas();
 
     const totalSuccess = visitasResults.success.length + salidasResults.success.length;
     const totalFailed = visitasResults.failed.length + salidasResults.failed.length;
@@ -305,8 +439,16 @@ export function setupConnectivityListeners() {
   window.addEventListener('online', () => {
     console.log('[Sync] Conexión restaurada, sincronizando...');
     // Esperar un momento para asegurar que la conexión es estable
-    setTimeout(() => {
-      registerBackgroundSync();
+    setTimeout(async () => {
+      try {
+        console.log('[Sync] Ejecutando sincronización inmediata...');
+        const result = await syncPendingData();
+        console.log('[Sync] Resultado de sincronización:', result);
+      } catch (error) {
+        console.error('[Sync] Error en sincronización inmediata:', error);
+        // Fallback: intentar con background sync
+        registerBackgroundSync();
+      }
     }, 1000);
   });
 
