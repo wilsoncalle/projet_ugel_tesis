@@ -65,22 +65,30 @@ const getById = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   logger.info('Registrando nueva visita');
   
+  // Extraer flag de sincronización offline y otros datos
+  const { _isOfflineSync, ...visitaData } = req.body;
+  
   // Agregar el ID del usuario que registra
-  const visitaData = {
-    ...req.body,
+  const visitaDataWithUser = {
+    ...visitaData,
     usuarioIngresoId: req.user.id
   };
   
-  const visita = await service.createVisita(visitaData);
+  const visita = await service.createVisita(visitaDataWithUser);
 
-  // Emitir evento tiempo real a todos los clientes
-  try {
-    const io = req.app.get('socketio');
-    if (io && visita) {
-      io.emit('nueva_visita_registrada', visita);
+  // Solo emitir evento si NO es sincronización offline
+  if (!_isOfflineSync) {
+    try {
+      const io = req.app.get('socketio');
+      if (io && visita) {
+        io.emit('nueva_visita_registrada', visita);
+        logger.info(`Evento 'nueva_visita_registrada' emitido para visita ID: ${visita.id}`);
+      }
+    } catch (e) {
+      logger.warn('No se pudo emitir evento de nueva visita:', e.message);
     }
-  } catch (e) {
-    logger.warn('No se pudo emitir evento de nueva visita:', e.message);
+  } else {
+    logger.info(`Sincronización offline detectada, omitiendo emisión de socket para visita ID: ${visita.id}`);
   }
   
   logger.info(`Visita registrada exitosamente con ID: ${visita.id}`);
@@ -98,9 +106,9 @@ const create = asyncHandler(async (req, res) => {
  */
 const registrarSalida = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { fechaSalida, horaSalida } = req.body; // Parámetros opcionales para sincronización offline
+  const { _isOfflineSync, fechaSalida, horaSalida, ...salidaData } = req.body; // Extraer flag de sincronización offline
   logger.info(`Registrando salida para visita ID: ${id}`);
-  logger.info(`Datos recibidos en el cuerpo de la petición:`, { fechaSalida, horaSalida, body: req.body });
+  logger.info(`Datos recibidos en el cuerpo de la petición:`, { fechaSalida, horaSalida, _isOfflineSync, body: req.body });
   
   // Agregar el ID del usuario que registra la salida
   const usuarioSalidaId = req.user.id;
@@ -137,15 +145,19 @@ const registrarSalida = asyncHandler(async (req, res) => {
   logger.info(`Salida registrada exitosamente para visita ID: ${id}`);
   logger.info(`Datos de la visita actualizada:`, visita);
   
-  // Emitir evento de salida registrada a todos los clientes
-  try {
-    const io = req.app.get('socketio');
-    if (io && visita) {
-      io.emit('salida_visita_registrada', { visitaId: parseInt(id) });
-      logger.info(`Evento 'salida_visita_registrada' emitido para visita ID: ${id}`);
+  // Solo emitir evento si NO es sincronización offline
+  if (!_isOfflineSync) {
+    try {
+      const io = req.app.get('socketio');
+      if (io && visita) {
+        io.emit('salida_visita_registrada', { visitaId: parseInt(id) });
+        logger.info(`Evento 'salida_visita_registrada' emitido para visita ID: ${id}`);
+      }
+    } catch (e) {
+      logger.warn('No se pudo emitir evento de salida registrada:', e.message);
     }
-  } catch (e) {
-    logger.warn('No se pudo emitir evento de salida registrada:', e.message);
+  } else {
+    logger.info(`Sincronización offline detectada, omitiendo emisión de socket para salida de visita ID: ${id}`);
   }
   
   res.json({

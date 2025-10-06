@@ -283,9 +283,10 @@ export async function getVisitasActivasCompletas() {
     });
     
     // Crear un mapa de salidas por visitaId para acceso rápido
+    // Normalizar visitaId a número para manejar tanto datos antiguos (string) como nuevos (number)
     const salidasPorVisita = new Map();
     salidasPendientes.forEach(salida => {
-      salidasPorVisita.set(salida.visitaId, salida);
+      salidasPorVisita.set(Number(salida.visitaId), salida);
     });
     
     // Transformar visitas pendientes al formato de visitas activas
@@ -518,6 +519,61 @@ export async function updateVisitaStatus(id, status) {
 }
 
 /**
+ * Limpia todos los datos pendientes (visitas y salidas)
+ * Útil para limpiar datos inconsistentes después de actualizaciones
+ */
+export async function clearAllPending() {
+  try {
+    console.log('[IndexedDB] 🧹 Limpiando todos los datos pendientes...');
+    
+    const db = await openDB();
+    const transaction = db.transaction([STORES.PENDING_VISITAS, STORES.PENDING_SALIDAS], 'readwrite');
+    
+    // Limpiar visitas pendientes
+    const visitasStore = transaction.objectStore(STORES.PENDING_VISITAS);
+    const salidasStore = transaction.objectStore(STORES.PENDING_SALIDAS);
+    
+    return new Promise((resolve, reject) => {
+      let completed = 0;
+      const total = 2;
+      
+      const checkComplete = () => {
+        completed++;
+        if (completed === total) {
+          console.log('[IndexedDB] ✅ Todos los datos pendientes han sido limpiados');
+          resolve();
+        }
+      };
+      
+      // Limpiar visitas pendientes
+      const clearVisitas = visitasStore.clear();
+      clearVisitas.onsuccess = () => {
+        console.log('[IndexedDB] ✅ Visitas pendientes limpiadas');
+        checkComplete();
+      };
+      clearVisitas.onerror = () => {
+        console.error('[IndexedDB] ❌ Error limpiando visitas pendientes');
+        checkComplete();
+      };
+      
+      // Limpiar salidas pendientes
+      const clearSalidas = salidasStore.clear();
+      clearSalidas.onsuccess = () => {
+        console.log('[IndexedDB] ✅ Salidas pendientes limpiadas');
+        checkComplete();
+      };
+      clearSalidas.onerror = () => {
+        console.error('[IndexedDB] ❌ Error limpiando salidas pendientes');
+        checkComplete();
+      };
+    });
+  } catch (error) {
+    console.error('[IndexedDB] ❌ Error limpiando datos pendientes:', error);
+    throw error;
+  }
+}
+
+/**
  * Obtiene el conteo de registros pendientes
  */
 export async function getPendingCount() {
@@ -536,23 +592,4 @@ export async function getPendingCount() {
   }
 }
 
-/**
- * Limpia todos los registros pendientes (solo usar en desarrollo)
- */
-export async function clearAllPending() {
-  try {
-    const db = await openDB();
-    const transaction = db.transaction(
-      [STORES.PENDING_VISITAS, STORES.PENDING_SALIDAS], 
-      'readwrite'
-    );
-    
-    transaction.objectStore(STORES.PENDING_VISITAS).clear();
-    transaction.objectStore(STORES.PENDING_SALIDAS).clear();
-    
-    console.log('[IndexedDB] Todos los registros pendientes eliminados');
-  } catch (error) {
-    console.error('[IndexedDB] Error limpiando registros:', error);
-  }
-}
 

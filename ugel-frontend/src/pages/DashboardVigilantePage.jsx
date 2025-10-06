@@ -237,13 +237,23 @@ const DashboardVigilantePage = () => {
 
   // Cargar visitantes activos al montar el componente
   useEffect(() => {
+    // Ref para evitar múltiples conexiones en React StrictMode
+    let socketInstance = null;
+    let isCleaningUp = false;
+
+    const initializeSocket = () => {
+      // Si ya hay una instancia, no crear otra
+      if (socketInstance) return socketInstance;
+
     // Conexión Socket.IO para actualizaciones en tiempo real
     const socket = io('http://localhost:3000', {
       transports: ['websocket'],
-      autoConnect: false, // No conectar automáticamente
-      reconnection: false, // Deshabilitar reconexión automática
-      timeout: 5000 // Timeout más corto
-    });
+        autoConnect: false,
+        reconnection: false,
+        timeout: 5000
+      });
+
+      socketInstance = socket;
 
     // Intentar conectar solo si estamos online
     if (navigator.onLine) {
@@ -251,15 +261,15 @@ const DashboardVigilantePage = () => {
     }
   
     socket.on('connect', () => {
-      // console.log('Conectado a Socket.IO', socket.id);
+        console.log('[Socket.IO] Conectado');
     });
   
     socket.on('nueva_visita_registrada', (visita) => {
-      // Si ya existe, no duplicar
+        if (isCleaningUp) return; // Ignorar si estamos limpiando
+
       setVisitantesActivos(prev => {
         if (prev.some(v => String(v.id) === String(visita.id))) return prev;
   
-        // Mapear a la estructura usada en UI
         const mapeada = {
           ...visita,
           empleadoVisitado: {
@@ -280,41 +290,65 @@ const DashboardVigilantePage = () => {
       });
     });
   
-    // NUEVO: Listener para salidas registradas
-    socket.on('salida_visita_registrada', ({ visitaId }) => {
-      console.log(`Salida registrada para visita ID: ${visitaId}`);
-      
-      // Remover la visita de la lista de activos
-      setVisitantesActivos(prev => {
-        const nuevaLista = prev.filter(v => String(v.id) !== String(visitaId));
-        console.log(`Visitantes activos después de remover: ${nuevaLista.length}`);
-        return nuevaLista;
-      });
-      
-      // Actualizar paginación
-      setActivosPagination(prev => ({
-        ...prev,
-        totalItems: Math.max(0, prev.totalItems - 1),
-        totalPages: Math.ceil(Math.max(0, prev.totalItems - 1) / prev.itemsPerPage)
-      }));
-    });
-  
-    socket.on('disconnect', () => {
-      // console.log('Socket desconectado');
-    });
+      // Handler para salidas con protección contra duplicados
+      const handleSalidaRegistrada = ({ visitaId }) => {
+        if (isCleaningUp) return; // Ignorar si estamos limpiando
 
-    // Manejar errores de conexión silenciosamente
-    socket.on('connect_error', (error) => {
-      // No mostrar errores de conexión en consola
-      // console.log('Error de conexión Socket.IO:', error.message);
-    });
-  
-    return () => {
-      socket.off('nueva_visita_registrada');
-      socket.off('salida_visita_registrada'); // Limpiar el listener
-      socket.close();
+        console.log(`[Socket.IO] Salida registrada para visita ID: ${visitaId}`);
+        
+      setVisitantesActivos(prev => {
+          const visitaExistente = prev.find(v => String(v.id) === String(visitaId));
+          
+          if (!visitaExistente) {
+            console.log(`[Socket.IO] Visita ${visitaId} no está en activos, ignorando`);
+            return prev;
+          }
+          
+          if (visitaExistente.fecha_salida || visitaExistente.hora_salida) {
+            console.log(`[Socket.IO] Visita ${visitaId} ya tiene salida, ignorando`);
+            return prev;
+          }
+          
+        const nuevaLista = prev.filter(v => String(v.id) !== String(visitaId));
+          console.log(`[Socket.IO] Visitantes activos después de remover: ${nuevaLista.length}`);
+          
+          setActivosPagination(prevPag => ({
+            ...prevPag,
+            totalItems: Math.max(0, prevPag.totalItems - 1),
+            totalPages: Math.ceil(Math.max(0, prevPag.totalItems - 1) / prevPag.itemsPerPage)
+          }));
+          
+          return nuevaLista;
+        });
+      };
+
+      socket.on('salida_visita_registrada', handleSalidaRegistrada);
+    socket.on('disconnect', () => {
+        console.log('[Socket.IO] Desconectado');
+      });
+      socket.on('connect_error', () => {
+        // Silencioso
+      });
+
+      return socket;
     };
-  }, []);
+
+    // Inicializar socket
+    const socket = initializeSocket();
+
+    // CLEANUP CRÍTICO
+    return () => {
+      console.log('[Socket.IO] Limpiando listeners...');
+      isCleaningUp = true;
+
+      if (socketInstance) {
+        socketInstance.removeAllListeners();
+        socketInstance.close();
+        socketInstance.disconnect();
+        socketInstance = null;
+      }
+    };
+  }, []); // Mantener array vacío pero con ref de control
 
   // Carga inicial
   useEffect(() => {
@@ -342,10 +376,14 @@ const DashboardVigilantePage = () => {
 
   // Listener para detectar cuando se vuelve online y cuando termina la sincronización
   useEffect(() => {
+    // COMENTADO: handleOnline causaba recarga prematura que competía con la sincronización
+    // El flujo correcto es: online → offlineSync.js → offline-sync-complete → recarga UI
+    /*
     const handleOnline = () => {
       console.log('[Dashboard] Conexión restaurada, sincronizando datos...');
       // No cargar inmediatamente, esperar a que termine la sincronización
     };
+    */
 
     const handleOffline = () => {
       console.log('[Dashboard] Conexión perdida, modo offline activado');
@@ -358,17 +396,23 @@ const DashboardVigilantePage = () => {
       if (successCount > 0) {
         console.log(`[Dashboard] ${successCount} registros sincronizados, recargando datos...`);
         
-        // Recargar visitantes activos para reflejar los cambios del servidor
-        cargarVisitantesActivos().then(() => {
-          console.log('[Dashboard] Visitantes activos recargados después de sincronización');
-        });
-        
-        // También recargar historial si estamos en esa pestaña
-        if (activeTab === 'historial') {
-          handleBuscarHistorial(filtros, historialPagination.currentPage).then(() => {
-            console.log('[Dashboard] Historial recargado después de sincronización');
-          });
-        }
+        // Esperar un momento para que la sincronización se complete completamente
+        // antes de recargar los datos para evitar que aparezcan visitantes brevemente
+        setTimeout(async () => {
+          try {
+            // Recargar visitantes activos para reflejar los cambios del servidor
+            await cargarVisitantesActivos();
+            console.log('[Dashboard] Visitantes activos recargados después de sincronización');
+            
+            // También recargar historial si estamos en esa pestaña
+            if (activeTab === 'historial') {
+              await handleBuscarHistorial(filtros, historialPagination.currentPage);
+              console.log('[Dashboard] Historial recargado después de sincronización');
+            }
+          } catch (error) {
+            console.error('[Dashboard] Error recargando datos después de sincronización:', error);
+          }
+        }, 1500); // Aumentar a 1500ms para dar margen a la DB
       }
     };
 
@@ -528,14 +572,16 @@ const DashboardVigilantePage = () => {
       });
     };
 
-    window.addEventListener('online', handleOnline);
+    // COMENTADO: No registrar handleOnline para evitar recarga prematura
+    // window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('offline-sync-complete', handleSyncComplete);
     window.addEventListener('offline-salida-registrada', handleOfflineSalidaRegistrada);
     window.addEventListener('offline-salida-sincronizada', handleOfflineSalidaSincronizada);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
+      // COMENTADO: No remover handleOnline ya que no se registró
+      // window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('offline-sync-complete', handleSyncComplete);
       window.removeEventListener('offline-salida-registrada', handleOfflineSalidaRegistrada);
@@ -778,13 +824,29 @@ const DashboardVigilantePage = () => {
         
         console.log('DashboardVigilantePage - Datos transformados:', activosTransformados);
         
-        setVisitantesActivos(activosTransformados);
+        // Filtrar visitas que ya tienen salida registrada para evitar que aparezcan en activos
+        const activosSinSalida = activosTransformados.filter(visita => {
+          // Excluir visitas que tienen fecha_salida (ya salieron)
+          const tieneSalida = visita.fecha_salida && visita.fecha_salida !== null;
+          if (tieneSalida) {
+            console.log('[Dashboard] Excluyendo visita con salida registrada:', {
+              id: visita.id,
+              fecha_salida: visita.fecha_salida,
+              hora_salida: visita.hora_salida
+            });
+          }
+          return !tieneSalida;
+        });
+        
+        console.log(`[Dashboard] Visitas activas filtradas: ${activosSinSalida.length} de ${activosTransformados.length}`);
+        
+        setVisitantesActivos(activosSinSalida);
         
         // Actualizar paginación para activos
         setActivosPagination(prev => ({
           ...prev,
-          totalItems: activosTransformados.length,
-          totalPages: Math.ceil(activosTransformados.length / prev.itemsPerPage),
+          totalItems: activosSinSalida.length,
+          totalPages: Math.ceil(activosSinSalida.length / prev.itemsPerPage),
         currentPage: 1
         }));
       
@@ -1268,57 +1330,57 @@ const DashboardVigilantePage = () => {
       
       // Si estamos online, cargar desde la API
       if (navigator.onLine) {
-        // Construir parámetros de búsqueda con paginación
-        const params = {
-          page: page,
-          limit: 15 // Usar 15 elementos por página
-        };
+      // Construir parámetros de búsqueda con paginación
+      const params = {
+        page: page,
+        limit: 15 // Usar 15 elementos por página
+      };
+      
+      // Debug: Log de los filtros recibidos (solo en desarrollo)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Filtros recibidos en handleBuscarHistorial:', filtrosData);
+      }
+      
+      // CORRECCIÓN: Usar los nombres correctos que espera el backend
+      if (filtrosData.busqueda) params.q = filtrosData.busqueda;
+      if (filtrosData.empleadoId) params.personalVisitadoId = filtrosData.empleadoId;
+      if (filtrosData.motivoId) params.motivoVisitaId = filtrosData.motivoId;
+      if (filtrosData.lugar) params.areaId = filtrosData.lugar;
+      if (filtrosData.fechaDesde) params.fechaInicio = filtrosData.fechaDesde;
+      if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
+      
+      // Debug: Log de los parámetros que se envían al backend
+      // Log solo en modo desarrollo
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Parámetros enviados al backend:', params);
+      }
+      
+      const response = await visitasService.getAll(params);
+      
+      if (response.data.success) {
+        const historialData = response.data.data || [];
         
-        // Debug: Log de los filtros recibidos (solo en desarrollo)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Filtros recibidos en handleBuscarHistorial:', filtrosData);
-        }
+        setHistorialVisitas(historialData);
         
-        // CORRECCIÓN: Usar los nombres correctos que espera el backend
-        if (filtrosData.busqueda) params.q = filtrosData.busqueda;
-        if (filtrosData.empleadoId) params.personalVisitadoId = filtrosData.empleadoId;
-        if (filtrosData.motivoId) params.motivoVisitaId = filtrosData.motivoId;
-        if (filtrosData.lugar) params.areaId = filtrosData.lugar;
-        if (filtrosData.fechaDesde) params.fechaInicio = filtrosData.fechaDesde;
-        if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
-        
-        // Debug: Log de los parámetros que se envían al backend
-        // Log solo en modo desarrollo
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Parámetros enviados al backend:', params);
-        }
-        
-        const response = await visitasService.getAll(params);
-        
-        if (response.data.success) {
-          const historialData = response.data.data || [];
-          
-          setHistorialVisitas(historialData);
-          
-          // Actualizar paginación si la respuesta incluye información de paginación
-          if (response.data.pagination) {
-            setHistorialPagination({
-              currentPage: response.data.pagination.page || page,
-              totalPages: response.data.pagination.totalPages || 1,
-              totalItems: response.data.pagination.total || 0,
-              itemsPerPage: response.data.pagination.limit || 15
-            });
-          } else {
-            // Si no hay información de paginación del backend, usar los datos locales
-            setHistorialPagination({
-              currentPage: 1,
-              totalPages: 1,
-              totalItems: historialData.length,
-              itemsPerPage: 15
-            });
-          }
+        // Actualizar paginación si la respuesta incluye información de paginación
+        if (response.data.pagination) {
+          setHistorialPagination({
+            currentPage: response.data.pagination.page || page,
+            totalPages: response.data.pagination.totalPages || 1,
+            totalItems: response.data.pagination.total || 0,
+            itemsPerPage: response.data.pagination.limit || 15
+          });
         } else {
-          setError('Error al buscar en el historial');
+          // Si no hay información de paginación del backend, usar los datos locales
+          setHistorialPagination({
+            currentPage: 1,
+            totalPages: 1,
+            totalItems: historialData.length,
+            itemsPerPage: 15
+          });
+        }
+      } else {
+        setError('Error al buscar en el historial');
           return;
         }
       } else {
@@ -1465,9 +1527,9 @@ const DashboardVigilantePage = () => {
       );
       
       if (response.data.success) {
-        // Verificar si es una respuesta offline
-        if (isOfflineResponse(response)) {
-          const message = getResponseMessage(response);
+      // Verificar si es una respuesta offline
+      if (isOfflineResponse(response)) {
+        const message = getResponseMessage(response);
           setError(`⚠️ ${message.title}: ${message.message}`);
           
           // En modo offline, la UI ya se actualiza automáticamente via eventos
@@ -1475,7 +1537,7 @@ const DashboardVigilantePage = () => {
           console.log('[Dashboard] Salida registrada offline, UI actualizada automáticamente');
         } else {
           // En modo online, recargar visitantes activos para reflejar el cambio
-          await cargarVisitantesActivos();
+        await cargarVisitantesActivos();
           console.log('[Dashboard] Salida registrada online, recargando datos');
         }
       } else {

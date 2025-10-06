@@ -120,7 +120,9 @@ async function syncPendingVisitas() {
         usuarioIngresoId: visita.usuarioIngresoId,
         // Preservar la fecha y hora originales del evento offline
         fechaIngreso: visita.fechaIngreso,
-        horaIngreso: visita.horaIngreso
+        horaIngreso: visita.horaIngreso,
+        // Flag para silenciar sockets durante sincronización offline
+        _isOfflineSync: true
       };
 
       console.log('[Sync] 🕐 Enviando datos con hora original:', {
@@ -208,7 +210,9 @@ async function syncPendingSalidas() {
       // Preparar datos para enviar al backend
       const salidaData = {
         fechaSalida: salida.fechaSalida,
-        horaSalida: salida.horaSalida
+        horaSalida: salida.horaSalida,
+        // Flag para silenciar sockets durante sincronización offline
+        _isOfflineSync: true
       };
       
       console.log('[Sync] 📋 Datos de salida offline completos:', {
@@ -250,14 +254,9 @@ async function syncPendingSalidas() {
         });
         console.log(`[Sync] ✅ Salida ${salida.id} sincronizada correctamente`);
         
-        // Notificar a la UI sobre la salida sincronizada
-        window.dispatchEvent(new CustomEvent('offline-salida-sincronizada', {
-          detail: { 
-            salidaId: salida.id,
-            visitaId: salida.visitaId,
-            responseData: responseData.data
-          }
-        }));
+        // NOTA: No disparar evento offline-salida-sincronizada aquí
+        // Esto evita que la visita aparezca momentáneamente en activos
+        // La UI se actualizará correctamente via offline-sync-complete
       } else {
         let errorMessage = 'Error del servidor';
         try {
@@ -300,27 +299,10 @@ async function actualizarSalidasPendientesConNuevoId(visitaIdOffline, nuevaVisit
     console.log(`[Sync] 📋 Total de salidas pendientes: ${salidasPendientes.length}`);
     
     // Buscar salidas que correspondan a esta visita offline
-    // Manejar comparación entre tipos (string vs number)
-    const salidasParaActualizar = salidasPendientes.filter(salida => {
-      const salidaVisitaId = salida.visitaId;
-      const offlineVisitaId = visitaIdOffline;
-      
-      // Comparación directa
-      if (salidaVisitaId === offlineVisitaId) {
-        return true;
-      }
-      
-      // Comparación numérica si uno es string y otro number
-      if (typeof salidaVisitaId === 'number' && typeof offlineVisitaId === 'string') {
-        return salidaVisitaId === parseInt(offlineVisitaId, 10);
-      }
-      
-      if (typeof salidaVisitaId === 'string' && typeof offlineVisitaId === 'number') {
-        return parseInt(salidaVisitaId, 10) === offlineVisitaId;
-      }
-      
-      return false;
-    });
+    // Normalizar visitaId a número para comparación, manejando tanto datos antiguos (string) como nuevos (number)
+    const salidasParaActualizar = salidasPendientes.filter(salida => 
+      Number(salida.visitaId) === visitaIdOffline
+    );
     
     console.log(`[Sync] 🔍 Salidas encontradas para actualizar: ${salidasParaActualizar.length}`);
     console.log(`[Sync] 📝 Detalles de salidas a actualizar:`, salidasParaActualizar.map(s => ({
