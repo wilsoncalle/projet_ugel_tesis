@@ -404,6 +404,39 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
             setTipoMensaje('');
             setVisitanteEncontrado(datosDNI);
             setDocumentoYaBuscado(documentoActual);
+            
+            // VERIFICAR: Si el visitante ya tiene una visita activa
+            const visitaActiva = await verificarVisitaActiva(datosDNI.id);
+            if (visitaActiva) {
+              setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
+              setTipoMensaje('error');
+              setDocumentoYaBuscado(documentoActual);
+              return;
+            }
+            
+            // AUTO-AGREGAR: Automáticamente agregar el visitante a la lista de espera
+            console.log('[RegistroForm] 🔄 Auto-agregando visitante encontrado en RENIEC...');
+            const visitanteData = {
+              tipoDocumentoId: formVisitante.tipoDocumentoId,
+              numeroDocumento: formVisitante.numeroDocumento,
+              nombres: datosDNI.nombres,
+              apellidos: datosDNI.apellidos,
+              visitanteId: datosDNI.id,
+              tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId)
+            };
+            
+            // Llamar a la función de agregar visitante
+            onAddVisitor(visitanteData);
+            
+            // Limpiar formulario de visitante
+            setFormVisitante({
+              tipoDocumentoId: formVisitante.tipoDocumentoId, // Preservar tipo de documento
+              numeroDocumento: '',
+              nombres: '',
+              apellidos: '',
+              visitanteId: null
+            });
+            
             return;
           }
         } catch (dniError) {
@@ -462,6 +495,29 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
         setMensajeVisitante('');
         setTipoMensaje('');
         setDocumentoYaBuscado(documentoActual);
+        
+        // AUTO-AGREGAR: Automáticamente agregar el visitante a la lista de espera
+        console.log('[RegistroForm] 🔄 Auto-agregando visitante encontrado en base de datos...');
+        const visitanteData = {
+          tipoDocumentoId: formVisitante.tipoDocumentoId,
+          numeroDocumento: formVisitante.numeroDocumento,
+          nombres: visitante.nombres || '',
+          apellidos: visitante.apellidos || '',
+          visitanteId: visitante.id,
+          tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId)
+        };
+        
+        // Llamar a la función de agregar visitante
+        onAddVisitor(visitanteData);
+        
+        // Limpiar formulario de visitante
+        setFormVisitante({
+          tipoDocumentoId: formVisitante.tipoDocumentoId, // Preservar tipo de documento
+          numeroDocumento: '',
+          nombres: '',
+          apellidos: '',
+          visitanteId: null
+        });
       } else {
         // Verificar si el visitante ya está en la lista de espera (incluso si no está en la BD)
         const yaEnEspera = visitantesEnEspera.find(v => 
