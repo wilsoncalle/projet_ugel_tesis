@@ -392,6 +392,15 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
               return;
             }
             
+            // Verificar si el visitante ya tiene una visita activa
+            const visitaActiva = await verificarVisitaActiva(datosDNI.id);
+            if (visitaActiva) {
+              setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
+              setTipoMensaje('error');
+              setDocumentoYaBuscado(documentoActual);
+              return;
+            }
+            
             // Autocompletar campos del formulario con datos de la API externa
             setFormVisitante(prev => ({
               ...prev,
@@ -404,15 +413,6 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
             setTipoMensaje('');
             setVisitanteEncontrado(datosDNI);
             setDocumentoYaBuscado(documentoActual);
-            
-            // VERIFICAR: Si el visitante ya tiene una visita activa
-            const visitaActiva = await verificarVisitaActiva(datosDNI.id);
-            if (visitaActiva) {
-              setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
-              setTipoMensaje('error');
-              setDocumentoYaBuscado(documentoActual);
-              return;
-            }
             
             // AUTO-AGREGAR: Automáticamente agregar el visitante a la lista de espera
             console.log('[RegistroForm] 🔄 Auto-agregando visitante encontrado en RENIEC...');
