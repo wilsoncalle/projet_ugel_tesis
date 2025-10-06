@@ -343,6 +343,7 @@ export const registrarVisitaCompleta = async (datosVisita) => {
     // Si es un visitante nuevo, preparar sus datos para offline
     visitanteDataForOffline = {
       tipoDocumentoId: parseInt(datosVisita.tipoDocumentoId),
+      tipoDocumentoCodigo: datosVisita.tipoDocumento?.codigo || 'DNI', // Incluir código del tipo de documento
       numeroDocumento: datosVisita.numeroDocumento,
       nombres: datosVisita.nombres,
       apellidos: datosVisita.apellidos

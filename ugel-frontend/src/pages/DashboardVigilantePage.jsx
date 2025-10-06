@@ -416,6 +416,44 @@ const DashboardVigilantePage = () => {
       }
     };
 
+    // Nuevo: Manejar actualizaciones de visitantes con datos de RENIEC
+    const handleVisitanteActualizadoRENIEC = (event) => {
+      console.log('[Dashboard] Visitante actualizado con datos de RENIEC:', event.detail);
+      const { visitanteId, nombres, apellidos, numeroDocumento } = event.detail;
+      
+      // Actualizar la tabla de visitantes activos con los nuevos datos
+      setVisitantesActivos(prev => prev.map(visitante => {
+        if (visitante.visitanteId === visitanteId || visitante.numero_documento === numeroDocumento) {
+          return {
+            ...visitante,
+            visitante_nombres: nombres,
+            visitante_apellidos: apellidos,
+            nombres: nombres,
+            apellidos: apellidos
+          };
+        }
+        return visitante;
+      }));
+      
+      // También actualizar el historial si está visible
+      if (activeTab === 'historial') {
+        setHistorialVisitas(prev => prev.map(visita => {
+          if (visita.visitanteId === visitanteId || visita.numero_documento === numeroDocumento) {
+            return {
+              ...visita,
+              visitante_nombres: nombres,
+              visitante_apellidos: apellidos,
+              nombres: nombres,
+              apellidos: apellidos
+            };
+          }
+          return visita;
+        }));
+      }
+      
+      console.log('[Dashboard] ✅ Datos del visitante actualizados con información de RENIEC');
+    };
+
     // Nuevo: Manejar salidas registradas offline
     const handleOfflineSalidaRegistrada = (event) => {
       console.log('[Dashboard] Salida registrada offline:', event.detail);
@@ -578,6 +616,7 @@ const DashboardVigilantePage = () => {
     window.addEventListener('offline-sync-complete', handleSyncComplete);
     window.addEventListener('offline-salida-registrada', handleOfflineSalidaRegistrada);
     window.addEventListener('offline-salida-sincronizada', handleOfflineSalidaSincronizada);
+    window.addEventListener('visitante-actualizado-reniec', handleVisitanteActualizadoRENIEC);
 
     return () => {
       // COMENTADO: No remover handleOnline ya que no se registró
@@ -586,6 +625,7 @@ const DashboardVigilantePage = () => {
       window.removeEventListener('offline-sync-complete', handleSyncComplete);
       window.removeEventListener('offline-salida-registrada', handleOfflineSalidaRegistrada);
       window.removeEventListener('offline-salida-sincronizada', handleOfflineSalidaSincronizada);
+      window.removeEventListener('visitante-actualizado-reniec', handleVisitanteActualizadoRENIEC);
     };
   }, []);
 
@@ -1065,6 +1105,7 @@ const DashboardVigilantePage = () => {
               // Preparar datos del visitante existente para modo offline
               visitanteDataForOffline = {
                 tipoDocumentoId: parseInt(visitante.tipoDocumentoId),
+                tipoDocumentoCodigo: visitante.tipoDocumento?.codigo || 'DNI', // Incluir código del tipo de documento
                 numeroDocumento: visitante.numeroDocumento,
                 nombres: visitante.nombres,
                 apellidos: visitante.apellidos,
@@ -1076,6 +1117,7 @@ const DashboardVigilantePage = () => {
               // Preparar datos del visitante
               const datosVisitante = {
                 tipoDocumentoId: parseInt(visitante.tipoDocumentoId),
+                tipoDocumentoCodigo: visitante.tipoDocumento?.codigo || 'DNI', // Incluir código del tipo de documento
                 numeroDocumento: visitante.numeroDocumento.slice(0, 20),
                 nombres: visitante.nombres.slice(0, 150),
                 apellidos: visitante.apellidos.slice(0, 150)

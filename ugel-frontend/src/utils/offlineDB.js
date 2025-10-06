@@ -82,6 +82,7 @@ export async function saveVisitaOffline(visitaData, visitanteData = null) {
       // Incluir datos del visitante si es nuevo
       visitanteData: visitanteData ? {
         tipoDocumentoId: visitanteData.tipoDocumentoId,
+        tipoDocumentoCodigo: visitanteData.tipoDocumentoCodigo || 'DNI', // Incluir código del tipo de documento
         numeroDocumento: visitanteData.numeroDocumento,
         nombres: visitanteData.nombres,
         apellidos: visitanteData.apellidos,

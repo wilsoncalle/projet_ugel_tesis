@@ -79,19 +79,139 @@ async function syncPendingVisitas() {
             if (searchResult.success && searchResult.data) {
               visitanteId = searchResult.data.id;
               console.log(`[Sync] ✅ Visitante encontrado con ID: ${visitanteId}`);
+              
+              // NUEVO: Verificar si el visitante existente tiene datos incompletos y es DNI de 8 dígitos
+              const esDNI = visita.visitanteData.tipoDocumentoCodigo === 'DNI' || 
+                           visita.visitanteData.tipoDocumentoId?.toString() === '1';
+              const esDNIValido = /^\d{8}$/.test(visita.visitanteData.numeroDocumento);
+              const tieneDatosIncompletos = !searchResult.data.nombres || 
+                                          !searchResult.data.apellidos ||
+                                          searchResult.data.nombres.trim() === '' ||
+                                          searchResult.data.apellidos.trim() === '';
+              
+              console.log('[Sync] 🔍 Verificando si visitante existente necesita actualización RENIEC:', {
+                esDNI,
+                esDNIValido,
+                tieneDatosIncompletos,
+                nombresActuales: searchResult.data.nombres,
+                apellidosActuales: searchResult.data.apellidos
+              });
+              
+              if (esDNI && esDNIValido && tieneDatosIncompletos) {
+                console.log('[Sync] 🔄 Visitante existe pero tiene datos incompletos, consultando RENIEC...');
+                try {
+                  const reniecResponse = await fetch(`${API_BASE_URL}/visitantes/consultar-dni`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ dni: visita.visitanteData.numeroDocumento })
+                  });
+                  
+                  if (reniecResponse.ok) {
+                    const reniecData = await reniecResponse.json();
+                    if (reniecData.success && reniecData.data) {
+                      console.log('[Sync] ✅ Datos de RENIEC obtenidos para visitante existente:', reniecData.data);
+                      
+                      // Actualizar el visitante existente con datos de RENIEC
+                      const updateResponse = await fetch(`${API_BASE_URL}/visitantes/${visitanteId}`, {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                          nombres: reniecData.data.nombres,
+                          apellidos: reniecData.data.apellidos
+                        })
+                      });
+                      
+                      if (updateResponse.ok) {
+                        console.log('[Sync] ✅ Visitante existente actualizado con datos de RENIEC');
+                        
+                        // Emitir evento para actualizar la UI
+                        window.dispatchEvent(new CustomEvent('visitante-actualizado-reniec', {
+                          detail: {
+                            visitanteId: visitanteId,
+                            nombres: reniecData.data.nombres,
+                            apellidos: reniecData.data.apellidos,
+                            numeroDocumento: visita.visitanteData.numeroDocumento
+                          }
+                        }));
+                      } else {
+                        console.warn('[Sync] ⚠️ Error actualizando visitante existente con datos de RENIEC');
+                      }
+                    }
+                  } else {
+                    console.warn('[Sync] ⚠️ No se pudieron obtener datos de RENIEC para visitante existente');
+                  }
+                } catch (reniecError) {
+                  console.warn('[Sync] ⚠️ Error consultando RENIEC para visitante existente:', reniecError.message);
+                }
+              }
             }
           }
           
           // SEGUNDO: Si no existe, crearlo
           if (!visitanteId) {
             console.log('[Sync] 📝 Visitante no existe, creando nuevo...');
+            
+            // Verificar si es DNI de 8 dígitos para consultar RENIEC
+            let visitanteDataToCreate = { ...visita.visitanteData };
+            // Verificar si es DNI comparando con el código 'DNI' en lugar del ID
+            const esDNI = visita.visitanteData.tipoDocumentoCodigo === 'DNI' || 
+                         visita.visitanteData.tipoDocumentoId?.toString() === '1'; // Fallback para compatibilidad
+            const esDNIValido = /^\d{8}$/.test(visita.visitanteData.numeroDocumento);
+            
+            console.log('[Sync] 🔍 Verificando condiciones RENIEC:', {
+              tipoDocumentoCodigo: visita.visitanteData.tipoDocumentoCodigo,
+              tipoDocumentoId: visita.visitanteData.tipoDocumentoId,
+              numeroDocumento: visita.visitanteData.numeroDocumento,
+              esDNI,
+              esDNIValido,
+              visitanteData: visita.visitanteData
+            });
+            
+            if (esDNI && esDNIValido) {
+              console.log('[Sync] 🔍 Consultando RENIEC para DNI:', visita.visitanteData.numeroDocumento);
+              try {
+                const reniecResponse = await fetch(`${API_BASE_URL}/visitantes/consultar-dni`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ dni: visita.visitanteData.numeroDocumento })
+                });
+                
+                if (reniecResponse.ok) {
+                  const reniecData = await reniecResponse.json();
+                  if (reniecData.success && reniecData.data) {
+                    console.log('[Sync] ✅ Datos de RENIEC obtenidos:', reniecData.data);
+                    // Usar los datos de RENIEC para crear el visitante
+                    visitanteDataToCreate = {
+                      ...visitanteDataToCreate,
+                      nombres: reniecData.data.nombres,
+                      apellidos: reniecData.data.apellidos
+                    };
+                    console.log('[Sync] 📝 Visitante actualizado con datos de RENIEC');
+                  }
+                } else {
+                  console.warn('[Sync] ⚠️ No se pudieron obtener datos de RENIEC, usando datos originales');
+                }
+              } catch (reniecError) {
+                console.warn('[Sync] ⚠️ Error consultando RENIEC:', reniecError.message);
+              }
+            }
+            
             const visitanteResponse = await fetch(`${API_BASE_URL}/visitantes`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
               },
-              body: JSON.stringify(visita.visitanteData)
+              body: JSON.stringify(visitanteDataToCreate)
             });
 
             if (visitanteResponse.ok) {
@@ -99,6 +219,21 @@ async function syncPendingVisitas() {
               if (visitanteResult.success && visitanteResult.data) {
                 visitanteId = visitanteResult.data.id;
                 console.log(`[Sync] ✅ Visitante creado con ID: ${visitanteId}`);
+                
+                // Si se actualizaron los datos con RENIEC, notificar para actualizar la UI
+                if (visitanteDataToCreate.nombres !== visita.visitanteData.nombres || 
+                    visitanteDataToCreate.apellidos !== visita.visitanteData.apellidos) {
+                  console.log('[Sync] 🔄 Visitante actualizado con datos de RENIEC, notificando UI...');
+                  // Emitir evento para actualizar la UI con los nuevos datos
+                  window.dispatchEvent(new CustomEvent('visitante-actualizado-reniec', {
+                    detail: {
+                      visitanteId: visitanteId,
+                      nombres: visitanteDataToCreate.nombres,
+                      apellidos: visitanteDataToCreate.apellidos,
+                      numeroDocumento: visita.visitanteData.numeroDocumento
+                    }
+                  }));
+                }
               }
             } else {
               const errorData = await visitanteResponse.json().catch(() => ({message: 'Unknown'}));
