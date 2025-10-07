@@ -776,7 +776,7 @@ const VisitantesTabla = ({
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => handleExport('excel')}
-                    className="flex items-center space-x-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
                     title="Exportar a Excel"
                   >
                     <DocumentTextIcon className="h-5 w-5" />
@@ -784,7 +784,7 @@ const VisitantesTabla = ({
                   </button>
                   <button
                     onClick={() => handleExport('pdf')}
-                    className="flex items-center space-x-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
                     title="Exportar a PDF"
                   >
                     <DocumentArrowDownIcon className="h-5 w-5" />
