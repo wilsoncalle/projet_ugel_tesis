@@ -622,37 +622,47 @@ const exportarAPDF = async (filtros = {}) => {
               drawPageHeader();
               doc.y = 150;
             }
-            doc.font('Helvetica-Bold').fontSize(9).fillColor('#FFFFFF');
+            doc.font('Helvetica-Bold').fontSize(9).fillColor('#222831');
           },
           prepareRow: (row, indexColumn, indexRow, rectRow, rectCell) => {
-            doc.font('Helvetica').fontSize(8).fillColor(textColor);
             const {x, y, width, height} = rectRow;
             
-            // Fondo alternado
-            if (indexRow % 2 === 0) {
-              doc.addBackground(rectRow, lightGray, 0.5);
+            // Dibujar fondo SOLO en la primera columna para evitar acumulación
+            if (indexRow % 2 === 0 && indexColumn === 0) {
+              doc.save();
+              doc.rect(x, y, width, height)
+                 .fill(lightGray);
+              doc.restore();
             }
+            
+            // Resetear opacidad SIEMPRE antes de configurar el texto
+            doc.fillOpacity(1)
+               .strokeOpacity(1)
+               .fillColor(textColor)
+               .font('Helvetica')
+               .fontSize(8);
             
             // Bordes
             doc.lineWidth(0.5)
+               .strokeColor('#D1D5DB')
                .moveTo(x, y)
                .lineTo(x + width, y)
-               .stroke('#D1D5DB');
+               .stroke();
             
             if (indexColumn === 0) {
               doc.moveTo(x, y)
                  .lineTo(x, y + height)
-                 .stroke('#D1D5DB');
+                 .stroke();
             }
             
             doc.moveTo(x + width, y)
                .lineTo(x + width, y + height)
-               .stroke('#D1D5DB');
+               .stroke();
             
             if (indexColumn === table.headers.length - 1) {
               doc.moveTo(x + width, y + height)
                  .lineTo(x, y + height)
-                 .stroke('#D1D5DB');
+                 .stroke();
             }
           }
         });

@@ -366,93 +366,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
     setVisitanteEncontrado(null);
 
     try {
-      // Si es DNI, intentar autocompletado con API externa
-      const tipoDNI = tiposDocumento.find(tipo => 
-        tipo.label?.toLowerCase().includes('dni') ||
-        tipo.label?.toLowerCase().includes('documento nacional')
-      );
-      
-      if (tipoDNI && formVisitante.tipoDocumentoId === tipoDNI.value && formVisitante.numeroDocumento.length === 8) {
-        try {
-          const dniResponse = await visitantesService.consultarDNI(formVisitante.numeroDocumento);
-          
-          if (dniResponse.data.success && dniResponse.data.data) {
-            const datosDNI = dniResponse.data.data;
-            
-            // Verificar si el visitante ya está en la lista de espera
-            const yaEnEspera = visitantesEnEspera.find(v => 
-              v.tipoDocumentoId === formVisitante.tipoDocumentoId && 
-              v.numeroDocumento === formVisitante.numeroDocumento
-            );
-            
-            if (yaEnEspera) {
-              setMensajeVisitante('Este visitante ya está en la lista de espera');
-              setTipoMensaje('error');
-              setDocumentoYaBuscado(documentoActual);
-              return;
-            }
-            
-            // Verificar si el visitante ya tiene una visita activa
-            const visitaActiva = await verificarVisitaActiva(datosDNI.id);
-            if (visitaActiva) {
-              setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
-              setTipoMensaje('error');
-              setDocumentoYaBuscado(documentoActual);
-              return;
-            }
-            
-            // Autocompletar campos del formulario con datos de la API externa
-            setFormVisitante(prev => ({
-              ...prev,
-              nombres: datosDNI.nombres,
-              apellidos: datosDNI.apellidos,
-              visitanteId: datosDNI.id // Usar el ID del visitante (ya sea local o recién creado)
-            }));
-
-            setMensajeVisitante('');
-            setTipoMensaje('');
-            setVisitanteEncontrado(datosDNI);
-            setDocumentoYaBuscado(documentoActual);
-            
-            // AUTO-AGREGAR: Automáticamente agregar el visitante a la lista de espera
-            console.log('[RegistroForm] 🔄 Auto-agregando visitante encontrado en RENIEC...');
-            const visitanteData = {
-              tipoDocumentoId: formVisitante.tipoDocumentoId,
-              numeroDocumento: formVisitante.numeroDocumento,
-              nombres: datosDNI.nombres,
-              apellidos: datosDNI.apellidos,
-              visitanteId: datosDNI.id,
-              tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId)
-            };
-            
-            // Llamar a la función de agregar visitante
-            onAddVisitor(visitanteData);
-            
-            // Limpiar formulario de visitante
-            setFormVisitante({
-              tipoDocumentoId: formVisitante.tipoDocumentoId, // Preservar tipo de documento
-              numeroDocumento: '',
-              nombres: '',
-              apellidos: '',
-              visitanteId: null
-            });
-            
-            return;
-          }
-        } catch (dniError) {
-          console.log('Error consultando DNI externo, continuando con búsqueda local:', dniError.message);
-          
-          // Si es error 404 (DNI no encontrado), mostrar mensaje específico
-          if (dniError.response && dniError.response.status === 404) {
-            setMensajeVisitante('DNI no encontrado en la base de datos nacional. Complete los datos manualmente.');
-            setTipoMensaje('info');
-            setDocumentoYaBuscado(documentoActual);
-            return;
-          }
-          
-          // Para otros errores, continuar con búsqueda local
-        }
-      }
+      // PRIMERO: Búsqueda local en base de datos (para evitar consultas innecesarias a RENIEC)
 
       // Búsqueda local tradicional
       const response = await visitantesService.getByDocumento(
@@ -532,6 +446,74 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           return;
         }
         
+        // SEGUNDO: Si no se encontró en BD local, consultar RENIEC (solo para DNI de 8 dígitos)
+        const tipoDNI = tiposDocumento.find(tipo => 
+          tipo.label?.toLowerCase().includes('dni') ||
+          tipo.label?.toLowerCase().includes('documento nacional')
+        );
+        
+        if (tipoDNI && formVisitante.tipoDocumentoId === tipoDNI.value && formVisitante.numeroDocumento.length === 8) {
+          console.log('[RegistroForm] 🔍 Visitante no encontrado en BD local, consultando RENIEC...');
+          try {
+            const dniResponse = await visitantesService.consultarDNI(formVisitante.numeroDocumento);
+            
+            if (dniResponse.data.success && dniResponse.data.data) {
+              const datosDNI = dniResponse.data.data;
+              
+              // Autocompletar campos del formulario con datos de la API externa
+              setFormVisitante(prev => ({
+                ...prev,
+                nombres: datosDNI.nombres,
+                apellidos: datosDNI.apellidos,
+                visitanteId: datosDNI.id // Usar el ID del visitante (ya sea local o recién creado)
+              }));
+
+              setMensajeVisitante('');
+              setTipoMensaje('');
+              setVisitanteEncontrado(datosDNI);
+              setDocumentoYaBuscado(documentoActual);
+              
+              // AUTO-AGREGAR: Automáticamente agregar el visitante a la lista de espera
+              console.log('[RegistroForm] 🔄 Auto-agregando visitante encontrado en RENIEC...');
+              const visitanteData = {
+                tipoDocumentoId: formVisitante.tipoDocumentoId,
+                numeroDocumento: formVisitante.numeroDocumento,
+                nombres: datosDNI.nombres,
+                apellidos: datosDNI.apellidos,
+                visitanteId: datosDNI.id,
+                tipoDocumento: tiposDocumento.find(tipo => tipo.value === formVisitante.tipoDocumentoId)
+              };
+              
+              // Llamar a la función de agregar visitante
+              onAddVisitor(visitanteData);
+              
+              // Limpiar formulario de visitante
+              setFormVisitante({
+                tipoDocumentoId: formVisitante.tipoDocumentoId, // Preservar tipo de documento
+                numeroDocumento: '',
+                nombres: '',
+                apellidos: '',
+                visitanteId: null
+              });
+              
+              return;
+            }
+          } catch (dniError) {
+            console.log('Error consultando DNI externo:', dniError.message);
+            
+            // Si es error 404 (DNI no encontrado), mostrar mensaje específico
+            if (dniError.response && dniError.response.status === 404) {
+              setMensajeVisitante('DNI no encontrado en la base de datos nacional. Complete los datos manualmente.');
+              setTipoMensaje('info');
+              setDocumentoYaBuscado(documentoActual);
+              return;
+            }
+            
+            // Para otros errores, continuar con mensaje genérico
+          }
+        }
+        
+        // Si no es DNI o RENIEC falló, mostrar mensaje genérico
         setMensajeVisitante('Visitante no encontrado. Complete los datos manualmente para registrar uno nuevo.');
         setTipoMensaje('info');
         setFormVisitante(prev => ({
