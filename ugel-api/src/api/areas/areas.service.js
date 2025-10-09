@@ -183,10 +183,77 @@ const deleteArea = async (id, userId) => {
   }
 };
 
+/**
+ * Obtener áreas eliminadas (soft delete)
+ * @param {Object} options - Opciones de filtrado y paginación
+ * @returns {Object} Áreas eliminadas y datos de paginación
+ */
+const getDeletedAreas = async (options = {}) => {
+  const { page = 1, limit = 20, q = '' } = options;
+  
+  try {
+    // Obtener áreas eliminadas con paginación
+    const result = await repository.findDeleted({
+      page,
+      limit,
+      search: q
+    });
+    
+    // Formatear respuesta
+    return {
+      areas: Array.isArray(result.areas) ? result.areas : [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.total || 0,
+        totalPages: Math.ceil((result.total || 0) / limit)
+      }
+    };
+    
+  } catch (error) {
+    logger.error('Error obteniendo áreas eliminadas:', error);
+    throw error;
+  }
+};
+
+/**
+ * Restaurar área eliminada
+ * @param {number} id - ID del área
+ * @param {number} userId - ID del usuario que restaura
+ * @returns {Object} Área restaurada
+ */
+const restoreArea = async (id, userId) => {
+  try {
+    // Verificar si el área existe (incluyendo eliminadas)
+    const existingArea = await repository.findByIdIncludingDeleted(id);
+    if (!existingArea) {
+      throw new AppError('Área no encontrada', 404);
+    }
+    
+    // Verificar si ya está activa
+    if (existingArea.activa) {
+      throw new AppError('El área ya está activa', 400);
+    }
+    
+    // Restaurar área (marcar como activa)
+    const restoredArea = await repository.restore(id);
+    
+    logger.info(`Área ID ${id} restaurada por usuario ID: ${userId}`);
+    
+    return restoredArea;
+    
+  } catch (error) {
+    logger.error(`Error restaurando área ID ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllAreas,
   getAreaById,
   createArea,
   updateArea,
-  deleteArea
+  deleteArea,
+  getDeletedAreas,
+  restoreArea
 };

@@ -213,10 +213,72 @@ const deleteCargo = async (id, userId) => {
   }
 };
 
+/**
+ * Obtener cargos eliminados (soft delete)
+ * @param {Object} options - Opciones de filtrado y paginación
+ * @returns {Object} Cargos eliminados y datos de paginación
+ */
+const getDeletedCargos = async (options = {}) => {
+  const { page = 1, limit = 20, q = '' } = options;
+  
+  try {
+    const result = await repository.findDeleted({
+      page,
+      limit,
+      search: q
+    });
+    
+    return {
+      cargos: Array.isArray(result.cargos) ? result.cargos : [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.total || 0,
+        totalPages: Math.ceil((result.total || 0) / limit)
+      }
+    };
+    
+  } catch (error) {
+    logger.error('Error obteniendo cargos eliminados:', error);
+    throw error;
+  }
+};
+
+/**
+ * Restaurar cargo eliminado
+ * @param {number} id - ID del cargo
+ * @param {number} userId - ID del usuario que restaura
+ * @returns {Object} Cargo restaurado
+ */
+const restoreCargo = async (id, userId) => {
+  try {
+    const existingCargo = await repository.findByIdIncludingDeleted(id);
+    if (!existingCargo) {
+      throw new AppError('Cargo no encontrado', 404);
+    }
+    
+    if (existingCargo.activo) {
+      throw new AppError('El cargo ya está activo', 400);
+    }
+    
+    const restoredCargo = await repository.restore(id);
+    
+    logger.info(`Cargo ID ${id} restaurado por usuario ID: ${userId}`);
+    
+    return restoredCargo;
+    
+  } catch (error) {
+    logger.error(`Error restaurando cargo ID ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllCargos,
   getCargoById,
   createCargo,
   updateCargo,
-  deleteCargo
+  deleteCargo,
+  getDeletedCargos,
+  restoreCargo
 };

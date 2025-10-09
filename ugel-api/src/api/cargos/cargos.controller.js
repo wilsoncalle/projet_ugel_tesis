@@ -96,10 +96,48 @@ const softDelete = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener cargos eliminados
+ * @route GET /api/cargos/deleted
+ */
+const getDeleted = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de cargos eliminados');
+  
+  const result = await service.getDeletedCargos(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Cargos eliminados obtenidos exitosamente',
+    data: result.cargos || [],
+    pagination: result.pagination
+  });
+});
+
+/**
+ * Restaurar cargo eliminado
+ * @route PUT /api/cargos/:id/restore
+ */
+const restore = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  logger.info(`Restaurando cargo ID: ${id}`);
+  
+  const cargo = await service.restoreCargo(id, req.user.id);
+  
+  logger.info(`Cargo restaurado exitosamente: ${cargo.nombre_cargo}`);
+  
+  res.json({
+    success: true,
+    message: 'Cargo restaurado exitosamente',
+    data: cargo
+  });
+});
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
-  softDelete
+  softDelete,
+  getDeleted,
+  restore
 };

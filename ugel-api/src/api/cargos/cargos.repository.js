@@ -394,6 +394,132 @@ const findByAreaDestino = async (areaDestinoId) => {
   }
 };
 
+/**
+ * Buscar cargos eliminados (soft delete)
+ * @param {Object} options - Opciones de búsqueda
+ * @returns {Object} Cargos eliminados y total
+ */
+const findDeleted = async (options = {}) => {
+  const { page = 1, limit = 20, search = '' } = options;
+  const offset = (page - 1) * limit;
+  
+  try {
+    // Construir la consulta base para cargos eliminados
+    const whereConditions = ['c.activo = false'];
+    const queryParams = [];
+    let paramCounter = 1;
+    
+    // Filtro por texto
+    if (search) {
+      whereConditions.push(`c.nombre_cargo ILIKE $${paramCounter}`);
+      queryParams.push(`%${search}%`);
+      paramCounter++;
+    }
+    
+    // Consulta para contar el total
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM Cargos c
+      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
+      WHERE ${whereConditions.join(' AND ')}
+    `;
+    
+    // Consulta principal
+    const query = `
+      SELECT 
+        c.id,
+        c.nombre_cargo,
+        c.descripcion,
+        c.area_destino_id,
+        a.nombre_area as area_nombre,
+        c.activo,
+        c.fecha_creacion
+      FROM Cargos c
+      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY c.nombre_cargo ASC
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+    `;
+    
+    // Agregar parámetros de paginación
+    queryParams.push(limit, offset);
+    
+    // Ejecutar consultas en paralelo
+    const [cargosResult, countResult] = await Promise.all([
+      db.query(query, queryParams),
+      db.query(countQuery, queryParams.slice(0, paramCounter - 1))
+    ]);
+    
+    return {
+      cargos: Array.isArray(cargosResult?.rows) ? cargosResult.rows : [],
+      total: countResult?.rows?.[0]?.total ? parseInt(countResult.rows[0].total) : 0
+    };
+    
+  } catch (error) {
+    logger.error('Error en repositorio buscando cargos eliminados:', error);
+    throw new AppError('Error obteniendo cargos eliminados', 500);
+  }
+};
+
+/**
+ * Buscar cargo por ID incluyendo eliminados
+ * @param {number} id - ID del cargo
+ * @returns {Object|null} Cargo encontrado o null
+ */
+const findByIdIncludingDeleted = async (id) => {
+  try {
+    const query = `
+      SELECT 
+        c.id,
+        c.nombre_cargo,
+        c.descripcion,
+        c.area_destino_id,
+        a.nombre_area as area_nombre,
+        c.activo,
+        c.fecha_creacion
+      FROM Cargos c
+      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
+      WHERE c.id = $1
+    `;
+    
+    const result = await db.query(query, [id]);
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando cargo por ID (incluyendo eliminados) ${id}:`, error);
+    throw new AppError('Error obteniendo cargo', 500);
+  }
+};
+
+/**
+ * Restaurar cargo eliminado
+ * @param {number} id - ID del cargo
+ * @returns {Object} Cargo restaurado
+ */
+const restore = async (id) => {
+  try {
+    const query = `
+      UPDATE Cargos 
+      SET activo = true
+      WHERE id = $1
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Cargo no encontrado', 404);
+    }
+    
+    // Obtener el cargo restaurado completo
+    return await findByIdIncludingDeleted(id);
+    
+  } catch (error) {
+    logger.error(`Error en repositorio restaurando cargo ID ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error restaurando cargo', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -403,5 +529,8 @@ module.exports = {
   softDelete,
   checkCargoInUse,
   getActiveCargosList,
-  findByAreaDestino
+  findByAreaDestino,
+  findDeleted,
+  findByIdIncludingDeleted,
+  restore
 };

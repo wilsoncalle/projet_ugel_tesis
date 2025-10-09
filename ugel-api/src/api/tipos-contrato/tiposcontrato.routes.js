@@ -24,6 +24,20 @@ router.get('/',
 );
 
 /**
+ * @route   GET /api/tipos-contrato/deleted
+ * @desc    Obtener tipos de contrato eliminados
+ * @access  Private (Admin/RRHH)
+ */
+router.get('/deleted', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  validationMiddleware.validatePagination,
+  validationMiddleware.validateSearch,
+  controller.getDeleted
+);
+
+/**
  * @route   GET /api/tipos-contrato/:id
  * @desc    Obtener tipo de contrato por ID
  * @access  Private
@@ -73,6 +87,19 @@ router.delete('/:id',
   requireAdminOrRRHH,
   validationMiddleware.validateId,
   controller.softDelete
+);
+
+/**
+ * @route   PUT /api/tipos-contrato/:id/restore
+ * @desc    Restaurar tipo de contrato eliminado
+ * @access  Private (Admin/RRHH)
+ */
+router.put('/:id/restore', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  validationMiddleware.validateId,
+  controller.restore
 );
 
 module.exports = router;

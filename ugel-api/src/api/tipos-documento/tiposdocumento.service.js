@@ -192,10 +192,72 @@ const deleteTipoDocumento = async (id, userId) => {
   }
 };
 
+/**
+ * Obtener tipos de documento eliminados (soft delete)
+ * @param {Object} options - Opciones de filtrado y paginación
+ * @returns {Object} Tipos de documento eliminados y datos de paginación
+ */
+const getDeletedTiposDocumento = async (options = {}) => {
+  const { page = 1, limit = 20, q = '' } = options;
+  
+  try {
+    const result = await repository.findDeleted({
+      page,
+      limit,
+      search: q
+    });
+    
+    return {
+      tiposDocumento: Array.isArray(result.tiposDocumento) ? result.tiposDocumento : [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.total || 0,
+        totalPages: Math.ceil((result.total || 0) / limit)
+      }
+    };
+    
+  } catch (error) {
+    logger.error('Error obteniendo tipos de documento eliminados:', error);
+    throw error;
+  }
+};
+
+/**
+ * Restaurar tipo de documento eliminado
+ * @param {number} id - ID del tipo de documento
+ * @param {number} userId - ID del usuario que restaura
+ * @returns {Object} Tipo de documento restaurado
+ */
+const restoreTipoDocumento = async (id, userId) => {
+  try {
+    const existingTipoDocumento = await repository.findByIdIncludingDeleted(id);
+    if (!existingTipoDocumento) {
+      throw new AppError('Tipo de documento no encontrado', 404);
+    }
+    
+    if (existingTipoDocumento.activo) {
+      throw new AppError('El tipo de documento ya está activo', 400);
+    }
+    
+    const restoredTipoDocumento = await repository.restore(id);
+    
+    logger.info(`Tipo de documento ID ${id} restaurado por usuario ID: ${userId}`);
+    
+    return restoredTipoDocumento;
+    
+  } catch (error) {
+    logger.error(`Error restaurando tipo de documento ID ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllTiposDocumento,
   getTipoDocumentoById,
   createTipoDocumento,
   updateTipoDocumento,
-  deleteTipoDocumento
+  deleteTipoDocumento,
+  getDeletedTiposDocumento,
+  restoreTipoDocumento
 };

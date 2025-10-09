@@ -334,6 +334,116 @@ const getActiveTiposDocumentoList = async () => {
   }
 };
 
+/**
+ * Buscar tipos de documento eliminados (soft delete)
+ * @param {Object} options - Opciones de búsqueda
+ * @returns {Object} Tipos de documento eliminados y total
+ */
+const findDeleted = async (options = {}) => {
+  const { page = 1, limit = 20, search = '' } = options;
+  const offset = (page - 1) * limit;
+  
+  try {
+    const whereConditions = ['activo = false'];
+    const queryParams = [];
+    let paramCounter = 1;
+    
+    if (search) {
+      whereConditions.push(`(codigo ILIKE $${paramCounter} OR nombre_completo ILIKE $${paramCounter})`);
+      queryParams.push(`%${search}%`);
+      paramCounter++;
+    }
+    
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM TiposDocumento
+      WHERE ${whereConditions.join(' AND ')}
+    `;
+    
+    const query = `
+      SELECT 
+        id,
+        codigo,
+        nombre_completo,
+        activo
+      FROM TiposDocumento
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY codigo ASC
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+    `;
+    
+    queryParams.push(limit, offset);
+    
+    const [tiposResult, countResult] = await Promise.all([
+      db.query(query, queryParams),
+      db.query(countQuery, queryParams.slice(0, paramCounter - 1))
+    ]);
+    
+    return {
+      tiposDocumento: Array.isArray(tiposResult?.rows) ? tiposResult.rows : [],
+      total: countResult?.rows?.[0]?.total ? parseInt(countResult.rows[0].total) : 0
+    };
+    
+  } catch (error) {
+    logger.error('Error en repositorio buscando tipos de documento eliminados:', error);
+    throw new AppError('Error obteniendo tipos de documento eliminados', 500);
+  }
+};
+
+/**
+ * Buscar tipo de documento por ID incluyendo eliminados
+ * @param {number} id - ID del tipo de documento
+ * @returns {Object|null} Tipo de documento encontrado o null
+ */
+const findByIdIncludingDeleted = async (id) => {
+  try {
+    const query = `
+      SELECT 
+        id,
+        codigo,
+        nombre_completo,
+        activo
+      FROM TiposDocumento 
+      WHERE id = $1
+    `;
+    
+    const result = await db.query(query, [id]);
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando tipo de documento por ID (incluyendo eliminados) ${id}:`, error);
+    throw new AppError('Error obteniendo tipo de documento', 500);
+  }
+};
+
+/**
+ * Restaurar tipo de documento eliminado
+ * @param {number} id - ID del tipo de documento
+ * @returns {Object} Tipo de documento restaurado
+ */
+const restore = async (id) => {
+  try {
+    const query = `
+      UPDATE TiposDocumento 
+      SET activo = true
+      WHERE id = $1
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Tipo de documento no encontrado', 404);
+    }
+    
+    return await findByIdIncludingDeleted(id);
+    
+  } catch (error) {
+    logger.error(`Error en repositorio restaurando tipo de documento ID ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error restaurando tipo de documento', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -342,5 +452,8 @@ module.exports = {
   update,
   softDelete,
   checkTipoDocumentoInUse,
-  getActiveTiposDocumentoList
+  getActiveTiposDocumentoList,
+  findDeleted,
+  findByIdIncludingDeleted,
+  restore
 };

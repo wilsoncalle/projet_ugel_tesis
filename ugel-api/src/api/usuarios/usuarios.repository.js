@@ -417,6 +417,120 @@ const countByRole = async (rol) => {
   }
 };
 
+/**
+ * Buscar usuarios eliminados (soft delete)
+ * @param {Object} options - Opciones de búsqueda
+ * @returns {Object} Usuarios eliminados y total
+ */
+const findDeleted = async (options = {}) => {
+  const { page = 1, limit = 20, search = '' } = options;
+  const offset = (page - 1) * limit;
+  
+  try {
+    const whereConditions = ['activo = false'];
+    const queryParams = [];
+    let paramCounter = 1;
+    
+    if (search) {
+      whereConditions.push(`(nombre_usuario ILIKE $${paramCounter} OR email ILIKE $${paramCounter})`);
+      queryParams.push(`%${search}%`);
+      paramCounter++;
+    }
+    
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM Usuarios
+      WHERE ${whereConditions.join(' AND ')}
+    `;
+    
+    const query = `
+      SELECT 
+        id,
+        nombre_usuario,
+        email,
+        rol,
+        activo,
+        fecha_creacion
+      FROM Usuarios
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY nombre_usuario ASC
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+    `;
+    
+    queryParams.push(limit, offset);
+    
+    const [usuariosResult, countResult] = await Promise.all([
+      db.query(query, queryParams),
+      db.query(countQuery, queryParams.slice(0, paramCounter - 1))
+    ]);
+    
+    return {
+      usuarios: Array.isArray(usuariosResult?.rows) ? usuariosResult.rows : [],
+      total: countResult?.rows?.[0]?.total ? parseInt(countResult.rows[0].total) : 0
+    };
+    
+  } catch (error) {
+    logger.error('Error en repositorio buscando usuarios eliminados:', error);
+    throw new AppError('Error obteniendo usuarios eliminados', 500);
+  }
+};
+
+/**
+ * Buscar usuario por ID incluyendo eliminados
+ * @param {number} id - ID del usuario
+ * @returns {Object|null} Usuario encontrado o null
+ */
+const findByIdIncludingDeleted = async (id) => {
+  try {
+    const query = `
+      SELECT 
+        id,
+        nombre_usuario,
+        email,
+        rol,
+        activo,
+        fecha_creacion
+      FROM Usuarios 
+      WHERE id = $1
+    `;
+    
+    const result = await db.query(query, [id]);
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando usuario por ID (incluyendo eliminados) ${id}:`, error);
+    throw new AppError('Error obteniendo usuario', 500);
+  }
+};
+
+/**
+ * Restaurar usuario eliminado
+ * @param {number} id - ID del usuario
+ * @returns {Object} Usuario restaurado
+ */
+const restore = async (id) => {
+  try {
+    const query = `
+      UPDATE Usuarios 
+      SET activo = true
+      WHERE id = $1
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+    
+    return await findByIdIncludingDeleted(id);
+    
+  } catch (error) {
+    logger.error(`Error en repositorio restaurando usuario ID ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error restaurando usuario', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -427,5 +541,8 @@ module.exports = {
   update,
   updatePassword,
   softDelete,
-  countByRole
+  countByRole,
+  findDeleted,
+  findByIdIncludingDeleted,
+  restore
 };

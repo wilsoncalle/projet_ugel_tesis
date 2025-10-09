@@ -96,10 +96,48 @@ const softDelete = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener motivos de salida eliminados
+ * @route GET /api/motivos-salida/deleted
+ */
+const getDeleted = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de motivos de salida eliminados');
+  
+  const result = await service.getDeletedMotivosSalida(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Motivos de salida eliminados obtenidos exitosamente',
+    data: result.motivosSalida || [],
+    pagination: result.pagination
+  });
+});
+
+/**
+ * Restaurar motivo de salida eliminado
+ * @route PUT /api/motivos-salida/:id/restore
+ */
+const restore = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  logger.info(`Restaurando motivo de salida ID: ${id}`);
+  
+  const motivoSalida = await service.restoreMotivoSalida(id, req.user.id);
+  
+  logger.info(`Motivo de salida restaurado exitosamente: ${motivoSalida.nombre_motivo}`);
+  
+  res.json({
+    success: true,
+    message: 'Motivo de salida restaurado exitosamente',
+    data: motivoSalida
+  });
+});
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
-  softDelete
+  softDelete,
+  getDeleted,
+  restore
 };

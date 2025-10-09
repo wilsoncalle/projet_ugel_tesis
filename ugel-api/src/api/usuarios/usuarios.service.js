@@ -281,11 +281,76 @@ const deleteUsuario = async (id, deleterId) => {
   }
 };
 
+/**
+ * Obtener usuarios eliminados (soft delete)
+ * @param {Object} options - Opciones de filtrado y paginación
+ * @returns {Object} Usuarios eliminados y datos de paginación
+ */
+const getDeletedUsuarios = async (options = {}) => {
+  const { page = 1, limit = 20, q = '' } = options;
+  
+  try {
+    const result = await repository.findDeleted({
+      page,
+      limit,
+      search: q
+    });
+    
+    return {
+      usuarios: Array.isArray(result.usuarios) ? result.usuarios : [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.total || 0,
+        totalPages: Math.ceil((result.total || 0) / limit)
+      }
+    };
+    
+  } catch (error) {
+    logger.error('Error obteniendo usuarios eliminados:', error);
+    throw error;
+  }
+};
+
+/**
+ * Restaurar usuario eliminado
+ * @param {number} id - ID del usuario
+ * @param {number} userId - ID del usuario que restaura
+ * @returns {Object} Usuario restaurado
+ */
+const restoreUsuario = async (id, userId) => {
+  try {
+    const existingUsuario = await repository.findByIdIncludingDeleted(id);
+    if (!existingUsuario) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+    
+    if (existingUsuario.activo) {
+      throw new AppError('El usuario ya está activo', 400);
+    }
+    
+    const restoredUsuario = await repository.restore(id);
+    
+    // Eliminar datos sensibles
+    const { hash_contrasena, ...usuarioSinContrasena } = restoredUsuario;
+    
+    logger.info(`Usuario ID ${id} restaurado por usuario ID: ${userId}`);
+    
+    return usuarioSinContrasena;
+    
+  } catch (error) {
+    logger.error(`Error restaurando usuario ID ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllUsuarios,
   getUsuarioById,
   createUsuario,
   updateUsuario,
   changePassword,
-  deleteUsuario
+  deleteUsuario,
+  getDeletedUsuarios,
+  restoreUsuario
 };

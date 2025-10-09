@@ -183,10 +183,72 @@ const deleteTipoContrato = async (id, userId) => {
   }
 };
 
+/**
+ * Obtener tipos de contrato eliminados (soft delete)
+ * @param {Object} options - Opciones de filtrado y paginación
+ * @returns {Object} Tipos de contrato eliminados y datos de paginación
+ */
+const getDeletedTiposContrato = async (options = {}) => {
+  const { page = 1, limit = 20, q = '' } = options;
+  
+  try {
+    const result = await repository.findDeleted({
+      page,
+      limit,
+      search: q
+    });
+    
+    return {
+      tiposContrato: Array.isArray(result.tiposContrato) ? result.tiposContrato : [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.total || 0,
+        totalPages: Math.ceil((result.total || 0) / limit)
+      }
+    };
+    
+  } catch (error) {
+    logger.error('Error obteniendo tipos de contrato eliminados:', error);
+    throw error;
+  }
+};
+
+/**
+ * Restaurar tipo de contrato eliminado
+ * @param {number} id - ID del tipo de contrato
+ * @param {number} userId - ID del usuario que restaura
+ * @returns {Object} Tipo de contrato restaurado
+ */
+const restoreTipoContrato = async (id, userId) => {
+  try {
+    const existingTipoContrato = await repository.findByIdIncludingDeleted(id);
+    if (!existingTipoContrato) {
+      throw new AppError('Tipo de contrato no encontrado', 404);
+    }
+    
+    if (existingTipoContrato.activo) {
+      throw new AppError('El tipo de contrato ya está activo', 400);
+    }
+    
+    const restoredTipoContrato = await repository.restore(id);
+    
+    logger.info(`Tipo de contrato ID ${id} restaurado por usuario ID: ${userId}`);
+    
+    return restoredTipoContrato;
+    
+  } catch (error) {
+    logger.error(`Error restaurando tipo de contrato ID ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllTiposContrato,
   getTipoContratoById,
   createTipoContrato,
   updateTipoContrato,
-  deleteTipoContrato
+  deleteTipoContrato,
+  getDeletedTiposContrato,
+  restoreTipoContrato
 };

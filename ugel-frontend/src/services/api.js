@@ -293,6 +293,8 @@ export const cargosService = {
   create: (cargo) => api.post('/cargos', cargo),
   update: (id, cargo) => api.put(`/cargos/${id}`, cargo),
   delete: (id) => api.delete(`/cargos/${id}`),
+  getDeleted: () => api.get('/cargos/deleted'),
+  restore: (id) => api.put(`/cargos/${id}/restore`),
 };
 
 export const usuariosService = {

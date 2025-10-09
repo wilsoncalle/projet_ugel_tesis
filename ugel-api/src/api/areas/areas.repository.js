@@ -309,6 +309,131 @@ const getActiveAreasList = async () => {
   }
 };
 
+/**
+ * Buscar áreas eliminadas (soft delete)
+ * @param {Object} options - Opciones de búsqueda
+ * @returns {Object} Áreas eliminadas y total
+ */
+const findDeleted = async (options = {}) => {
+  const { page = 1, limit = 20, search = '' } = options;
+  const offset = (page - 1) * limit;
+  
+  try {
+    // Construir la consulta base para áreas eliminadas
+    let query = `
+      SELECT 
+        id,
+        nombre_area,
+        activa
+      FROM AreasDestino
+      WHERE activa = false
+    `;
+    
+    // Construir la cláusula WHERE adicional
+    const whereConditions = ['activa = false'];
+    const queryParams = [];
+    let paramCounter = 1;
+    
+    // Filtro por texto
+    if (search) {
+      whereConditions.push(`nombre_area ILIKE $${paramCounter}`);
+      queryParams.push(`%${search}%`);
+      paramCounter++;
+    }
+    
+    // Consulta para contar el total
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM AreasDestino
+      WHERE ${whereConditions.join(' AND ')}
+    `;
+    
+    // Agregar ordenamiento y paginación
+    query = `
+      SELECT 
+        id,
+        nombre_area,
+        activa
+      FROM AreasDestino
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY nombre_area ASC
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+    `;
+    
+    // Agregar parámetros de paginación
+    queryParams.push(limit, offset);
+    
+    // Ejecutar consultas en paralelo
+    const [areasResult, countResult] = await Promise.all([
+      db.query(query, queryParams),
+      db.query(countQuery, queryParams.slice(0, paramCounter - 1))
+    ]);
+    
+    return {
+      areas: Array.isArray(areasResult?.rows) ? areasResult.rows : [],
+      total: countResult?.rows?.[0]?.total ? parseInt(countResult.rows[0].total) : 0
+    };
+    
+  } catch (error) {
+    logger.error('Error en repositorio buscando áreas eliminadas:', error);
+    throw new AppError('Error obteniendo áreas eliminadas', 500);
+  }
+};
+
+/**
+ * Buscar área por ID incluyendo eliminadas
+ * @param {number} id - ID del área
+ * @returns {Object|null} Área encontrada o null
+ */
+const findByIdIncludingDeleted = async (id) => {
+  try {
+    const query = `
+      SELECT 
+        id,
+        nombre_area,
+        activa
+      FROM AreasDestino 
+      WHERE id = $1
+    `;
+    
+    const result = await db.query(query, [id]);
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando área por ID (incluyendo eliminadas) ${id}:`, error);
+    throw new AppError('Error obteniendo área', 500);
+  }
+};
+
+/**
+ * Restaurar área eliminada
+ * @param {number} id - ID del área
+ * @returns {Object} Área restaurada
+ */
+const restore = async (id) => {
+  try {
+    const query = `
+      UPDATE AreasDestino 
+      SET activa = true
+      WHERE id = $1
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Área no encontrada', 404);
+    }
+    
+    // Obtener el área restaurada completa
+    return await findByIdIncludingDeleted(id);
+    
+  } catch (error) {
+    logger.error(`Error en repositorio restaurando área ID ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error restaurando área', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -317,5 +442,8 @@ module.exports = {
   update,
   softDelete,
   checkAreaInUse,
-  getActiveAreasList
+  getActiveAreasList,
+  findDeleted,
+  findByIdIncludingDeleted,
+  restore
 };

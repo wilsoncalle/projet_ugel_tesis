@@ -24,6 +24,20 @@ router.get('/',
 );
 
 /**
+ * @route   GET /api/tipos-documento/deleted
+ * @desc    Obtener tipos de documento eliminados
+ * @access  Private (Admin/RRHH)
+ */
+router.get('/deleted', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  validationMiddleware.validatePagination,
+  validationMiddleware.validateSearch,
+  controller.getDeleted
+);
+
+/**
  * @route   GET /api/tipos-documento/:id
  * @desc    Obtener tipo de documento por ID
  * @access  Private
@@ -71,6 +85,19 @@ router.delete('/:id',
   requireAdminOrRRHH,
   validationMiddleware.validateId,
   controller.softDelete
+);
+
+/**
+ * @route   PUT /api/tipos-documento/:id/restore
+ * @desc    Restaurar tipo de documento eliminado
+ * @access  Private (Admin/RRHH)
+ */
+router.put('/:id/restore', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  validationMiddleware.validateId,
+  controller.restore
 );
 
 module.exports = router;

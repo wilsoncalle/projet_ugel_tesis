@@ -308,6 +308,114 @@ const getActiveTiposContratoList = async () => {
   }
 };
 
+/**
+ * Buscar tipos de contrato eliminados (soft delete)
+ * @param {Object} options - Opciones de búsqueda
+ * @returns {Object} Tipos de contrato eliminados y total
+ */
+const findDeleted = async (options = {}) => {
+  const { page = 1, limit = 20, search = '' } = options;
+  const offset = (page - 1) * limit;
+  
+  try {
+    const whereConditions = ['activo = false'];
+    const queryParams = [];
+    let paramCounter = 1;
+    
+    if (search) {
+      whereConditions.push(`nombre_tipo ILIKE $${paramCounter}`);
+      queryParams.push(`%${search}%`);
+      paramCounter++;
+    }
+    
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM TiposContrato
+      WHERE ${whereConditions.join(' AND ')}
+    `;
+    
+    const query = `
+      SELECT 
+        id,
+        nombre_tipo,
+        activo
+      FROM TiposContrato
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY nombre_tipo ASC
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+    `;
+    
+    queryParams.push(limit, offset);
+    
+    const [tiposResult, countResult] = await Promise.all([
+      db.query(query, queryParams),
+      db.query(countQuery, queryParams.slice(0, paramCounter - 1))
+    ]);
+    
+    return {
+      tiposContrato: Array.isArray(tiposResult?.rows) ? tiposResult.rows : [],
+      total: countResult?.rows?.[0]?.total ? parseInt(countResult.rows[0].total) : 0
+    };
+    
+  } catch (error) {
+    logger.error('Error en repositorio buscando tipos de contrato eliminados:', error);
+    throw new AppError('Error obteniendo tipos de contrato eliminados', 500);
+  }
+};
+
+/**
+ * Buscar tipo de contrato por ID incluyendo eliminados
+ * @param {number} id - ID del tipo de contrato
+ * @returns {Object|null} Tipo de contrato encontrado o null
+ */
+const findByIdIncludingDeleted = async (id) => {
+  try {
+    const query = `
+      SELECT 
+        id,
+        nombre_tipo,
+        activo
+      FROM TiposContrato 
+      WHERE id = $1
+    `;
+    
+    const result = await db.query(query, [id]);
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando tipo de contrato por ID (incluyendo eliminados) ${id}:`, error);
+    throw new AppError('Error obteniendo tipo de contrato', 500);
+  }
+};
+
+/**
+ * Restaurar tipo de contrato eliminado
+ * @param {number} id - ID del tipo de contrato
+ * @returns {Object} Tipo de contrato restaurado
+ */
+const restore = async (id) => {
+  try {
+    const query = `
+      UPDATE TiposContrato 
+      SET activo = true
+      WHERE id = $1
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Tipo de contrato no encontrado', 404);
+    }
+    
+    return await findByIdIncludingDeleted(id);
+    
+  } catch (error) {
+    logger.error(`Error en repositorio restaurando tipo de contrato ID ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error restaurando tipo de contrato', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -316,5 +424,8 @@ module.exports = {
   update,
   softDelete,
   checkTipoContratoInUse,
-  getActiveTiposContratoList
+  getActiveTiposContratoList,
+  findDeleted,
+  findByIdIncludingDeleted,
+  restore
 };

@@ -183,10 +183,72 @@ const deleteMotivoVisita = async (id, userId) => {
   }
 };
 
+/**
+ * Obtener motivos de visita eliminados (soft delete)
+ * @param {Object} options - Opciones de filtrado y paginación
+ * @returns {Object} Motivos de visita eliminados y datos de paginación
+ */
+const getDeletedMotivosVisita = async (options = {}) => {
+  const { page = 1, limit = 20, q = '' } = options;
+  
+  try {
+    const result = await repository.findDeleted({
+      page,
+      limit,
+      search: q
+    });
+    
+    return {
+      motivosVisita: Array.isArray(result.motivosVisita) ? result.motivosVisita : [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.total || 0,
+        totalPages: Math.ceil((result.total || 0) / limit)
+      }
+    };
+    
+  } catch (error) {
+    logger.error('Error obteniendo motivos de visita eliminados:', error);
+    throw error;
+  }
+};
+
+/**
+ * Restaurar motivo de visita eliminado
+ * @param {number} id - ID del motivo de visita
+ * @param {number} userId - ID del usuario que restaura
+ * @returns {Object} Motivo de visita restaurado
+ */
+const restoreMotivoVisita = async (id, userId) => {
+  try {
+    const existingMotivoVisita = await repository.findByIdIncludingDeleted(id);
+    if (!existingMotivoVisita) {
+      throw new AppError('Motivo de visita no encontrado', 404);
+    }
+    
+    if (existingMotivoVisita.activo) {
+      throw new AppError('El motivo de visita ya está activo', 400);
+    }
+    
+    const restoredMotivoVisita = await repository.restore(id);
+    
+    logger.info(`Motivo de visita ID ${id} restaurado por usuario ID: ${userId}`);
+    
+    return restoredMotivoVisita;
+    
+  } catch (error) {
+    logger.error(`Error restaurando motivo de visita ID ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllMotivosVisita,
   getMotivoVisitaById,
   createMotivoVisita,
   updateMotivoVisita,
-  deleteMotivoVisita
+  deleteMotivoVisita,
+  getDeletedMotivosVisita,
+  restoreMotivoVisita
 };

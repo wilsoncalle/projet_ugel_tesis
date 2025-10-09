@@ -135,11 +135,49 @@ const softDelete = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener usuarios eliminados
+ * @route GET /api/usuarios/deleted
+ */
+const getDeleted = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de usuarios eliminados');
+  
+  const result = await service.getDeletedUsuarios(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Usuarios eliminados obtenidos exitosamente',
+    data: result.usuarios || [],
+    pagination: result.pagination
+  });
+});
+
+/**
+ * Restaurar usuario eliminado
+ * @route PUT /api/usuarios/:id/restore
+ */
+const restore = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  logger.info(`Restaurando usuario ID: ${id}`);
+  
+  const usuario = await service.restoreUsuario(id, req.user.id);
+  
+  logger.info(`Usuario restaurado exitosamente: ${usuario.nombre_usuario}`);
+  
+  res.json({
+    success: true,
+    message: 'Usuario restaurado exitosamente',
+    data: usuario
+  });
+});
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
   changePassword,
-  softDelete
+  softDelete,
+  getDeleted,
+  restore
 };

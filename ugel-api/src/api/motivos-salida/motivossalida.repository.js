@@ -308,6 +308,114 @@ const getActiveMotivosSalidaList = async () => {
   }
 };
 
+/**
+ * Buscar motivos de salida eliminados (soft delete)
+ * @param {Object} options - Opciones de búsqueda
+ * @returns {Object} Motivos de salida eliminados y total
+ */
+const findDeleted = async (options = {}) => {
+  const { page = 1, limit = 20, search = '' } = options;
+  const offset = (page - 1) * limit;
+  
+  try {
+    const whereConditions = ['activo = false'];
+    const queryParams = [];
+    let paramCounter = 1;
+    
+    if (search) {
+      whereConditions.push(`nombre_motivo ILIKE $${paramCounter}`);
+      queryParams.push(`%${search}%`);
+      paramCounter++;
+    }
+    
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM MotivosSalidaPersonal
+      WHERE ${whereConditions.join(' AND ')}
+    `;
+    
+    const query = `
+      SELECT 
+        id,
+        nombre_motivo,
+        activo
+      FROM MotivosSalidaPersonal
+      WHERE ${whereConditions.join(' AND ')}
+      ORDER BY nombre_motivo ASC
+      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+    `;
+    
+    queryParams.push(limit, offset);
+    
+    const [motivosResult, countResult] = await Promise.all([
+      db.query(query, queryParams),
+      db.query(countQuery, queryParams.slice(0, paramCounter - 1))
+    ]);
+    
+    return {
+      motivosSalida: Array.isArray(motivosResult?.rows) ? motivosResult.rows : [],
+      total: countResult?.rows?.[0]?.total ? parseInt(countResult.rows[0].total) : 0
+    };
+    
+  } catch (error) {
+    logger.error('Error en repositorio buscando motivos de salida eliminados:', error);
+    throw new AppError('Error obteniendo motivos de salida eliminados', 500);
+  }
+};
+
+/**
+ * Buscar motivo de salida por ID incluyendo eliminados
+ * @param {number} id - ID del motivo de salida
+ * @returns {Object|null} Motivo de salida encontrado o null
+ */
+const findByIdIncludingDeleted = async (id) => {
+  try {
+    const query = `
+      SELECT 
+        id,
+        nombre_motivo,
+        activo
+      FROM MotivosSalidaPersonal 
+      WHERE id = $1
+    `;
+    
+    const result = await db.query(query, [id]);
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando motivo de salida por ID (incluyendo eliminados) ${id}:`, error);
+    throw new AppError('Error obteniendo motivo de salida', 500);
+  }
+};
+
+/**
+ * Restaurar motivo de salida eliminado
+ * @param {number} id - ID del motivo de salida
+ * @returns {Object} Motivo de salida restaurado
+ */
+const restore = async (id) => {
+  try {
+    const query = `
+      UPDATE MotivosSalidaPersonal 
+      SET activo = true
+      WHERE id = $1
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Motivo de salida no encontrado', 404);
+    }
+    
+    return await findByIdIncludingDeleted(id);
+    
+  } catch (error) {
+    logger.error(`Error en repositorio restaurando motivo de salida ID ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error restaurando motivo de salida', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -316,5 +424,8 @@ module.exports = {
   update,
   softDelete,
   checkMotivoSalidaInUse,
-  getActiveMotivosSalidaList
+  getActiveMotivosSalidaList,
+  findDeleted,
+  findByIdIncludingDeleted,
+  restore
 };

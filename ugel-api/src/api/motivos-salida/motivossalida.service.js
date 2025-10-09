@@ -183,10 +183,72 @@ const deleteMotivoSalida = async (id, userId) => {
   }
 };
 
+/**
+ * Obtener motivos de salida eliminados (soft delete)
+ * @param {Object} options - Opciones de filtrado y paginación
+ * @returns {Object} Motivos de salida eliminados y datos de paginación
+ */
+const getDeletedMotivosSalida = async (options = {}) => {
+  const { page = 1, limit = 20, q = '' } = options;
+  
+  try {
+    const result = await repository.findDeleted({
+      page,
+      limit,
+      search: q
+    });
+    
+    return {
+      motivosSalida: Array.isArray(result.motivosSalida) ? result.motivosSalida : [],
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.total || 0,
+        totalPages: Math.ceil((result.total || 0) / limit)
+      }
+    };
+    
+  } catch (error) {
+    logger.error('Error obteniendo motivos de salida eliminados:', error);
+    throw error;
+  }
+};
+
+/**
+ * Restaurar motivo de salida eliminado
+ * @param {number} id - ID del motivo de salida
+ * @param {number} userId - ID del usuario que restaura
+ * @returns {Object} Motivo de salida restaurado
+ */
+const restoreMotivoSalida = async (id, userId) => {
+  try {
+    const existingMotivoSalida = await repository.findByIdIncludingDeleted(id);
+    if (!existingMotivoSalida) {
+      throw new AppError('Motivo de salida no encontrado', 404);
+    }
+    
+    if (existingMotivoSalida.activo) {
+      throw new AppError('El motivo de salida ya está activo', 400);
+    }
+    
+    const restoredMotivoSalida = await repository.restore(id);
+    
+    logger.info(`Motivo de salida ID ${id} restaurado por usuario ID: ${userId}`);
+    
+    return restoredMotivoSalida;
+    
+  } catch (error) {
+    logger.error(`Error restaurando motivo de salida ID ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllMotivosSalida,
   getMotivoSalidaById,
   createMotivoSalida,
   updateMotivoSalida,
-  deleteMotivoSalida
+  deleteMotivoSalida,
+  getDeletedMotivosSalida,
+  restoreMotivoSalida
 };

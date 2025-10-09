@@ -96,10 +96,48 @@ const softDelete = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener áreas eliminadas
+ * @route GET /api/areas/deleted
+ */
+const getDeleted = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de áreas eliminadas');
+  
+  const result = await service.getDeletedAreas(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Áreas eliminadas obtenidas exitosamente',
+    data: result.areas || [],
+    pagination: result.pagination
+  });
+});
+
+/**
+ * Restaurar área eliminada
+ * @route PUT /api/areas/:id/restore
+ */
+const restore = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  logger.info(`Restaurando área ID: ${id}`);
+  
+  const area = await service.restoreArea(id, req.user.id);
+  
+  logger.info(`Área restaurada exitosamente: ${area.nombre_area}`);
+  
+  res.json({
+    success: true,
+    message: 'Área restaurada exitosamente',
+    data: area
+  });
+});
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
-  softDelete
+  softDelete,
+  getDeleted,
+  restore
 };

@@ -194,30 +194,24 @@ export const transformAreasToBackend = (data) => {
 };
 
 export const transformTiposDocumento = (data) => {
-  console.log('transformTiposDocumento - Datos de entrada:', data);
   if (Array.isArray(data)) {
-    const transformed = data.map(item => ({
+    return data.map(item => ({
       id: item.id,
       codigo: item.codigo,
       nombre_completo: item.nombre_completo,
       activo: item.activo
     }));
-    console.log('transformTiposDocumento - Datos transformados:', transformed);
-    return transformed;
   }
-  console.log('transformTiposDocumento - No es un array, retornando datos originales:', data);
   return data;
 };
 
 // Función para transformar datos del frontend al backend
 export const transformTiposDocumentoToBackend = (data) => {
-  console.log('transformTiposDocumentoToBackend - Datos de entrada:', data);
   const transformed = {
     codigo: data.codigo,
     nombreCompleto: data.nombre_completo, // Convertir snake_case a camelCase
     activo: data.activo
   };
-  console.log('transformTiposDocumentoToBackend - Datos transformados:', transformed);
   return transformed;
 };
 
@@ -301,47 +295,39 @@ export const transformMotivosSalidaToBackend = (data) => {
 
 // Transformación de datos para el módulo de Cargos
 export const transformCargos = (data) => {
-  console.log('transformCargos - Datos de entrada:', data);
   if (Array.isArray(data)) {
-    const transformed = data.map(item => ({
+    return data.map(item => ({
       id: item.id,
       nombre_cargo: item.nombre_cargo,
-      descripcion: item.descripcion,
+      descripcion: item.descripcion || '',
       area_destino_id: item.area_destino_id ? item.area_destino_id.toString() : '',
       area_nombre: item.area_nombre || 'No asignado',
       activo: item.activo,
       fecha_creacion: item.fecha_creacion
     }));
-    console.log('transformCargos - Datos transformados (array):', transformed);
-    return transformed;
   } else if (data && typeof data === 'object') {
     // Manejar objeto individual (para edición)
-    const transformed = {
+    return {
       id: data.id,
       nombre_cargo: data.nombre_cargo,
-      descripcion: data.descripcion,
+      descripcion: data.descripcion || '',
       area_destino_id: data.area_destino_id ? data.area_destino_id.toString() : '',
       area_nombre: data.area_nombre || 'No asignado',
       activo: data.activo,
       fecha_creacion: data.fecha_creacion
     };
-    console.log('transformCargos - Datos transformados (objeto):', transformed);
-    return transformed;
   }
-  console.log('transformCargos - No es un array ni objeto, retornando datos originales:', data);
   return data;
 };
 
 // Función para transformar datos del frontend al backend
 export const transformCargosToBackend = (data) => {
-  console.log('transformCargosToBackend - Datos de entrada:', data);
   const transformed = {
     nombre_cargo: data.nombre_cargo,
     descripcion: data.descripcion,
     area_destino_id: parseInt(data.area_destino_id),
     activo: data.activo !== undefined ? data.activo : true // Valor por defecto si no se especifica
   };
-  console.log('transformCargosToBackend - Datos transformados:', transformed);
   return transformed;
 };
 

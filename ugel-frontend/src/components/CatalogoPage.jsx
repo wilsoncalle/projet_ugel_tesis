@@ -182,7 +182,7 @@ const CatalogoPage = ({
     try {
       setDeletedItemsLoading(true);
       const response = await service.getDeleted();
-      const data = response?.data || [];
+      const data = response?.data?.data || [];
       const transformed = transformData ? transformData(data) : data;
       setDeletedItems(Array.isArray(transformed) ? transformed : []);
     } catch (error) {
@@ -192,10 +192,6 @@ const CatalogoPage = ({
     }
   };
 
-  // Debug: Log items cuando cambien
-  useEffect(() => {
-    console.log('CatalogoPage - Items actualizados:', items);
-  }, [items]);
 
   // Handle form submission
   const handleSubmit = async (formData) => {
@@ -457,14 +453,26 @@ const CatalogoPage = ({
               <Card>
                 <AdaptiveTable
                   columns={[
-                    ...tableColumns,
+                    ...tableColumns.map(col => {
+                      if (col.key === 'activo' || col.key === 'activa' || col.key === 'estado') {
+                        return {
+                          ...col,
+                          render: () => (
+                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                              Inactivo
+                            </span>
+                          )
+                        };
+                      }
+                      return col;
+                    }),
                     { 
                       key: 'acciones', 
                       title: 'Acciones', 
                       render: deletedActions,
-                      minWidth: '80px',
-                      maxWidth: '100px',
-                      width: '80px',
+                      minWidth: '100px',
+                      maxWidth: '120px',
+                      width: '100px',
                       sticky: 'right',
                       stickyOffset: '0px'
                     }
@@ -476,6 +484,7 @@ const CatalogoPage = ({
                   searchPlaceholder={`Buscar ${moduleName.toLowerCase()} eliminados...`}
                   pagination={pagination}
                   itemsPerPage={itemsPerPage}
+                  rowClassName="opacity-50"
                 />
               </Card>
             ),

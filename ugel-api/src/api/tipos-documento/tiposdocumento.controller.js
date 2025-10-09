@@ -96,10 +96,48 @@ const softDelete = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener tipos de documento eliminados
+ * @route GET /api/tipos-documento/deleted
+ */
+const getDeleted = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de tipos de documento eliminados');
+  
+  const result = await service.getDeletedTiposDocumento(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Tipos de documento eliminados obtenidos exitosamente',
+    data: result.tiposDocumento || [],
+    pagination: result.pagination
+  });
+});
+
+/**
+ * Restaurar tipo de documento eliminado
+ * @route PUT /api/tipos-documento/:id/restore
+ */
+const restore = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  logger.info(`Restaurando tipo de documento ID: ${id}`);
+  
+  const tipoDocumento = await service.restoreTipoDocumento(id, req.user.id);
+  
+  logger.info(`Tipo de documento restaurado exitosamente: ${tipoDocumento.codigo}`);
+  
+  res.json({
+    success: true,
+    message: 'Tipo de documento restaurado exitosamente',
+    data: tipoDocumento
+  });
+});
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
-  softDelete
+  softDelete,
+  getDeleted,
+  restore
 };

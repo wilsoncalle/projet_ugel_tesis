@@ -96,10 +96,48 @@ const softDelete = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener tipos de contrato eliminados
+ * @route GET /api/tipos-contrato/deleted
+ */
+const getDeleted = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de tipos de contrato eliminados');
+  
+  const result = await service.getDeletedTiposContrato(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Tipos de contrato eliminados obtenidos exitosamente',
+    data: result.tiposContrato || [],
+    pagination: result.pagination
+  });
+});
+
+/**
+ * Restaurar tipo de contrato eliminado
+ * @route PUT /api/tipos-contrato/:id/restore
+ */
+const restore = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  logger.info(`Restaurando tipo de contrato ID: ${id}`);
+  
+  const tipoContrato = await service.restoreTipoContrato(id, req.user.id);
+  
+  logger.info(`Tipo de contrato restaurado exitosamente: ${tipoContrato.nombre_tipo}`);
+  
+  res.json({
+    success: true,
+    message: 'Tipo de contrato restaurado exitosamente',
+    data: tipoContrato
+  });
+});
+
 module.exports = {
   getAll,
   getById,
   create,
   update,
-  softDelete
+  softDelete,
+  getDeleted,
+  restore
 };

@@ -24,15 +24,17 @@ router.get('/',
 );
 
 /**
- * @route   GET /api/personal/:id
- * @desc    Obtener personal por ID
- * @access  Private
+ * @route   GET /api/personal/deleted
+ * @desc    Obtener personal eliminado
+ * @access  Private (Admin/RRHH)
  */
-router.get('/:id', 
+router.get('/deleted', 
   authenticateToken,
   requireActiveUser,
-  validationMiddleware.validateId,
-  controller.getById
+  requireAdminOrRRHH,
+  validationMiddleware.validatePagination,
+  validationMiddleware.validateSearch,
+  controller.getDeleted
 );
 
 /**
@@ -44,6 +46,18 @@ router.get('/documento/:tipo/:numero',
   authenticateToken,
   requireActiveUser,
   controller.getByDocumento
+);
+
+/**
+ * @route   GET /api/personal/:id
+ * @desc    Obtener personal por ID
+ * @access  Private
+ */
+router.get('/:id', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateId,
+  controller.getById
 );
 
 /**
@@ -84,20 +98,6 @@ router.delete('/:id',
   requireAdminOrRRHH,
   validationMiddleware.validateId,
   controller.softDelete
-);
-
-/**
- * @route   GET /api/personal/deleted
- * @desc    Obtener personal eliminado
- * @access  Private (Admin/RRHH)
- */
-router.get('/deleted', 
-  authenticateToken,
-  requireActiveUser,
-  requireAdminOrRRHH,
-  validationMiddleware.validatePagination,
-  validationMiddleware.validateSearch,
-  controller.getDeleted
 );
 
 /**

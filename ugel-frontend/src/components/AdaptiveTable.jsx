@@ -18,6 +18,7 @@ const AdaptiveTable = ({
   totalItems: externalTotalItems,
   onPageChange: externalOnPageChange,
   isRowInWaiting = null,
+  rowClassName = '',
   ...props
 }) => {
   const [internalCurrentPage, setInternalCurrentPage] = useState(1);
@@ -275,7 +276,9 @@ const AdaptiveTable = ({
                           key={`${rowIndex}-${column.key || colIndex}`}
                           className={`px-3 py-3 text-sm text-gray-900 ${
                             column.cellClassName || ''
-                          } ${column.sticky ? 'sticky bg-white z-10' : ''}`}
+                          } ${column.sticky ? 'sticky bg-white z-10' : ''} ${
+                            column.key === 'acciones' ? '' : rowClassName
+                          }`}
                           style={{
                             ...column.cellStyle,
                             width: column.width || 'auto',

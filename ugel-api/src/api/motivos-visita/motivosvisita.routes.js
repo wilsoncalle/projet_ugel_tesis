@@ -24,6 +24,20 @@ router.get('/',
 );
 
 /**
+ * @route   GET /api/motivos-visita/deleted
+ * @desc    Obtener motivos de visita eliminados
+ * @access  Private (Admin/RRHH)
+ */
+router.get('/deleted', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  validationMiddleware.validatePagination,
+  validationMiddleware.validateSearch,
+  controller.getDeleted
+);
+
+/**
  * @route   GET /api/motivos-visita/:id
  * @desc    Obtener motivo de visita por ID
  * @access  Private
@@ -73,6 +87,19 @@ router.delete('/:id',
   requireAdminOrRRHH,
   validationMiddleware.validateId,
   controller.softDelete
+);
+
+/**
+ * @route   PUT /api/motivos-visita/:id/restore
+ * @desc    Restaurar motivo de visita eliminado
+ * @access  Private (Admin/RRHH)
+ */
+router.put('/:id/restore', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  validationMiddleware.validateId,
+  controller.restore
 );
 
 module.exports = router;

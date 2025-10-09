@@ -24,6 +24,20 @@ router.get('/',
 );
 
 /**
+ * @route   GET /api/areas/deleted
+ * @desc    Obtener áreas eliminadas
+ * @access  Private (Admin/RRHH)
+ */
+router.get('/deleted', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  validationMiddleware.validatePagination,
+  validationMiddleware.validateSearch,
+  controller.getDeleted
+);
+
+/**
  * @route   GET /api/areas/:id
  * @desc    Obtener área por ID
  * @access  Private
@@ -73,6 +87,19 @@ router.delete('/:id',
   requireAdminOrRRHH,
   validationMiddleware.validateId,
   controller.softDelete
+);
+
+/**
+ * @route   PUT /api/areas/:id/restore
+ * @desc    Restaurar área eliminada
+ * @access  Private (Admin/RRHH)
+ */
+router.put('/:id/restore', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  validationMiddleware.validateId,
+  controller.restore
 );
 
 module.exports = router;

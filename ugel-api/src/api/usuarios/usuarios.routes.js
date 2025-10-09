@@ -25,6 +25,20 @@ router.get('/',
 );
 
 /**
+ * @route   GET /api/usuarios/deleted
+ * @desc    Obtener usuarios eliminados
+ * @access  Private (Admin)
+ */
+router.get('/deleted', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdmin,
+  validationMiddleware.validatePagination,
+  validationMiddleware.validateSearch,
+  controller.getDeleted
+);
+
+/**
  * @route   GET /api/usuarios/:id
  * @desc    Obtener usuario por ID
  * @access  Private (Admin o propietario)
@@ -89,6 +103,19 @@ router.delete('/:id',
   requireAdmin,
   validationMiddleware.validateId,
   controller.softDelete
+);
+
+/**
+ * @route   PUT /api/usuarios/:id/restore
+ * @desc    Restaurar usuario eliminado
+ * @access  Private (Admin)
+ */
+router.put('/:id/restore', 
+  authenticateToken,
+  requireActiveUser,
+  requireAdmin,
+  validationMiddleware.validateId,
+  controller.restore
 );
 
 module.exports = router;
