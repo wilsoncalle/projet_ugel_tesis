@@ -5,6 +5,7 @@ import Card from '../components/Card';
 import RegistroForm from '../components/vigilante/RegistroForm';
 import VisitantesTabla from '../components/vigilante/VisitantesTabla';
 import DateRangeFilter from '../components/DateRangeFilter';
+import PanelSeleccionEstadisticas from '../components/vigilante/PanelSeleccionEstadisticas';
 import { visitasService, visitantesService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
@@ -98,6 +99,7 @@ const DashboardVigilantePage = () => {
   const [activeTab, setActiveTab] = useState('activos');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [categoriaEstadisticas, setCategoriaEstadisticas] = useState('total-visitas');
   const [showSalidaModal, setShowSalidaModal] = useState(false);
   const [visitaParaSalida, setVisitaParaSalida] = useState(null);
   const [visitanteParaSalida, setVisitanteParaSalida] = useState(null);
@@ -1654,6 +1656,11 @@ const DashboardVigilantePage = () => {
     }
   };
 
+  // Función para manejar cambio de categoría de estadísticas
+  const handleCategoriaEstadisticasChange = (categoria) => {
+    setCategoriaEstadisticas(categoria);
+  };
+
   // Configurar atajos de teclado
   useKeyboardShortcuts({
     activeTab,
@@ -1786,6 +1793,14 @@ const DashboardVigilantePage = () => {
                       />
                     </motion.div>
                   </>
+                ) : activeTab === "estadisticas" ? (
+                  // Tab "estadisticas": PanelSeleccionEstadisticas
+                  <motion.div variants={itemVariants}>
+                    <PanelSeleccionEstadisticas
+                      categoriaActiva={categoriaEstadisticas}
+                      onCategoriaChange={handleCategoriaEstadisticasChange}
+                    />
+                  </motion.div>
                 ) : (
                   // Tab "activos": solo animamos RegistroForm
                   <motion.div variants={itemVariants}>
