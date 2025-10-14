@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 
 const SelectCustom = ({
   options = [],
@@ -24,6 +25,8 @@ const SelectCustom = ({
   const [calculatedMenuWidth, setCalculatedMenuWidth] = useState('250px');
   const [menuPosition, setMenuPosition] = useState({ openUpwards: false, alignRight: false });
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [menuStyle, setMenuStyle] = useState({});
+  const [usePortal, setUsePortal] = useState(false);
 
   const inputRef = useRef(null);
   const containerRef = useRef(null);
@@ -47,6 +50,10 @@ const SelectCustom = ({
     const rect = container.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
+
+    // Detectar si estamos dentro de un modal
+    const isInModal = container.closest('[role="dialog"]') !== null;
+    setUsePortal(isInModal);
 
     let width = menuWidth;
     if (menuWidth === 'auto') {
@@ -73,6 +80,18 @@ const SelectCustom = ({
     const menuWidthNumber = parseInt(width);
     const spaceRight = viewportWidth - rect.left;
     const alignRight = spaceRight < menuWidthNumber && rect.right > menuWidthNumber;
+
+    // Si estamos en un modal, calcular posición absoluta
+    if (isInModal) {
+      const style = {
+        position: 'fixed',
+        top: openUpwards ? `${rect.top - menuHeight - 8}px` : `${rect.bottom + 8}px`,
+        left: alignRight ? `${rect.right - menuWidthNumber}px` : `${rect.left}px`,
+        width: width,
+        zIndex: 9999
+      };
+      setMenuStyle(style);
+    }
 
     return { width, openUpwards, alignRight };
   }, [options, menuWidth]);
@@ -330,20 +349,62 @@ const SelectCustom = ({
         </div>
 
         {isOpen && (
-          <div
-            className={`
-              absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto
-              ${menuPosition.openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'}
-              ${menuPosition.alignRight ? 'right-0' : 'left-0'}
-            `}
-            style={{
-              width: calculatedMenuWidth,
-              minWidth: '250px',
-              maxWidth: '450px'
-            }}
-            role="listbox"
-            aria-label="Opciones"
-          >
+          usePortal ? createPortal(
+            <div
+              className="fixed bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+              style={{
+                ...menuStyle,
+                minWidth: '250px',
+                maxWidth: '450px'
+              }}
+              role="listbox"
+              aria-label="Opciones"
+            >
+              {isLoading ? (
+                <div className="px-3 py-2 text-sm text-gray-500">
+                  Cargando...
+                </div>
+              ) : filteredOptions.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-gray-500 italic">
+                  {noOptionsMessage}
+                </div>
+              ) : (
+                filteredOptions.map((option, index) => (
+                  <div
+                    key={option.value}
+                    ref={(el) => (optionRefs.current[index] = el)}
+                    id={`option-${index}`}
+                    className={`
+                      px-3 py-2 text-sm cursor-pointer transition-colors
+                      ${index === focusedIndex ? 'bg-blue-100 text-blue-900' : 'text-gray-900 hover:bg-gray-100'}
+                      ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                    onClick={() => !option.disabled && handleOptionSelect(option)}
+                    onMouseEnter={() => setFocusedIndex(index)}
+                    role="option"
+                    aria-selected={index === focusedIndex}
+                  >
+                    {option.label}
+                  </div>
+                ))
+              )}
+            </div>,
+            document.body
+          ) : (
+            <div
+              className={`
+                absolute z-[60] bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto
+                ${menuPosition.openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'}
+                ${menuPosition.alignRight ? 'right-0' : 'left-0'}
+              `}
+              style={{
+                width: calculatedMenuWidth,
+                minWidth: '250px',
+                maxWidth: '450px'
+              }}
+              role="listbox"
+              aria-label="Opciones"
+            >
             {isLoading ? (
               <div className="px-3 py-2 text-sm text-gray-500">
                 Cargando...
@@ -384,6 +445,7 @@ const SelectCustom = ({
               ))
             )}
           </div>
+          )
         )}
       </div>
       {error && (

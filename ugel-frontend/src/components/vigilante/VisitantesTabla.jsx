@@ -38,6 +38,11 @@ const VisitantesTabla = ({
     if (tab === 'historial' && !filtrosExpanded) {
       setFiltrosExpanded(true);
     }
+    // Agregar lógica específica para estadísticas
+    if (tab === 'estadisticas') {
+      console.log('Navegando a estadísticas');
+      // Aquí puedes agregar lógica específica para mostrar estadísticas
+    }
   };
 
   // Funciones para manejar el modal de detalles
@@ -760,6 +765,12 @@ const VisitantesTabla = ({
       key: 'historial',
       label: 'Historial de Visitas',
       icon: <ClockIcon className="h-4 w-4" />
+    },
+    {
+      key: 'estadisticas',
+      label: 'Estadísticas',
+      icon: null,
+      isStatsButton: true
     }
   ];
 

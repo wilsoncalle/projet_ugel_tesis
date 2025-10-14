@@ -14,14 +14,61 @@ const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => 
   return (
     <div className={`space-y-2 ${className}`}>
       {/* Botones de tabs con pill animado */}
-      <div className="bg-muted rounded-full p-1 grid grid-cols-2 relative overflow-hidden">
+      <div className="bg-muted rounded-full p-1 flex items-center relative overflow-hidden">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
+          const isStatsButton = tab.isStatsButton;
+          
+          // Si es el botón de estadísticas, renderizar de forma diferente
+          if (isStatsButton) {
+            return (
+              <button
+                key={tab.key}
+                onClick={(event) => handleTabClick(tab.key, event)}
+                className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ml-2 ${
+                  isActive
+                    ? "bg-background shadow-md"
+                    : "bg-transparent"
+                }`}
+                title="Estadísticas"
+              >
+                <svg 
+                  className={`h-5 w-5 transition-colors duration-300 ${
+                    isActive 
+                      ? 'text-foreground' 
+                      : 'text-muted-foreground hover:text-black'
+                  }`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                
+                {/* Píldora animada para estadísticas */}
+                {isActive && (
+                  <motion.span
+                    layoutId="active-pill"
+                    className="absolute inset-0 bg-background rounded-full shadow-md -z-10"
+                    style={{ pointerEvents: 'none' }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 500,
+                      damping: 30,
+                      bounce: 0.3
+                    }}
+                  />
+                )}
+              </button>
+            );
+          }
+          
+          // Renderizar tabs normales
           return (
             <button
               key={tab.key}
               onClick={(event) => handleTabClick(tab.key, event)}
-              className={`relative z-10 px-4 py-2 rounded-full font-medium text-sm transition-colors duration-300 flex items-center justify-center gap-2 ${
+              className={`relative z-10 px-4 py-2 rounded-full font-medium text-sm transition-colors duration-300 flex items-center justify-center gap-2 flex-1 ${
                 isActive
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -52,6 +99,7 @@ const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => 
                     type: "spring",
                     stiffness: 500,
                     damping: 30,
+                    bounce: 0.3
                   }}
                 />
               )}

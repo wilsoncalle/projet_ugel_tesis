@@ -35,6 +35,8 @@ const CatalogoPage = ({
   const [deletedItemsLoading, setDeletedItemsLoading] = useState(false);
   const hasInitialized = useRef(false);
   const [formData, setFormData] = useState({}); // Estado para los datos del formulario
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [itemToRestore, setItemToRestore] = useState(null);
   
   const {
     items,
@@ -281,12 +283,18 @@ const CatalogoPage = ({
     }
   };
 
-  // Función para restaurar elemento eliminado
-  const handleRestore = async (item) => {
-    if (!service.restore) return;
+  // Función para abrir modal de confirmación de restauración
+  const handleRestore = (item) => {
+    setItemToRestore(item);
+    setRestoreModalOpen(true);
+  };
+
+  // Función para confirmar la restauración
+  const confirmRestore = async () => {
+    if (!service.restore || !itemToRestore) return;
     
     try {
-      await service.restore(item.id);
+      await service.restore(itemToRestore.id);
       
       // Mostrar notificación de éxito
       setNotification({
@@ -301,6 +309,11 @@ const CatalogoPage = ({
       
       // Cambiar a la pestaña activa
       setActiveTab('active');
+      
+      // Cerrar modal
+      setRestoreModalOpen(false);
+      setItemToRestore(null);
+      
     } catch (error) {
       console.error('Error restaurando elemento:', error);
       setNotification({
@@ -309,6 +322,12 @@ const CatalogoPage = ({
         duration: 5000
       });
     }
+  };
+
+  // Función para cancelar la restauración
+  const cancelRestore = () => {
+    setRestoreModalOpen(false);
+    setItemToRestore(null);
   };
 
   // Generate actions column for active items
@@ -576,6 +595,36 @@ const CatalogoPage = ({
           onClose={() => setNotification(null)}
         />
       )}
+
+      {/* Modal de confirmación para restaurar */}
+      {/* Modal de confirmación para restaurar */}
+      <ModalGenerico
+        isOpen={restoreModalOpen}
+        onClose={cancelRestore}
+        title="Confirmar Restauración"
+        size="sm"
+        footer={
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={cancelRestore}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={confirmRestore}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              Restaurar
+            </Button>
+          </div>
+        }
+      >
+        <p>
+          ¿Está seguro que desea restaurar el {moduleName.toLowerCase()}{' '}
+          <strong>{itemToRestore?.nombre || itemToRestore?.nombre_area || itemToRestore?.nombre_cargo || itemToRestore?.nombre_motivo || itemToRestore?.nombre_tipo || itemToRestore?.nombre_usuario || itemToRestore?.nombres || 'seleccionado'}</strong>?
+        </p>
+        <p className="mt-2 text-sm text-gray-500">
+          El elemento volverá a estar activo.
+        </p>
+      </ModalGenerico>
     </div>
   );
 };
