@@ -691,6 +691,111 @@ const exportarAPDF = async (filtros = {}) => {
   }
 };
 
+/**
+ * Obtener estadísticas de visitas por área
+ * @param {string} periodo - Periodo de tiempo ('hoy', 'semana', 'mes', 'anio', 'todo')
+ * @returns {Array} Array de objetos con nombre_area y visitas
+ */
+const getVisitasPorArea = async (periodo = 'todo') => {
+  try {
+    logger.info(`Obteniendo estadísticas por área para periodo: ${periodo}`);
+    
+    // Calcular fechas según el periodo
+    let fechaInicio, fechaFin;
+    const ahora = new Date();
+    
+    switch (periodo) {
+      case 'hoy':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
+        break;
+      case 'semana':
+        const inicioSemana = new Date(ahora);
+        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
+        inicioSemana.setHours(0, 0, 0, 0);
+        fechaInicio = inicioSemana;
+        fechaFin = new Date(inicioSemana);
+        fechaFin.setDate(inicioSemana.getDate() + 6);
+        fechaFin.setHours(23, 59, 59);
+        break;
+      case 'mes':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'anio':
+        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
+        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        break;
+      case 'todo':
+      default:
+        fechaInicio = null;
+        fechaFin = null;
+        break;
+    }
+    
+    // Obtener estadísticas del repositorio
+    const estadisticas = await repository.getVisitasPorArea(fechaInicio, fechaFin);
+    
+    logger.info(`Estadísticas obtenidas: ${estadisticas.length} áreas`);
+    
+    return estadisticas;
+    
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas por área:', error);
+    throw error;
+  }
+};
+
+const getVisitasPorMotivo = async (periodo = 'todo') => {
+  try {
+    logger.info(`Obteniendo estadísticas por motivo para periodo: ${periodo}`);
+    
+    // Calcular fechas según el periodo
+    let fechaInicio, fechaFin;
+    const ahora = new Date();
+    
+    switch (periodo) {
+      case 'hoy':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
+        break;
+      case 'semana':
+        const inicioSemana = new Date(ahora);
+        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
+        inicioSemana.setHours(0, 0, 0, 0);
+        fechaInicio = inicioSemana;
+        fechaFin = new Date(inicioSemana);
+        fechaFin.setDate(inicioSemana.getDate() + 6);
+        fechaFin.setHours(23, 59, 59);
+        break;
+      case 'mes':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'anio':
+        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
+        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        break;
+      case 'todo':
+      default:
+        fechaInicio = null;
+        fechaFin = null;
+        break;
+    }
+    
+    // Obtener estadísticas del repositorio
+    const estadisticas = await repository.getVisitasPorMotivo(fechaInicio, fechaFin);
+    
+    logger.info(`Estadísticas obtenidas: ${estadisticas.length} motivos`);
+    
+    return estadisticas;
+    
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas por motivo:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllVisitas,
   getVisitasActivas,
@@ -700,5 +805,7 @@ module.exports = {
   registrarSalidaVisitaConFechaHora,
   getEstadisticas,
   exportarAExcel,
-  exportarAPDF
+  exportarAPDF,
+  getVisitasPorArea,
+  getVisitasPorMotivo
 };

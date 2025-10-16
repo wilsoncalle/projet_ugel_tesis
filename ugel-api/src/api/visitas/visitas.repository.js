@@ -649,6 +649,97 @@ const findVisitaActivaPorVisitante = async (visitanteId) => {
   }
 };
 
+/**
+ * Obtener estadísticas de visitas por área
+ * @param {Date|null} fechaInicio - Fecha de inicio del filtro
+ * @param {Date|null} fechaFin - Fecha de fin del filtro
+ * @returns {Array} Array de objetos con nombre_area y visitas
+ */
+const getVisitasPorArea = async (fechaInicio = null, fechaFin = null) => {
+  try {
+    let query = `
+      SELECT 
+        a.nombre_area,
+        COUNT(*) AS visitas
+      FROM RegistrosVisitas rv
+      JOIN AreasDestino a ON rv.area_destino_id = a.id
+    `;
+    
+    const params = [];
+    let paramCount = 0;
+    
+    // Agregar filtro de fecha si se proporciona
+    if (fechaInicio && fechaFin) {
+      paramCount += 2;
+      query += ` WHERE rv.fecha_ingreso BETWEEN $${paramCount - 1} AND $${paramCount}`;
+      params.push(fechaInicio, fechaFin);
+    }
+    
+    query += `
+      GROUP BY rv.area_destino_id, a.nombre_area
+      ORDER BY visitas DESC
+    `;
+    
+    logger.info(`Ejecutando consulta de estadísticas por área: ${query}`);
+    logger.info(`Parámetros: ${JSON.stringify(params)}`);
+    
+    const result = await db.query(query, params);
+    
+    logger.info(`Estadísticas por área obtenidas: ${result.rows.length} registros`);
+    
+    return result.rows;
+    
+  } catch (error) {
+    logger.error('Error en repositorio obteniendo estadísticas por área:', error);
+    throw new AppError('Error obteniendo estadísticas por área', 500);
+  }
+};
+
+const getVisitasPorMotivo = async (fechaInicio = null, fechaFin = null) => {
+  try {
+    let query = `
+      SELECT 
+        m.nombre_motivo,
+        COUNT(*) AS count,
+        (COUNT(*) * 100.0 / (
+          SELECT COUNT(*) 
+          FROM RegistrosVisitas rv2
+          ${fechaInicio && fechaFin ? 'WHERE rv2.fecha_ingreso BETWEEN $' + (params.length + 1) + ' AND $' + (params.length + 2) : ''}
+        )) AS porcentaje
+      FROM RegistrosVisitas rv
+      JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
+    `;
+    
+    const params = [];
+    let paramCount = 0;
+    
+    // Agregar filtro de fecha si se proporciona
+    if (fechaInicio && fechaFin) {
+      paramCount += 2;
+      query += ` WHERE rv.fecha_ingreso BETWEEN $${paramCount - 1} AND $${paramCount}`;
+      params.push(fechaInicio, fechaFin);
+    }
+    
+    query += `
+      GROUP BY rv.motivo_visita_id, m.nombre_motivo
+      ORDER BY count DESC
+    `;
+    
+    logger.info(`Ejecutando consulta de estadísticas por motivo: ${query}`);
+    logger.info(`Parámetros: ${JSON.stringify(params)}`);
+    
+    const result = await db.query(query, params);
+    
+    logger.info(`Estadísticas por motivo obtenidas: ${result.rows.length} registros`);
+    
+    return result.rows;
+    
+  } catch (error) {
+    logger.error('Error en repositorio obteniendo estadísticas por motivo:', error);
+    throw new AppError('Error obteniendo estadísticas por motivo', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findActivas,
@@ -657,5 +748,7 @@ module.exports = {
   registrarSalida,
   registrarSalidaConFechaHora,
   getEstadisticas,
-  findVisitaActivaPorVisitante
+  findVisitaActivaPorVisitante,
+  getVisitasPorArea,
+  getVisitasPorMotivo
 };

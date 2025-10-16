@@ -224,6 +224,36 @@ const exportarAPDF = asyncHandler(async (req, res) => {
   res.send(buffer);
 });
 
+/**
+ * Obtener estadísticas de visitas por área
+ * @route GET /api/visitas/por-area
+ */
+const getVisitasPorArea = asyncHandler(async (req, res) => {
+  const { periodo = 'todo' } = req.query;
+  logger.info(`Solicitud de estadísticas por área para periodo: ${periodo}`);
+  
+  const result = await service.getVisitasPorArea(periodo);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas por área obtenidas exitosamente',
+    data: result
+  });
+});
+
+const getVisitasPorMotivo = asyncHandler(async (req, res) => {
+  const { periodo = 'todo' } = req.query;
+  logger.info(`Solicitud de estadísticas por motivo para periodo: ${periodo}`);
+  
+  const result = await service.getVisitasPorMotivo(periodo);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas por motivo obtenidas exitosamente',
+    data: result
+  });
+});
+
 module.exports = {
   getAll,
   getActivas,
@@ -231,5 +261,7 @@ module.exports = {
   create,
   registrarSalida,
   exportarAExcel,
-  exportarAPDF
+  exportarAPDF,
+  getVisitasPorArea,
+  getVisitasPorMotivo
 };

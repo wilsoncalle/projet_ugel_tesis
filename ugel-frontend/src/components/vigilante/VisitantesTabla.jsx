@@ -8,6 +8,8 @@ import FiltrosVisitas from './FiltrosVisitas';
 import TableGenerica from '../TableGenerica';
 import ModalDetalles from '../ModalDetalles';
 import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon, DocumentTextIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
+import { VisitasAreaCard } from '../vigilante_areas_estadisticas';
+import { VisitasMotivoCard } from '../vigilante_motivos_estadisticas';
 
 const VisitantesTabla = ({
   visitantesActivos,
@@ -25,7 +27,8 @@ const VisitantesTabla = ({
   historialPagination,
   onHistorialPageChange,
   activosPagination,
-  onActivosPageChange
+  onActivosPageChange,
+  categoriaEstadisticas // Nueva prop para la categoría de estadísticas
 }) => {
   const [filtrosExpanded, setFiltrosExpanded] = useState(false);
   
@@ -824,22 +827,39 @@ const VisitantesTabla = ({
           >
 
 
-            {/* Tabla de datos */}
+            {/* Contenido de las pestañas */}
             <div className="flex-1" style={{ maxWidth: '100%' }}>
-              <TableGenerica
-                columns={getColumns}
-                data={getTabData()}
-                isRowInWaiting={(row) => 
-                  (visitantesEnEspera || []).some(v => v.id === row.id)
-                  // Las visitas pendientes NO se muestran como "en espera", sino como visitas normales
-                }
-                {...getPaginationProps()}
-                emptyMessage={
-                  activeTab === 'activos'
-                    ? 'No hay visitantes activos en este momento'
-                    : 'No se encontraron registros para los filtros aplicados'
-                }
-              />
+              {activeTab === 'estadisticas' ? (
+                // Mostrar estadísticas cuando estemos en el tab de estadísticas
+                categoriaEstadisticas === 'areas' ? (
+                  <VisitasAreaCard />
+                ) : categoriaEstadisticas === 'motivos' ? (
+                  <VisitasMotivoCard />
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center text-gray-500">
+                      <div className="text-4xl mb-4">📊</div>
+                      <p>Seleccione una categoría de estadísticas</p>
+                    </div>
+                  </div>
+                )
+              ) : (
+                // Mostrar tabla normal para otros tabs
+                <TableGenerica
+                  columns={getColumns}
+                  data={getTabData()}
+                  isRowInWaiting={(row) => 
+                    (visitantesEnEspera || []).some(v => v.id === row.id)
+                    // Las visitas pendientes NO se muestran como "en espera", sino como visitas normales
+                  }
+                  {...getPaginationProps()}
+                  emptyMessage={
+                    activeTab === 'activos'
+                      ? 'No hay visitantes activos en este momento'
+                      : 'No se encontraron registros para los filtros aplicados'
+                  }
+                />
+              )}
             </div>
           </TabView>
         </div>

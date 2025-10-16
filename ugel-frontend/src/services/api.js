@@ -146,6 +146,8 @@ export const visitasService = {
   update: (id, visita) => api.put(`/visitas/${id}`, visita),
   delete: (id) => api.delete(`/visitas/${id}`),
   registrarSalida: (id) => api.put(`/visitas/${id}/salida`),
+  getVisitasPorArea: (periodo = 'todo') => api.get(`/visitas/por-area?periodo=${periodo}`),
+  getVisitasPorMotivo: (periodo = 'todo') => api.get(`/visitas/por-motivo?periodo=${periodo}`),
 };
 
 export const tiposDocumentoService = {

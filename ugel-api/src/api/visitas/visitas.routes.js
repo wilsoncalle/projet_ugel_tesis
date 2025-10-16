@@ -58,6 +58,23 @@ router.get('/activas',
 );
 
 /**
+ * @route   GET /api/visitas/por-area
+ * @desc    Obtener estadísticas de visitas por área
+ * @access  Private
+ */
+router.get('/por-area', 
+  authenticateToken,
+  requireActiveUser,
+  controller.getVisitasPorArea
+);
+
+router.get('/por-motivo', 
+  authenticateToken,
+  requireActiveUser,
+  controller.getVisitasPorMotivo
+);
+
+/**
  * @route   GET /api/visitas/:id
  * @desc    Obtener visita por ID
  * @access  Private

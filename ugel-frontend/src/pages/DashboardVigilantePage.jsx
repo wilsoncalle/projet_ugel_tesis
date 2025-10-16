@@ -6,6 +6,8 @@ import RegistroForm from '../components/vigilante/RegistroForm';
 import VisitantesTabla from '../components/vigilante/VisitantesTabla';
 import DateRangeFilter from '../components/DateRangeFilter';
 import PanelSeleccionEstadisticas from '../components/vigilante/PanelSeleccionEstadisticas';
+import { VisitasAreaCard } from '../components/vigilante_areas_estadisticas';
+import { VisitasMotivoCard } from '../components/vigilante_motivos_estadisticas';
 import { visitasService, visitantesService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
@@ -1740,6 +1742,8 @@ const DashboardVigilantePage = () => {
               onHistorialPageChange={handleHistorialPageChange}
               activosPagination={activosPagination}
               onActivosPageChange={handleActivosPageChange}
+              // Pasar datos adicionales para estadísticas
+              categoriaEstadisticas={categoriaEstadisticas}
             />
           </div>
 
