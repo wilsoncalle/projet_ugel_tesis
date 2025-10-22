@@ -56,8 +56,8 @@ const ModalVisitanteDetalle = ({ isOpen, onClose, visitante, periodo }) => {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
       >
         {/* --- HEADER --- */}
         <div className=" text-gray-800 p-5 flex justify-between items-start">
@@ -152,7 +152,7 @@ const ModalVisitanteDetalle = ({ isOpen, onClose, visitante, periodo }) => {
               </button>
             </div>
           ) : vistaActiva === "calendario" ? (
-            <div className="flex flex-col items-center space-y-6">
+            <div className="flex flex-col items-start space-y-6">
               <CalendarioVisitas
                 visitasPorFecha={detalle?.visitas_por_fecha || []}
                 compact={true}
@@ -231,18 +231,6 @@ const ModalVisitanteDetalle = ({ isOpen, onClose, visitante, periodo }) => {
               )}
             </div>
           )}
-        </div>
-
-        {/* --- FOOTER --- */}
-        <div className="border-t border-gray-200 px-6 py-3 bg-white">
-          <div className="flex justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
-            >
-              Cerrar
-            </button>
-          </div>
         </div>
       </div>
     </div>

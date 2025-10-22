@@ -131,7 +131,7 @@ const CalendarioVisitas = ({ visitasPorFecha = [] }) => {
             >
               <div
                 className={`
-                  aspect-square flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200
+                  aspect-[2/1] flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200
                   ${esDelMesActual ? 'text-gray-900' : 'text-gray-300'}
                   ${tieneVisitas ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 hover:shadow-md' : esFinDeSemana ? 'bg-gray-50 text-gray-400' : 'hover:bg-gray-50'}
                   cursor-pointer
@@ -205,7 +205,6 @@ const CalendarioVisitas = ({ visitasPorFecha = [] }) => {
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-blue-500 text-white rounded-full text-xs flex items-center justify-center font-bold">
-            2
           </div>
           <span>Múltiples visitas</span>
         </div>
