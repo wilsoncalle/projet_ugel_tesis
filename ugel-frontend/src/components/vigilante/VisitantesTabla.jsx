@@ -7,7 +7,7 @@ import TabView from '../TabView';
 import FiltrosVisitas from './FiltrosVisitas';
 import TableGenerica from '../TableGenerica';
 import ModalDetalles from '../ModalDetalles';
-import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon, DocumentTextIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
+import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon, DocumentTextIcon, DocumentArrowDownIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { VisitasAreaCard, VisitasMotivoCard, VisitasTotalesCard, VisitasPersonalCard, VisitantesFrecuentesCard } from '../vigilante_estadisticas';
 
 const VisitantesTabla = ({
@@ -34,6 +34,9 @@ const VisitantesTabla = ({
   // Estados para el modal de detalles
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  
+  // Estado para el dropdown de exportación
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
 
   const handleTabClick = (tab) => {
     onTabChange(tab);
@@ -784,25 +787,70 @@ const VisitantesTabla = ({
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold text-gray-800">Gestión de Visitantes</h2>
             <div className="flex items-center space-x-3">
-              {/* Botones de exportación - Solo visible en historial */}
+              {/* Dropdown de exportación - Solo visible en historial */}
               {activeTab === 'historial' && (
-                <div className="flex items-center space-x-2">
+                <div className="relative">
                   <button
-                    onClick={() => handleExport('excel')}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
-                    title="Exportar a Excel"
-                  >
-                    <DocumentTextIcon className="h-5 w-5" />
-                    <span className="text-xs font-medium">Excel</span>
-                  </button>
-                  <button
-                    onClick={() => handleExport('pdf')}
-                    className="flex items-center space-x-2 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
-                    title="Exportar a PDF"
+                    onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-amber-500 text-amber-600 rounded-full hover:bg-amber-50 transition-all duration-200 shadow-sm hover:shadow-md"
                   >
                     <DocumentArrowDownIcon className="h-5 w-5" />
-                    <span className="text-xs font-medium">PDF</span>
+                    <span className="text-sm font-semibold">Exportar</span>
+                    <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${exportDropdownOpen ? 'rotate-180' : ''}`} />
                   </button>
+                  
+                  {/* Dropdown Menu */}
+                  {exportDropdownOpen && (
+                    <>
+                      {/* Overlay para cerrar al hacer clic afuera */}
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setExportDropdownOpen(false)}
+                      />
+                      
+                      {/* Menu desplegable */}
+                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20 animate-fadeIn">
+                        <div className="py-1">
+                          {/* Opción Excel */}
+                          <button
+                            onClick={() => {
+                              handleExport('excel');
+                              setExportDropdownOpen(false);
+                            }}
+                            className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-green-50 transition-colors group"
+                          >
+                            <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                              <DocumentTextIcon className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-green-700">Excel</div>
+                              <div className="text-xs text-green-600">Formato .xlsx</div>
+                            </div>
+                          </button>
+                          
+                          {/* Divider */}
+                          <div className="border-t border-gray-100 mx-2"></div>
+                          
+                          {/* Opción PDF */}
+                          <button
+                            onClick={() => {
+                              handleExport('pdf');
+                              setExportDropdownOpen(false);
+                            }}
+                            className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-red-50 transition-colors group"
+                          >
+                            <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
+                              <DocumentArrowDownIcon className="h-5 w-5 text-red-600" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-red-700">PDF</div>
+                              <div className="text-xs text-red-600">Formato .pdf</div>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
               
