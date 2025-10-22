@@ -697,33 +697,43 @@ const getVisitasPorArea = async (fechaInicio = null, fechaFin = null) => {
 
 const getVisitasPorMotivo = async (fechaInicio = null, fechaFin = null) => {
   try {
-    let query = `
-      SELECT 
-        m.nombre_motivo,
-        COUNT(*) AS count,
-        (COUNT(*) * 100.0 / (
-          SELECT COUNT(*) 
-          FROM RegistrosVisitas rv2
-          ${fechaInicio && fechaFin ? 'WHERE rv2.fecha_ingreso BETWEEN $' + (params.length + 1) + ' AND $' + (params.length + 2) : ''}
-        )) AS porcentaje
-      FROM RegistrosVisitas rv
-      JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
-    `;
-    
     const params = [];
-    let paramCount = 0;
+    let query = '';
     
-    // Agregar filtro de fecha si se proporciona
     if (fechaInicio && fechaFin) {
-      paramCount += 2;
-      query += ` WHERE rv.fecha_ingreso BETWEEN $${paramCount - 1} AND $${paramCount}`;
+      // Consulta con filtro de fechas
+      query = `
+        SELECT 
+          m.nombre_motivo,
+          COUNT(*) AS count,
+          (COUNT(*) * 100.0 / (
+            SELECT COUNT(*) 
+            FROM RegistrosVisitas rv2
+            WHERE rv2.fecha_ingreso BETWEEN $1 AND $2
+          )) AS porcentaje
+        FROM RegistrosVisitas rv
+        JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
+        WHERE rv.fecha_ingreso BETWEEN $1 AND $2
+        GROUP BY rv.motivo_visita_id, m.nombre_motivo
+        ORDER BY count DESC
+      `;
       params.push(fechaInicio, fechaFin);
+    } else {
+      // Consulta sin filtro de fechas
+      query = `
+        SELECT 
+          m.nombre_motivo,
+          COUNT(*) AS count,
+          (COUNT(*) * 100.0 / (
+            SELECT COUNT(*) 
+            FROM RegistrosVisitas rv2
+          )) AS porcentaje
+        FROM RegistrosVisitas rv
+        JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
+        GROUP BY rv.motivo_visita_id, m.nombre_motivo
+        ORDER BY count DESC
+      `;
     }
-    
-    query += `
-      GROUP BY rv.motivo_visita_id, m.nombre_motivo
-      ORDER BY count DESC
-    `;
     
     logger.info(`Ejecutando consulta de estadísticas por motivo: ${query}`);
     logger.info(`Parámetros: ${JSON.stringify(params)}`);
