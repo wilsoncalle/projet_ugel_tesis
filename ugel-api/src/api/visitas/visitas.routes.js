@@ -75,6 +75,50 @@ router.get('/por-motivo',
 );
 
 /**
+ * @route   GET /api/visitas/por-personal
+ * @desc    Obtener estadísticas de visitas por personal visitado
+ * @access  Private
+ */
+router.get('/por-personal', 
+  authenticateToken,
+  requireActiveUser,
+  controller.getVisitasPorPersonal
+);
+
+/**
+ * @route   GET /api/visitas/visitantes-frecuentes
+ * @desc    Obtener visitantes frecuentes
+ * @access  Private
+ */
+router.get('/visitantes-frecuentes', 
+  authenticateToken,
+  requireActiveUser,
+  controller.getVisitantesFrecuentes
+);
+
+/**
+ * @route   GET /api/visitas/visitante/:visitanteId/detalle
+ * @desc    Obtener detalle de visitas de un visitante específico
+ * @access  Private
+ */
+router.get('/visitante/:visitanteId/detalle', 
+  authenticateToken,
+  requireActiveUser,
+  controller.getVisitanteDetalle
+);
+
+/**
+ * @route   GET /api/visitas/totales
+ * @desc    Obtener estadísticas de visitas totales
+ * @access  Private
+ */
+router.get('/totales', 
+  authenticateToken,
+  requireActiveUser,
+  controller.getVisitasTotales
+);
+
+/**
  * @route   GET /api/visitas/:id
  * @desc    Obtener visita por ID
  * @access  Private

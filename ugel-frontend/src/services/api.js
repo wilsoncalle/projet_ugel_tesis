@@ -148,6 +148,9 @@ export const visitasService = {
   registrarSalida: (id) => api.put(`/visitas/${id}/salida`),
   getVisitasPorArea: (periodo = 'todo') => api.get(`/visitas/por-area?periodo=${periodo}`),
   getVisitasPorMotivo: (periodo = 'todo') => api.get(`/visitas/por-motivo?periodo=${periodo}`),
+  getVisitasPorPersonal: (periodo = 'mes') => api.get(`/visitas/por-personal?periodo=${periodo}`),
+  getVisitantesFrecuentes: (periodo = 'mes') => api.get(`/visitas/visitantes-frecuentes?periodo=${periodo}`),
+  getVisitanteDetalle: (visitanteId, periodo = 'mes') => api.get(`/visitas/visitante/${visitanteId}/detalle?periodo=${periodo}`),
 };
 
 export const tiposDocumentoService = {

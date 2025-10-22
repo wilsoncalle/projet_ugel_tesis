@@ -740,6 +740,285 @@ const getVisitasPorMotivo = async (fechaInicio = null, fechaFin = null) => {
   }
 };
 
+/**
+ * Obtener total de visitas en un período
+ * @param {Date} fechaInicio - Fecha de inicio del rango (opcional)
+ * @param {Date} fechaFin - Fecha de fin del rango (opcional)
+ * @returns {number} Total de visitas
+ */
+const getTotalVisitas = async (fechaInicio = null, fechaFin = null) => {
+  try {
+    let query = `SELECT COUNT(*) AS total FROM RegistrosVisitas`;
+    const params = [];
+    
+    if (fechaInicio && fechaFin) {
+      query += ` WHERE fecha_ingreso BETWEEN $1 AND $2`;
+      params.push(fechaInicio, fechaFin);
+    }
+    
+    logger.info(`Ejecutando consulta de total de visitas: ${query}`);
+    logger.info(`Parámetros: ${JSON.stringify(params)}`);
+    
+    const result = await db.query(query, params);
+    const total = parseInt(result.rows[0].total, 10);
+    
+    logger.info(`Total de visitas obtenido: ${total}`);
+    
+    return total;
+    
+  } catch (error) {
+    logger.error('Error obteniendo total de visitas:', error);
+    throw new AppError('Error obteniendo total de visitas', 500);
+  }
+};
+
+/**
+ * Obtener flujo de visitas por día
+ * @param {Date} fechaInicio - Fecha de inicio del rango (opcional)
+ * @param {Date} fechaFin - Fecha de fin del rango (opcional)
+ * @returns {Array} Array de objetos con fecha y conteo de visitas por día
+ */
+const getFlujoDiario = async (fechaInicio = null, fechaFin = null) => {
+  try {
+    let query = `
+      SELECT 
+        DATE(fecha_ingreso) AS dia,
+        COUNT(*) AS visitas
+      FROM RegistrosVisitas
+    `;
+    
+    const params = [];
+    
+    if (fechaInicio && fechaFin) {
+      query += ` WHERE fecha_ingreso BETWEEN $1 AND $2`;
+      params.push(fechaInicio, fechaFin);
+    }
+    
+    query += `
+      GROUP BY DATE(fecha_ingreso)
+      ORDER BY dia ASC
+    `;
+    
+    logger.info(`Ejecutando consulta de flujo diario: ${query}`);
+    logger.info(`Parámetros: ${JSON.stringify(params)}`);
+    
+    const result = await db.query(query, params);
+    
+    logger.info(`Flujo diario obtenido: ${result.rows.length} días`);
+    
+    return result.rows;
+    
+  } catch (error) {
+    logger.error('Error obteniendo flujo diario:', error);
+    throw new AppError('Error obteniendo flujo diario', 500);
+  }
+};
+
+/**
+ * Obtener estadísticas de visitas por personal visitado
+ * @param {Date|null} fechaInicio - Fecha de inicio del filtro
+ * @param {Date|null} fechaFin - Fecha de fin del filtro
+ * @returns {Array} Array de objetos con nombre_personal y visitas
+ */
+const getVisitasPorPersonal = async (fechaInicio = null, fechaFin = null) => {
+  try {
+    let query = `
+      SELECT 
+        CONCAT(p.nombres, ' ', p.apellidos) AS nombre_personal,
+        COUNT(*) AS visitas
+      FROM RegistrosVisitas rv
+      JOIN Personal p ON rv.personal_visitado_id = p.id
+    `;
+    
+    const params = [];
+    let paramCount = 0;
+    
+    // Agregar filtro de fecha si se proporciona
+    if (fechaInicio && fechaFin) {
+      paramCount += 2;
+      query += ` WHERE rv.fecha_ingreso BETWEEN $${paramCount - 1} AND $${paramCount}`;
+      params.push(fechaInicio, fechaFin);
+    }
+    
+    query += `
+      GROUP BY rv.personal_visitado_id, p.nombres, p.apellidos
+      ORDER BY visitas DESC
+    `;
+    
+    logger.info(`Ejecutando consulta de estadísticas por personal: ${query}`);
+    logger.info(`Parámetros: ${JSON.stringify(params)}`);
+    
+    const result = await db.query(query, params);
+    
+    logger.info(`Estadísticas por personal obtenidas: ${result.rows.length} registros`);
+    
+    return result.rows;
+    
+  } catch (error) {
+    logger.error('Error en repositorio obteniendo estadísticas por personal:', error);
+    throw new AppError('Error obteniendo estadísticas por personal', 500);
+  }
+};
+
+/**
+ * Obtener visitantes frecuentes (top 10)
+ * @param {Date|null} fechaInicio - Fecha de inicio del filtro
+ * @param {Date|null} fechaFin - Fecha de fin del filtro
+ * @returns {Array} Array de objetos con visitante, num_visitas y ultima_visita
+ */
+const getVisitantesFrecuentes = async (fechaInicio = null, fechaFin = null) => {
+  try {
+    let query = `
+      SELECT 
+        v.id AS visitante_id,
+        CONCAT(v.nombres, ' ', v.apellidos) AS visitante,
+        v.numero_documento,
+        td.codigo AS tipo_documento,
+        COUNT(rv.id) AS num_visitas,
+        MAX(rv.fecha_ingreso) AS ultima_visita
+      FROM RegistrosVisitas rv
+      JOIN Visitantes v ON rv.visitante_id = v.id
+      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+    `;
+    
+    const params = [];
+    
+    if (fechaInicio && fechaFin) {
+      query += ` WHERE rv.fecha_ingreso BETWEEN $1 AND $2`;
+      params.push(fechaInicio, fechaFin);
+    }
+    
+    query += `
+      GROUP BY v.id, v.nombres, v.apellidos, v.numero_documento, td.codigo
+      ORDER BY num_visitas DESC
+      LIMIT 10
+    `;
+    
+    logger.info(`Ejecutando consulta de visitantes frecuentes: ${query}`);
+    logger.info(`Parámetros: ${JSON.stringify(params)}`);
+    
+    const result = await db.query(query, params);
+    
+    logger.info(`Visitantes frecuentes obtenidos: ${result.rows.length} registros`);
+    
+    return result.rows;
+    
+  } catch (error) {
+    logger.error('Error en repositorio obteniendo visitantes frecuentes:', error);
+    throw new AppError('Error obteniendo visitantes frecuentes', 500);
+  }
+};
+
+/**
+ * Obtener detalle de visitas de un visitante específico
+ * @param {number} visitanteId - ID del visitante
+ * @param {Date|null} fechaInicio - Fecha de inicio del filtro
+ * @param {Date|null} fechaFin - Fecha de fin del filtro
+ * @returns {Object} Detalle del visitante con todas sus visitas
+ */
+const getVisitanteDetalle = async (visitanteId, fechaInicio = null, fechaFin = null) => {
+  try {
+    // Query principal para datos del visitante
+    let queryVisitante = `
+      SELECT 
+        v.id,
+        v.nombres,
+        v.apellidos,
+        v.numero_documento,
+        td.codigo AS tipo_documento,
+        COUNT(rv.id) AS total_visitas,
+        MAX(rv.fecha_ingreso) AS ultima_visita
+      FROM Visitantes v
+      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+      LEFT JOIN RegistrosVisitas rv ON v.id = rv.visitante_id
+    `;
+    
+    const paramsVisitante = [visitanteId];
+    let paramCount = 1;
+    
+    queryVisitante += ` WHERE v.id = $${paramCount}`;
+    
+    if (fechaInicio && fechaFin) {
+      paramCount++;
+      queryVisitante += ` AND rv.fecha_ingreso BETWEEN $${paramCount} AND $${paramCount + 1}`;
+      paramsVisitante.push(fechaInicio, fechaFin);
+      paramCount++;
+    }
+    
+    queryVisitante += `
+      GROUP BY v.id, v.nombres, v.apellidos, v.numero_documento, td.codigo
+    `;
+    
+    // Query para obtener todas las visitas del visitante
+    let queryVisitas = `
+      SELECT 
+        DATE(rv.fecha_ingreso) AS fecha,
+        COUNT(*) AS visitas_dia,
+        ARRAY_AGG(
+          JSON_BUILD_OBJECT(
+            'hora_ingreso', TO_CHAR(rv.fecha_ingreso, 'HH24:MI'),
+            'hora_salida', CASE WHEN rv.fecha_salida IS NOT NULL 
+                               THEN TO_CHAR(rv.fecha_salida, 'HH24:MI') 
+                               ELSE NULL END,
+            'motivo', m.nombre_motivo,
+            'area', a.nombre_area,
+            'personal', CONCAT(p.nombres, ' ', p.apellidos)
+          )
+          ORDER BY rv.fecha_ingreso
+        ) AS detalles
+      FROM RegistrosVisitas rv
+      LEFT JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
+      LEFT JOIN AreasDestino a ON rv.area_destino_id = a.id
+      LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
+      WHERE rv.visitante_id = $1
+    `;
+    
+    const paramsVisitas = [visitanteId];
+    
+    if (fechaInicio && fechaFin) {
+      queryVisitas += ` AND rv.fecha_ingreso BETWEEN $2 AND $3`;
+      paramsVisitas.push(fechaInicio, fechaFin);
+    }
+    
+    queryVisitas += `
+      GROUP BY DATE(rv.fecha_ingreso)
+      ORDER BY DATE(rv.fecha_ingreso) DESC
+    `;
+    
+    // Ejecutar ambas queries
+    const [visitanteResult, visitasResult] = await Promise.all([
+      db.query(queryVisitante, paramsVisitante),
+      db.query(queryVisitas, paramsVisitas)
+    ]);
+    
+    if (visitanteResult.rows.length === 0) {
+      throw new AppError('Visitante no encontrado', 404);
+    }
+    
+    const visitante = visitanteResult.rows[0];
+    const visitas = visitasResult.rows;
+    
+    // Calcular días de la semana visitados
+    const diasSemana = new Set();
+    visitas.forEach(v => {
+      const fecha = new Date(v.fecha);
+      const dia = fecha.toLocaleDateString('es-ES', { weekday: 'short' });
+      diasSemana.add(dia);
+    });
+    
+    return {
+      ...visitante,
+      visitas_por_fecha: visitas,
+      dias_semana: Array.from(diasSemana)
+    };
+    
+  } catch (error) {
+    logger.error(`Error obteniendo detalle del visitante ${visitanteId}:`, error);
+    if (error instanceof AppError) throw error;
+    throw new AppError('Error obteniendo detalle del visitante', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findActivas,
@@ -750,5 +1029,10 @@ module.exports = {
   getEstadisticas,
   findVisitaActivaPorVisitante,
   getVisitasPorArea,
-  getVisitasPorMotivo
+  getVisitasPorMotivo,
+  getTotalVisitas,
+  getFlujoDiario,
+  getVisitasPorPersonal,
+  getVisitantesFrecuentes,
+  getVisitanteDetalle
 };

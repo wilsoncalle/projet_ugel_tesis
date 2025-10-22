@@ -796,6 +796,233 @@ const getVisitasPorMotivo = async (periodo = 'todo') => {
   }
 };
 
+/**
+ * Obtener estadísticas de total de visitas por período
+ * @param {string} periodo - Periodo de consulta (hoy, semana, mes, anio, todo)
+ * @returns {Object} Datos de estadísticas con total y flujo diario
+ */
+const getVisitasTotales = async (periodo = 'mes') => {
+  try {
+    logger.info(`Obteniendo estadísticas totales para periodo: ${periodo}`);
+    
+    // Calcular fechas según el periodo
+    let fechaInicio, fechaFin;
+    const ahora = new Date();
+    
+    switch (periodo) {
+      case 'hoy':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
+        break;
+      case 'semana':
+        const inicioSemana = new Date(ahora);
+        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
+        inicioSemana.setHours(0, 0, 0, 0);
+        fechaInicio = inicioSemana;
+        fechaFin = new Date(inicioSemana);
+        fechaFin.setDate(inicioSemana.getDate() + 6);
+        fechaFin.setHours(23, 59, 59);
+        break;
+      case 'mes':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'anio':
+        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
+        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        break;
+      case 'todo':
+      default:
+        fechaInicio = null;
+        fechaFin = null;
+        break;
+    }
+    
+    // Obtener total de visitas y flujo diario del repositorio
+    const [totalVisitas, flujoDiario] = await Promise.all([
+      repository.getTotalVisitas(fechaInicio, fechaFin),
+      repository.getFlujoDiario(fechaInicio, fechaFin)
+    ]);
+    
+    logger.info(`Estadísticas totales obtenidas: ${totalVisitas} visitas, ${flujoDiario.length} días`);
+    
+    return {
+      total: totalVisitas,
+      flujoDiario: flujoDiario
+    };
+    
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas totales:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas de visitas por personal visitado con filtro de período
+ * @param {string} periodo - Periodo de consulta (hoy, semana, mes, anio, todo)
+ * @returns {Array} Estadísticas de visitas por personal visitado
+ */
+const getVisitasPorPersonal = async (periodo = 'mes') => {
+  try {
+    logger.info(`Obteniendo estadísticas por personal para periodo: ${periodo}`);
+    
+    // Calcular fechas según el periodo
+    let fechaInicio, fechaFin;
+    const ahora = new Date();
+    
+    switch (periodo) {
+      case 'hoy':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
+        break;
+      case 'semana':
+        const inicioSemana = new Date(ahora);
+        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
+        inicioSemana.setHours(0, 0, 0, 0);
+        fechaInicio = inicioSemana;
+        fechaFin = new Date(inicioSemana);
+        fechaFin.setDate(inicioSemana.getDate() + 6);
+        fechaFin.setHours(23, 59, 59);
+        break;
+      case 'mes':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'anio':
+        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
+        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        break;
+      case 'todo':
+      default:
+        fechaInicio = null;
+        fechaFin = null;
+        break;
+    }
+    
+    // Obtener estadísticas del repositorio
+    const estadisticas = await repository.getVisitasPorPersonal(fechaInicio, fechaFin);
+    
+    logger.info(`Estadísticas obtenidas: ${estadisticas.length} personal`);
+    
+    return estadisticas;
+    
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas por personal:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener visitantes frecuentes con filtro de período
+ * @param {string} periodo - Periodo de consulta (hoy, semana, mes, anio, todo)
+ * @returns {Array} Visitantes frecuentes
+ */
+const getVisitantesFrecuentes = async (periodo = 'mes') => {
+  try {
+    logger.info(`Obteniendo visitantes frecuentes para periodo: ${periodo}`);
+    
+    // Calcular fechas según el periodo
+    let fechaInicio, fechaFin;
+    const ahora = new Date();
+    
+    switch (periodo) {
+      case 'hoy':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
+        break;
+      case 'semana':
+        const inicioSemana = new Date(ahora);
+        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
+        inicioSemana.setHours(0, 0, 0, 0);
+        fechaInicio = inicioSemana;
+        fechaFin = new Date(inicioSemana);
+        fechaFin.setDate(inicioSemana.getDate() + 6);
+        fechaFin.setHours(23, 59, 59);
+        break;
+      case 'mes':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'anio':
+        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
+        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        break;
+      case 'todo':
+      default:
+        fechaInicio = null;
+        fechaFin = null;
+        break;
+    }
+    
+    // Obtener visitantes frecuentes del repositorio
+    const visitantes = await repository.getVisitantesFrecuentes(fechaInicio, fechaFin);
+    
+    logger.info(`Visitantes frecuentes obtenidos: ${visitantes.length} registros`);
+    
+    return visitantes;
+    
+  } catch (error) {
+    logger.error('Error obteniendo visitantes frecuentes:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener detalle de visitas de un visitante específico
+ * @param {number} visitanteId - ID del visitante
+ * @param {string} periodo - Periodo de consulta
+ * @returns {Object} Detalle del visitante con sus visitas
+ */
+const getVisitanteDetalle = async (visitanteId, periodo = 'mes') => {
+  try {
+    logger.info(`Obteniendo detalle del visitante ${visitanteId} para periodo: ${periodo}`);
+    
+    // Calcular fechas según el periodo
+    let fechaInicio, fechaFin;
+    const ahora = new Date();
+    
+    switch (periodo) {
+      case 'hoy':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
+        break;
+      case 'semana':
+        const inicioSemana = new Date(ahora);
+        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
+        inicioSemana.setHours(0, 0, 0, 0);
+        fechaInicio = inicioSemana;
+        fechaFin = new Date(inicioSemana);
+        fechaFin.setDate(inicioSemana.getDate() + 6);
+        fechaFin.setHours(23, 59, 59);
+        break;
+      case 'mes':
+        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        break;
+      case 'anio':
+        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
+        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        break;
+      case 'todo':
+      default:
+        fechaInicio = null;
+        fechaFin = null;
+        break;
+    }
+    
+    // Obtener detalle del visitante
+    const detalle = await repository.getVisitanteDetalle(visitanteId, fechaInicio, fechaFin);
+    
+    logger.info(`Detalle del visitante obtenido con ${detalle.visitas_por_fecha?.length || 0} días de visita`);
+    
+    return detalle;
+    
+  } catch (error) {
+    logger.error(`Error obteniendo detalle del visitante ${visitanteId}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllVisitas,
   getVisitasActivas,
@@ -807,5 +1034,9 @@ module.exports = {
   exportarAExcel,
   exportarAPDF,
   getVisitasPorArea,
-  getVisitasPorMotivo
+  getVisitasPorMotivo,
+  getVisitasTotales,
+  getVisitasPorPersonal,
+  getVisitantesFrecuentes,
+  getVisitanteDetalle
 };

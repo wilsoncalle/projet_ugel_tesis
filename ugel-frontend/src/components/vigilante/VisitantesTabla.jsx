@@ -8,8 +8,7 @@ import FiltrosVisitas from './FiltrosVisitas';
 import TableGenerica from '../TableGenerica';
 import ModalDetalles from '../ModalDetalles';
 import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon, DocumentTextIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
-import { VisitasAreaCard } from '../vigilante_areas_estadisticas';
-import { VisitasMotivoCard } from '../vigilante_motivos_estadisticas';
+import { VisitasAreaCard, VisitasMotivoCard, VisitasTotalesCard, VisitasPersonalCard, VisitantesFrecuentesCard } from '../vigilante_estadisticas';
 
 const VisitantesTabla = ({
   visitantesActivos,
@@ -835,6 +834,12 @@ const VisitantesTabla = ({
                   <VisitasAreaCard />
                 ) : categoriaEstadisticas === 'motivos' ? (
                   <VisitasMotivoCard />
+                ) : categoriaEstadisticas === 'total-visitas' ? (
+                  <VisitasTotalesCard />
+                ) : categoriaEstadisticas === 'personal' ? (
+                  <VisitasPersonalCard />
+                ) : categoriaEstadisticas === 'visitantes' ? (
+                  <VisitantesFrecuentesCard />
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center text-gray-500">

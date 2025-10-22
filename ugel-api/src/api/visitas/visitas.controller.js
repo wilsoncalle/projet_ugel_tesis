@@ -254,6 +254,75 @@ const getVisitasPorMotivo = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener estadísticas de visitas totales
+ * @route GET /api/visitas/totales
+ */
+const getVisitasTotales = asyncHandler(async (req, res) => {
+  const { periodo = 'mes' } = req.query;
+  logger.info(`Solicitud de estadísticas totales para periodo: ${periodo}`);
+  
+  const result = await service.getVisitasTotales(periodo);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas totales obtenidas exitosamente',
+    data: result
+  });
+});
+
+/**
+ * Obtener estadísticas de visitas por personal visitado
+ * @route GET /api/visitas/por-personal
+ */
+const getVisitasPorPersonal = asyncHandler(async (req, res) => {
+  const { periodo = 'mes' } = req.query;
+  logger.info(`Solicitud de estadísticas por personal para periodo: ${periodo}`);
+  
+  const result = await service.getVisitasPorPersonal(periodo);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas por personal obtenidas exitosamente',
+    data: result
+  });
+});
+
+/**
+ * Obtener visitantes frecuentes
+ * @route GET /api/visitas/visitantes-frecuentes
+ */
+const getVisitantesFrecuentes = asyncHandler(async (req, res) => {
+  const { periodo = 'mes' } = req.query;
+  logger.info(`Solicitud de visitantes frecuentes para periodo: ${periodo}`);
+  
+  const result = await service.getVisitantesFrecuentes(periodo);
+  
+  res.json({
+    success: true,
+    message: 'Visitantes frecuentes obtenidos exitosamente',
+    data: result
+  });
+});
+
+/**
+ * Obtener detalle de visitas de un visitante específico
+ * @route GET /api/visitas/visitante/:visitanteId/detalle
+ */
+const getVisitanteDetalle = asyncHandler(async (req, res) => {
+  const { visitanteId } = req.params;
+  const { periodo = 'mes' } = req.query;
+  logger.info(`Solicitud de detalle del visitante ${visitanteId} para periodo: ${periodo}`);
+  
+  const result = await service.getVisitanteDetalle(parseInt(visitanteId), periodo);
+  
+  res.json({
+    success: true,
+    message: 'Detalle del visitante obtenido exitosamente',
+    data: result
+  });
+});
+
 module.exports = {
   getAll,
   getActivas,
@@ -263,5 +332,9 @@ module.exports = {
   exportarAExcel,
   exportarAPDF,
   getVisitasPorArea,
-  getVisitasPorMotivo
+  getVisitasPorMotivo,
+  getVisitasTotales,
+  getVisitasPorPersonal,
+  getVisitantesFrecuentes,
+  getVisitanteDetalle
 };
