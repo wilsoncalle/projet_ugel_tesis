@@ -13,29 +13,38 @@
     @apply bg-gray-50 text-gray-900;
   }
 
-  /* Estilo personalizado para el scrollbar que coincida con el fondo */
-  html::-webkit-scrollbar {
+  /* =================================================================== */
+  /* ESTILOS DE SCROLLBAR CORREGIDOS (APLICADOS A TODO) */
+  /* =================================================================== */
+
+  /* Estilo para CUALQUIER scrollbar que coincida con el fondo */
+  /* ANTES: html::-webkit-scrollbar */
+  ::-webkit-scrollbar {
     width: 17px; /* Ancho del scrollbar */
   }
 
-  html::-webkit-scrollbar-track {
+  /* ANTES: html::-webkit-scrollbar-track */
+  ::-webkit-scrollbar-track {
     background: #f9fafb; /* bg-gray-50 - mismo color del body */
     backdrop-filter: blur(8px); /* Efecto de difuminado */
     -webkit-backdrop-filter: blur(8px);
   }
 
-  html::-webkit-scrollbar-thumb {
+  /* ANTES: html::-webkit-scrollbar-thumb */
+  ::-webkit-scrollbar-thumb {
     background: #e5e7eb; /* bg-gray-200 - color sutil para el thumb */
     border-radius: 8px;
     border: 2px solid #f9fafb; /* borde del mismo color del track */
   }
 
-  html::-webkit-scrollbar-thumb:hover {
+  /* ANTES: html::-webkit-scrollbar-thumb:hover */
+  ::-webkit-scrollbar-thumb:hover {
     background: #d1d5db; /* bg-gray-300 - más oscuro al hover */
   }
 
-  /* Para Firefox */
-  html {
+  /* Para Firefox (aplicado a todos los elementos con *) */
+  /* ANTES: html { ... } */
+  * {
     scrollbar-width: thin;
     scrollbar-color: #e5e7eb #f9fafb; /* thumb track */
   }

@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 
 const SelectCustom = ({
   options = [],
@@ -16,7 +15,7 @@ const SelectCustom = ({
   required = false,
   noOptionsMessage = "No se encontraron resultados",
   menuWidth = 'auto',
-  isSearchable = true, // Agregar isSearchable como prop válida
+  isSearchable = true,
   ...props
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,22 +24,18 @@ const SelectCustom = ({
   const [calculatedMenuWidth, setCalculatedMenuWidth] = useState('250px');
   const [menuPosition, setMenuPosition] = useState({ openUpwards: false, alignRight: false });
   const [focusedIndex, setFocusedIndex] = useState(-1);
-  const [menuStyle, setMenuStyle] = useState({});
-  const [usePortal, setUsePortal] = useState(false);
-
+  
   const inputRef = useRef(null);
   const containerRef = useRef(null);
   const optionRefs = useRef([]);
 
-  // Memoizar las opciones filtradas para evitar recálculos innecesarios
   const filteredOptions = useMemo(() => {
     if (!query) return options;
-    return options.filter((option) => 
+    return options.filter((option) =>
       option.label.toLowerCase().includes(query.toLowerCase())
     );
   }, [options, query]);
 
-  // Función optimizada para calcular posición y ancho
   const calculatePositionAndWidth = useCallback(() => {
     if (!containerRef.current) {
       return { width: '250px', openUpwards: false, alignRight: false };
@@ -51,13 +46,12 @@ const SelectCustom = ({
     const viewportHeight = window.innerHeight;
     const viewportWidth = window.innerWidth;
 
-    // Detectar si estamos dentro de un modal
-    const isInModal = container.closest('[role="dialog"]') !== null;
-    setUsePortal(isInModal);
+    // ----- CORRECCIÓN #1: ELIMINAMOS LA LÍNEA QUE CAUSABA EL ERROR 'setUsePortal' -----
+    // const isInModal = container.closest('[role="dialog"]') !== null;
+    // setUsePortal(isInModal); // <--- ESTA LÍNEA SE FUE
 
     let width = menuWidth;
     if (menuWidth === 'auto') {
-      // Optimización: usar canvas para medir texto más rápido
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       context.font = '14px system-ui, -apple-system, sans-serif';
@@ -81,22 +75,9 @@ const SelectCustom = ({
     const spaceRight = viewportWidth - rect.left;
     const alignRight = spaceRight < menuWidthNumber && rect.right > menuWidthNumber;
 
-    // Si estamos en un modal, calcular posición absoluta
-    if (isInModal) {
-      const style = {
-        position: 'fixed',
-        top: openUpwards ? `${rect.top - menuHeight - 8}px` : `${rect.bottom + 8}px`,
-        left: alignRight ? `${rect.right - menuWidthNumber}px` : `${rect.left}px`,
-        width: width,
-        zIndex: 9999
-      };
-      setMenuStyle(style);
-    }
-
     return { width, openUpwards, alignRight };
   }, [options, menuWidth]);
 
-  // Función para hacer scroll al elemento enfocado
   const scrollToOption = useCallback((index) => {
     if (optionRefs.current[index]) {
       optionRefs.current[index].scrollIntoView({
@@ -106,109 +87,15 @@ const SelectCustom = ({
     }
   }, []);
 
-  // Manejar navegación con teclado
-  const handleKeyDown = useCallback((e) => {
-    if (!isOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') {
-        e.preventDefault();
-        handleInputClick();
-        return;
-      }
-    }
+  const handleOptionSelect = useCallback((option) => {
+    onChange?.(option);
+    setQuery('');
+    setIsOpen(false);
+    setIsTyping(false);
+    setFocusedIndex(-1);
+  }, [onChange]);
 
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setFocusedIndex(prev => {
-          const newIndex = prev < filteredOptions.length - 1 ? prev + 1 : 0;
-          setTimeout(() => scrollToOption(newIndex), 0);
-          return newIndex;
-        });
-        break;
-        
-      case 'ArrowUp':
-        e.preventDefault();
-        setFocusedIndex(prev => {
-          const newIndex = prev > 0 ? prev - 1 : filteredOptions.length - 1;
-          setTimeout(() => scrollToOption(newIndex), 0);
-          return newIndex;
-        });
-        break;
-        
-      case 'Enter':
-        e.preventDefault();
-        if (isOpen && focusedIndex >= 0 && filteredOptions[focusedIndex]) {
-          handleOptionSelect(filteredOptions[focusedIndex]);
-        } else if (!isOpen) {
-          handleInputClick();
-        }
-        break;
-        
-      case 'Escape':
-        e.preventDefault();
-        setIsOpen(false);
-        setIsTyping(false);
-        setQuery('');
-        setFocusedIndex(-1);
-        inputRef.current?.blur();
-        break;
-        
-      case 'Tab':
-        if (isOpen) {
-          setIsOpen(false);
-          setIsTyping(false);
-          setQuery('');
-          setFocusedIndex(-1);
-        }
-        break;
-    }
-  }, [isOpen, focusedIndex, filteredOptions]);
-
-  // useEffect para eventos de scroll y resize (throttled)
-  useEffect(() => {
-    if (!isOpen) return;
-    
-    let timeoutId;
-    const handleRecalculate = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        const { width, openUpwards, alignRight } = calculatePositionAndWidth();
-        setCalculatedMenuWidth(width);
-        setMenuPosition({ openUpwards, alignRight });
-      }, 16); // ~60fps
-    };
-
-    window.addEventListener('scroll', handleRecalculate, true);
-    window.addEventListener('resize', handleRecalculate);
-    
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('scroll', handleRecalculate, true);
-      window.removeEventListener('resize', handleRecalculate);
-    };
-  }, [isOpen, calculatePositionAndWidth]);
-
-  // Cerrar dropdown al hacer click fuera
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
-        setIsOpen(false);
-        setIsTyping(false);
-        setQuery('');
-        setFocusedIndex(-1);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Reset focused index cuando cambian las opciones filtradas
-  useEffect(() => {
-    if (isOpen && filteredOptions.length > 0 && focusedIndex >= filteredOptions.length) {
-      setFocusedIndex(0);
-    }
-  }, [filteredOptions.length, focusedIndex, isOpen]);
-
+  // ----- CORRECCIÓN #2: MOVIMOS ESTAS FUNCIONES ANTES DE 'handleKeyDown' -----
   const handleInputClick = useCallback(() => {
     if (isDisabled) return;
 
@@ -230,6 +117,103 @@ const SelectCustom = ({
       inputRef.current?.focus();
     }, 0);
   }, [isDisabled, isOpen, calculatePositionAndWidth]);
+
+  const handleKeyDown = useCallback((e) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        e.preventDefault();
+        handleInputClick();
+        return;
+      }
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex(prev => {
+          const newIndex = prev < filteredOptions.length - 1 ? prev + 1 : 0;
+          setTimeout(() => scrollToOption(newIndex), 0);
+          return newIndex;
+        });
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex(prev => {
+          const newIndex = prev > 0 ? prev - 1 : filteredOptions.length - 1;
+          setTimeout(() => scrollToOption(newIndex), 0);
+          return newIndex;
+        });
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (isOpen && focusedIndex >= 0 && filteredOptions[focusedIndex]) {
+          handleOptionSelect(filteredOptions[focusedIndex]);
+        } else if (!isOpen) {
+          handleInputClick();
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        setIsTyping(false);
+        setQuery('');
+        setFocusedIndex(-1);
+        inputRef.current?.blur();
+        break;
+      case 'Tab':
+        if (isOpen) {
+          setIsOpen(false);
+          setIsTyping(false);
+          setQuery('');
+          setFocusedIndex(-1);
+        }
+        break;
+      default:
+        break;
+    }
+  }, [isOpen, focusedIndex, filteredOptions, handleInputClick, handleOptionSelect, scrollToOption]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    let timeoutId;
+    const handleRecalculate = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const { width, openUpwards, alignRight } = calculatePositionAndWidth();
+        setCalculatedMenuWidth(width);
+        setMenuPosition({ openUpwards, alignRight });
+      }, 16);
+    };
+
+    window.addEventListener('scroll', handleRecalculate, true);
+    window.addEventListener('resize', handleRecalculate);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('scroll', handleRecalculate, true);
+      window.removeEventListener('resize', handleRecalculate);
+    };
+  }, [isOpen, calculatePositionAndWidth]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setIsTyping(false);
+        setQuery('');
+        setFocusedIndex(-1);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && filteredOptions.length > 0 && focusedIndex >= filteredOptions.length) {
+      setFocusedIndex(0);
+    }
+  }, [filteredOptions.length, focusedIndex, isOpen]);
   
   const handleInputChange = useCallback((e) => {
     if (!isSearchable) return;
@@ -246,14 +230,6 @@ const SelectCustom = ({
       setIsOpen(true);
     }
   }, [isOpen, calculatePositionAndWidth, isSearchable]);
-
-  const handleOptionSelect = useCallback((option) => {
-    onChange?.(option);
-    setQuery('');
-    setIsOpen(false);
-    setIsTyping(false);
-    setFocusedIndex(-1);
-  }, [onChange]);
 
   const handleOptionHover = useCallback((index) => {
     setFocusedIndex(index);
@@ -349,62 +325,21 @@ const SelectCustom = ({
         </div>
 
         {isOpen && (
-          usePortal ? createPortal(
-            <div
-              className="fixed bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
-              style={{
-                ...menuStyle,
-                minWidth: '250px',
-                maxWidth: '450px'
-              }}
-              role="listbox"
-              aria-label="Opciones"
-            >
-              {isLoading ? (
-                <div className="px-3 py-2 text-sm text-gray-500">
-                  Cargando...
-                </div>
-              ) : filteredOptions.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-gray-500 italic">
-                  {noOptionsMessage}
-                </div>
-              ) : (
-                filteredOptions.map((option, index) => (
-                  <div
-                    key={option.value}
-                    ref={(el) => (optionRefs.current[index] = el)}
-                    id={`option-${index}`}
-                    className={`
-                      px-3 py-2 text-sm cursor-pointer transition-colors
-                      ${index === focusedIndex ? 'bg-blue-100 text-blue-900' : 'text-gray-900 hover:bg-gray-100'}
-                      ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
-                    onClick={() => !option.disabled && handleOptionSelect(option)}
-                    onMouseEnter={() => setFocusedIndex(index)}
-                    role="option"
-                    aria-selected={index === focusedIndex}
-                  >
-                    {option.label}
-                  </div>
-                ))
-              )}
-            </div>,
-            document.body
-          ) : (
-            <div
-              className={`
-                absolute z-[60] bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto
-                ${menuPosition.openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'}
-                ${menuPosition.alignRight ? 'right-0' : 'left-0'}
-              `}
-              style={{
-                width: calculatedMenuWidth,
-                minWidth: '250px',
-                maxWidth: '450px'
-              }}
-              role="listbox"
-              aria-label="Opciones"
-            >
+          <div
+            className={`
+              absolute bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto
+              ${menuPosition.openUpwards ? 'bottom-full mb-1' : 'top-full mt-1'}
+              ${menuPosition.alignRight ? 'right-0' : 'left-0'}
+              z-[1001]
+            `}
+            style={{
+              width: calculatedMenuWidth,
+              minWidth: '250px',
+              maxWidth: '450px'
+            }}
+            role="listbox"
+            aria-label="Opciones"
+          >
             {isLoading ? (
               <div className="px-3 py-2 text-sm text-gray-500">
                 Cargando...
@@ -422,8 +357,8 @@ const SelectCustom = ({
                   className={`
                     px-3 py-2 text-sm cursor-pointer border-b border-gray-100 last:border-b-0
                     transition-colors duration-100
-                    ${focusedIndex === index 
-                      ? 'bg-blue-50 text-blue-900' 
+                    ${focusedIndex === index
+                      ? 'bg-blue-50 text-blue-900'
                       : 'hover:bg-blue-50 hover:text-blue-900'
                     }
                     ${value?.value === option.value ? 'bg-blue-100 text-blue-900 font-medium' : 'text-gray-900'}
@@ -445,7 +380,6 @@ const SelectCustom = ({
               ))
             )}
           </div>
-          )
         )}
       </div>
       {error && (

@@ -52,13 +52,26 @@ const getVisitanteById = async (req, res, next) => {
 const getVisitanteByDocumento = async (req, res, next) => {
   try {
     const { tipoDocumentoId, numeroDocumento } = req.params;
-    const visitante = await visitantesService.getVisitanteByDocumento(tipoDocumentoId, numeroDocumento);
     
-    res.json({
-      success: true,
-      message: 'Visitante obtenido exitosamente',
-      data: visitante
-    });
+    try {
+      const visitante = await visitantesService.getVisitanteByDocumento(tipoDocumentoId, numeroDocumento);
+      
+      res.json({
+        success: true,
+        message: 'Visitante encontrado',
+        data: visitante
+      });
+    } catch (error) {
+      // Si es un error 404, devolver éxito con data null en lugar de error
+      if (error.statusCode === 404) {
+        return res.json({
+          success: true,
+          message: 'Visitante no encontrado',
+          data: null
+        });
+      }
+      throw error;
+    }
   } catch (error) {
     next(error);
   }

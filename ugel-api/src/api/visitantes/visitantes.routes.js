@@ -24,21 +24,10 @@ router.get('/',
 );
 
 /**
- * @route   GET /api/visitantes/:id
- * @desc    Obtener visitante por ID
- * @access  Private
- */
-router.get('/:id', 
-  authenticateToken,
-  requireActiveUser,
-  validationMiddleware.validateId,
-  controller.getById
-);
-
-/**
  * @route   GET /api/visitantes/documento/:tipoDocumentoId/:numeroDocumento
  * @desc    Obtener visitante por tipo y número de documento
  * @access  Private
+ * @note    Esta ruta debe ir ANTES de /:id para evitar conflictos
  */
 router.get('/documento/:tipoDocumentoId/:numeroDocumento', 
   authenticateToken,
@@ -50,6 +39,7 @@ router.get('/documento/:tipoDocumentoId/:numeroDocumento',
  * @route   GET /api/visitantes/:id/historial
  * @desc    Obtener historial de visitas de un visitante
  * @access  Private
+ * @note    Esta ruta debe ir ANTES de /:id para evitar conflictos
  */
 router.get('/:id/historial', 
   authenticateToken,
@@ -57,6 +47,19 @@ router.get('/:id/historial',
   validationMiddleware.validateId,
   validationMiddleware.validatePagination,
   controller.getHistorial
+);
+
+/**
+ * @route   GET /api/visitantes/:id
+ * @desc    Obtener visitante por ID
+ * @access  Private
+ * @note    Esta ruta genérica debe ir AL FINAL de las rutas GET para evitar conflictos
+ */
+router.get('/:id', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateId,
+  controller.getById
 );
 
 /**

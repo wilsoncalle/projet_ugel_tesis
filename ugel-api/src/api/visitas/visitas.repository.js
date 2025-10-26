@@ -703,16 +703,16 @@ const getVisitasPorMotivo = async (fechaInicio = null, fechaFin = null) => {
     if (fechaInicio && fechaFin) {
       // Consulta con filtro de fechas
       query = `
-        SELECT 
-          m.nombre_motivo,
-          COUNT(*) AS count,
-          (COUNT(*) * 100.0 / (
-            SELECT COUNT(*) 
-            FROM RegistrosVisitas rv2
+      SELECT 
+        m.nombre_motivo,
+        COUNT(*) AS count,
+        (COUNT(*) * 100.0 / (
+          SELECT COUNT(*) 
+          FROM RegistrosVisitas rv2
             WHERE rv2.fecha_ingreso BETWEEN $1 AND $2
-          )) AS porcentaje
-        FROM RegistrosVisitas rv
-        JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
+        )) AS porcentaje
+      FROM RegistrosVisitas rv
+      JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
         WHERE rv.fecha_ingreso BETWEEN $1 AND $2
         GROUP BY rv.motivo_visita_id, m.nombre_motivo
         ORDER BY count DESC

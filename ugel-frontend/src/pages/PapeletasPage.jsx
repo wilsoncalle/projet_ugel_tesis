@@ -41,8 +41,21 @@ const PapeletasPage = () => {
     transformData: (data) => {
       return data.map(item => ({
         ...item,
-        personal_nombre: item.personal ? `${item.personal.nombres} ${item.personal.apellidos}` : 'No asignado',
-        motivo_nombre: item.motivoSalida ? item.motivoSalida.nombre_motivo || item.motivoSalida.nombre : 'No especificado'
+        // Manejar datos aplanados del backend
+        personal_nombre: item.personal_nombres && item.personal_apellidos 
+          ? `${item.personal_nombres} ${item.personal_apellidos}`.trim()
+          : item.personal 
+            ? `${item.personal.nombres} ${item.personal.apellidos}`.trim()
+            : 'No asignado',
+        motivo_nombre: item.nombre_motivo || 
+          (item.motivoSalida ? item.motivoSalida.nombre_motivo || item.motivoSalida.nombre : null) || 
+          'No especificado',
+        // Extraer fecha y horas desde los timestamps
+        fecha: item.fecha_hora_salida ? item.fecha_hora_salida.split('T')[0] : '',
+        horaInicio: item.fecha_hora_salida,
+        horaFin: item.fecha_hora_retorno_real || item.fecha_hora_retorno_estimada,
+        // Determinar estado basado en retorno
+        estado: item.fecha_hora_retorno_real ? 'aprobada' : 'pendiente'
       }));
     },
     onSuccess: (operation, data) => {
@@ -306,17 +319,22 @@ const PapeletasPage = () => {
   };
   
   const formatHora = (horaStr) => {
+    // Validar que horaStr sea un string válido
+    if (!horaStr || typeof horaStr !== 'string') {
+      return '';
+    }
+    
     // Si la hora ya viene formateada como HH:MM, la retornamos
-    if (horaStr && horaStr.includes(':')) {
+    if (horaStr.includes(':')) {
       return horaStr;
     }
     
     // Si es una fecha ISO, extraemos la hora
-    if (horaStr && horaStr.includes('T')) {
+    if (horaStr.includes('T')) {
       return horaStr.split('T')[1].substring(0, 5);
     }
     
-    return horaStr || '';
+    return horaStr;
   };
   
   // Obtener estado de la papeleta con color
@@ -359,23 +377,23 @@ const PapeletasPage = () => {
     { 
       key: 'fecha', 
       title: 'Fecha', 
-      render: (fecha) => formatFecha(fecha)
+      render: (row) => formatFecha(row.fecha)
     },
     { 
       key: 'horaInicio', 
       title: 'Hora Inicio', 
-      render: (hora) => formatHora(hora) 
+      render: (row) => formatHora(row.horaInicio) 
     },
     { 
       key: 'horaFin', 
       title: 'Hora Fin', 
-      render: (hora) => formatHora(hora) 
+      render: (row) => formatHora(row.horaFin) 
     },
     { key: 'motivo_nombre', title: 'Motivo' },
     { 
       key: 'estado', 
       title: 'Estado',
-      render: renderEstado
+      render: (row) => renderEstado(row.estado)
     }
   ];
   
