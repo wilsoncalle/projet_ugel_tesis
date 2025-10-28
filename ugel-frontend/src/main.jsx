@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import { MantineProvider } from '@mantine/core';
+import '@mantine/core/styles.css';
 import App from './App';
 import 'react-day-picker/dist/style.css';
 import { AuthProvider } from './contexts/AuthContext';
@@ -55,10 +57,12 @@ if ('Notification' in window && Notification.permission === 'default') {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </BrowserRouter>
+    <MantineProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </BrowserRouter>
+    </MantineProvider>
   </React.StrictMode>,
 );
