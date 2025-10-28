@@ -100,6 +100,47 @@ const PersonalAsistenciaPage = () => {
   // Referencias
   const registroFormRef = useRef(null);
   const searchTimeout = useRef(null);
+  const documentoInputRef = useRef(null);
+
+  // Hook para detectar números y enfocar automáticamente al campo de documento
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Solo procesar si estamos en el tab de "hoy" (registro de ingreso)
+      if (activeTab !== 'hoy') return;
+      
+      // Solo procesar si no estamos ya en un input o textarea
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+        return;
+      }
+      
+      // Detectar si se presionó una tecla numérica (0-9)
+      if (event.key >= '0' && event.key <= '9') {
+        // Prevenir el comportamiento por defecto
+        event.preventDefault();
+        
+        // Enfocar al campo de número de documento
+        if (documentoInputRef.current) {
+          documentoInputRef.current.focus();
+          
+          // Si el campo está vacío, agregar el número presionado
+          if (!documentoInputRef.current.value) {
+            documentoInputRef.current.value = event.key;
+            // Disparar el evento onChange para que se actualice el estado
+            const changeEvent = new Event('input', { bubbles: true });
+            documentoInputRef.current.dispatchEvent(changeEvent);
+          }
+        }
+      }
+    };
+
+    // Agregar el listener
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Limpiar el listener al desmontar
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeTab]);
 
   // Cargar catálogos una sola vez (optimización)
   useEffect(() => {
@@ -790,90 +831,66 @@ const PersonalAsistenciaPage = () => {
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold text-gray-800">Control de Asistencia de Personal</h2>
                   
-                  <div className="flex items-center space-x-3">
-                    {/* Estadísticas - Siempre visibles */}
-                    {(activeTab === 'hoy' || activeTab === 'historial') && (
-                      <div className="flex items-center space-x-2">
-                        <Badge className="bg-green-100 text-green-800">
-                          <CheckCircleIcon className="h-4 w-4 inline mr-1" />
-                          {estadisticas.presentes} Presente{estadisticas.presentes !== 1 ? 's' : ''}
-                        </Badge>
-                        <Badge className="bg-yellow-100 text-yellow-800">
-                          <ClockIcon className="h-4 w-4 inline mr-1" />
-                          {estadisticas.tardes} Tarde{estadisticas.tardes !== 1 ? 's' : ''}
-                        </Badge>
-                        <Badge className="bg-red-100 text-red-800">
-                          <XCircleIcon className="h-4 w-4 inline mr-1" />
-                          {estadisticas.ausentes} Ausente{estadisticas.ausentes !== 1 ? 's' : ''}
-                        </Badge>
-                        <Badge className="bg-blue-100 text-blue-800">
-                          <ExclamationTriangleIcon className="h-4 w-4 inline mr-1" />
-                          {estadisticas.permisos} Permiso{estadisticas.permisos !== 1 ? 's' : ''}
-                        </Badge>
-                      </div>
-                    )}
-                    
-                    {/* Dropdown de exportación - Solo en historial */}
-                    {activeTab === 'historial' && (
-                      <div className="relative">
-                        <button
-                          onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-                          className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-amber-500 text-amber-600 rounded-full hover:bg-amber-50 transition-all duration-200 shadow-sm hover:shadow-md"
-                        >
-                          <DocumentArrowDownIcon className="h-5 w-5" />
-                          <span className="text-sm font-semibold">Exportar</span>
-                          <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${exportDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
-                        
-                        {exportDropdownOpen && (
-                          <>
-                            <div 
-                              className="fixed inset-0 z-10" 
-                              onClick={() => setExportDropdownOpen(false)}
-                            />
-                            
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20">
-                              <div className="py-1">
-                                <button
-                                  onClick={() => {
-                                    handleExport('excel');
-                                    setExportDropdownOpen(false);
-                                  }}
-                                  className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-green-50 transition-colors group"
-                                >
-                                  <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                                    <DocumentTextIcon className="h-5 w-5 text-green-600" />
-                                  </div>
-                                  <div>
-                                    <div className="text-sm font-semibold text-green-700">Excel</div>
-                                    <div className="text-xs text-green-600">Formato .xlsx</div>
-                                  </div>
-                                </button>
-                                
-                                <div className="border-t border-gray-100 mx-2"></div>
-                                
-                                <button
-                                  onClick={() => {
-                                    handleExport('pdf');
-                                    setExportDropdownOpen(false);
-                                  }}
-                                  className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-red-50 transition-colors group"
-                                >
-                                  <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
-                                    <DocumentArrowDownIcon className="h-5 w-5 text-red-600" />
-                                  </div>
-                                  <div>
-                                    <div className="text-sm font-semibold text-red-700">PDF</div>
-                                    <div className="text-xs text-red-600">Formato .pdf</div>
-                                  </div>
-                                </button>
-                              </div>
+                  {/* Dropdown de exportación - Solo en historial */}
+                  {activeTab === 'historial' && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-amber-500 text-amber-600 rounded-full hover:bg-amber-50 transition-all duration-200 shadow-sm hover:shadow-md"
+                      >
+                        <DocumentArrowDownIcon className="h-5 w-5" />
+                        <span className="text-sm font-semibold">Exportar</span>
+                        <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${exportDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {exportDropdownOpen && (
+                        <>
+                          <div 
+                            className="fixed inset-0 z-10" 
+                            onClick={() => setExportDropdownOpen(false)}
+                          />
+                          
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20">
+                            <div className="py-1">
+                              <button
+                                onClick={() => {
+                                  handleExport('excel');
+                                  setExportDropdownOpen(false);
+                                }}
+                                className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-green-50 transition-colors group"
+                              >
+                                <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                                  <DocumentTextIcon className="h-5 w-5 text-green-600" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-semibold text-green-700">Excel</div>
+                                  <div className="text-xs text-green-600">Formato .xlsx</div>
+                                </div>
+                              </button>
+                              
+                              <div className="border-t border-gray-100 mx-2"></div>
+                              
+                              <button
+                                onClick={() => {
+                                  handleExport('pdf');
+                                  setExportDropdownOpen(false);
+                                }}
+                                className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-red-50 transition-colors group"
+                              >
+                                <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
+                                  <DocumentArrowDownIcon className="h-5 w-5 text-red-600" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-semibold text-red-700">PDF</div>
+                                  <div className="text-xs text-red-600">Formato .pdf</div>
+                                </div>
+                              </button>
                             </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 {/* TabView */}
@@ -883,17 +900,24 @@ const PersonalAsistenciaPage = () => {
                   onTabChange={handleTabChange}
                   className="flex-1 flex flex-col"
                 >
-                  <div className="flex-1">
-                    <TableGenerica
-                      columns={getColumns()}
-                      data={getTabData()}
-                      {...getPaginationProps()}
-                      emptyMessage={
-                        activeTab === 'hoy'
-                          ? 'No hay asistencias registradas hoy'
-                          : 'No se encontraron registros para los filtros aplicados'
-                      }
-                    />
+                  <div className="flex-1 flex flex-col">
+                    {/* Indicadores arriba de la tabla, dentro del contenedor blanco */}
+                    <div className="px-0 pt-0 pb-2">
+                      <IndicadoresAsistencia estadisticas={estadisticas} />
+                    </div>
+
+                    <div className="flex-1">
+                      <TableGenerica
+                        columns={getColumns()}
+                        data={getTabData()}
+                        {...getPaginationProps()}
+                        emptyMessage={
+                          activeTab === 'hoy'
+                            ? 'No hay asistencias registradas hoy'
+                            : 'No se encontraron registros para los filtros aplicados'
+                        }
+                      />
+                    </div>
                   </div>
                 </TabView>
               </div>
@@ -951,6 +975,8 @@ const PersonalAsistenciaPage = () => {
                       loading={loading}
                       tiposDocumento={tiposDocumento}
                       areas={areas}
+                      documentoInputRef={documentoInputRef}
+                      asistenciasHoy={asistenciasHoy}
                     />
                   </motion.div>
                 )}
@@ -1050,7 +1076,7 @@ const PersonalAsistenciaPage = () => {
 };
 
 // Componente: Formulario de registro de ingreso
-const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPersonalChange, onRegistrarIngreso, loading, tiposDocumento, areas }) => {
+const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPersonalChange, onRegistrarIngreso, loading, tiposDocumento, areas, documentoInputRef, asistenciasHoy }) => {
   const [formData, setFormData] = useState({
     personalSeleccionado: null,
     tipoDocumento: '',
@@ -1074,6 +1100,22 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
   // Estados para búsqueda automática
   const [buscandoPersonal, setBuscandoPersonal] = useState(false);
   const [documentoYaBuscado, setDocumentoYaBuscado] = useState('');
+  
+  // Estados para mensajes informativos
+  const [mensajePersonal, setMensajePersonal] = useState('');
+  const [tipoMensaje, setTipoMensaje] = useState('');
+
+  // Función para verificar si el personal ya tiene asistencia registrada hoy
+  const verificarAsistenciaHoy = (personalId) => {
+    const asistenciaExistente = asistenciasHoy.find(a => a.personal_id === parseInt(personalId));
+    return asistenciaExistente;
+  };
+
+  // Función para limpiar mensajes
+  const limpiarMensajes = () => {
+    setMensajePersonal('');
+    setTipoMensaje('');
+  };
 
   // Búsqueda automática con debounce (igual que RegistroForm.jsx)
   useEffect(() => {
@@ -1155,6 +1197,17 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
       console.log('🔍 Personal encontrado:', personalEncontrado);
 
       if (personalEncontrado) {
+        // Verificar si ya tiene asistencia registrada hoy
+        const asistenciaExistente = verificarAsistenciaHoy(personalEncontrado.value);
+        
+        if (asistenciaExistente) {
+          setMensajePersonal(`${personalEncontrado.label} ya tiene asistencia registrada hoy (${asistenciaExistente.estado_presencia})`);
+          setTipoMensaje('warning');
+        } else {
+          setMensajePersonal(`${personalEncontrado.label} encontrado. Puede registrar asistencia.`);
+          setTipoMensaje('success');
+        }
+        
         // Buscar el tipo de documento correcto
         let tipoDocumentoAsignado = '';
         if (personalEncontrado.tipo_documento_id) {
@@ -1233,9 +1286,13 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
         }));
         setDocumentoYaBuscado(documentoActual);
         console.log('❌ Personal no encontrado');
+        setMensajePersonal('Personal no encontrado con ese número de documento');
+        setTipoMensaje('error');
       }
     } catch (error) {
       console.error('Error al buscar personal:', error);
+      setMensajePersonal('Error al buscar personal. Intente nuevamente.');
+      setTipoMensaje('error');
     } finally {
       setBuscandoPersonal(false);
     }
@@ -1243,6 +1300,8 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
 
   // Función para limpiar búsqueda
   const limpiarBusqueda = () => {
+    setMensajePersonal('');
+    setTipoMensaje('');
     setDocumentoYaBuscado('');
   };
 
@@ -1268,7 +1327,7 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
     };
     
     setFormData(newFormData);
-    limpiarBusqueda(); // Limpiar estado de búsqueda
+    limpiarBusqueda(); // Limpiar estado de búsqueda y mensajes
   };
 
   const handleFormChange = (field, value) => {
@@ -1288,6 +1347,17 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
         // Cuando se selecciona personal, autocompletar todos los campos
         const personal = personalOptions.find(p => p.value === value.value);
         if (personal) {
+          // Verificar si ya tiene asistencia registrada hoy
+          const asistenciaExistente = verificarAsistenciaHoy(value.value);
+          
+          if (asistenciaExistente) {
+            setMensajePersonal(`${personal.label} ya tiene asistencia registrada hoy (${asistenciaExistente.estado_presencia})`);
+            setTipoMensaje('warning');
+          } else {
+            setMensajePersonal(`${personal.label} seleccionado. Puede registrar asistencia.`);
+            setTipoMensaje('success');
+          }
+          
           newFormData.numeroDocumento = personal.numero_documento || '';
           
           // Asignar tipo de documento - buscar por ID primero, luego por nombre
@@ -1317,6 +1387,9 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
             areaAsignada: newFormData.area
           });
         }
+      } else if (field === 'personalSeleccionado' && !value) {
+        // Si se deselecciona el personal, limpiar mensajes
+        limpiarMensajes();
       }
 
       return newFormData;
@@ -1358,6 +1431,7 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
                          </label>
                          <div className="flex mt-auto">
                            <Input
+                             ref={documentoInputRef}
                              value={formData.numeroDocumento}
                              onChange={(e) => handleFormChange('numeroDocumento', e.target.value)}
                              placeholder=""
@@ -1390,6 +1464,28 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           placeholder="Seleccione área..."
           isClearable={true}
         />
+        
+        {/* Mensaje de estado de la búsqueda */}
+        {mensajePersonal && (
+          <div className={`p-2 rounded-lg border text-xs ${
+            tipoMensaje === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
+            tipoMensaje === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+            tipoMensaje === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
+            'bg-blue-50 border-blue-200 text-blue-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{mensajePersonal}</span>
+              <Button
+                variant="ghost"
+                onClick={limpiarMensajes}
+                className="text-gray-500 hover:text-gray-700 p-1 h-6 w-6"
+                size="sm"
+              >
+                ×
+              </Button>
+            </div>
+          </div>
+        )}
         
                     {/* Información del personal seleccionado */}
                     {/* {formData.personalSeleccionado && (
@@ -1712,6 +1808,32 @@ const EstadoBadge = ({ estado }) => {
       <Icon className="h-3 w-3 mr-1" />
       {estado || 'Ausente'}
     </span>
+  );
+};
+
+// Componente de indicadores de asistencia
+const IndicadoresAsistencia = ({ estadisticas }) => {
+    const items = [
+      { key: 'presentes', label: 'Presentes', value: estadisticas.presentes, icon: CheckCircleIcon, chip: 'bg-white text-green-600 border-green-300' },
+      { key: 'tardes',    label: 'Tardanzas', value: estadisticas.tardes,    icon: ClockIcon,       chip: 'bg-white text-amber-600 border-amber-300' },
+      { key: 'ausentes',  label: 'Ausentes',  value: estadisticas.ausentes,  icon: XCircleIcon,     chip: 'bg-white text-red-600 border-red-300' },
+      { key: 'permisos',  label: 'Permisos',  value: estadisticas.permisos,  icon: ExclamationTriangleIcon, chip: 'bg-white text-blue-600 border-blue-300' },
+    ];
+
+  return (
+    <div className="w-full">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {items.map(({ key, label, value, icon: Icon, chip }) => (
+          <div key={key} className={`flex items-center justify-between rounded-xl border px-3 py-2 ${chip}`}>
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4" />
+              <span className="text-xs font-medium">{label}</span>
+            </div>
+            <span className="text-sm font-semibold tabular-nums">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 

@@ -473,30 +473,44 @@ const PersonalTabla = ({
             onTabChange={handleTabClick}
             className="flex-1 flex flex-col"
           >
-            {/* Contenido de las pestañas */}
-            <div className="flex-1" style={{ maxWidth: '100%' }}>
-              {activeTab === 'estadisticas' ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-center text-gray-500">
-                    <div className="text-4xl mb-4">📊</div>
-                    <p>Estadísticas de personal (próximamente)</p>
-                  </div>
+            <div className="flex-1 flex flex-col">
+              {/* Indicadores arriba de la tabla, dentro del contenedor blanco */}
+              {activeTab !== 'estadisticas' && (
+                <div className="px-4 pt-2 pb-2">
+                  <IndicadoresPersonal 
+                    personalActivo={personalActivo}
+                    personalEnEspera={personalEnEspera}
+                    historialPersonal={historialPersonal}
+                    activeTab={activeTab}
+                  />
                 </div>
-              ) : (
-                <TableGenerica
-                  columns={getColumns}
-                  data={getTabData()}
-                  isRowInWaiting={(row) => 
-                    (personalEnEspera || []).some(p => p.id === row.id)
-                  }
-                  {...getPaginationProps()}
-                  emptyMessage={
-                    activeTab === 'activos'
-                      ? 'No hay personal activo en este momento'
-                      : 'No se encontraron registros para los filtros aplicados'
-                  }
-                />
               )}
+
+              {/* Contenido de las pestañas */}
+              <div className="flex-1" style={{ maxWidth: '100%' }}>
+                {activeTab === 'estadisticas' ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center text-gray-500">
+                      <div className="text-4xl mb-4">📊</div>
+                      <p>Estadísticas de personal (próximamente)</p>
+                    </div>
+                  </div>
+                ) : (
+                  <TableGenerica
+                    columns={getColumns}
+                    data={getTabData()}
+                    isRowInWaiting={(row) => 
+                      (personalEnEspera || []).some(p => p.id === row.id)
+                    }
+                    {...getPaginationProps()}
+                    emptyMessage={
+                      activeTab === 'activos'
+                        ? 'No hay personal activo en este momento'
+                        : 'No se encontraron registros para los filtros aplicados'
+                    }
+                  />
+                )}
+              </div>
             </div>
           </TabView>
         </div>
@@ -555,6 +569,40 @@ const PersonalTabla = ({
           }
         ]}
       />
+    </div>
+  );
+};
+
+// Componente de indicadores de personal
+const IndicadoresPersonal = ({ personalActivo, personalEnEspera, historialPersonal, activeTab }) => {
+  const estadisticas = {
+    activos: (personalActivo || []).length,
+    enEspera: (personalEnEspera || []).length,
+    historial: (historialPersonal || []).length,
+    total: (personalActivo || []).length + (personalEnEspera || []).length
+  };
+
+  const items = activeTab === 'activos' ? [
+    { key: 'activos', label: 'Activos', value: estadisticas.activos, icon: UsersIcon, chip: 'bg-green-100 text-green-700 border-green-200' },
+    { key: 'enEspera', label: 'En Espera', value: estadisticas.enEspera, icon: ClockIcon, chip: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+    { key: 'total', label: 'Total', value: estadisticas.total, icon: UsersIcon, chip: 'bg-blue-100 text-blue-700 border-blue-200' },
+  ] : [
+    { key: 'historial', label: 'Registros', value: estadisticas.historial, icon: ClockIcon, chip: 'bg-gray-100 text-gray-700 border-gray-200' },
+  ];
+
+  return (
+    <div className="w-full">
+      <div className={`grid gap-2 ${activeTab === 'activos' ? 'grid-cols-3' : 'grid-cols-1'}`}>
+        {items.map(({ key, label, value, icon: Icon, chip }) => (
+          <div key={key} className={`flex items-center justify-between rounded-xl border px-3 py-2 ${chip}`}>
+            <div className="flex items-center gap-2">
+              <Icon className="h-4 w-4" />
+              <span className="text-xs font-medium">{label}</span>
+            </div>
+            <span className="text-sm font-semibold tabular-nums">{value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
