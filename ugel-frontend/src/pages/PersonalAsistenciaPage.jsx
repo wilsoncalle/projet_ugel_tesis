@@ -56,6 +56,10 @@ const PersonalAsistenciaPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
+  // Estados para catálogos (optimización - cargar una sola vez)
+  const [tiposDocumento, setTiposDocumento] = useState([]);
+  const [areas, setAreas] = useState([]);
+  
   // Estados para el modal de detalles
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -69,6 +73,8 @@ const PersonalAsistenciaPage = () => {
     busqueda: '',
     personalId: '',
     estadoPresencia: '',
+    areaId: '',
+    cargoId: '',
     fechaDesde: null,
     fechaHasta: null
   });
@@ -94,6 +100,38 @@ const PersonalAsistenciaPage = () => {
   // Referencias
   const registroFormRef = useRef(null);
   const searchTimeout = useRef(null);
+
+  // Cargar catálogos una sola vez (optimización)
+  useEffect(() => {
+    const cargarCatalogos = async () => {
+      try {
+        const [tiposResp, areasResp] = await Promise.all([
+          tiposDocumentoService.getAll(),
+          areasService.getAll()
+        ]);
+
+        if (tiposResp.data.success) {
+          const tiposData = tiposResp.data.data.map(tipo => ({
+            value: tipo.id.toString(),
+            label: tipo.nombre_completo || tipo.nombre
+          }));
+          setTiposDocumento(tiposData);
+        }
+
+        if (areasResp.data.success) {
+          const areasData = areasResp.data.data.map(area => ({
+            value: area.id.toString(),
+            label: area.nombre_area || area.nombre
+          }));
+          setAreas(areasData);
+        }
+      } catch (error) {
+        console.error('Error al cargar catálogos:', error);
+      }
+    };
+
+    cargarCatalogos();
+  }, []);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -141,7 +179,9 @@ const PersonalAsistenciaPage = () => {
             tipo_documento_id: p.tipo_documento_id || p.tipoDocumentoId || p.tipo_documento_id,
             area_id: p.area_id || p.areaDestinoId || p.area_destino_id,
             nombres: p.nombres,
-            apellidos: p.apellidos
+            apellidos: p.apellidos,
+            // Agregar el tipo de documento como string para búsqueda alternativa
+            tipo_documento_nombre: p.tipo_documento
           };
           
           console.log('📋 Personal mapeado:', {
@@ -243,6 +283,8 @@ const PersonalAsistenciaPage = () => {
       if (filtrosData.busqueda) params.q = filtrosData.busqueda;
       if (filtrosData.personalId) params.personalId = filtrosData.personalId;
       if (filtrosData.estadoPresencia) params.estadoPresencia = filtrosData.estadoPresencia;
+      if (filtrosData.areaId) params.areaId = filtrosData.areaId;
+      if (filtrosData.cargoId) params.cargoId = filtrosData.cargoId;
       if (filtrosData.fechaDesde) params.fechaInicio = filtrosData.fechaDesde;
       if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
       
@@ -894,6 +936,8 @@ const PersonalAsistenciaPage = () => {
                         onBuscar={handleFiltrosChange}
                         personalOptions={personalOptions}
                         loading={loading}
+                        tiposDocumento={tiposDocumento}
+                        areas={areas}
                       />
                     </motion.div>
                   </>
@@ -905,6 +949,8 @@ const PersonalAsistenciaPage = () => {
                       onPersonalChange={setPersonalSeleccionado}
                       onRegistrarIngreso={registrarIngreso}
                       loading={loading}
+                      tiposDocumento={tiposDocumento}
+                      areas={areas}
                     />
                   </motion.div>
                 )}
@@ -1004,9 +1050,7 @@ const PersonalAsistenciaPage = () => {
 };
 
 // Componente: Formulario de registro de ingreso
-const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPersonalChange, onRegistrarIngreso, loading }) => {
-  const [tiposDocumento, setTiposDocumento] = useState([]);
-  const [areas, setAreas] = useState([]);
+const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPersonalChange, onRegistrarIngreso, loading, tiposDocumento, areas }) => {
   const [formData, setFormData] = useState({
     personalSeleccionado: null,
     tipoDocumento: '',
@@ -1014,46 +1058,18 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
     area: ''
   });
 
-  // Cargar tipos de documento y áreas
+  // Seleccionar DNI por defecto cuando se cargan los tipos
   useEffect(() => {
-    const cargarCatalogos = async () => {
-      try {
-        const [tiposResp, areasResp] = await Promise.all([
-          tiposDocumentoService.getAll(), // Usar el servicio correcto para tipos de documento
-          areasService.getAll()  // Usar el servicio correcto para áreas
-        ]);
-
-        if (tiposResp.data.success) {
-          const tiposData = tiposResp.data.data.map(tipo => ({
-            value: tipo.id.toString(),
-            label: tipo.nombre_completo || tipo.nombre
-          }));
-          setTiposDocumento(tiposData);
-          
-          // Seleccionar DNI por defecto
-          const tipoDNI = tiposData.find(tipo => 
-            tipo.label?.toLowerCase().includes('dni') ||
-            tipo.label?.toLowerCase().includes('documento nacional')
-          );
-          if (tipoDNI) {
-            setFormData(prev => ({ ...prev, tipoDocumento: tipoDNI.value }));
-          }
-        }
-
-        if (areasResp.data.success) {
-          const areasData = areasResp.data.data.map(area => ({
-            value: area.id.toString(),
-            label: area.nombre_area || area.nombre
-          }));
-          setAreas(areasData);
-        }
-      } catch (error) {
-        console.error('Error al cargar catálogos:', error);
+    if (tiposDocumento.length > 0 && !formData.tipoDocumento) {
+      const tipoDNI = tiposDocumento.find(tipo => 
+        tipo.label?.toLowerCase().includes('dni') ||
+        tipo.label?.toLowerCase().includes('documento nacional')
+      );
+      if (tipoDNI) {
+        setFormData(prev => ({ ...prev, tipoDocumento: tipoDNI.value }));
       }
-    };
-
-    cargarCatalogos();
-  }, []);
+    }
+  }, [tiposDocumento, formData.tipoDocumento]);
 
   // Estados para búsqueda automática
   const [buscandoPersonal, setBuscandoPersonal] = useState(false);
@@ -1063,10 +1079,9 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
   useEffect(() => {
     const documentoActual = `${formData.tipoDocumento}-${formData.numeroDocumento}`;
     
-    // Solo buscar si tenemos tipo de documento, número de documento con al menos 8 caracteres,
+    // Solo buscar si tenemos número de documento con al menos 8 caracteres,
     // no estamos buscando actualmente, y no hemos buscado este documento específico antes
-    if (formData.tipoDocumento && 
-        formData.numeroDocumento && 
+    if (formData.numeroDocumento && 
         formData.numeroDocumento.length >= 8 &&
         !buscandoPersonal &&
         documentoActual !== documentoYaBuscado) {
@@ -1082,7 +1097,7 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
 
   // Función para buscar personal por documento (igual que buscarVisitante en RegistroForm.jsx)
   const buscarPersonalPorDocumento = async () => {
-    if (!formData.tipoDocumento || !formData.numeroDocumento) {
+    if (!formData.numeroDocumento) {
       return;
     }
 
@@ -1097,36 +1112,118 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
         personalOptions: personalOptions.length
       });
 
-      // Buscar en la lista local primero - por número de documento solamente
-      // Ya que tipo_documento_id viene undefined del backend
+      // Buscar en la lista local primero
       const personalEncontrado = personalOptions.find(p => {
-        // Buscar solo por número de documento por ahora
         const numeroCoincide = p.numero_documento === formData.numeroDocumento;
+        
+        // Solo verificar tipo si ya tenemos un personal seleccionado (para evitar deseleccionar)
+        let tipoCoincide = true;
+        if (formData.personalSeleccionado && formData.tipoDocumento) {
+          // Si ya hay un personal seleccionado, solo verificar tipo si es necesario
+          if (formData.personalSeleccionado.value === p.value) {
+            // Es el mismo personal, no verificar tipo para evitar deselección
+            tipoCoincide = true;
+          } else {
+            // Es otro personal, verificar tipo normalmente
+            if (p.tipo_documento_id) {
+              tipoCoincide = p.tipo_documento_id.toString() === formData.tipoDocumento;
+            } else {
+              const tipoSeleccionado = tiposDocumento.find(t => t.value === formData.tipoDocumento);
+              if (tipoSeleccionado && p.tipo_documento_nombre) {
+                tipoCoincide = p.tipo_documento_nombre.toLowerCase().includes(tipoSeleccionado.label.toLowerCase()) ||
+                             tipoSeleccionado.label.toLowerCase().includes(p.tipo_documento_nombre.toLowerCase());
+              }
+            }
+          }
+        }
         
         console.log('🔍 Verificando personal:', {
           nombre: p.label,
           numero_documento: p.numero_documento,
+          tipo_documento_id: p.tipo_documento_id,
+          tipo_documento_nombre: p.tipo_documento_nombre,
           numeroCoincide,
-          buscando: formData.numeroDocumento
+          tipoCoincide,
+          buscando: formData.numeroDocumento,
+          tipoBuscando: formData.tipoDocumento,
+          personalYaSeleccionado: formData.personalSeleccionado?.value
         });
         
-        return numeroCoincide;
+        return numeroCoincide && tipoCoincide;
       });
 
       console.log('🔍 Personal encontrado:', personalEncontrado);
 
       if (personalEncontrado) {
+        // Buscar el tipo de documento correcto
+        let tipoDocumentoAsignado = '';
+        if (personalEncontrado.tipo_documento_id) {
+          tipoDocumentoAsignado = personalEncontrado.tipo_documento_id.toString();
+        } else if (personalEncontrado.tipo_documento_nombre) {
+          // Buscar por nombre del tipo de documento
+          console.log('🔍 Buscando tipo de documento por nombre:', {
+            buscando: personalEncontrado.tipo_documento_nombre,
+            tiposDisponibles: tiposDocumento.map(t => ({ value: t.value, label: t.label }))
+          });
+          
+          // Log detallado de cada tipo para debug
+          tiposDocumento.forEach((tipo, index) => {
+            console.log(`🔍 Tipo ${index}:`, {
+              value: tipo.value,
+              label: tipo.label,
+              labelLower: tipo.label.toLowerCase(),
+              buscandoLower: personalEncontrado.tipo_documento_nombre.toLowerCase(),
+              contiene: tipo.label.toLowerCase().includes(personalEncontrado.tipo_documento_nombre.toLowerCase()),
+              esContenido: personalEncontrado.tipo_documento_nombre.toLowerCase().includes(tipo.label.toLowerCase())
+            });
+          });
+          
+          const tipoEncontrado = tiposDocumento.find(t => {
+            const labelLower = t.label.toLowerCase();
+            const buscandoLower = personalEncontrado.tipo_documento_nombre.toLowerCase();
+            
+            // Buscar por coincidencia exacta primero
+            if (labelLower === buscandoLower) {
+              return true;
+            }
+            
+            // Buscar por coincidencia parcial
+            if (labelLower.includes(buscandoLower) || buscandoLower.includes(labelLower)) {
+              return true;
+            }
+            
+            // Buscar por palabras clave comunes
+            if (buscandoLower === 'dni' && (labelLower.includes('documento nacional') || labelLower.includes('dni'))) {
+              return true;
+            }
+            
+            return false;
+          });
+          
+          if (tipoEncontrado) {
+            tipoDocumentoAsignado = tipoEncontrado.value;
+            console.log('✅ Tipo de documento encontrado:', tipoEncontrado);
+          } else {
+            console.log('❌ No se encontró tipo de documento para:', personalEncontrado.tipo_documento_nombre);
+          }
+        }
+        
         // Autocompletar todos los campos
         setFormData(prev => ({
           ...prev,
           personalSeleccionado: personalEncontrado,
-          // Mantener el tipo de documento que ya estaba seleccionado
-          // tipoDocumento: personalEncontrado.tipo_documento_id?.toString() || personalEncontrado.tipoDocumentoId?.toString() || '',
+          // Solo asignar tipo de documento si no hay uno seleccionado o si es diferente
+          tipoDocumento: prev.tipoDocumento || tipoDocumentoAsignado,
           area: personalEncontrado.area_id?.toString() || personalEncontrado.area_destino_id?.toString() || ''
         }));
         
         setDocumentoYaBuscado(documentoActual);
-        console.log('✅ Personal autocompletado exitosamente:', personalEncontrado.label);
+        console.log('✅ Personal autocompletado exitosamente:', {
+          nombre: personalEncontrado.label,
+          tipo_documento_nombre: personalEncontrado.tipo_documento_nombre,
+          tipoDocumentoAsignado: tipoDocumentoAsignado,
+          areaAsignada: personalEncontrado.area_id?.toString() || personalEncontrado.area_destino_id?.toString() || ''
+        });
       } else {
         // Si no se encuentra, limpiar selección
         setFormData(prev => ({
@@ -1149,6 +1246,31 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
     setDocumentoYaBuscado('');
   };
 
+  // Función para limpiar el formulario completo
+  const handleLimpiarFormulario = () => {
+    // Buscar DNI en los tipos disponibles o usar el primer tipo
+    let tipoPorDefecto = tiposDocumento[0]?.value || '1'; // Fallback
+    if (tiposDocumento.length > 0) {
+      const tipoDNI = tiposDocumento.find(tipo => 
+        tipo.label && (
+          tipo.label.toLowerCase().includes('dni') || 
+          tipo.label.toLowerCase().includes('documento nacional')
+        )
+      );
+      tipoPorDefecto = tipoDNI ? tipoDNI.value : tiposDocumento[0].value;
+    }
+    
+    const newFormData = {
+      personalSeleccionado: null,
+      tipoDocumento: tipoPorDefecto, // Preservar tipo de documento por defecto
+      numeroDocumento: '',
+      area: ''
+    };
+    
+    setFormData(newFormData);
+    limpiarBusqueda(); // Limpiar estado de búsqueda
+  };
+
   const handleFormChange = (field, value) => {
     setFormData(prev => {
       const newFormData = {
@@ -1156,8 +1278,8 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
         [field]: value
       };
 
-      // Limpiar búsqueda cuando cambie tipo de documento o número de documento
-      if (field === 'tipoDocumento' || field === 'numeroDocumento') {
+      // Limpiar búsqueda solo cuando cambie número de documento (no tipo de documento)
+      if (field === 'numeroDocumento') {
         limpiarBusqueda();
       }
 
@@ -1167,8 +1289,33 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
         const personal = personalOptions.find(p => p.value === value.value);
         if (personal) {
           newFormData.numeroDocumento = personal.numero_documento || '';
-          newFormData.tipoDocumento = personal.tipo_documento_id?.toString() || '';
-          newFormData.area = personal.area_id?.toString() || '';
+          
+          // Asignar tipo de documento - buscar por ID primero, luego por nombre
+          let tipoDocumentoAsignado = '';
+          if (personal.tipo_documento_id) {
+            tipoDocumentoAsignado = personal.tipo_documento_id.toString();
+          } else if (personal.tipo_documento_nombre) {
+            // Buscar por nombre del tipo de documento
+            const tipoEncontrado = tiposDocumento.find(t => 
+              t.label.toLowerCase().includes(personal.tipo_documento_nombre.toLowerCase()) ||
+              personal.tipo_documento_nombre.toLowerCase().includes(t.label.toLowerCase())
+            );
+            if (tipoEncontrado) {
+              tipoDocumentoAsignado = tipoEncontrado.value;
+            }
+          }
+          
+          newFormData.tipoDocumento = tipoDocumentoAsignado;
+          newFormData.area = personal.area_id?.toString() || personal.area_destino_id?.toString() || '';
+          
+          console.log('✅ Personal seleccionado desde dropdown:', {
+            nombre: personal.label,
+            numero_documento: personal.numero_documento,
+            tipo_documento_id: personal.tipo_documento_id,
+            tipo_documento_nombre: personal.tipo_documento_nombre,
+            tipoDocumentoAsignado: newFormData.tipoDocumento,
+            areaAsignada: newFormData.area
+          });
         }
       }
 
@@ -1245,7 +1392,7 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
         />
         
                     {/* Información del personal seleccionado */}
-                    {formData.personalSeleccionado && (
+                    {/* {formData.personalSeleccionado && (
                       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <div className="text-xs text-gray-600 mb-1">Personal seleccionado:</div>
                         <div className="text-sm font-medium text-gray-900">{formData.personalSeleccionado.label}</div>
@@ -1259,21 +1406,27 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
                           <span className="font-medium">Documento:</span> {formData.personalSeleccionado.tipo_documento}: {formData.personalSeleccionado.numero_documento}
                         </div>
                       </div>
-                    )}
+                    ) */}
         
-        {/* Botón de registro */}
-        <Button
-          onClick={() => onRegistrarIngreso(formData.personalSeleccionado)}
-          disabled={!formData.personalSeleccionado || loading}
-          className="w-full bg-green-600 hover:bg-green-700 text-white"
-          size="lg"
-        >
-          <CheckCircleIcon className="h-5 w-5 inline mr-2" />
-          Registrar Ingreso
-        </Button>
-        
-        <div className="text-xs text-gray-500 text-center">
-          Hora límite: 9:10 AM (después se marca como Tarde)
+        {/* Botones de registro y limpieza */}
+        <div className="flex gap-2">
+          <Button
+            onClick={() => onRegistrarIngreso(formData.personalSeleccionado)}
+            disabled={!formData.personalSeleccionado || loading}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+            size="lg"
+          >
+            <CheckCircleIcon className="h-5 w-5 inline mr-2" />
+            Registrar Ingreso
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleLimpiarFormulario}
+            className="border-gray-300 text-gray-700 hover:bg-gray-50 px-3"
+            size="lg"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </Button>
         </div>
       </div>
     </Card>
@@ -1281,28 +1434,164 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
 };
 
 // Componente: Formulario de búsqueda para historial
-const FormularioBusquedaHistorial = ({ filtros, onBuscar, personalOptions, loading }) => {
+const FormularioBusquedaHistorial = ({ filtros, onBuscar, personalOptions, loading, tiposDocumento, areas }) => {
   const [formFiltros, setFormFiltros] = useState({
     busqueda: '',
     personalId: '',
     estadoPresencia: '',
+    areaId: '',
+    cargoId: '',
     ...filtros
   });
+
+  // Estados para cargar cargos
+  const [cargos, setCargos] = useState([]);
+  const [cargosFiltrados, setCargosFiltrados] = useState([]);
+  const [areasFiltradas, setAreasFiltradas] = useState([]);
+  const [personalFiltrado, setPersonalFiltrado] = useState([]);
+
+  // Cargar cargos al montar el componente
+  useEffect(() => {
+    const cargarCargos = async () => {
+      try {
+        const response = await import('../services/api').then(module => module.cargosService.getAll());
+        if (response.data.success) {
+          const cargosData = response.data.data.map(cargo => ({
+            value: cargo.id.toString(),
+            label: cargo.nombre_cargo || cargo.nombre
+          }));
+          setCargos(cargosData);
+          setCargosFiltrados(cargosData); // Inicializar con todos los cargos
+        }
+      } catch (error) {
+        console.error('Error al cargar cargos:', error);
+      }
+    };
+
+    cargarCargos();
+  }, []);
+
+  // Inicializar áreas filtradas con todas las áreas
+  useEffect(() => {
+    setAreasFiltradas(areas);
+  }, [areas]);
+
+  // Inicializar personal filtrado con todo el personal
+  useEffect(() => {
+    setPersonalFiltrado(personalOptions);
+  }, [personalOptions]);
+
+  // Función para obtener cargos de un área específica
+  const obtenerCargosDeArea = (areaId) => {
+    if (!areaId) {
+      return cargos; // Retornar todos los cargos si no hay área seleccionada
+    }
+    
+    // Filtrar personal por área y obtener cargos únicos
+    const personalDelArea = personalOptions.filter(personal => 
+      (personal.area_id?.toString() === areaId || personal.area_destino_id?.toString() === areaId)
+    );
+    
+    // Obtener cargos únicos del personal de esa área
+    const cargosUnicos = [...new Set(personalDelArea.map(p => p.cargo_id).filter(Boolean))];
+    
+    return cargos.filter(cargo => cargosUnicos.includes(cargo.value));
+  };
+
+  // Función para obtener áreas de un cargo específico
+  const obtenerAreasDeCargo = (cargoId) => {
+    if (!cargoId) {
+      return areas; // Retornar todas las áreas si no hay cargo seleccionado
+    }
+    
+    // Filtrar personal por cargo y obtener áreas únicas
+    const personalDelCargo = personalOptions.filter(personal => 
+      personal.cargo_id?.toString() === cargoId
+    );
+    
+    // Obtener áreas únicas del personal de ese cargo
+    const areasUnicas = [...new Set(personalDelCargo.map(p => 
+      p.area_id?.toString() || p.area_destino_id?.toString()
+    ).filter(Boolean))];
+    
+    return areas.filter(area => areasUnicas.includes(area.value));
+  };
+
+  // Función para filtrar personal por área y cargo
+  const filtrarPersonal = (areaId, cargoId) => {
+    let personalFiltrado = personalOptions;
+    
+    // Filtrar por área si está seleccionada
+    if (areaId) {
+      personalFiltrado = personalFiltrado.filter(personal => 
+        personal.area_id?.toString() === areaId || 
+        personal.area_destino_id?.toString() === areaId
+      );
+    }
+    
+    // Filtrar por cargo si está seleccionado
+    if (cargoId) {
+      personalFiltrado = personalFiltrado.filter(personal => 
+        personal.cargo_id?.toString() === cargoId
+      );
+    }
+    
+    return personalFiltrado;
+  };
 
   const handleChange = (field, value) => {
     const newFiltros = {
       ...formFiltros,
       [field]: value
     };
-    setFormFiltros(newFiltros);
     
-    // Si selecciona personal, autocompletar otros datos (opcional)
-    if (field === 'personalId' && value) {
+    // Implementar vinculación automática entre área y cargo (igual que RegistroForm.jsx)
+    if (field === 'areaId') {
+      // Cuando se selecciona un área, filtrar cargos disponibles en esa área
+      const cargosDisponibles = obtenerCargosDeArea(value);
+      setCargosFiltrados(cargosDisponibles);
+      
+      // Si había un cargo seleccionado que no está disponible en la nueva área, limpiarlo
+      if (newFiltros.cargoId && !cargosDisponibles.find(c => c.value === newFiltros.cargoId)) {
+        newFiltros.cargoId = '';
+      }
+      
+      // Filtrar personal por área y cargo actual
+      const personalFiltradoPorArea = filtrarPersonal(value, newFiltros.cargoId);
+      setPersonalFiltrado(personalFiltradoPorArea);
+      
+    } else if (field === 'cargoId') {
+      // Cuando se selecciona un cargo, filtrar áreas disponibles para ese cargo
+      const areasDisponibles = obtenerAreasDeCargo(value);
+      setAreasFiltradas(areasDisponibles);
+      
+      // Si había un área seleccionada que no está disponible para el nuevo cargo, limpiarla
+      if (newFiltros.areaId && !areasDisponibles.find(a => a.value === newFiltros.areaId)) {
+        newFiltros.areaId = '';
+      }
+      
+      // Filtrar personal por área y cargo actual
+      const personalFiltradoPorCargo = filtrarPersonal(newFiltros.areaId, value);
+      setPersonalFiltrado(personalFiltradoPorCargo);
+      
+    } else if (field === 'personalId' && value) {
+      // Si selecciona personal, autocompletar área y cargo
       const personal = personalOptions.find(p => p.value === value);
       if (personal) {
-        // Aquí podrías autocompletar más filtros si lo deseas
+        // Autocompletar área si está disponible
+        if (personal.area_id || personal.area_destino_id) {
+          const areaId = personal.area_id?.toString() || personal.area_destino_id?.toString();
+          newFiltros.areaId = areaId;
+        }
+        
+        // Autocompletar cargo si está disponible
+        if (personal.cargo_id) {
+          newFiltros.cargoId = personal.cargo_id.toString();
+        }
       }
     }
+    
+    setFormFiltros(newFiltros);
   };
 
   const handleBuscar = () => {
@@ -1313,9 +1602,15 @@ const FormularioBusquedaHistorial = ({ filtros, onBuscar, personalOptions, loadi
     const filtrosLimpios = {
       busqueda: '',
       personalId: '',
-      estadoPresencia: ''
+      estadoPresencia: '',
+      areaId: '',
+      cargoId: ''
     };
     setFormFiltros(filtrosLimpios);
+    // Restaurar listas completas al limpiar
+    setCargosFiltrados(cargos);
+    setAreasFiltradas(areas);
+    setPersonalFiltrado(personalOptions);
     onBuscar(filtrosLimpios);
   };
 
@@ -1334,25 +1629,38 @@ const FormularioBusquedaHistorial = ({ filtros, onBuscar, personalOptions, loadi
           Buscar Asistencias
         </h3>
         
-        {/* Buscar por texto */}
-        <Input
-          label="Buscar Personal"
-          value={formFiltros.busqueda}
-          onChange={(e) => handleChange('busqueda', e.target.value)}
-          placeholder="Nombre, apellido o documento..."
-          leftIcon={<MagnifyingGlassIcon className="h-4 w-4" />}
-        />
-        
         {/* Seleccionar personal específico */}
         <SelectCustom
           label="Seleccionar Personal"
-          value={personalOptions.find(p => p.value === formFiltros.personalId) || null}
+          value={personalFiltrado.find(p => p.value === formFiltros.personalId) || null}
           onChange={(selectedOption) => handleChange('personalId', selectedOption?.value || '')}
-          options={[{ value: '', label: 'Todo el personal' }, ...personalOptions]}
+          options={[{ value: '', label: 'Todo el personal' }, ...personalFiltrado]}
           placeholder="Seleccione..."
           isSearchable={true}
           menuWidth="auto"
         />
+        
+        {/* Área y Cargo - lado a lado */}
+        <div className="grid grid-cols-2 gap-3">
+          <SelectCustom
+            label="Área"
+            value={areasFiltradas.find(a => a.value === formFiltros.areaId) || null}
+            onChange={(selectedOption) => handleChange('areaId', selectedOption?.value || '')}
+            options={[{ value: '', label: 'Todas las áreas' }, ...areasFiltradas]}
+            placeholder="Seleccione área..."
+            isSearchable={true}
+            menuWidth="auto"
+          />
+          <SelectCustom
+            label="Cargo"
+            value={cargosFiltrados.find(c => c.value === formFiltros.cargoId) || null}
+            onChange={(selectedOption) => handleChange('cargoId', selectedOption?.value || '')}
+            options={[{ value: '', label: 'Todos los cargos' }, ...cargosFiltrados]}
+            placeholder="Seleccione cargo..."
+            isSearchable={true}
+            menuWidth="auto"
+          />
+        </div>
         
         {/* Filtro por estado */}
         <SelectCustom
@@ -1371,7 +1679,7 @@ const FormularioBusquedaHistorial = ({ filtros, onBuscar, personalOptions, loadi
             size="lg"
             leftIcon={<MagnifyingGlassIcon className="h-4 w-4" />}
           >
-            Buscar
+            Buscar Personal
           </Button>
           <Button
             variant="outline"
