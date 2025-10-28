@@ -352,14 +352,15 @@ const VisitantesTabla = ({
             else {
               console.log('VisitantesTabla - Es visitante activo, personal_cargo:', row.personal_cargo);
               console.log('VisitantesTabla - empleadoVisitado:', row.empleadoVisitado);
-              // Usar la estructura transformada del dashboard
-              cargo = row.personal_cargo || row.empleadoVisitado?.cargo || '';
+              // Buscar cargo en múltiples campos posibles
+              cargo = row.personal_cargo || row.empleadoVisitado?.cargo || row.cargo_nombre || row.cargo || '';
             }
           } 
           // Para historial (formato plano)
           else {
             console.log('VisitantesTabla - Row completo para historial:', row);
-            cargo = row.personal_cargo || '';
+            // Buscar cargo en múltiples campos posibles para historial también
+            cargo = row.personal_cargo || row.cargo_nombre || row.cargo || '';
           }
           
           console.log('VisitantesTabla - Cargo final:', cargo);

@@ -26,6 +26,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardAdminPage from './pages/DashboardAdminPage';
 import DashboardRRHHPage from './pages/DashboardRRHHPage';
 import DashboardVigilantePage from './pages/DashboardVigilantePage';
+import PersonalAsistenciaPage from './pages/PersonalAsistenciaPage';
 
 // Catalog Pages
 import AreasPage from './pages/AreasPage';
@@ -88,6 +89,7 @@ function App() {
             {/* Vigilante Routes */}
             <Route path="/vigilante">
               <Route index element={<ProtectedRoute allowedRoles={['vigilante']} element={<DashboardVigilantePage />} />} />
+              <Route path="asistencia" element={<ProtectedRoute allowedRoles={['vigilante']} element={<PersonalAsistenciaPage />} />} />
             </Route>
             
 

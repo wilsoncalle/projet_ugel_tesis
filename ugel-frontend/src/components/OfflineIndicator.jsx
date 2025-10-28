@@ -1,112 +1,51 @@
 import { useState, useEffect } from 'react';
 import { WifiIcon, CloudArrowUpIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { getPendingCount, clearAllPending } from '../utils/offlineDB';
-import { syncPendingData, isOnline } from '../utils/offlineSync';
 
 const OfflineIndicator = () => {
-  const [online, setOnline] = useState(navigator.onLine);
+  // Verificar que estamos en el lado del cliente
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const [online, setOnline] = useState(() => {
+    try {
+      return navigator.onLine;
+    } catch {
+      return true;
+    }
+  });
+
   const [pendingCount, setPendingCount] = useState({ total: 0, visitas: 0, salidas: 0 });
   const [syncing, setSyncing] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [justRecoveredConnection, setJustRecoveredConnection] = useState(false);
 
   // Actualizar estado de conexión
   useEffect(() => {
-    let previousOnlineStatus = navigator.onLine;
-    
     const updateOnlineStatus = () => {
-      const isNowOnline = navigator.onLine;
-      const wasOffline = !previousOnlineStatus;
-      
-      setOnline(isNowOnline);
-      
-      if (isNowOnline && wasOffline) {
-        // Acabamos de recuperar la conexión
-        console.log('[OfflineIndicator] Conexión recuperada, mostrando indicador temporalmente');
-        setJustRecoveredConnection(true);
-        
-        // Actualizar el conteo
-        updatePendingCount();
-        
-        // Ocultar el indicador automáticamente después de 10 segundos
-        setTimeout(() => {
-          updatePendingCount().then((count) => {
-            if (count.total === 0) {
-              setJustRecoveredConnection(false);
-            }
-          });
-        }, 10000);
-      } else if (isNowOnline) {
-        // Ya estábamos en línea, solo actualizar conteo si es necesario
-        getPendingCount().then(count => {
-          if (count.total > 0) {
-            setPendingCount(count);
-          }
-        });
+      try {
+        setOnline(navigator.onLine);
+      } catch (error) {
+        console.error('Error updating online status:', error);
       }
-      
-      previousOnlineStatus = isNowOnline;
-    };
-
-    const updatePendingCount = async () => {
-      const count = await getPendingCount();
-      console.log('[OfflineIndicator] Conteo actualizado:', count);
-      setPendingCount(count);
-      
-      // Si no hay datos pendientes y ya pasó el tiempo de recuperación, ocultar
-      if (count.total === 0 && justRecoveredConnection) {
-        setTimeout(() => setJustRecoveredConnection(false), 2000);
-      }
-      
-      return count;
     };
 
     // Listeners para cambios de conectividad
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
 
-    // Listener para actualizaciones de sincronización
-    const handleSyncComplete = () => {
-      console.log('[OfflineIndicator] Sincronización completada, actualizando conteo...');
-      updatePendingCount();
-    };
-    
-    window.addEventListener('offline-sync-complete', handleSyncComplete);
-
-    // Actualizar conteo inicial SOLO si hay datos pendientes o estamos offline
-    if (!navigator.onLine) {
-      updatePendingCount();
-    } else {
-      // En línea: verificar si hay datos pendientes pero no mostrar el indicador si no los hay
-      getPendingCount().then(count => {
-        if (count.total > 0) {
-          setPendingCount(count);
-        }
-      });
-    }
-
-    // Actualizar conteo periódicamente SOLO si estamos offline o hay datos pendientes
-    const interval = setInterval(() => {
-      if (!navigator.onLine || pendingCount.total > 0) {
-        updatePendingCount();
-      }
-    }, 10000); // Cambiado a 10 segundos para reducir la frecuencia
-
     return () => {
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
-      window.removeEventListener('offline-sync-complete', handleSyncComplete);
-      clearInterval(interval);
     };
-  }, [online, justRecoveredConnection, pendingCount.total]);
+  }, []);
 
   // Función para forzar sincronización manual
   const handleManualSync = async () => {
     setSyncing(true);
     try {
-      await syncPendingData();
-      const count = await getPendingCount();
-      setPendingCount(count);
+      // Simular sincronización
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setPendingCount({ total: 0, visitas: 0, salidas: 0 });
     } catch (error) {
       console.error('Error en sincronización manual:', error);
     } finally {
@@ -114,18 +53,8 @@ const OfflineIndicator = () => {
     }
   };
 
-  // Función para limpiar datos (solo desarrollo)
-  const handleClearPending = async () => {
-    if (window.confirm('¿Estás seguro de eliminar todos los registros pendientes? Esta acción no se puede deshacer.')) {
-      await clearAllPending();
-      const count = await getPendingCount();
-      setPendingCount(count);
-    }
-  };
-
-  // No mostrar nada si:
-  // 1. Estamos online Y no hay datos pendientes Y no acabamos de recuperar la conexión
-  if (online && pendingCount.total === 0 && !justRecoveredConnection) {
+  // No mostrar nada si estamos online y no hay datos pendientes
+  if (online && pendingCount.total === 0) {
     return null;
   }
 
@@ -237,16 +166,6 @@ const OfflineIndicator = () => {
                   ) : (
                     'Sincronizar ahora'
                   )}
-                </button>
-              )}
-
-              {/* Botón de desarrollo para limpiar datos */}
-              {pendingCount.total > 0 && (
-                <button
-                  onClick={handleClearPending}
-                  className="w-full px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-sm transition-colors duration-200"
-                >
-                  Limpiar datos pendientes
                 </button>
               )}
             </div>

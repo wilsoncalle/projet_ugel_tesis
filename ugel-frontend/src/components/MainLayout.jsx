@@ -335,9 +335,42 @@ const MainLayout = () => {
                 </button>
               )}
               
-              <div className="flex flex-col">
-                <span className="text-lg font-bold text-gray-800">Sistema Integral de Control de Acceso</span>
-                <span className="text-xs text-gray-500" id="current-date">{currentDate}</span>
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold text-gray-800">COAC-UGEL</span>
+                  <span className="text-xs text-gray-500" id="current-date">{currentDate}</span>
+                </div>
+                
+                {/* Navegación entre Visitas, Personal y Asistencia - Solo mostrar en rutas de vigilante */}
+                {isVigilanteRoute && (
+                  <div className="flex gap-2 ml-4">
+                    <NavLink
+                      to="/vigilante"
+                      end
+                      className={({ isActive }) => `
+                        px-4 py-2 rounded-lg font-medium transition-colors text-sm
+                        ${isActive 
+                          ? 'bg-blue-600 text-white shadow-md' 
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        }
+                      `}
+                    >
+                      Visitas
+                    </NavLink>
+                    <NavLink
+                      to="/vigilante/asistencia"
+                      className={({ isActive }) => `
+                        px-4 py-2 rounded-lg font-medium transition-colors text-sm
+                        ${isActive 
+                          ? 'bg-blue-600 text-white shadow-md' 
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        }
+                      `}
+                    >
+                      Asistencia
+                    </NavLink>
+                  </div>
+                )}
               </div>
             </div>
             

@@ -84,31 +84,45 @@ export const areasService = {
 export const personalService = {
   getAll: (filters = {}) => {
     const params = new URLSearchParams();
-    if (filters.activo !== undefined) {
-      params.append('activo', filters.activo);
-    }
-    if (filters.q) {
-      params.append('q', filters.q);
-    }
-    if (filters.page) {
-      params.append('page', filters.page);
-    }
-    if (filters.limit) {
-      params.append('limit', filters.limit);
-    }
-    if (filters.areaId) {
-      params.append('areaId', filters.areaId);
-    }
-    if (filters.tipoContratoId) {
-      params.append('tipoContratoId', filters.tipoContratoId);
-    }
+    if (filters.activo !== undefined) params.append('activo', filters.activo);
+    if (filters.q) params.append('q', filters.q);
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.areaId) params.append('areaId', filters.areaId);
+    if (filters.tipoContratoId) params.append('tipoContratoId', filters.tipoContratoId);
+    if (filters.cargoId) params.append('cargoId', filters.cargoId);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
+    return api.get(`/personal?${params.toString()}`);
+  },
+  getActivos: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.q) params.append('q', filters.q);
+    params.append('activo', 'true');
+    return api.get(`/personal?${params.toString()}`);
+  },
+  getHistorial: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.q) params.append('q', filters.q);
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.cargoId) params.append('cargoId', filters.cargoId);
+    if (filters.areaId) params.append('areaId', filters.areaId);
+    if (filters.activo !== undefined) params.append('activo', filters.activo);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
     return api.get(`/personal?${params.toString()}`);
   },
   getById: (id) => api.get(`/personal/${id}`),
   getByDocumento: (tipoDocumento, numeroDocumento) => api.get(`/personal/documento/${tipoDocumento}/${numeroDocumento}`),
+  consultarDNI: (dni) => api.post('/visitantes/consultar-dni', { dni }),
   create: (personal) => api.post('/personal', personal),
+  registrarAlta: (personal) => api.post('/personal', personal),
   update: (id, personal) => api.put(`/personal/${id}`, personal),
   delete: (id) => api.delete(`/personal/${id}`),
+  registrarBaja: (id, data) => api.put(`/personal/${id}`, { ...data, activo: false }),
   getDeleted: () => api.get('/personal/deleted'),
   restore: (id) => api.put(`/personal/${id}/restore`),
 };
@@ -119,6 +133,32 @@ export const papeletasSalidaService = {
   create: (papeleta) => api.post('/papeletas-salida', papeleta),
   update: (id, papeleta) => api.put(`/papeletas-salida/${id}`, papeleta),
   delete: (id) => api.delete(`/papeletas-salida/${id}`),
+};
+
+export const asistenciaPersonalService = {
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.q) params.append('q', filters.q);
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.fecha) params.append('fecha', filters.fecha);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
+    if (filters.personalId) params.append('personalId', filters.personalId);
+    if (filters.estadoPresencia) params.append('estadoPresencia', filters.estadoPresencia);
+    return api.get(`/asistencia-personal?${params.toString()}`);
+  },
+  getHoy: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.q) params.append('q', filters.q);
+    return api.get(`/asistencia-personal/hoy?${params.toString()}`);
+  },
+  getById: (id) => api.get(`/asistencia-personal/${id}`),
+  registrarIngreso: (personalId) => api.post('/asistencia-personal/ingreso', { personalId }),
+  registrarSalida: (personalId) => api.put('/asistencia-personal/salida', { personalId }),
+  registrarEstado: (personalId, estadoPresencia) => api.post('/asistencia-personal/estado', { personalId, estadoPresencia })
 };
 
 export const visitasService = {
