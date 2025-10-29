@@ -12,11 +12,23 @@ const DateRangeFilter = ({
   onClear,
   className = '',
   onSemanaChange, // <- NUEVO (opcional)
+  semanaUIProp, // <- Prop opcional para recibir semanaUI desde el padre
 }) => {
   const [fromInput, setFromInput] = useState('');
   const [toInput, setToInput] = useState('');
   const [semanaUI, setSemanaUI] = useState(null); // Estado interno para los chips
   const [diaSeleccionado, setDiaSeleccionado] = useState(null); // Día seleccionado dentro de la semana
+  
+  // Sincronizar semanaUI interno con el prop del padre
+  useEffect(() => {
+    if (semanaUIProp) {
+      setSemanaUI(semanaUIProp);
+      // Si el prop tiene un día seleccionado, establecerlo también
+      if (fechaDesde && fechaHasta && fechaDesde === fechaHasta) {
+        setDiaSeleccionado(fechaDesde);
+      }
+    }
+  }, [semanaUIProp, fechaDesde, fechaHasta]);
 
   const [fromCalendarMonth, setFromCalendarMonth] = useState(new Date().getMonth());
   const [fromCalendarYear, setFromCalendarYear] = useState(new Date().getFullYear());

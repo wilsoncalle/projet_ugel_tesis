@@ -425,6 +425,82 @@ const PersonalAsistenciaPage = () => {
     setActiveTab(tab);
     
     if (tab === 'historial') {
+      // Calcular semana actual (lunes a domingo)
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      
+      // Obtener el lunes de esta semana
+      const dayOfWeek = hoy.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const lunesSemanaActual = new Date(hoy);
+      lunesSemanaActual.setDate(hoy.getDate() - daysToMonday);
+      lunesSemanaActual.setHours(0, 0, 0, 0);
+      
+      // Obtener el domingo de esta semana
+      const domingoSemanaActual = new Date(lunesSemanaActual);
+      domingoSemanaActual.setDate(lunesSemanaActual.getDate() + 6);
+      
+      // Si el domingo está en el futuro, usar hoy como límite
+      const finSemana = domingoSemanaActual > hoy ? hoy : domingoSemanaActual;
+      
+      // Formatear fechas como YYYY-MM-DD
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      const fechaHoy = formatDate(hoy);
+      const fechaLunes = formatDate(lunesSemanaActual);
+      const fechaDomingo = formatDate(finSemana);
+      
+      // Calcular el índice de la semana en el mes actual
+      const firstDayOfMonth = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      const firstMondayOfMonth = new Date(firstDayOfMonth);
+      const dowFirstDay = firstDayOfMonth.getDay();
+      const toSubtractFirstDay = dowFirstDay === 0 ? 6 : dowFirstDay - 1;
+      firstMondayOfMonth.setDate(firstDayOfMonth.getDate() - toSubtractFirstDay);
+      
+      // Calcular qué semana es en el mes (S1, S2, etc.)
+      const diffTime = lunesSemanaActual.getTime() - firstMondayOfMonth.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      const weekIndex = Math.floor(diffDays / 7);
+      
+      // Construir payload de la semana (similar a buildWeekPayload en DateRangeFilter)
+      const days = Array.from({ length: 7 }, (_, i) => {
+        const day = new Date(lunesSemanaActual);
+        day.setDate(lunesSemanaActual.getDate() + i);
+        return day;
+      });
+      
+      const monthDate = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                          'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      const monthName = monthNames[monthDate.getMonth()];
+      const monthNameCapitalized = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+      
+      const semanaPayload = {
+        start: fechaLunes,
+        end: fechaDomingo,
+        monthName: monthNameCapitalized,
+        weekIndex: weekIndex + 1,
+        days: days.map((d) => {
+          const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+          const dayShortNames = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+          const dayOfWeek = d.getDay();
+          return {
+            date: formatDate(d),
+            labelShort: dayShortNames[dayOfWeek],
+            labelLong: dayNames[dayOfWeek]
+          };
+        })
+      };
+      
+      // Establecer la semana en semanaUI y el día actual
+      setSemanaUI(semanaPayload);
+      handleFechaDesdeChange(fechaHoy, fechaHoy);
+    } else {
       const filtrosVacios = {
         busqueda: '',
         personalId: '',
@@ -974,6 +1050,7 @@ const PersonalAsistenciaPage = () => {
                           ejecutarBusqueda(filtrosCompletos, 1);
                         }}
                         onSemanaChange={(info) => setSemanaUI(info)}
+                        semanaUIProp={semanaUI}
                         className="mb-4"
                       />
                     </motion.div>
