@@ -6,6 +6,7 @@
 const db = require('../../config/database');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { toLimaDateYYYYMMDD } = require('../../utils/fechas');
 
 /**
  * Buscar todos los registros de asistencia con filtros y paginación
@@ -13,7 +14,7 @@ const logger = require('../../utils/logger');
  * @returns {Object} Registros de asistencia encontrados y total
  */
 const findAll = async (options = {}) => {
-  const { 
+  let { 
     page = 1, 
     limit = 20, 
     search = '',
@@ -23,6 +24,16 @@ const findAll = async (options = {}) => {
     personalId,
     estadoPresencia
   } = options;
+  
+  // Normalizar fechas a YYYY-MM-DD (zona Lima) antes de construir el SQL
+  fecha = toLimaDateYYYYMMDD(fecha);
+  fechaInicio = toLimaDateYYYYMMDD(fechaInicio);
+  fechaFin = toLimaDateYYYYMMDD(fechaFin);
+  
+  // Si se proporciona rango (inicio/fin), ignorar fecha exacta para evitar duplicar condiciones
+  if (fechaInicio || fechaFin) {
+    fecha = null;
+  }
   
   const offset = (page - 1) * limit;
   
@@ -68,20 +79,21 @@ const findAll = async (options = {}) => {
     
     // Filtro por fecha específica
     if (fecha) {
-      whereConditions.push(`ca.fecha = $${paramCounter}`);
+      whereConditions.push(`ca.fecha = $${paramCounter}::date`);
       queryParams.push(fecha);
       paramCounter++;
     }
     
-    // Filtro por rango de fechas
+    // Filtro por rango de fechas (inclusivo, usando < fechaFin + 1 día para incluir todo el día final)
     if (fechaInicio) {
-      whereConditions.push(`ca.fecha >= $${paramCounter}`);
+      whereConditions.push(`ca.fecha >= $${paramCounter}::date`);
       queryParams.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
-      whereConditions.push(`ca.fecha <= $${paramCounter}`);
+      // Fin exclusivo = día siguiente → incluye TODO el día fin
+      whereConditions.push(`ca.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
       queryParams.push(fechaFin);
       paramCounter++;
     }
@@ -381,19 +393,26 @@ const updateEstadoPresencia = async (id, estadoPresencia, usuarioId) => {
  */
 const getEstadisticas = async (fechaInicio, fechaFin) => {
   try {
-    // Construir las condiciones de fecha
+    // Normalizar fechas a YYYY-MM-DD (zona Lima) antes de construir el SQL
+    fechaInicio = toLimaDateYYYYMMDD(fechaInicio);
+    fechaFin = toLimaDateYYYYMMDD(fechaFin);
+    
+    // Construir las condiciones de fecha (inclusivo, usando < fechaFin + 1 día para incluir todo el día final)
     const whereCondition = [];
     const params = [];
     let paramCounter = 1;
     
     if (fechaInicio) {
-      whereCondition.push(`fecha >= $${paramCounter++}`);
+      whereCondition.push(`fecha >= $${paramCounter}::date`);
       params.push(fechaInicio);
+      paramCounter++;
     }
     
     if (fechaFin) {
-      whereCondition.push(`fecha <= $${paramCounter++}`);
+      // Fin exclusivo = día siguiente → incluye TODO el día fin
+      whereCondition.push(`fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
+      paramCounter++;
     }
     
     const whereClause = whereCondition.length > 0 ? `WHERE ${whereCondition.join(' AND ')}` : '';
