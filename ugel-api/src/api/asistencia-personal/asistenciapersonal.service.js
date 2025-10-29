@@ -115,6 +115,43 @@ const getAsistenciaById = async (id) => {
 };
 
 /**
+ * Determinar estado de presencia según la hora de ingreso
+ * @param {string} horaIngreso - Hora en formato HH:MM:SS
+ * @returns {string} Estado de presencia: 'Presente' o 'Tardanza'
+ */
+const determinarEstadoPresencia = (horaIngreso) => {
+  if (!horaIngreso) {
+    return 'Ausente';
+  }
+  
+  // Separar la hora en componentes
+  const partesHora = horaIngreso.split(':');
+  if (partesHora.length < 2) {
+    return 'Presente'; // Por defecto si no se puede parsear
+  }
+  
+  const horas = parseInt(partesHora[0], 10);
+  const minutos = parseInt(partesHora[1], 10);
+  
+  // Validar que sean números válidos
+  if (isNaN(horas) || isNaN(minutos)) {
+    return 'Presente'; // Por defecto si no son números válidos
+  }
+  
+  // Convertir a minutos totales desde medianoche para comparar
+  const minutosTotales = horas * 60 + minutos;
+  const limiteMinutos = 9 * 60 + 15; // 9:15 = 555 minutos
+  
+  // Si llega a las 9:00, 9:15 o antes → Presente
+  // Si llega después de las 9:15 → Tardanza
+  if (minutosTotales <= limiteMinutos) {
+    return 'Presente';
+  } else {
+    return 'Tardanza';
+  }
+};
+
+/**
  * Registrar ingreso de personal
  * @param {number} personalId - ID del personal
  * @param {number} usuarioId - ID del usuario que registra
@@ -131,8 +168,23 @@ const registrarIngreso = async (personalId, usuarioId) => {
       throw new AppError('Personal inactivo', 400);
     }
     
-    // Obtener fecha actual en formato YYYY-MM-DD
-    const fechaActual = new Date().toISOString().split('T')[0];
+    // Obtener fecha y hora actual en zona horaria de Lima (UTC-5)
+    const ahora = new Date();
+    // Obtener la hora en Lima (UTC-5)
+    const limaOffset = -5 * 60; // -5 horas en minutos
+    const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
+    const limaTime = new Date(utcTime + (limaOffset * 60000));
+    
+    // Obtener fecha actual en formato YYYY-MM-DD (Lima)
+    const fechaActual = limaTime.toISOString().split('T')[0];
+    
+    // Obtener hora actual en formato HH:MM:SS (Lima)
+    const horaActual = limaTime.toTimeString().split(' ')[0];
+    
+    // Determinar estado según la hora de ingreso
+    const estadoPresencia = determinarEstadoPresencia(horaActual);
+    
+    logger.info(`Registrando ingreso - Hora Lima: ${horaActual}, Estado: ${estadoPresencia}`);
     
     // Verificar si ya existe un registro para este personal en la fecha actual
     const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);
@@ -144,25 +196,23 @@ const registrarIngreso = async (personalId, usuarioId) => {
       }
       
       // Si existe un registro pero sin hora de ingreso, actualizarlo
-      const horaActual = new Date().toTimeString().split(' ')[0];
-      const asistencia = await repository.updateIngreso(registroExistente.id, horaActual, 'Presente', usuarioId);
+      const asistencia = await repository.updateIngreso(registroExistente.id, horaActual, estadoPresencia, usuarioId);
       
-      logger.info(`Ingreso actualizado para personal ID ${personalId} a las ${horaActual}`);
+      logger.info(`Ingreso actualizado para personal ID ${personalId} a las ${horaActual} - Estado: ${estadoPresencia}`);
       
       return asistencia;
     } else {
       // Si no existe un registro, crear uno nuevo
-      const horaActual = new Date().toTimeString().split(' ')[0];
       const asistencia = await repository.create({
         personal_id: personalId,
         fecha: fechaActual,
         hora_ingreso: horaActual,
         hora_salida: null,
-        estado_presencia: 'Presente',
+        estado_presencia: estadoPresencia,
         usuario_registro_id: usuarioId
       });
       
-      logger.info(`Ingreso registrado para personal ID ${personalId} a las ${horaActual}`);
+      logger.info(`Ingreso registrado para personal ID ${personalId} a las ${horaActual} - Estado: ${estadoPresencia}`);
       
       return asistencia;
     }

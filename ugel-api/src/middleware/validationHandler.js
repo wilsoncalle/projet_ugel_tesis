@@ -3,9 +3,9 @@
  * Sistema Integral de Control de Acceso - UGEL Talara
  */
 
-const Joi = require('joi');
-const { AppError, asyncHandler } = require('./errorHandler');
-const config = require('../config');
+const Joi = require("joi");
+const { AppError, asyncHandler } = require("./errorHandler");
+const config = require("../config");
 
 /**
  * Middleware genérico para validación con Joi
@@ -13,18 +13,18 @@ const config = require('../config');
  * @param {string} property - Propiedad del request a validar ('body', 'params', 'query')
  * @returns {Function} Middleware de validación
  */
-const validate = (schema, property = 'body') => {
+const validate = (schema, property = "body") => {
   return asyncHandler(async (req, res, next) => {
     const { error, value } = schema.validate(req[property], {
       abortEarly: false, // Mostrar todos los errores
       allowUnknown: true, // Permitir campos desconocidos
-      stripUnknown: false // No remover campos desconocidos
+      stripUnknown: false, // No remover campos desconocidos
     });
-    
+
     if (error) {
       throw error; // El errorHandler se encargará de formatear el error de Joi
     }
-    
+
     // Reemplazar los datos originales con los validados y sanitizados
     req[property] = value;
     next();
@@ -37,15 +37,19 @@ const validate = (schema, property = 'body') => {
 const commonSchemas = {
   // Schema para ID numérico
   id: Joi.object({
-    id: Joi.number().integer().positive().required()
+    id: Joi.number().integer().positive().required(),
   }),
-  
+
   // Schema para paginación
   pagination: Joi.object({
     page: Joi.number().integer().min(1).default(config.pagination.defaultPage),
-    limit: Joi.number().integer().min(1).max(config.pagination.maxLimit).default(config.pagination.defaultLimit),
+    limit: Joi.number()
+      .integer()
+      .min(1)
+      .max(config.pagination.maxLimit)
+      .default(config.pagination.defaultLimit),
     sortBy: Joi.string().optional(),
-    sortOrder: Joi.string().valid('asc', 'desc').default('asc'),
+    sortOrder: Joi.string().valid("asc", "desc").default("asc"),
     // Permitir parámetros adicionales para filtros
     q: Joi.string().optional(),
     areaId: Joi.number().integer().positive().optional(),
@@ -53,9 +57,9 @@ const commonSchemas = {
     personalVisitadoId: Joi.number().integer().positive().optional(),
     documentoVisitante: Joi.string().optional(),
     fechaInicio: Joi.date().iso().optional(),
-    fechaFin: Joi.date().iso().optional()
+    fechaFin: Joi.date().iso().optional(),
   }),
-  
+
   // Schema para fechas
   dateRange: Joi.object({
     fechaInicio: Joi.date().iso().optional(),
@@ -68,14 +72,14 @@ const commonSchemas = {
     personalVisitadoId: Joi.number().integer().positive().optional(),
     documentoVisitante: Joi.string().optional(),
     page: Joi.number().integer().min(1).optional(),
-    limit: Joi.number().integer().min(1).max(100).optional()
+    limit: Joi.number().integer().min(1).max(100).optional(),
   }),
-  
+
   // Schema para búsqueda
   search: Joi.object({
     q: Joi.string().min(1).max(100).optional(),
-    activo: Joi.boolean().optional()
-  })
+    activo: Joi.boolean().optional(),
+  }),
 };
 
 /**
@@ -91,82 +95,65 @@ const schemas = {
         .max(100)
         .required()
         .messages({
-          'string.alphanum': 'El nombre de usuario solo puede contener letras y números',
-          'string.min': 'El nombre de usuario debe tener al menos 3 caracteres',
-          'string.max': 'El nombre de usuario no puede exceder 100 caracteres'
+          "string.alphanum":
+            "El nombre de usuario solo puede contener letras y números",
+          "string.min": "El nombre de usuario debe tener al menos 3 caracteres",
+          "string.max": "El nombre de usuario no puede exceder 100 caracteres",
         }),
-      email: Joi.string()
-        .email()
-        .max(150)
-        .required()
-        .messages({
-          'string.email': 'Debe ser un email válido'
-        }),
+      email: Joi.string().email().max(150).required().messages({
+        "string.email": "Debe ser un email válido",
+      }),
       contrasena: Joi.string()
         .min(config.validation.minPasswordLength)
         .max(255)
         .required()
         .messages({
-          'string.min': `La contraseña debe tener al menos ${config.validation.minPasswordLength} caracteres`
+          "string.min": `La contraseña debe tener al menos ${config.validation.minPasswordLength} caracteres`,
         }),
       rol: Joi.string()
         .valid(...config.validation.validRoles)
         .required()
         .messages({
-          'any.only': `El rol debe ser uno de: ${config.validation.validRoles.join(', ')}`
-        })
+          "any.only": `El rol debe ser uno de: ${config.validation.validRoles.join(", ")}`,
+        }),
     }),
-    
+
     login: Joi.object({
       nombreUsuario: Joi.string().required(),
-      contrasena: Joi.string().required()
+      contrasena: Joi.string().required(),
     }),
-    
+
     changePassword: Joi.object({
       contrasenaActual: Joi.string().required(),
       nuevaContrasena: Joi.string()
         .min(config.validation.minPasswordLength)
         .max(255)
         .required()
-        .disallow(Joi.ref('contrasenaActual'))
+        .disallow(Joi.ref("contrasenaActual"))
         .messages({
-          'string.min': `La contraseña debe tener al menos ${config.validation.minPasswordLength} caracteres`,
-          'any.invalid': 'La nueva contraseña debe ser diferente a la actual'
-        })
-    })
+          "string.min": `La contraseña debe tener al menos ${config.validation.minPasswordLength} caracteres`,
+          "any.invalid": "La nueva contraseña debe ser diferente a la actual",
+        }),
+    }),
   },
-  
+
   // Usuarios
   usuarios: {
     create: Joi.object({
-      nombreUsuario: Joi.string()
-        .alphanum()
-        .min(3)
-        .max(100)
-        .required(),
-      email: Joi.string()
-        .email()
-        .max(150)
-        .required(),
+      nombreUsuario: Joi.string().alphanum().min(3).max(100).required(),
+      email: Joi.string().email().max(150).required(),
       contrasena: Joi.string()
         .min(config.validation.minPasswordLength)
         .max(255)
         .required(),
       rol: Joi.string()
         .valid(...config.validation.validRoles)
-        .required()
+        .required(),
     }),
-    
+
     update: Joi.object({
-      nombreUsuario: Joi.string()
-        .alphanum()
-        .min(3)
-        .max(100)
-        .optional(),
-      email: Joi.string()
-        .email()
-        .max(150)
-        .optional(),
+      nombreUsuario: Joi.string().alphanum().min(3).max(100).optional(),
+      email: Joi.string().email().max(150).optional(),
       contrasena: Joi.string()
         .min(config.validation.minPasswordLength)
         .max(255)
@@ -174,307 +161,279 @@ const schemas = {
       rol: Joi.string()
         .valid(...config.validation.validRoles)
         .optional(),
-      activo: Joi.boolean().optional()
-    }).min(1)
+      activo: Joi.boolean().optional(),
+    }).min(1),
   },
-  
+
   // Personal
   personal: {
     create: Joi.object({
       tipoDocumento: Joi.string()
         .valid(...config.validation.validDocumentTypes)
         .required(),
-      numeroDocumento: Joi.string()
-        .min(8)
-        .max(20)
-        .required(),
-      nombres: Joi.string()
-        .min(2)
-        .max(150)
-        .required(),
-      apellidos: Joi.string()
-        .min(2)
-        .max(150)
-        .required(),
-      cargo: Joi.string()
-        .min(2)
-        .max(100)
-        .default('Sin asignar')
-        .optional(),
-      areaDestinoId: Joi.number()
-        .integer()
-        .positive()
-        .required(),
-      tipoContratoId: Joi.number()
-        .integer()
-        .positive()
-        .required()
+      numeroDocumento: Joi.string().min(8).max(20).required(),
+      nombres: Joi.string().min(2).max(150).required(),
+      apellidos: Joi.string().min(2).max(150).required(),
+      cargo: Joi.string().min(2).max(100).default("Sin asignar").optional(),
+      areaDestinoId: Joi.number().integer().positive().required(),
+      tipoContratoId: Joi.number().integer().positive().required(),
     }),
-    
+
     update: Joi.object({
       tipoDocumento: Joi.string()
         .valid(...config.validation.validDocumentTypes)
         .optional(),
-      numeroDocumento: Joi.string()
-        .min(8)
-        .max(20)
-        .optional(),
-      nombres: Joi.string()
-        .min(2)
-        .max(150)
-        .optional(),
-      apellidos: Joi.string()
-        .min(2)
-        .max(150)
-        .optional(),
-      cargo: Joi.string()
-        .min(2)
-        .max(100)
-        .optional(),
-      areaDestinoId: Joi.number()
-        .integer()
-        .positive()
-        .optional(),
-      tipoContratoId: Joi.number()
-        .integer()
-        .positive()
-        .optional(),
-      activo: Joi.boolean().optional()
-    }).min(1)
+      numeroDocumento: Joi.string().min(8).max(20).optional(),
+      nombres: Joi.string().min(2).max(150).optional(),
+      apellidos: Joi.string().min(2).max(150).optional(),
+      cargo: Joi.string().min(2).max(100).optional(),
+      areaDestinoId: Joi.number().integer().positive().optional(),
+      tipoContratoId: Joi.number().integer().positive().optional(),
+      activo: Joi.boolean().optional(),
+    }).min(1),
   },
-  
+
   // Visitantes
   visitantes: {
     create: Joi.object({
-      tipoDocumentoId: Joi.number()
-        .integer()
-        .positive()
-        .required(),
-      numeroDocumento: Joi.string()
-        .min(8)
-        .max(20)
-        .required(),
-      nombres: Joi.string()
-        .min(2)
-        .max(150)
-        .required(),
-      apellidos: Joi.string()
-        .min(2)
-        .max(150)
-        .required()
+      tipoDocumentoId: Joi.number().integer().positive().required(),
+      numeroDocumento: Joi.string().min(8).max(20).required(),
+      nombres: Joi.string().min(2).max(150).required(),
+      apellidos: Joi.string().min(2).max(150).required(),
     }),
-    
+
     update: Joi.object({
-      tipoDocumentoId: Joi.number()
-        .integer()
-        .positive()
-        .optional(),
-      numeroDocumento: Joi.string()
-        .min(8)
-        .max(20)
-        .optional(),
-      nombres: Joi.string()
-        .min(2)
-        .max(150)
-        .optional(),
-      apellidos: Joi.string()
-        .min(2)
-        .max(150)
-        .optional()
+      tipoDocumentoId: Joi.number().integer().positive().optional(),
+      numeroDocumento: Joi.string().min(8).max(20).optional(),
+      nombres: Joi.string().min(2).max(150).optional(),
+      apellidos: Joi.string().min(2).max(150).optional(),
     }).min(1),
-    
+
     consultarDNI: Joi.object({
       dni: Joi.string()
         .pattern(/^\d{8}$/)
         .required()
         .messages({
-          'string.pattern.base': 'El DNI debe tener exactamente 8 dígitos',
-          'any.required': 'El DNI es requerido'
-        })
-    })
+          "string.pattern.base": "El DNI debe tener exactamente 8 dígitos",
+          "any.required": "El DNI es requerido",
+        }),
+    }),
   },
-  
+
   // Visitas
   visitas: {
     create: Joi.object({
       // Caso 1: Visitante existente
-      visitanteId: Joi.number()
-        .integer()
-        .positive(),
-      
+      visitanteId: Joi.number().integer().positive(),
+
       // Caso 2: Nuevo visitante
-      tipoDocumentoId: Joi.number()
-        .integer()
-        .positive(),
-      numeroDocumento: Joi.string()
-        .min(8)
-        .max(20),
-      nombres: Joi.string()
-        .min(2)
-        .max(150),
-      apellidos: Joi.string()
-        .min(2)
-        .max(150),
-      
+      tipoDocumentoId: Joi.number().integer().positive(),
+      numeroDocumento: Joi.string().min(8).max(20),
+      nombres: Joi.string().min(2).max(150),
+      apellidos: Joi.string().min(2).max(150),
+
       // Datos de la visita
-      areaDestinoId: Joi.number()
-        .integer()
-        .positive()
-        .required(),
+      areaDestinoId: Joi.number().integer().positive().required(),
       personalVisitadoId: Joi.number()
         .integer()
         .positive()
         .allow(null)
         .optional(),
-      motivoVisitaId: Joi.number()
-        .integer()
-        .positive()
-        .required(),
-      
+      motivoVisitaId: Joi.number().integer().positive().required(),
+
       // Campos de fecha y hora (opcionales para compatibilidad con modo offline)
       fechaIngreso: Joi.string()
         .pattern(/^\d{4}-\d{2}-\d{2}$/)
         .optional(),
       horaIngreso: Joi.string()
         .pattern(/^\d{2}:\d{2}$/)
-        .optional()
-    }).xor('visitanteId', 'tipoDocumentoId')
-      .and('tipoDocumentoId', 'numeroDocumento', 'nombres', 'apellidos')
+        .optional(),
+    })
+      .xor("visitanteId", "tipoDocumentoId")
+      .and("tipoDocumentoId", "numeroDocumento", "nombres", "apellidos"),
   },
-  
+
   // Papeletas de salida
   papeletasSalida: {
+    // Crear (SOLICITADO por defecto o APROBADO si se indica)
     create: Joi.object({
-      personalId: Joi.number()
-        .integer()
-        .positive()
-        .required(),
-      motivoSalidaId: Joi.number()
-        .integer()
-        .positive()
-        .required(),
-      fechaHoraSalida: Joi.date()
+      personalSolicitanteId: Joi.number().integer().positive().required(),
+      motivoSalidaId: Joi.number().integer().positive().required(),
+      sustentoSolicitud: Joi.string().max(1000).allow("", null),
+
+      // Fechas programadas: ambas requeridas y retorno >= salida
+      fechaHoraSalidaProgramada: Joi.date().iso().required(),
+      fechaHoraRetornoProgramada: Joi.date()
         .iso()
-        .default(() => new Date().toISOString()),
-      fechaHoraRetornoEstimada: Joi.date()
-        .iso()
-        .min(Joi.ref('fechaHoraSalida'))
-        .allow(null),
-      observacionSalida: Joi.string()
-        .max(500)
-        .allow(null, '')
-    })
+        .min(Joi.ref("fechaHoraSalidaProgramada"))
+        .required(),
+
+      // Si entra como aprobada, requiere personalAutorizaId
+      crearComoAprobada: Joi.boolean().default(false),
+      personalAutorizaId: Joi.when("crearComoAprobada", {
+        is: true,
+        then: Joi.number().integer().positive().required(),
+        otherwise: Joi.number().integer().positive().optional().allow(null),
+      }),
+      observacionAutorizacion: Joi.string().max(500).allow("", null),
+    }),
+
+    // Decidir (aprobar/rechazar)
+    decidir: Joi.object({
+      accion: Joi.string().valid("APROBAR", "RECHAZAR").required(),
+      personalAutorizaId: Joi.number().integer().positive().required(),
+      observacionAutorizacion: Joi.string().max(500).allow("", null),
+    }),
+
+    // Cancelar (antes de salida real)
+    cancelar: Joi.object({
+      observacionAutorizacion: Joi.string().max(500).allow("", null),
+    }),
+
+    // Listado general con filtros (GET /?query)
+    listQuery: Joi.object({
+      page: Joi.number()
+        .integer()
+        .min(1)
+        .default(config.pagination.defaultPage),
+      limit: Joi.number()
+        .integer()
+        .min(1)
+        .max(config.pagination.maxLimit)
+        .default(config.pagination.defaultLimit),
+
+      q: Joi.string().max(100).optional(),
+      estado: Joi.string()
+        .valid(
+          "SOLICITADO",
+          "APROBADO",
+          "RECHAZADO",
+          "EN_CURSO",
+          "FINALIZADO",
+          "CANCELADO",
+        )
+        .optional(),
+
+      fechaInicio: Joi.date().iso().optional(),
+      fechaFin: Joi.date().iso().optional(),
+      campoFecha: Joi.string()
+        .valid("solicitud", "programada", "salida_real", "retorno_real")
+        .optional(),
+
+      motivoSalidaId: Joi.number().integer().positive().optional(),
+      solicitanteId: Joi.number().integer().positive().optional(),
+      autorizaId: Joi.number().integer().positive().optional(),
+      areaDestinoId: Joi.number().integer().positive().optional(),
+
+      // Orden seguro (debe coincidir con whitelist del repo)
+      orderBy: Joi.string()
+        .valid(
+          "ps.fecha_solicitud",
+          "ps.fecha_hora_salida_programada",
+          "ps.fecha_hora_retorno_programada",
+          "ps.fecha_hora_salida_real",
+          "ps.fecha_hora_retorno_real",
+          "ps.codigo_papeleta",
+        )
+        .optional(),
+      orderDir: Joi.string().valid("ASC", "DESC").optional(),
+    }),
+
+    // Pendientes para garita (GET /pendientes?query)
+    pendientesQuery: Joi.object({
+      page: Joi.number()
+        .integer()
+        .min(1)
+        .default(config.pagination.defaultPage),
+      limit: Joi.number()
+        .integer()
+        .min(1)
+        .max(config.pagination.maxLimit)
+        .default(config.pagination.defaultLimit),
+      q: Joi.string().max(100).optional(),
+      areaDestinoId: Joi.number().integer().positive().optional(),
+      motivoSalidaId: Joi.number().integer().positive().optional(),
+    }),
+
+    // Estadísticas (GET /estadisticas?query)
+    estadisticasQuery: Joi.object({
+      fechaInicio: Joi.date().iso().optional(),
+      fechaFin: Joi.date().iso().optional(),
+      campoFecha: Joi.string()
+        .valid("solicitud", "programada", "salida_real", "retorno_real")
+        .default("solicitud"),
+    }),
   },
-  
+
   // Asistencia de personal
   asistenciaPersonal: {
     registrarIngreso: Joi.object({
-      personalId: Joi.number()
-        .integer()
-        .positive()
-        .required()
+      personalId: Joi.number().integer().positive().required(),
     }),
-    
+
     registrarSalida: Joi.object({
-      personalId: Joi.number()
-        .integer()
-        .positive()
-        .required()
+      personalId: Joi.number().integer().positive().required(),
     }),
-    
+
     registrarEstado: Joi.object({
-      personalId: Joi.number()
-        .integer()
-        .positive()
-        .required(),
+      personalId: Joi.number().integer().positive().required(),
       estadoPresencia: Joi.string()
         .valid(...config.validation.validPresenceStates)
-        .required()
-    })
+        .required(),
+    }),
   },
-  
+
   // Catálogos genéricos
   catalogo: {
     create: Joi.object({
-      nombre: Joi.string()
-        .min(2)
-        .max(150)
-        .required()
-        .messages({
-          'string.min': 'El nombre debe tener al menos 2 caracteres',
-          'string.max': 'El nombre no puede exceder 150 caracteres'
-        })
+      nombre: Joi.string().min(2).max(150).required().messages({
+        "string.min": "El nombre debe tener al menos 2 caracteres",
+        "string.max": "El nombre no puede exceder 150 caracteres",
+      }),
     }),
-    
+
     update: Joi.object({
-      nombre: Joi.string()
-        .min(2)
-        .max(150)
-        .optional(),
-      activo: Joi.boolean().optional()
-    }).min(1)
+      nombre: Joi.string().min(2).max(150).optional(),
+      activo: Joi.boolean().optional(),
+    }).min(1),
   },
 
   // Cargos específicos
   cargos: {
     create: Joi.object({
-      nombre_cargo: Joi.string()
-        .min(2)
-        .max(150)
-        .required()
-        .messages({
-          'string.min': 'El nombre del cargo debe tener al menos 2 caracteres',
-          'string.max': 'El nombre del cargo no puede exceder 150 caracteres',
-          'any.required': 'El nombre del cargo es requerido'
-        }),
-      descripcion: Joi.string()
-        .max(500)
-        .allow('')
-        .optional()
-        .messages({
-          'string.max': 'La descripción no puede exceder 500 caracteres'
-        }),
-      area_destino_id: Joi.number()
-        .integer()
-        .positive()
-        .required()
-        .messages({
-          'number.base': 'El área de destino debe ser un número válido',
-          'number.integer': 'El área de destino debe ser un número entero',
-          'number.positive': 'El área de destino debe ser un número positivo',
-          'any.required': 'El área de destino es requerida'
-        }),
-      activo: Joi.boolean().optional()
+      nombre_cargo: Joi.string().min(2).max(150).required().messages({
+        "string.min": "El nombre del cargo debe tener al menos 2 caracteres",
+        "string.max": "El nombre del cargo no puede exceder 150 caracteres",
+        "any.required": "El nombre del cargo es requerido",
+      }),
+      descripcion: Joi.string().max(500).allow("").optional().messages({
+        "string.max": "La descripción no puede exceder 500 caracteres",
+      }),
+      area_destino_id: Joi.number().integer().positive().required().messages({
+        "number.base": "El área de destino debe ser un número válido",
+        "number.integer": "El área de destino debe ser un número entero",
+        "number.positive": "El área de destino debe ser un número positivo",
+        "any.required": "El área de destino es requerida",
+      }),
+      activo: Joi.boolean().optional(),
     }),
-    
+
     update: Joi.object({
-      nombre_cargo: Joi.string()
-        .min(2)
-        .max(150)
-        .optional()
-        .messages({
-          'string.min': 'El nombre del cargo debe tener al menos 2 caracteres',
-          'string.max': 'El nombre del cargo no puede exceder 150 caracteres'
-        }),
-      descripcion: Joi.string()
-        .max(500)
-        .allow('')
-        .optional()
-        .messages({
-          'string.max': 'La descripción no puede exceder 500 caracteres'
-        }),
-      area_destino_id: Joi.number()
-        .integer()
-        .positive()
-        .optional()
-        .messages({
-          'number.base': 'El área de destino debe ser un número válido',
-          'number.integer': 'El área de destino debe ser un número entero',
-          'number.positive': 'El área de destino debe ser un número positivo'
-        }),
-      activo: Joi.boolean().optional()
-    }).min(1)
-  }
+      nombre_cargo: Joi.string().min(2).max(150).optional().messages({
+        "string.min": "El nombre del cargo debe tener al menos 2 caracteres",
+        "string.max": "El nombre del cargo no puede exceder 150 caracteres",
+      }),
+      descripcion: Joi.string().max(500).allow("").optional().messages({
+        "string.max": "La descripción no puede exceder 500 caracteres",
+      }),
+      area_destino_id: Joi.number().integer().positive().optional().messages({
+        "number.base": "El área de destino debe ser un número válido",
+        "number.integer": "El área de destino debe ser un número entero",
+        "number.positive": "El área de destino debe ser un número positivo",
+      }),
+      activo: Joi.boolean().optional(),
+    }).min(1),
+  },
 };
 
 /**
@@ -482,58 +441,66 @@ const schemas = {
  */
 const validationMiddleware = {
   // Validación de parámetros ID
-  validateId: validate(commonSchemas.id, 'params'),
-  
+  validateId: validate(commonSchemas.id, "params"),
+
   // Validación de paginación
-  validatePagination: validate(commonSchemas.pagination, 'query'),
-  
+  validatePagination: validate(commonSchemas.pagination, "query"),
+
   // Validación de rango de fechas
-  validateDateRange: validate(commonSchemas.dateRange, 'query'),
-  
+  validateDateRange: validate(commonSchemas.dateRange, "query"),
+
   // Validación de búsqueda
-  validateSearch: validate(commonSchemas.search, 'query'),
-  
+  validateSearch: validate(commonSchemas.search, "query"),
+
   // Autenticación
   validateRegister: validate(schemas.auth.register),
   validateLogin: validate(schemas.auth.login),
   validateChangePassword: validate(schemas.auth.changePassword),
-  
+
   // Usuarios
   validateCreateUser: validate(schemas.usuarios.create),
   validateUpdateUser: validate(schemas.usuarios.update),
-  
+
   // Personal
   validateCreatePersonal: validate(schemas.personal.create),
   validateUpdatePersonal: validate(schemas.personal.update),
-  
+
   // Visitantes
   validateCreateVisitante: validate(schemas.visitantes.create),
   validateUpdateVisitante: validate(schemas.visitantes.update),
   validateConsultarDNI: validate(schemas.visitantes.consultarDNI),
-  
+
   // Visitas
   validateCreateVisita: validate(schemas.visitas.create),
-  
+
   // Papeletas de salida
   validateCreatePapeleta: validate(schemas.papeletasSalida.create),
-  
+  validateListPapeletas: validate(schemas.papeletasSalida.listQuery, 'query'),
+  validatePendientesPapeletas: validate(schemas.papeletasSalida.pendientesQuery, 'query'),
+  validateDecidirPapeleta: validate(schemas.papeletasSalida.decidir),
+  validateCancelarPapeleta: validate(schemas.papeletasSalida.cancelar),
+  validateEstadisticasPapeletas: validate(schemas.papeletasSalida.estadisticasQuery, 'query'),
+
+
   // Asistencia de personal
-  validateRegistrarIngreso: validate(schemas.asistenciaPersonal.registrarIngreso),
+  validateRegistrarIngreso: validate(
+    schemas.asistenciaPersonal.registrarIngreso,
+  ),
   validateRegistrarSalida: validate(schemas.asistenciaPersonal.registrarSalida),
   validateRegistrarEstado: validate(schemas.asistenciaPersonal.registrarEstado),
-  
+
   // Catálogos
   validateCreateCatalogo: validate(schemas.catalogo.create),
   validateUpdateCatalogo: validate(schemas.catalogo.update),
-  
+
   // Cargos
   validateCreateCargo: validate(schemas.cargos.create),
-  validateUpdateCargo: validate(schemas.cargos.update)
+  validateUpdateCargo: validate(schemas.cargos.update),
 };
 
 module.exports = {
   validate,
   schemas,
   commonSchemas,
-  validationMiddleware
+  validationMiddleware,
 };

@@ -23,36 +23,35 @@ router.get(
   "/",
   authenticateToken,
   requireActiveUser,
-  validationMiddleware.validatePagination,
-  validationMiddleware.validateDateRange,
+  validationMiddleware.validateListPapeletas, // filtros específicos de papeletas
   controller.getAll,
 );
 
 /**
  * @route   GET /api/papeletas-salida/pendientes
- * @desc    Obtener papeletas de salida pendientes para garita (APROBADO/EN_CURSO sin retorno)
+ * @desc    Obtener papeletas pendientes para garita (APROBADO/EN_CURSO sin retorno)
  * @access  Private
  */
 router.get(
   "/pendientes",
   authenticateToken,
   requireActiveUser,
-  validationMiddleware.validatePagination,
+  validationMiddleware.validatePendientesPapeletas,
   controller.getPendientes,
 );
 
 /**
  * @route   GET /api/papeletas-salida/estadisticas
  * @desc    Obtener estadísticas por rango y campoFecha
- * @access  Private (Admin/RRHH)
  * @query   fechaInicio, fechaFin, campoFecha=solicitud|programada|salida_real|retorno_real
+ * @access  Private (Admin/RRHH)
  */
 router.get(
   "/estadisticas",
   authenticateToken,
   requireActiveUser,
   requireAdminOrRRHH,
-  validationMiddleware.validateDateRange,
+  validationMiddleware.validateEstadisticasPapeletas,
   controller.getStats,
 );
 
@@ -80,8 +79,7 @@ router.put(
   requireActiveUser,
   requireAdminOrRRHH,
   validationMiddleware.validateId,
-  // Opcional: si tienes un validador para el body de decidir, agrégalo aquí
-  // validationMiddleware.validateDecidirPapeleta,
+  validationMiddleware.validateDecidirPapeleta,
   controller.decidir,
 );
 
@@ -121,7 +119,7 @@ router.put(
   authenticateToken,
   requireActiveUser,
   validationMiddleware.validateId,
-  // Opcional: validador para body { observacionAutorizacion? }
+  validationMiddleware.validateCancelarPapeleta,
   controller.cancelar,
 );
 

@@ -728,6 +728,11 @@ const PersonalAsistenciaPage = () => {
           }
           
           const tieneSalida = row.hora_salida;
+          const tieneIngreso = row.hora_ingreso;
+          const esAusente = row.estado_presencia === 'Ausente';
+          
+          // Solo mostrar botón de salida si tiene ingreso, no es ausente y no tiene salida
+          const puedeRegistrarSalida = tieneIngreso && !esAusente && !tieneSalida;
           
           return (
             <div className="flex justify-center space-x-1">
@@ -740,8 +745,8 @@ const PersonalAsistenciaPage = () => {
                 <EyeIcon className="h-4 w-4" />
               </button>
               
-              {/* Botón Registrar Salida - solo si no tiene salida */}
-              {!tieneSalida && (
+              {/* Botón Registrar Salida - solo si tiene ingreso, no es ausente y no tiene salida */}
+              {puedeRegistrarSalida && (
                 <button
                   onClick={() => registrarSalida(row.personal_id)}
                   className="p-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors"

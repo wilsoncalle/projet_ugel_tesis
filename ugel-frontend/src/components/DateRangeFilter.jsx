@@ -756,7 +756,7 @@ const DateRangeFilter = ({
                       type="button"
                       onClick={() => handleDiaClick(d.date)}
                       className={`
-                        px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border-r border-gray-300 last:border-r-0
+                        ${isSelected ? 'px-4' : 'px-3'} py-1.5 text-xs font-medium transition-colors cursor-pointer border-r border-gray-300 last:border-r-0
                         ${isSelected 
                           ? 'bg-blue-600 text-white hover:bg-blue-700' 
                           : isToday 
@@ -768,7 +768,7 @@ const DateRangeFilter = ({
                       `}
                       title={d.labelLong}
                     >
-                      {d.labelShort}
+                      {isSelected ? d.labelLong.charAt(0).toUpperCase() + d.labelLong.slice(1) : d.labelShort}
                     </button>
                   );
                 })}

@@ -10,6 +10,7 @@ const { toLimaDateYYYYMMDD } = require('../../utils/fechas');
 
 /**
  * Buscar todos los registros de asistencia con filtros y paginación
+ * Si hay filtro de fecha, incluye TODOS los personal activos mostrando ausentes
  * @param {Object} options - Opciones de búsqueda
  * @returns {Object} Registros de asistencia encontrados y total
  */
@@ -22,7 +23,8 @@ const findAll = async (options = {}) => {
     fechaInicio,
     fechaFin,
     personalId,
-    estadoPresencia
+    estadoPresencia,
+    areaId
   } = options;
   
   // Normalizar fechas a YYYY-MM-DD (zona Lima) antes de construir el SQL
@@ -30,124 +32,306 @@ const findAll = async (options = {}) => {
   fechaInicio = toLimaDateYYYYMMDD(fechaInicio);
   fechaFin = toLimaDateYYYYMMDD(fechaFin);
   
-  // Si se proporciona rango (inicio/fin), ignorar fecha exacta para evitar duplicar condiciones
-  if (fechaInicio || fechaFin) {
-    fecha = null;
-  }
-  
   const offset = (page - 1) * limit;
   
   try {
-    // Construir la consulta base
-    let query = `
-      SELECT 
-        ca.id,
-        ca.personal_id,
-        p.tipo_documento as personal_tipo_documento,
-        p.numero_documento as personal_numero_documento,
-        p.nombres as personal_nombres,
-        p.apellidos as personal_apellidos,
-        a.nombre_area as area_nombre,
-        ca.fecha,
-        ca.hora_ingreso,
-        ca.hora_salida,
-        ca.estado_presencia,
-        ca.usuario_registro_id,
-        u.nombre_usuario as usuario_registro,
-        ca.fecha_registro
-      FROM ControlAsistenciaPersonal ca
-      JOIN Personal p ON ca.personal_id = p.id
-      JOIN AreasDestino a ON p.area_destino_id = a.id
-      JOIN Usuarios u ON ca.usuario_registro_id = u.id
-    `;
+    // Si hay filtro de fecha específica o fechaInicio, incluir TODOS los personal activos
+    // para mostrar ausentes (personal sin registro de asistencia)
+    // Incluir ausentes cuando hay fecha específica o cuando hay fechaInicio (para historial)
+    const incluirAusentes = (fecha && typeof fecha === 'string' && fecha.trim() !== '') || 
+                            (fechaInicio && typeof fechaInicio === 'string' && fechaInicio.trim() !== '');
     
-    // Construir la cláusula WHERE
-    const whereConditions = [];
-    const queryParams = [];
-    let paramCounter = 1;
-    
-    // Filtro por texto
-    if (search) {
-      whereConditions.push(`(
-        p.nombres ILIKE $${paramCounter} OR 
-        p.apellidos ILIKE $${paramCounter} OR 
-        p.numero_documento ILIKE $${paramCounter}
-      )`);
-      queryParams.push(`%${search}%`);
-      paramCounter++;
+    // Si se proporciona rango (inicio/fin), ignorar fecha exacta para evitar duplicar condiciones
+    // Pero guardar fecha original si existe para usar en el LEFT JOIN
+    const fechaOriginal = fecha;
+    if (fechaInicio || fechaFin) {
+      fecha = null;
     }
     
-    // Filtro por fecha específica
-    if (fecha) {
-      whereConditions.push(`ca.fecha = $${paramCounter}::date`);
-      queryParams.push(fecha);
+    if (incluirAusentes) {
+      // Construir la consulta con LEFT JOIN para incluir personal sin registro
+      const queryParams = [];
+      let paramCounter = 1;
+      
+      // Usar fecha específica si existe, sino usar fechaInicio (para historial de un día específico)
+      // Si fechaInicio y fechaFin son iguales, es un solo día, usar esa fecha
+      let fechaJoin = fechaOriginal;
+      if (!fechaJoin && fechaInicio) {
+        fechaJoin = fechaInicio;
+      }
+      
+      // Validar que fechaJoin no sea null o undefined
+      if (!fechaJoin || typeof fechaJoin !== 'string' || fechaJoin.trim() === '') {
+        throw new AppError('Fecha inválida para consulta de asistencia', 400);
+      }
+      
+      // Construir la consulta base con LEFT JOIN
+      let query = `
+        SELECT 
+          COALESCE(ca.id, NULL) as id,
+          p.id as personal_id,
+          p.tipo_documento as personal_tipo_documento,
+          p.numero_documento as personal_numero_documento,
+          p.nombres as personal_nombres,
+          p.apellidos as personal_apellidos,
+          c.nombre_cargo as personal_cargo_nombre,
+          a.nombre_area as area_nombre,
+          COALESCE(ca.fecha, $${paramCounter}::date) as fecha,
+          ca.hora_ingreso,
+          ca.hora_salida,
+          COALESCE(ca.estado_presencia, 'Ausente') as estado_presencia,
+          ca.usuario_registro_id,
+          u.nombre_usuario as usuario_registro,
+          ca.fecha_registro
+        FROM Personal p
+        LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
+        LEFT JOIN Cargos c ON p.cargo_id = c.id
+        LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
+          AND ca.fecha = $${paramCounter}::date
+        LEFT JOIN Usuarios u ON ca.usuario_registro_id = u.id
+      `;
+      
+      // Agregar parámetro de fecha para el join
+      queryParams.push(fechaJoin);
       paramCounter++;
-    }
-    
-    // Filtro por rango de fechas (inclusivo, usando < fechaFin + 1 día para incluir todo el día final)
-    if (fechaInicio) {
-      whereConditions.push(`ca.fecha >= $${paramCounter}::date`);
-      queryParams.push(fechaInicio);
-      paramCounter++;
-    }
-    
-    if (fechaFin) {
-      // Fin exclusivo = día siguiente → incluye TODO el día fin
-      whereConditions.push(`ca.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
-      queryParams.push(fechaFin);
-      paramCounter++;
-    }
-    
-    // Filtro por personal
-    if (personalId) {
-      whereConditions.push(`ca.personal_id = $${paramCounter}`);
-      queryParams.push(personalId);
-      paramCounter++;
-    }
-    
-    // Filtro por estado de presencia
-    if (estadoPresencia) {
-      whereConditions.push(`ca.estado_presencia = $${paramCounter}`);
-      queryParams.push(estadoPresencia);
-      paramCounter++;
-    }
-    
-    // Agregar condiciones WHERE si existen
-    if (whereConditions.length > 0) {
+      
+      // Construir condiciones WHERE
+      const whereConditions = ['p.activo = true'];
+      
+      // Filtro por texto
+      if (search) {
+        whereConditions.push(`(
+          p.nombres ILIKE $${paramCounter} OR 
+          p.apellidos ILIKE $${paramCounter} OR 
+          p.numero_documento ILIKE $${paramCounter}
+        )`);
+        queryParams.push(`%${search}%`);
+        paramCounter++;
+      }
+      
+      // Filtro por rango de fechas (si hay rango, filtrar en la fecha del registro)
+      if (fechaInicio && !fecha) {
+        // Para rangos, necesitamos una consulta diferente o usar UNION
+        // Por ahora, si hay rango, solo mostramos registros del primer día con ausentes
+        // TODO: Mejorar para rangos de fechas
+      }
+      
+      // Filtro por personal
+      if (personalId) {
+        whereConditions.push(`p.id = $${paramCounter}`);
+        queryParams.push(personalId);
+        paramCounter++;
+      }
+      
+      // Filtro por área
+      if (areaId) {
+        whereConditions.push(`p.area_destino_id = $${paramCounter}`);
+        queryParams.push(areaId);
+        paramCounter++;
+      }
+      
+      // Filtro por estado de presencia
+      if (estadoPresencia) {
+        whereConditions.push(`COALESCE(ca.estado_presencia, 'Ausente') = $${paramCounter}`);
+        queryParams.push(estadoPresencia);
+        paramCounter++;
+      }
+      
+      // Agregar condiciones WHERE
       query += ` WHERE ${whereConditions.join(' AND ')}`;
+      
+      // Construir countQuery de forma más simple con los mismos parámetros
+      const countWhereConditions = ['p.activo = true'];
+      const countParamsSimplified = [fechaJoin];
+      let countParamCounter = 2;
+      
+      if (search) {
+        countWhereConditions.push(`(
+          p.nombres ILIKE $${countParamCounter} OR 
+          p.apellidos ILIKE $${countParamCounter} OR 
+          p.numero_documento ILIKE $${countParamCounter}
+        )`);
+        countParamsSimplified.push(`%${search}%`);
+        countParamCounter++;
+      }
+      
+      if (personalId) {
+        countWhereConditions.push(`p.id = $${countParamCounter}`);
+        countParamsSimplified.push(personalId);
+        countParamCounter++;
+      }
+      
+      if (areaId) {
+        countWhereConditions.push(`p.area_destino_id = $${countParamCounter}`);
+        countParamsSimplified.push(areaId);
+        countParamCounter++;
+      }
+      
+      if (estadoPresencia) {
+        countWhereConditions.push(`COALESCE(ca.estado_presencia, 'Ausente') = $${countParamCounter}`);
+        countParamsSimplified.push(estadoPresencia);
+        countParamCounter++;
+      }
+      
+      const countQueryFinal = `
+        SELECT COUNT(*) as total
+        FROM Personal p
+        LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
+          AND ca.fecha = $1::date
+        WHERE ${countWhereConditions.join(' AND ')}
+      `;
+      
+      // Agregar ordenamiento y paginación
+      query += `
+        ORDER BY COALESCE(ca.fecha, $1::date) DESC, p.apellidos ASC, p.nombres ASC
+        LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+      `;
+      
+      // Agregar parámetros de paginación
+      queryParams.push(limit, offset);
+      
+      // Ejecutar consultas en paralelo
+      const [asistenciasResult, countResult] = await Promise.all([
+        db.query(query, queryParams),
+        db.query(countQueryFinal, countParamsSimplified)
+      ]);
+      
+      return {
+        asistencias: asistenciasResult.rows,
+        total: parseInt(countResult.rows[0].total)
+      };
+    } else {
+      // Construir la consulta base (comportamiento original sin incluir ausentes)
+      let query = `
+        SELECT 
+          ca.id,
+          ca.personal_id,
+          p.tipo_documento as personal_tipo_documento,
+          p.numero_documento as personal_numero_documento,
+          p.nombres as personal_nombres,
+          p.apellidos as personal_apellidos,
+          c.nombre_cargo as personal_cargo_nombre,
+          a.nombre_area as area_nombre,
+          ca.fecha,
+          ca.hora_ingreso,
+          ca.hora_salida,
+          ca.estado_presencia,
+          ca.usuario_registro_id,
+          u.nombre_usuario as usuario_registro,
+          ca.fecha_registro
+        FROM ControlAsistenciaPersonal ca
+        JOIN Personal p ON ca.personal_id = p.id
+        JOIN AreasDestino a ON p.area_destino_id = a.id
+        LEFT JOIN Cargos c ON p.cargo_id = c.id
+        JOIN Usuarios u ON ca.usuario_registro_id = u.id
+      `;
+    
+      // Construir la cláusula WHERE
+      const whereConditions = [];
+      const queryParams = [];
+      let paramCounter = 1;
+      
+      // Filtro por texto
+      if (search) {
+        whereConditions.push(`(
+          p.nombres ILIKE $${paramCounter} OR 
+          p.apellidos ILIKE $${paramCounter} OR 
+          p.numero_documento ILIKE $${paramCounter}
+        )`);
+        queryParams.push(`%${search}%`);
+        paramCounter++;
+      }
+      
+      // Filtro por fecha específica
+      if (fecha) {
+        whereConditions.push(`ca.fecha = $${paramCounter}::date`);
+        queryParams.push(fecha);
+        paramCounter++;
+      }
+      
+      // Filtro por rango de fechas (inclusivo, usando < fechaFin + 1 día para incluir todo el día final)
+      if (fechaInicio) {
+        whereConditions.push(`ca.fecha >= $${paramCounter}::date`);
+        queryParams.push(fechaInicio);
+        paramCounter++;
+      }
+      
+      if (fechaFin) {
+        // Fin exclusivo = día siguiente → incluye TODO el día fin
+        whereConditions.push(`ca.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+        queryParams.push(fechaFin);
+        paramCounter++;
+      }
+      
+      // Filtro por personal
+      if (personalId) {
+        whereConditions.push(`ca.personal_id = $${paramCounter}`);
+        queryParams.push(personalId);
+        paramCounter++;
+      }
+      
+      // Filtro por área
+      if (areaId) {
+        whereConditions.push(`p.area_destino_id = $${paramCounter}`);
+        queryParams.push(areaId);
+        paramCounter++;
+      }
+      
+      // Filtro por estado de presencia
+      if (estadoPresencia) {
+        whereConditions.push(`ca.estado_presencia = $${paramCounter}`);
+        queryParams.push(estadoPresencia);
+        paramCounter++;
+      }
+      
+      // Agregar condiciones WHERE si existen
+      if (whereConditions.length > 0) {
+        query += ` WHERE ${whereConditions.join(' AND ')}`;
+      }
+      
+      // Consulta para contar el total
+      // Solo incluir parámetros que corresponden a las condiciones WHERE, sin los de LIMIT/OFFSET
+      const countParams = queryParams.slice(0, queryParams.length - 2); // Excluir limit y offset
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM ControlAsistenciaPersonal ca
+        JOIN Personal p ON ca.personal_id = p.id
+        ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
+      `;
+      
+      // Agregar ordenamiento y paginación
+      query += `
+        ORDER BY ca.fecha DESC, p.apellidos ASC, p.nombres ASC
+        LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+      `;
+      
+      // Agregar parámetros de paginación
+      queryParams.push(limit, offset);
+      
+      // Ejecutar consultas en paralelo
+      const [asistenciasResult, countResult] = await Promise.all([
+        db.query(query, queryParams),
+        db.query(countQuery, countParams)
+      ]);
+      
+      return {
+        asistencias: asistenciasResult.rows,
+        total: parseInt(countResult.rows[0].total)
+      };
     }
-    
-    // Consulta para contar el total
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM ControlAsistenciaPersonal ca
-      JOIN Personal p ON ca.personal_id = p.id
-      ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
-    `;
-    
-    // Agregar ordenamiento y paginación
-    query += `
-      ORDER BY ca.fecha DESC, p.apellidos ASC, p.nombres ASC
-      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
-    `;
-    
-    // Agregar parámetros de paginación
-    queryParams.push(limit, offset);
-    
-    // Ejecutar consultas en paralelo
-    const [asistenciasResult, countResult] = await Promise.all([
-      db.query(query, queryParams),
-      db.query(countQuery, queryParams.slice(0, paramCounter - 1))
-    ]);
-    
-    return {
-      asistencias: asistenciasResult.rows,
-      total: parseInt(countResult.rows[0].total)
-    };
     
   } catch (error) {
     logger.error('Error en repositorio buscando registros de asistencia:', error);
-    throw new AppError('Error obteniendo registros de asistencia', 500);
+    logger.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    // Si es un error de AppError, relanzarlo; sino, crear uno nuevo
+    if (error instanceof AppError) {
+      throw error;
+    }
+    throw new AppError(`Error obteniendo registros de asistencia: ${error.message}`, 500);
   }
 };
 
@@ -166,6 +350,7 @@ const findById = async (id) => {
         p.numero_documento as personal_numero_documento,
         p.nombres as personal_nombres,
         p.apellidos as personal_apellidos,
+        c.nombre_cargo as personal_cargo_nombre,
         a.nombre_area as area_nombre,
         ca.fecha,
         ca.hora_ingreso,
@@ -177,6 +362,7 @@ const findById = async (id) => {
       FROM ControlAsistenciaPersonal ca
       JOIN Personal p ON ca.personal_id = p.id
       JOIN AreasDestino a ON p.area_destino_id = a.id
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       JOIN Usuarios u ON ca.usuario_registro_id = u.id
       WHERE ca.id = $1
     `;
