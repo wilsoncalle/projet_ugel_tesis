@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { format, parse, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
@@ -9,19 +9,18 @@ const DateRangeFilter = ({
   fechaHasta, 
   onFechaDesdeChange, 
   onFechaHastaChange,
-  onClear,  // Nuevo prop para manejar la limpieza atómica
-  className = '' 
+  onClear,
+  className = '',
+  onSemanaChange, // <- NUEVO (opcional)
 }) => {
   const [fromInput, setFromInput] = useState('');
   const [toInput, setToInput] = useState('');
 
-  // Estados para los calendarios
   const [fromCalendarMonth, setFromCalendarMonth] = useState(new Date().getMonth());
   const [fromCalendarYear, setFromCalendarYear] = useState(new Date().getFullYear());
   const [toCalendarMonth, setToCalendarMonth] = useState(new Date().getMonth());
   const [toCalendarYear, setToCalendarYear] = useState(new Date().getFullYear());
 
-  // Sincronizar inputs con props externas
   useEffect(() => {
     if (fechaDesde) {
       const date = parseDate(fechaDesde);
@@ -32,7 +31,6 @@ const DateRangeFilter = ({
       }
     } else {
       setFromInput('');
-      // Resetear calendario a fecha actual cuando no hay fecha seleccionada
       const today = new Date();
       setFromCalendarMonth(today.getMonth());
       setFromCalendarYear(today.getFullYear());
@@ -49,42 +47,59 @@ const DateRangeFilter = ({
       }
     } else {
       setToInput('');
-      // Resetear calendario a fecha actual cuando no hay fecha seleccionada
       const today = new Date();
       setToCalendarMonth(today.getMonth());
       setToCalendarYear(today.getFullYear());
     }
   }, [fechaHasta]);
 
-  // Función para parsear fechas de manera consistente
   const parseDate = (dateString) => {
     if (!dateString) return null;
-    
     let date;
-    
     if (dateString.includes('-')) {
       const [year, month, day] = dateString.split('-').map(Number);
       date = new Date(year, month - 1, day);
-    }
-    else if (dateString.includes('/')) {
+    } else if (dateString.includes('/')) {
       date = parse(dateString, 'dd/MM/yyyy', new Date());
-    }
-    else {
+    } else {
       return null;
     }
-    
     if (date && isValid(date)) {
       return new Date(date.getFullYear(), date.getMonth(), date.getDate());
     }
-    
     return null;
   };
 
-  // Función para convertir Date a string YYYY-MM-DD
   const dateToString = (date) => {
     if (!date || !isValid(date)) return '';
     const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     return format(localDate, 'yyyy-MM-dd');
+  };
+
+  // Helper para calcular número de semana ISO
+  const getIsoWeekNumber = (date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  };
+
+  // Helper para construir payload de la semana
+  const buildWeekPayload = (start, end) => {
+    const days = Array.from({ length: 7 }, (_, i) =>
+      new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
+    );
+    return {
+      start: dateToString(start),
+      end: dateToString(end),
+      weekNumber: getIsoWeekNumber(start),
+      days: days.map(d => ({
+        date: dateToString(d),
+        labelShort: format(d, 'EEEEE', { locale: es }).toUpperCase(), // L, M, X, J, V, S, D
+        labelLong: format(d, 'EEEE', { locale: es }),                // lunes, martes, miércoles...
+      })),
+    };
   };
 
   const handleFechaDesdeSelect = (date, close) => {
@@ -109,22 +124,18 @@ const DateRangeFilter = ({
           return;
         }
       }
-
       onFechaHastaChange(dateString);
       close();
     }
   };
 
-  // Manejar cambios en el input "Desde"
   const handleFromInputChange = (e) => {
     const value = e.target.value;
     setFromInput(value);
-
     if (value === '') {
       onFechaDesdeChange('');
       return;
     }
-
     if (value.length === 10 && value.includes('/')) {
       const parsedDate = parse(value, 'dd/MM/yyyy', new Date());
       if (isValid(parsedDate) && !isWeekend(parsedDate) && !isFutureDate(parsedDate)) {
@@ -133,16 +144,13 @@ const DateRangeFilter = ({
     }
   };
 
-  // Manejar cambios en el input "Hasta"
   const handleToInputChange = (e) => {
     const value = e.target.value;
     setToInput(value);
-
     if (value === '') {
       onFechaHastaChange('');
       return;
     }
-
     if (value.length === 10 && value.includes('/')) {
       const parsedDate = parse(value, 'dd/MM/yyyy', new Date());
       if (isValid(parsedDate) && !isWeekend(parsedDate) && !isFutureDate(parsedDate)) {
@@ -168,59 +176,58 @@ const DateRangeFilter = ({
   const clearRange = () => {
     setFromInput('');
     setToInput('');
-    // Resetear calendarios a fecha actual
     const today = new Date();
     setFromCalendarMonth(today.getMonth());
     setFromCalendarYear(today.getFullYear());
     setToCalendarMonth(today.getMonth());
     setToCalendarYear(today.getFullYear());
-
-    if (onClear) {
-      onClear();  // Llama al handler del padre para limpiar filtros y trigger búsqueda única
-    }
+    if (onClear) onClear();
   };
 
-  // Función para obtener la fecha actual sin tiempo
   const getTodayDate = () => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), today.getDate());
   };
 
-  // Función para verificar si un día es fin de semana
   const isWeekend = (date) => {
     const day = date.getDay();
     return day === 0 || day === 6;
   };
 
-  // Función para verificar si una fecha está en el futuro
   const isFutureDate = (date) => {
     const today = getTodayDate();
     return date > today;
   };
 
-  // Generar días del calendario (empezando por lunes)
-  const generateCalendarDays = (month, year) => {
+  // ==== Calendario con semanas (lunes-domingo) ====
+  const generateCalendarWeeks = (month, year) => {
     const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startDate = new Date(firstDay);
-    
-    // Ajustar para que el primer día sea lunes (1) en lugar de domingo (0)
-    const dayOfWeek = firstDay.getDay();
-    const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    startDate.setDate(startDate.getDate() - daysToSubtract);
-    
+    const lastDay  = new Date(year, month + 1, 0);
+
+    const start = new Date(firstDay);
+    const dow = firstDay.getDay(); // 0=Dom … 1=Lun
+    const toSubtract = dow === 0 ? 6 : dow - 1;
+    start.setDate(start.getDate() - toSubtract);
+
+    const end = new Date(lastDay);
+    const dowEnd = lastDay.getDay();
+    const toAdd = dowEnd === 0 ? 0 : 7 - dowEnd;
+    end.setDate(end.getDate() + toAdd);
+
     const days = [];
-    const current = new Date(startDate);
-    
-    for (let i = 0; i < 42; i++) {
-      days.push(new Date(current));
-      current.setDate(current.getDate() + 1);
+    const cur = new Date(start);
+    while (cur <= end) {
+      days.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
     }
-    
-    return days;
+
+    const weeks = [];
+    for (let i = 0; i < days.length; i += 7) {
+      weeks.push(days.slice(i, i + 7));
+    }
+    return weeks; // 5-6 filas
   };
 
-  // Generar opciones de años (solo hasta el año actual)
   const generateYearOptions = () => {
     const currentYear = new Date().getFullYear();
     const years = [];
@@ -230,15 +237,11 @@ const DateRangeFilter = ({
     return years;
   };
 
-  // Generar opciones de meses
   const generateMonthOptions = () => {
     const months = [];
     for (let month = 0; month < 12; month++) {
       const date = new Date(2024, month, 1);
-      months.push({ 
-        value: month, 
-        label: format(date, 'MMMM', { locale: es }) 
-      });
+      months.push({ value: month, label: format(date, 'MMMM', { locale: es }) });
     }
     return months;
   };
@@ -246,18 +249,23 @@ const DateRangeFilter = ({
   const yearOptions = generateYearOptions();
   const monthOptions = generateMonthOptions();
 
+  // ================= CalendarComponent =================
   const CalendarComponent = ({ 
-    selectedDate, 
-    onSelect, 
-    close, 
-    calendarMonth, 
-    setCalendarMonth, 
-    calendarYear, 
-    setCalendarYear,
-    isFromCalendar = true 
+    selectedDate,        // para pintar el día activo (desde o hasta)
+    onSelect,            // callback al elegir un día
+    close,
+    isFechaDesde,        // true si es el calendario de fecha inicio, false si es fecha fin
+    fechaDesde,          // fecha inicio actual (pasada como prop)
+    fechaHasta,          // fecha fin actual (pasada como prop)
+    onFechaDesdeChange,  // callback para cambiar fecha inicio
+    onFechaHastaChange,  // callback para cambiar fecha fin
+    onSemanaChange,      // callback para cambiar semana (nuevo)
+    calendarMonth, setCalendarMonth, 
+    calendarYear, setCalendarYear,
   }) => {
-    const days = generateCalendarDays(calendarMonth, calendarYear);
+    const weeks = generateCalendarWeeks(calendarMonth, calendarYear);
     const selectedDateObj = selectedDate ? parseDate(selectedDate) : null;
+    const today = getTodayDate();
 
     const navigateMonth = (direction) => {
       if (direction === 'prev') {
@@ -277,19 +285,66 @@ const DateRangeFilter = ({
       }
     };
 
+    // Rango actual (si existe) para pintar Sx activo - usar las props del componente padre
+    const rangoActual = {
+      desde: fechaDesde ? parseDate(fechaDesde) : null,
+      hasta: fechaHasta ? parseDate(fechaHasta) : null,
+    };
+
+    const getWeekRange = (week) => {
+      const start = new Date(week[0].getFullYear(), week[0].getMonth(), week[0].getDate()); // lunes
+      const end   = new Date(week[6].getFullYear(), week[6].getMonth(), week[6].getDate()); // domingo
+      // Clampea el fin al día de hoy si la semana se va al futuro
+      const endClamped = end > today ? today : end;
+      return { start, end: endClamped };
+    };
+
+    const isSameDay = (a, b) =>
+      a && b && a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+    const isSameWeekRange = (week) => {
+      if (!rangoActual.desde || !rangoActual.hasta) return false;
+      const { start, end } = getWeekRange(week);
+      return isSameDay(rangoActual.desde, start) && isSameDay(rangoActual.hasta, end);
+    };
+
+    const onClickSemana = (week) => {
+      const { start, end } = getWeekRange(week);
+      // Evita futuro en el inicio (por si toda la semana está en el futuro)
+      const startClamped = start > today ? today : start;
+      // Establecer AMBAS fechas: inicio (lunes) y fin (domingo o hoy)
+      const startString = dateToString(startClamped);
+      const endString = dateToString(end);
+      
+      // SOLUCIÓN: Crear un evento personalizado con ambas fechas para evitar problemas con el debounce
+      if (startString && endString && onFechaDesdeChange && onFechaHastaChange) {
+        // Llamar ambos callbacks inmediatamente - el componente padre debe manejar esto
+        onFechaDesdeChange(startString, endString); // Pasar endString como segundo parámetro
+        onFechaHastaChange(endString, startString); // Pasar startString como segundo parámetro
+        
+        // EMITIR SEMANA (si el padre pasó el callback)
+        if (onSemanaChange) {
+          onSemanaChange(buildWeekPayload(startClamped, end));
+        }
+        
+        // Cerrar el popover después de establecer el rango
+        setTimeout(() => {
+          close();
+        }, 50);
+      }
+    };
+
     return (
-      <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-lg w-80">
-        {/* Header con controles de mes/año */}
+      <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-lg w-[22rem]">
+        {/* Header */}
         <div className="flex justify-between items-center mb-4">
-          <button
-            onClick={() => navigateMonth('prev')}
-            className="p-1 hover:bg-gray-100 rounded"
-          >
+          <button onClick={() => navigateMonth('prev')} className="p-1 hover:bg-gray-100 rounded">
             <ChevronLeftIcon className="h-4 w-4" />
           </button>
-          
+
           <div className="flex gap-2">
-            {/* Select de Mes */}
+            {/* Mes */}
             <Listbox value={calendarMonth} onChange={setCalendarMonth}>
               <div className="relative">
                 <Listbox.Button className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors min-w-[100px] text-center">
@@ -323,7 +378,7 @@ const DateRangeFilter = ({
               </div>
             </Listbox>
 
-            {/* Select de Año */}
+            {/* Año */}
             <Listbox value={calendarYear} onChange={setCalendarYear}>
               <div className="relative">
                 <Listbox.Button className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors min-w-[70px] text-center">
@@ -358,16 +413,14 @@ const DateRangeFilter = ({
             </Listbox>
           </div>
 
-          <button
-            onClick={() => navigateMonth('next')}
-            className="p-1 hover:bg-gray-100 rounded"
-          >
+          <button onClick={() => navigateMonth('next')} className="p-1 hover:bg-gray-100 rounded">
             <ChevronRightIcon className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Días de la semana */}
-        <div className="grid grid-cols-7 mb-2">
+        {/* Encabezados: columna S + 7 días */}
+        <div className="grid grid-cols-8 mb-2">
+          <div className="p-2 text-center text-xs font-medium text-blue-400 select-none"></div>
           {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => (
             <div key={day} className="p-2 text-center text-xs font-medium text-gray-500">
               {day}
@@ -375,36 +428,66 @@ const DateRangeFilter = ({
           ))}
         </div>
 
-        {/* Días del mes */}
-        <div className="grid grid-cols-7">
-          {days.map((day, index) => {
-            const isCurrentMonth = day.getMonth() === calendarMonth;
-            const isSelected = selectedDateObj && 
-              day.getTime() === selectedDateObj.getTime();
-            const isToday = day.toDateString() === new Date().toDateString();
-            const isDisabled = isWeekend(day) || isFutureDate(day) || !isCurrentMonth;
+        {/* Filas (semanas) */}
+        <div className="space-y-1">
+          {weeks.map((week, wIdx) => {
+            const activeRow = isSameWeekRange(week);
 
             return (
-              <button
-                key={index}
-                onClick={() => !isDisabled && onSelect(day, close)}
-                disabled={isDisabled}
+              <div
+                key={wIdx}
                 className={`
-                  h-8 w-8 text-sm rounded-full transition-colors
-                  ${isSelected 
-                    ? 'bg-blue-500 text-white hover:bg-blue-600' 
-                    : isToday 
-                    ? 'font-bold text-blue-600 hover:bg-blue-100'
-                    : isDisabled 
-                    ? 'text-gray-300 cursor-not-allowed bg-gray-50'
-                    : isCurrentMonth
-                    ? 'hover:bg-gray-100 cursor-pointer'
-                    : 'text-gray-300'
-                  }
+                  relative grid grid-cols-8 items-center px-1 transition-colors
+                  ${activeRow ? 'bg-blue-100 ring-2 ring-blue-400 rounded-full' : 'hover:bg-blue-50 rounded-full'}
                 `}
               >
-                {day.getDate()}
-              </button>
+                {/* Slider Semana */}
+                <button
+                  type="button"
+                  onClick={() => onClickSemana(week)}
+                  className={`
+                    my-1 mx-1 px-2 py-1 text-[11px] font-bold rounded-full transition-colors
+                    ${activeRow 
+                      ? 'text-blue-700 bg-blue-200 border-2 border-blue-400'
+                      : 'text-blue-600 hover:bg-blue-100 border border-blue-200'
+                    }
+                  `}
+                  title={`Semana ${wIdx + 1}`}
+                >
+                  {`S${wIdx + 1}`}
+                </button>
+
+                {/* Días */}
+                {week.map((day, idx) => {
+                  const isCurrentMonth = day.getMonth() === calendarMonth;
+                  const isSelected = selectedDateObj && day.getTime() === selectedDateObj.getTime();
+                  const isToday = day.toDateString() === new Date().toDateString();
+                  const disabled = isWeekend(day) || isFutureDate(day) || !isCurrentMonth;
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => !disabled && onSelect(day, close)}
+                      disabled={disabled}
+                      className={`
+                        h-8 w-8 mx-auto my-1 text-sm rounded-full transition-colors
+                        ${isSelected
+                          ? 'bg-blue-500 text-white hover:bg-blue-600'
+                          : isToday
+                          ? 'font-bold text-blue-600 hover:bg-blue-100'
+                          : disabled
+                          ? 'text-gray-300 cursor-not-allowed bg-gray-50'
+                          : isCurrentMonth
+                          ? 'hover:bg-gray-100 cursor-pointer'
+                          : 'text-gray-300'
+                        }
+                      `}
+                    >
+                      {day.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </div>
@@ -426,13 +509,10 @@ const DateRangeFilter = ({
         )}
       </div>
 
-      {/* Campos de Fecha Inicio y Fecha Fin */}
       <div className="grid grid-cols-2 gap-3">
         {/* Fecha Inicio */}
         <div className="relative">
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Fecha Inicio
-          </label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Fecha Inicio</label>
           <Popover className="relative">
             <div className="relative">
               <Popover.Button as="div" className="w-full">
@@ -444,12 +524,12 @@ const DateRangeFilter = ({
                   placeholder="DD/MM/AAAA"
                   readOnly
                 />
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded pointer-events-none">
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 p-1 pointer-events-none">
                   <CalendarIcon className="h-4 w-4 text-gray-400" />
                 </div>
               </Popover.Button>
             </div>
-            
+
             <Transition
               as={Fragment}
               enter="transition ease-out duration-200"
@@ -465,11 +545,16 @@ const DateRangeFilter = ({
                     selectedDate={fechaDesde}
                     onSelect={handleFechaDesdeSelect}
                     close={close}
+                    isFechaDesde={true}
+                    fechaDesde={fechaDesde}
+                    fechaHasta={fechaHasta}
+                    onFechaDesdeChange={onFechaDesdeChange}
+                    onFechaHastaChange={onFechaHastaChange}
+                    onSemanaChange={onSemanaChange}
                     calendarMonth={fromCalendarMonth}
                     setCalendarMonth={setFromCalendarMonth}
                     calendarYear={fromCalendarYear}
                     setCalendarYear={setFromCalendarYear}
-                    isFromCalendar={true}
                   />
                 )}
               </Popover.Panel>
@@ -479,9 +564,7 @@ const DateRangeFilter = ({
 
         {/* Fecha Fin */}
         <div className="relative">
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Fecha Fin
-          </label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Fecha Fin</label>
           <Popover className="relative">
             <div className="relative">
               <Popover.Button as="div" className="w-full">
@@ -493,12 +576,12 @@ const DateRangeFilter = ({
                   placeholder="DD/MM/AAAA"
                   readOnly
                 />
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-100 rounded pointer-events-none">
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 p-1 pointer-events-none">
                   <CalendarIcon className="h-4 w-4 text-gray-400" />
                 </div>
               </Popover.Button>
             </div>
-            
+
             <Transition
               as={Fragment}
               enter="transition ease-out duration-200"
@@ -514,11 +597,16 @@ const DateRangeFilter = ({
                     selectedDate={fechaHasta}
                     onSelect={handleFechaHastaSelect}
                     close={close}
+                    isFechaDesde={false}
+                    fechaDesde={fechaDesde}
+                    fechaHasta={fechaHasta}
+                    onFechaDesdeChange={onFechaDesdeChange}
+                    onFechaHastaChange={onFechaHastaChange}
+                    onSemanaChange={onSemanaChange}
                     calendarMonth={toCalendarMonth}
                     setCalendarMonth={setToCalendarMonth}
                     calendarYear={toCalendarYear}
                     setCalendarYear={setToCalendarYear}
-                    isFromCalendar={false}
                   />
                 )}
               </Popover.Panel>

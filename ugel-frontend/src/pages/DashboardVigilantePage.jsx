@@ -97,6 +97,10 @@ const DashboardVigilantePage = () => {
     fechaDesde: null, // Sin filtro de fecha por defecto para mostrar todos los registros
     fechaHasta: null  // Sin filtro de fecha por defecto para mostrar todos los registros
   });
+  
+  // Estado para la semana seleccionada
+  const [semanaUI, setSemanaUI] = useState(null);
+  
   const [activeTab, setActiveTab] = useState('activos');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -1510,16 +1514,38 @@ const DashboardVigilantePage = () => {
   };
 
   // Función específica para manejar cambios de fecha desde
-  const handleFechaDesdeChange = (fecha) => {
-    const filtrosCompletos = {
-      ...filtros,
-      fechaDesde: fecha
-    };
-    ejecutarBusqueda(filtrosCompletos, 1);
+  const handleFechaDesdeChange = (fecha, fechaHasta = null) => {
+    // Si viene fechaHasta, es porque se seleccionó un rango completo (semana)
+    if (fechaHasta) {
+      const filtrosCompletos = {
+        ...filtros,
+        fechaDesde: fecha,
+        fechaHasta: fechaHasta
+      };
+      
+      // Actualizar directamente sin debounce para rangos de semana
+      setFiltros(filtrosCompletos);
+      setHistorialPagination(prev => ({ ...prev, currentPage: 1 }));
+      handleBuscarHistorial(filtrosCompletos, 1);
+    } else {
+      // Comportamiento normal para selección individual
+      const filtrosCompletos = {
+        ...filtros,
+        fechaDesde: fecha
+      };
+      ejecutarBusqueda(filtrosCompletos, 1);
+    }
   };
 
   // Función específica para manejar cambios de fecha hasta
-  const handleFechaHastaChange = (fecha) => {
+  const handleFechaHastaChange = (fecha, fechaDesde = null) => {
+    // Si viene fechaDesde, es porque se seleccionó un rango completo (semana)
+    // En este caso, el handleFechaDesdeChange ya manejó todo, así que ignoramos
+    if (fechaDesde) {
+      return;
+    }
+    
+    // Comportamiento normal para selección individual
     const filtrosCompletos = {
       ...filtros,
       fechaHasta: fecha
@@ -1772,10 +1798,51 @@ const DashboardVigilantePage = () => {
                             fechaDesde: null,
                             fechaHasta: null,
                           };
+                          setSemanaUI(null); // limpiar chips al limpiar fechas
                           ejecutarBusqueda(filtrosCompletos, 1);
                         }}
+                        onSemanaChange={(info) => setSemanaUI(info)}
                         className="mb-4"
                       />
+                      
+                      {/* Chips de semana seleccionada */}
+                      {semanaUI && (
+                        <motion.div 
+                          variants={itemVariants}
+                          className="mt-2 flex items-center gap-3 flex-wrap"
+                        >
+                          {/* Chip de Semana */}
+                          <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold text-sm border border-blue-200 shadow-sm">
+                            Semana: {semanaUI.weekNumber}
+                          </span>
+
+                          {/* Chips de días */}
+                          <div className="flex flex-wrap gap-2">
+                            {semanaUI.days.map(d => {
+                              const hoyISO = new Date().toISOString().slice(0, 10);
+                              const isSelected =
+                                d.date === filtros.fechaDesde || d.date === filtros.fechaHasta;
+                              const isToday = d.date === hoyISO;
+                              const showLong = isSelected || isToday; // regla solicitada
+
+                              return (
+                                <span
+                                  key={d.date}
+                                  className={
+                                    `px-2 py-1 rounded-lg border text-sm
+                                     ${isSelected ? 'bg-blue-600 text-white border-blue-600' :
+                                     isToday ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                     'bg-gray-50 text-gray-700 border-gray-200'}`
+                                  }
+                                  title={d.labelLong}
+                                >
+                                  {showLong ? d.labelLong.charAt(0).toUpperCase() + d.labelLong.slice(1) : d.labelShort}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
                     </motion.div>
 
                     {/* Item 2: RegistroForm */}

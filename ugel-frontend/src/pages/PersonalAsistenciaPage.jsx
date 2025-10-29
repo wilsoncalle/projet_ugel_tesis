@@ -80,6 +80,9 @@ const PersonalAsistenciaPage = () => {
     fechaHasta: null
   });
   
+  // Estado para la semana seleccionada
+  const [semanaUI, setSemanaUI] = useState(null);
+  
   // Paginación
   const [historialPagination, setHistorialPagination] = useState({
     currentPage: 1,
@@ -202,12 +205,7 @@ const PersonalAsistenciaPage = () => {
       const response = await personalService.getAll();
       
       if (response.data.success) {
-        console.log('📋 Datos del personal recibidos:', response.data.data);
-        
         const personalData = response.data.data.map(p => {
-          // Log para ver todos los campos disponibles del backend
-          console.log('📋 Datos completos del personal desde backend:', p);
-          
           const personalItem = {
             value: p.id.toString(),
             label: `${p.nombres} ${p.apellidos}`,
@@ -226,18 +224,10 @@ const PersonalAsistenciaPage = () => {
             tipo_documento_nombre: p.tipo_documento
           };
           
-          console.log('📋 Personal mapeado:', {
-            nombre: personalItem.label,
-            numero_documento: personalItem.numero_documento,
-            tipo_documento_id: personalItem.tipo_documento_id,
-            area_id: personalItem.area_id
-          });
-          
           return personalItem;
         });
         
         setPersonalOptions(personalData);
-        console.log('📋 Total personal cargado:', personalData.length);
       }
     } catch (error) {
       console.error('Error al cargar personal:', error);
@@ -253,12 +243,6 @@ const PersonalAsistenciaPage = () => {
       });
       
       if (response.data.success) {
-        console.log('📋 Datos de asistencias de hoy recibidos:', response.data.data);
-        // Log del primer elemento para ver la estructura
-        if (response.data.data && response.data.data.length > 0) {
-          console.log('📋 Estructura del primer elemento:', response.data.data[0]);
-        }
-        
         setAsistenciasHoy(response.data.data || []);
         
         setHoyPagination(prev => ({
@@ -333,12 +317,6 @@ const PersonalAsistenciaPage = () => {
       const response = await asistenciaPersonalService.getAll(params);
       
       if (response.data.success) {
-        console.log('📋 Datos de historial recibidos:', response.data.data);
-        // Log del primer elemento para ver la estructura
-        if (response.data.data && response.data.data.length > 0) {
-          console.log('📋 Estructura del primer elemento del historial:', response.data.data[0]);
-        }
-        
         const historialData = response.data.data || [];
         setHistorialAsistencias(historialData);
         
@@ -396,15 +374,37 @@ const PersonalAsistenciaPage = () => {
     ejecutarBusqueda(filtrosCompletos, 1);
   };
 
-  const handleFechaDesdeChange = (fecha) => {
-    const filtrosCompletos = {
-      ...filtros,
-      fechaDesde: fecha
-    };
-    ejecutarBusqueda(filtrosCompletos, 1);
+  const handleFechaDesdeChange = (fecha, fechaHasta = null) => {
+    // Si viene fechaHasta, es porque se seleccionó un rango completo (semana)
+    if (fechaHasta) {
+      const filtrosCompletos = {
+        ...filtros,
+        fechaDesde: fecha,
+        fechaHasta: fechaHasta
+      };
+      
+      // Actualizar directamente sin debounce para rangos de semana
+      setFiltros(filtrosCompletos);
+      setHistorialPagination(prev => ({ ...prev, currentPage: 1 }));
+      handleBuscarHistorial(filtrosCompletos, 1);
+    } else {
+      // Comportamiento normal para selección individual
+      const filtrosCompletos = {
+        ...filtros,
+        fechaDesde: fecha
+      };
+      ejecutarBusqueda(filtrosCompletos, 1);
+    }
   };
 
-  const handleFechaHastaChange = (fecha) => {
+  const handleFechaHastaChange = (fecha, fechaDesde = null) => {
+    // Si viene fechaDesde, es porque se seleccionó un rango completo (semana)
+    // En este caso, el handleFechaDesdeChange ya manejó todo, así que ignoramos
+    if (fechaDesde) {
+      return;
+    }
+    
+    // Comportamiento normal para selección individual
     const filtrosCompletos = {
       ...filtros,
       fechaHasta: fecha
@@ -436,7 +436,6 @@ const PersonalAsistenciaPage = () => {
 
   // Funciones para manejar el modal de detalles
   const handleOpenModal = (item) => {
-    console.log('Abriendo modal para item:', item);
     setSelectedItem(item);
     setIsModalOpen(true);
   };
@@ -969,10 +968,51 @@ const PersonalAsistenciaPage = () => {
                             fechaDesde: null,
                             fechaHasta: null,
                           };
+                          setSemanaUI(null); // limpiar chips al limpiar fechas
                           ejecutarBusqueda(filtrosCompletos, 1);
                         }}
+                        onSemanaChange={(info) => setSemanaUI(info)}
                         className="mb-4"
                       />
+                      
+                      {/* Chips de semana seleccionada */}
+                      {semanaUI && (
+                        <motion.div 
+                          variants={itemVariants}
+                          className="mt-2 flex items-center gap-3 flex-wrap"
+                        >
+                          {/* Chip de Semana */}
+                          <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold text-sm border border-blue-200 shadow-sm">
+                            Semana: {semanaUI.weekNumber}
+                          </span>
+
+                          {/* Chips de días */}
+                          <div className="flex flex-wrap gap-2">
+                            {semanaUI.days.map(d => {
+                              const hoyISO = new Date().toISOString().slice(0, 10);
+                              const isSelected =
+                                d.date === filtros.fechaDesde || d.date === filtros.fechaHasta;
+                              const isToday = d.date === hoyISO;
+                              const showLong = isSelected || isToday; // regla solicitada
+
+                              return (
+                                <span
+                                  key={d.date}
+                                  className={
+                                    `px-2 py-1 rounded-lg border text-sm
+                                     ${isSelected ? 'bg-blue-600 text-white border-blue-600' :
+                                     isToday ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                     'bg-gray-50 text-gray-700 border-gray-200'}`
+                                  }
+                                  title={d.labelLong}
+                                >
+                                  {showLong ? d.labelLong.charAt(0).toUpperCase() + d.labelLong.slice(1) : d.labelShort}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
                     </motion.div>
 
                     <motion.div variants={itemVariants}>
@@ -1169,12 +1209,6 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
     setBuscandoPersonal(true);
 
     try {
-      console.log('🔍 Buscando personal con:', {
-        tipoDocumento: formData.tipoDocumento,
-        numeroDocumento: formData.numeroDocumento,
-        personalOptions: personalOptions.length
-      });
-
       // Buscar en la lista local primero
       const personalEncontrado = personalOptions.find(p => {
         const numeroCoincide = p.numero_documento === formData.numeroDocumento;
@@ -1200,22 +1234,8 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           }
         }
         
-        console.log('🔍 Verificando personal:', {
-          nombre: p.label,
-          numero_documento: p.numero_documento,
-          tipo_documento_id: p.tipo_documento_id,
-          tipo_documento_nombre: p.tipo_documento_nombre,
-          numeroCoincide,
-          tipoCoincide,
-          buscando: formData.numeroDocumento,
-          tipoBuscando: formData.tipoDocumento,
-          personalYaSeleccionado: formData.personalSeleccionado?.value
-        });
-        
         return numeroCoincide && tipoCoincide;
       });
-
-      console.log('🔍 Personal encontrado:', personalEncontrado);
 
       if (personalEncontrado) {
         // Verificar si ya tiene asistencia registrada hoy
@@ -1235,23 +1255,6 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           tipoDocumentoAsignado = personalEncontrado.tipo_documento_id.toString();
         } else if (personalEncontrado.tipo_documento_nombre) {
           // Buscar por nombre del tipo de documento
-          console.log('🔍 Buscando tipo de documento por nombre:', {
-            buscando: personalEncontrado.tipo_documento_nombre,
-            tiposDisponibles: tiposDocumento.map(t => ({ value: t.value, label: t.label }))
-          });
-          
-          // Log detallado de cada tipo para debug
-          tiposDocumento.forEach((tipo, index) => {
-            console.log(`🔍 Tipo ${index}:`, {
-              value: tipo.value,
-              label: tipo.label,
-              labelLower: tipo.label.toLowerCase(),
-              buscandoLower: personalEncontrado.tipo_documento_nombre.toLowerCase(),
-              contiene: tipo.label.toLowerCase().includes(personalEncontrado.tipo_documento_nombre.toLowerCase()),
-              esContenido: personalEncontrado.tipo_documento_nombre.toLowerCase().includes(tipo.label.toLowerCase())
-            });
-          });
-          
           const tipoEncontrado = tiposDocumento.find(t => {
             const labelLower = t.label.toLowerCase();
             const buscandoLower = personalEncontrado.tipo_documento_nombre.toLowerCase();
@@ -1276,9 +1279,6 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           
           if (tipoEncontrado) {
             tipoDocumentoAsignado = tipoEncontrado.value;
-            console.log('✅ Tipo de documento encontrado:', tipoEncontrado);
-          } else {
-            console.log('❌ No se encontró tipo de documento para:', personalEncontrado.tipo_documento_nombre);
           }
         }
         
@@ -1292,12 +1292,6 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
         }));
         
         setDocumentoYaBuscado(documentoActual);
-        console.log('✅ Personal autocompletado exitosamente:', {
-          nombre: personalEncontrado.label,
-          tipo_documento_nombre: personalEncontrado.tipo_documento_nombre,
-          tipoDocumentoAsignado: tipoDocumentoAsignado,
-          areaAsignada: personalEncontrado.area_id?.toString() || personalEncontrado.area_destino_id?.toString() || ''
-        });
       } else {
         // Si no se encuentra, limpiar selección
         setFormData(prev => ({
@@ -1306,7 +1300,6 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           area: ''
         }));
         setDocumentoYaBuscado(documentoActual);
-        console.log('❌ Personal no encontrado');
         setMensajePersonal('Personal no encontrado con ese número de documento');
         setTipoMensaje('error');
       }
@@ -1398,15 +1391,6 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           
           newFormData.tipoDocumento = tipoDocumentoAsignado;
           newFormData.area = personal.area_id?.toString() || personal.area_destino_id?.toString() || '';
-          
-          console.log('✅ Personal seleccionado desde dropdown:', {
-            nombre: personal.label,
-            numero_documento: personal.numero_documento,
-            tipo_documento_id: personal.tipo_documento_id,
-            tipo_documento_nombre: personal.tipo_documento_nombre,
-            tipoDocumentoAsignado: newFormData.tipoDocumento,
-            areaAsignada: newFormData.area
-          });
         }
       } else if (field === 'personalSeleccionado' && !value) {
         // Si se deselecciona el personal, limpiar mensajes
