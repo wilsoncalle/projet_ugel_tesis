@@ -294,6 +294,7 @@ const DateRangeFilter = ({
     onFechaDesdeChange,  // callback para cambiar fecha inicio
     onFechaHastaChange,  // callback para cambiar fecha fin
     onSemanaChange,      // callback para cambiar semana (nuevo)
+    semanaUI,            // información de la semana seleccionada (para verificar el rango)
     calendarMonth, setCalendarMonth, 
     calendarYear, setCalendarYear,
   }) => {
@@ -340,7 +341,34 @@ const DateRangeFilter = ({
     const isSameWeekRange = (week) => {
       if (!rangoActual.desde || !rangoActual.hasta) return false;
       const { start, end } = getWeekRange(week);
-      return isSameDay(rangoActual.desde, start) && isSameDay(rangoActual.hasta, end);
+      
+      // Si hay semanaUI y el rango de la semana coincide con el almacenado, es una semana seleccionada
+      if (semanaUI) {
+        const semanaStart = parseDate(semanaUI.start);
+        const semanaEnd = parseDate(semanaUI.end);
+        if (semanaStart && semanaEnd) {
+          if (isSameDay(start, semanaStart) && isSameDay(end, semanaEnd)) {
+            return true;
+          }
+        }
+      }
+      
+      // Verificar si la fecha seleccionada está dentro del rango de la semana
+      const fechaSeleccionada = rangoActual.desde;
+      
+      // Si fechaDesde === fechaHasta (un día específico) y está dentro del rango de la semana
+      // y hay semanaUI, entonces es una semana seleccionada
+      if (rangoActual.desde && rangoActual.hasta && 
+          isSameDay(rangoActual.desde, rangoActual.hasta) && 
+          semanaUI) {
+        const fechaEnRango = fechaSeleccionada >= start && fechaSeleccionada <= end;
+        return fechaEnRango;
+      }
+      
+      // Verificar si coincide exactamente con el rango completo (caso anterior)
+      const coincideRangoCompleto = isSameDay(rangoActual.desde, start) && isSameDay(rangoActual.hasta, end);
+      
+      return coincideRangoCompleto;
     };
 
     const onClickSemana = (week) => {
@@ -353,18 +381,10 @@ const DateRangeFilter = ({
       
       // SOLUCIÓN: Crear un evento personalizado con ambas fechas para evitar problemas con el debounce
       if (startString && endString && onFechaDesdeChange && onFechaHastaChange) {
-        // PRIMERO: Establecer el rango completo (para el backend) con el segundo parámetro
-        onFechaDesdeChange(startString, endString); // Pasar endString como segundo parámetro
-        onFechaHastaChange(endString, startString); // Pasar startString como segundo parámetro
-        
-        // SEGUNDO: Inmediatamente establecer el primer día para mostrar en la tabla
-        // Esto actualiza fechaDesde y fechaHasta al mismo día (primer día de la semana)
-        // Usando setTimeout para que el rango completo se establezca primero
-        setTimeout(() => {
-          // Establecer ambas fechas al primer día (pasando el mismo día como primer y segundo parámetro)
-          // Esto indica que es un solo día específico (fechaDesde = fechaHasta = startString)
-          onFechaDesdeChange(startString, startString);
-        }, 50);
+        // Establecer directamente el primer día de la semana
+        // El rango completo se guarda en semanaUI para uso futuro
+        // Pasar el mismo día como primer y segundo parámetro indica que es un solo día específico
+        onFechaDesdeChange(startString, startString);
         
         // EMITIR SEMANA - encontrar el índice de la semana en el array
         const weekIndex = weeks.findIndex(w => {
@@ -601,6 +621,7 @@ const DateRangeFilter = ({
                     onFechaDesdeChange={onFechaDesdeChange}
                     onFechaHastaChange={onFechaHastaChange}
                     onSemanaChange={handleSemanaChange}
+                    semanaUI={semanaUI}
                     calendarMonth={fromCalendarMonth}
                     setCalendarMonth={setFromCalendarMonth}
                     calendarYear={fromCalendarYear}
@@ -653,6 +674,7 @@ const DateRangeFilter = ({
                     onFechaDesdeChange={onFechaDesdeChange}
                     onFechaHastaChange={onFechaHastaChange}
                     onSemanaChange={handleSemanaChange}
+                    semanaUI={semanaUI}
                     calendarMonth={toCalendarMonth}
                     setCalendarMonth={setToCalendarMonth}
                     calendarYear={toCalendarYear}
@@ -667,39 +689,80 @@ const DateRangeFilter = ({
       
       {/* Chips de semana seleccionada */}
       {semanaUI && (
-        <div className="mt-3 flex items-center gap-3 flex-wrap">
-          {/* Chip de Mes junto con S1, S2, etc. */}
+        <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+          {/* Chip de Mes junto con S1, S2, etc. - Alineado a la izquierda */}
           <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold text-sm border border-blue-200 shadow-sm">
             {semanaUI.monthName} S{semanaUI.weekIndex}
           </span>
 
-          {/* Chips de días de la semana (botones clickeables) */}
-          <div className="flex flex-wrap gap-2">
-            {semanaUI.days.map((d, idx) => {
-              const hoyISO = new Date().toISOString().slice(0, 10);
+          {/* Píldora segmentada con días de la semana - Alineada a la derecha */}
+          {(() => {
+            const hoyISO = new Date().toISOString().slice(0, 10);
+            
+            // Filtrar días: quitar sábado siempre, domingo solo si está seleccionado o es hoy
+            const diasFiltrados = semanaUI.days.filter((d, idx) => {
+              // Parsear la fecha correctamente evitando problemas de zona horaria
+              const parsedDate = parseDate(d.date);
+              if (!parsedDate) return false;
+              const dayOfWeek = parsedDate.getDay(); // 0=Dom, 1=Lun, ..., 6=Sáb
+              const isSaturday = dayOfWeek === 6;
+              const isSunday = dayOfWeek === 0;
               const isSelected = diaSeleccionado === d.date || 
                 (diaSeleccionado === null && d.date === semanaUI.start && idx === 0) ||
                 (fechaDesde === d.date && fechaHasta === d.date);
               const isToday = d.date === hoyISO;
+              
+              // Quitar sábado siempre
+              if (isSaturday) {
+                return false;
+              }
+              
+              // Domingo solo si está seleccionado o es hoy
+              if (isSunday) {
+                return isSelected || isToday;
+              }
+              
+              // Mostrar todos los días laborables (L-V)
+              return true;
+            });
 
-              return (
-                <button
-                  key={d.date}
-                  type="button"
-                  onClick={() => handleDiaClick(d.date)}
-                  className={
-                    `px-2 py-1 rounded-lg border text-sm transition-colors cursor-pointer
-                     ${isSelected ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' :
-                     isToday ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200' :
-                     'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`
-                  }
-                  title={d.labelLong}
-                >
-                  {d.labelShort}
-                </button>
-              );
-            })}
-          </div>
+            return (
+              <div className="flex items-center bg-gray-100 border border-gray-300 rounded-full overflow-hidden shadow-sm">
+                {diasFiltrados.map((d, idx) => {
+                  const originalIdx = semanaUI.days.findIndex(dd => dd.date === d.date);
+                  const isSelected = diaSeleccionado === d.date || 
+                    (diaSeleccionado === null && d.date === semanaUI.start && originalIdx === 0) ||
+                    (fechaDesde === d.date && fechaHasta === d.date);
+                  const isToday = d.date === hoyISO;
+                  const parsedDateForRender = parseDate(d.date);
+                  const dayOfWeek = parsedDateForRender ? parsedDateForRender.getDay() : -1;
+                  const isSunday = dayOfWeek === 0; // Ya no hay sábados en la lista
+
+                  return (
+                    <button
+                      key={d.date}
+                      type="button"
+                      onClick={() => handleDiaClick(d.date)}
+                      className={`
+                        px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border-r border-gray-300 last:border-r-0
+                        ${isSelected 
+                          ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                          : isToday 
+                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
+                          : isSunday
+                          ? 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }
+                      `}
+                      title={d.labelLong}
+                    >
+                      {d.labelShort}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

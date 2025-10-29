@@ -3,9 +3,9 @@
  * Sistema Integral de Control de Acceso - UGEL Talara
  */
 
-const db = require("../../config/database");
-const { AppError } = require("../../middleware/errorHandler");
-const logger = require("../../utils/logger");
+const db = require('../../config/database');
+const { AppError } = require('../../middleware/errorHandler');
+const logger = require('../../utils/logger');
 
 /* =========================================================
  * Helpers
@@ -17,28 +17,24 @@ const logger = require("../../utils/logger");
  * La unicidad real la impone el UNIQUE(codigo_papeleta).
  */
 const generarCodigoPapeleta = async () => {
-  const { rows } = await db.query(
-    `SELECT nextval('papeletas_codigo_seq') AS n`,
-  );
-  const n = String(rows[0].n).padStart(4, "0");
-  const { rows: today } = await db.query(
-    `SELECT to_char(NOW() AT TIME ZONE 'America/Lima', 'YYYYMMDD') AS d`,
-  );
+  const { rows } = await db.query(`SELECT nextval('papeletas_codigo_seq') AS n`);
+  const n = String(rows[0].n).padStart(4, '0');
+  const { rows: today } = await db.query(`SELECT to_char(NOW() AT TIME ZONE 'America/Lima', 'YYYYMMDD') AS d`);
   return `PS-${today[0].d}-${n}`;
 };
 
 /** Construye cláusulas dinámicas para filtros comunes */
 const buildFilters = (opts = {}) => {
   const {
-    search = "",
+    search = '',
     estado,
-    fechaInicio, // aplica sobre fecha_solicitud si no se especifica campoFecha = 'solicitud'
+    fechaInicio,       // aplica sobre fecha_solicitud si no se especifica campoFecha = 'solicitud'
     fechaFin,
-    campoFecha = "solicitud", // 'solicitud' | 'programada' | 'salida_real' | 'retorno_real'
+    campoFecha = 'solicitud', // 'solicitud' | 'programada' | 'salida_real' | 'retorno_real'
     motivoSalidaId,
-    solicitanteId, // personal_solicitante_id
-    autorizaId, // personal_autoriza_id
-    areaDestinoId, // filtra por área del solicitante (join Personal)
+    solicitanteId,     // personal_solicitante_id
+    autorizaId,        // personal_autoriza_id
+    areaDestinoId,     // filtra por área del solicitante (join Personal)
   } = opts;
 
   const where = [];
@@ -53,63 +49,53 @@ const buildFilters = (opts = {}) => {
       OR p.apellidos ILIKE $${i}
       OR p.numero_documento ILIKE $${i}
     )`);
-    params.push(`%${search}%`);
-    i++;
+    params.push(`%${search}%`); i++;
   }
 
   // Estado
   if (estado) {
     where.push(`ps.estado = $${i}`);
-    params.push(estado);
-    i++;
+    params.push(estado); i++;
   }
 
   // Motivo
   if (motivoSalidaId) {
     where.push(`ps.motivo_salida_id = $${i}`);
-    params.push(motivoSalidaId);
-    i++;
+    params.push(motivoSalidaId); i++;
   }
 
   // Solicitante
   if (solicitanteId) {
     where.push(`ps.personal_solicitante_id = $${i}`);
-    params.push(solicitanteId);
-    i++;
+    params.push(solicitanteId); i++;
   }
 
   // Autoriza
   if (autorizaId) {
     where.push(`ps.personal_autoriza_id = $${i}`);
-    params.push(autorizaId);
-    i++;
+    params.push(autorizaId); i++;
   }
 
   // Área del solicitante (vía Personal.area_destino_id)
   if (areaDestinoId) {
     where.push(`p.area_destino_id = $${i}`);
-    params.push(areaDestinoId);
-    i++;
+    params.push(areaDestinoId); i++;
   }
 
   // Fechas
   const campoMap = {
-    solicitud: "ps.fecha_solicitud",
-    programada: "ps.fecha_hora_salida_programada",
-    salida_real: "ps.fecha_hora_salida_real",
-    retorno_real: "ps.fecha_hora_retorno_real",
+    solicitud: 'ps.fecha_solicitud',
+    programada: 'ps.fecha_hora_salida_programada',
+    salida_real: 'ps.fecha_hora_salida_real',
+    retorno_real: 'ps.fecha_hora_retorno_real',
   };
   const col = campoMap[campoFecha] || campoMap.solicitud;
 
   if (fechaInicio) {
-    where.push(`${col} >= $${i}`);
-    params.push(fechaInicio);
-    i++;
+    where.push(`${col} >= $${i}`); params.push(fechaInicio); i++;
   }
   if (fechaFin) {
-    where.push(`${col} <= $${i}`);
-    params.push(fechaFin);
-    i++;
+    where.push(`${col} <= $${i}`); params.push(fechaFin); i++;
   }
 
   return { where, params, nextIndex: i };
@@ -126,8 +112,8 @@ const findAll = async (options = {}) => {
   const {
     page = 1,
     limit = 20,
-    orderBy = "ps.fecha_solicitud", // columna segura
-    orderDir = "DESC", // ASC | DESC
+    orderBy = 'ps.fecha_solicitud',   // columna segura
+    orderDir = 'DESC',                // ASC | DESC
     ...filtros
   } = options;
 
@@ -135,21 +121,19 @@ const findAll = async (options = {}) => {
 
   try {
     const { where, params } = buildFilters(filtros);
-    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const whereSQL = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     // whitelist de ordenamientos seguros
     const safeOrderCols = new Set([
-      "ps.fecha_solicitud",
-      "ps.fecha_hora_salida_programada",
-      "ps.fecha_hora_retorno_programada",
-      "ps.fecha_hora_salida_real",
-      "ps.fecha_hora_retorno_real",
-      "ps.codigo_papeleta",
+      'ps.fecha_solicitud',
+      'ps.fecha_hora_salida_programada',
+      'ps.fecha_hora_retorno_programada',
+      'ps.fecha_hora_salida_real',
+      'ps.fecha_hora_retorno_real',
+      'ps.codigo_papeleta'
     ]);
-    const colOrden = safeOrderCols.has(orderBy)
-      ? orderBy
-      : "ps.fecha_solicitud";
-    const dirOrden = String(orderDir).toUpperCase() === "ASC" ? "ASC" : "DESC";
+    const colOrden = safeOrderCols.has(orderBy) ? orderBy : 'ps.fecha_solicitud';
+    const dirOrden = String(orderDir).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
     const baseSelect = `
       SELECT
@@ -210,8 +194,8 @@ const findAll = async (options = {}) => {
       total: parseInt(countRes.rows[0].total, 10) || 0,
     };
   } catch (error) {
-    logger.error("Error listando papeletas:", error);
-    throw new AppError("Error obteniendo papeletas", 500);
+    logger.error('Error listando papeletas:', error);
+    throw new AppError('Error obteniendo papeletas', 500);
   }
 };
 
@@ -221,11 +205,8 @@ const findAll = async (options = {}) => {
  */
 const findPendientes = async (options = {}) => {
   const {
-    page = 1,
-    limit = 20,
-    search = "",
-    areaDestinoId,
-    motivoSalidaId,
+    page = 1, limit = 20, search = '',
+    areaDestinoId, motivoSalidaId,
   } = options;
 
   const offset = (page - 1) * limit;
@@ -245,23 +226,18 @@ const findPendientes = async (options = {}) => {
         p.apellidos ILIKE $${i} OR
         p.numero_documento ILIKE $${i}
       )`);
-      params.push(`%${search}%`);
-      i++;
+      params.push(`%${search}%`); i++;
     }
 
     if (areaDestinoId) {
-      where.push(`p.area_destino_id = $${i}`);
-      params.push(areaDestinoId);
-      i++;
+      where.push(`p.area_destino_id = $${i}`); params.push(areaDestinoId); i++;
     }
 
     if (motivoSalidaId) {
-      where.push(`ps.motivo_salida_id = $${i}`);
-      params.push(motivoSalidaId);
-      i++;
+      where.push(`ps.motivo_salida_id = $${i}`); params.push(motivoSalidaId); i++;
     }
 
-    const whereSQL = `WHERE ${where.join(" AND ")}`;
+    const whereSQL = `WHERE ${where.join(' AND ')}`;
 
     const listSQL = `
       SELECT
@@ -304,8 +280,8 @@ const findPendientes = async (options = {}) => {
       total: parseInt(countRes.rows[0].total, 10) || 0,
     };
   } catch (error) {
-    logger.error("Error listando papeletas pendientes:", error);
-    throw new AppError("Error obteniendo papeletas pendientes", 500);
+    logger.error('Error listando papeletas pendientes:', error);
+    throw new AppError('Error obteniendo papeletas pendientes', 500);
   }
 };
 
@@ -325,11 +301,8 @@ const findPendientesByPersonal = async (personalId) => {
     const { rows } = await db.query(sql, [personalId]);
     return rows;
   } catch (error) {
-    logger.error(
-      `Error buscando pendientes por personal ${personalId}:`,
-      error,
-    );
-    throw new AppError("Error obteniendo pendientes por personal", 500);
+    logger.error(`Error buscando pendientes por personal ${personalId}:`, error);
+    throw new AppError('Error obteniendo pendientes por personal', 500);
   }
 };
 
@@ -362,7 +335,7 @@ const findById = async (id) => {
     return rows[0] || null;
   } catch (error) {
     logger.error(`Error buscando papeleta id ${id}:`, error);
-    throw new AppError("Error obteniendo papeleta", 500);
+    throw new AppError('Error obteniendo papeleta', 500);
   }
 };
 
@@ -379,13 +352,13 @@ const create = async (data) => {
       fecha_hora_salida_programada,
       fecha_hora_retorno_programada,
       // opcional: creación ya aprobada
-      estado = "SOLICITADO",
+      estado = 'SOLICITADO',
       personal_autoriza_id = null,
       fecha_autorizacion = null,
       observacion_autorizacion = null,
     } = data;
 
-    await client.query("BEGIN");
+    await client.query('BEGIN');
 
     const codigo = await generarCodigoPapeleta();
 
@@ -419,30 +392,22 @@ const create = async (data) => {
       observacion_autorizacion,
     ]);
 
-    await client.query("COMMIT");
+    await client.query('COMMIT');
     return await findById(rows[0].id);
   } catch (error) {
     await db.safeRollback(client);
-    if (
-      error.code === "23505" &&
-      /codigo_papeleta/.test(error.constraint || "")
-    ) {
+    if (error.code === '23505' && /codigo_papeleta/.test(error.constraint || '')) {
       // choque improbable de código -> reintentar una vez
-      logger.warn("Colisión de codigo_papeleta, reintentando…");
+      logger.warn('Colisión de codigo_papeleta, reintentando…');
       return await create(data);
     }
-    if (error.code === "23503") {
-      if (error.constraint?.includes("personal_solicitante_id"))
-        throw new AppError("Personal solicitante no encontrado", 404);
-      if (error.constraint?.includes("motivo_salida_id"))
-        throw new AppError("Motivo de salida no encontrado", 404);
-      if (error.constraint?.includes("personal_autoriza_id"))
-        throw new AppError("Personal que autoriza no encontrado", 404);
+    if (error.code === '23503') {
+      if (error.constraint?.includes('personal_solicitante_id')) throw new AppError('Personal solicitante no encontrado', 404);
+      if (error.constraint?.includes('motivo_salida_id')) throw new AppError('Motivo de salida no encontrado', 404);
+      if (error.constraint?.includes('personal_autoriza_id')) throw new AppError('Personal que autoriza no encontrado', 404);
     }
-    logger.error("Error creando papeleta:", error);
-    throw error instanceof AppError
-      ? error
-      : new AppError("Error creando papeleta", 500);
+    logger.error('Error creando papeleta:', error);
+    throw error instanceof AppError ? error : new AppError('Error creando papeleta', 500);
   } finally {
     client.release?.();
   }
@@ -452,12 +417,9 @@ const create = async (data) => {
  * Autorizar/Rechazar papeleta
  * accion: 'APROBAR' | 'RECHAZAR'
  */
-const decidirPapeleta = async (
-  id,
-  { accion, personal_autoriza_id, observacion_autorizacion = null },
-) => {
+const decidirPapeleta = async (id, { accion, personal_autoriza_id, observacion_autorizacion = null }) => {
   try {
-    const nextEstado = accion === "APROBAR" ? "APROBADO" : "RECHAZADO";
+    const nextEstado = accion === 'APROBAR' ? 'APROBADO' : 'RECHAZADO';
     const sql = `
       UPDATE PapeletasSalida
       SET estado = $1,
@@ -467,20 +429,12 @@ const decidirPapeleta = async (
       WHERE id = $4 AND estado IN ('SOLICITADO','RECHAZADO','APROBADO')
       RETURNING id
     `;
-    const { rows } = await db.query(sql, [
-      nextEstado,
-      personal_autoriza_id,
-      observacion_autorizacion,
-      id,
-    ]);
-    if (!rows.length)
-      throw new AppError("Papeleta no encontrada o ya decidida", 404);
+    const { rows } = await db.query(sql, [nextEstado, personal_autoriza_id, observacion_autorizacion, id]);
+    if (!rows.length) throw new AppError('Papeleta no encontrada o ya decidida', 404);
     return await findById(id);
   } catch (error) {
     logger.error(`Error decidiendo papeleta ${id}:`, error);
-    throw error instanceof AppError
-      ? error
-      : new AppError("Error al decidir la papeleta", 500);
+    throw error instanceof AppError ? error : new AppError('Error al decidir la papeleta', 500);
   }
 };
 
@@ -498,13 +452,11 @@ const registrarSalida = async (id, usuario_registro_salida_id) => {
       RETURNING id
     `;
     const { rows } = await db.query(sql, [id, usuario_registro_salida_id]);
-    if (!rows.length) throw new AppError("Papeleta no encontrada", 404);
+    if (!rows.length) throw new AppError('Papeleta no encontrada', 404);
     return await findById(id);
   } catch (error) {
     logger.error(`Error registrando salida en papeleta ${id}:`, error);
-    throw error instanceof AppError
-      ? error
-      : new AppError("Error registrando salida", 500);
+    throw error instanceof AppError ? error : new AppError('Error registrando salida', 500);
   }
 };
 
@@ -522,14 +474,11 @@ const registrarRetorno = async (id, usuario_registro_retorno_id) => {
       RETURNING id
     `;
     const { rows } = await db.query(sql, [id, usuario_registro_retorno_id]);
-    if (!rows.length)
-      throw new AppError("Papeleta no encontrada o ya finalizada", 404);
+    if (!rows.length) throw new AppError('Papeleta no encontrada o ya finalizada', 404);
     return await findById(id);
   } catch (error) {
     logger.error(`Error registrando retorno en papeleta ${id}:`, error);
-    throw error instanceof AppError
-      ? error
-      : new AppError("Error registrando retorno", 500);
+    throw error instanceof AppError ? error : new AppError('Error registrando retorno', 500);
   }
 };
 
@@ -546,14 +495,11 @@ const cancelar = async (id, observacion_autorizacion = null) => {
       RETURNING id
     `;
     const { rows } = await db.query(sql, [id, observacion_autorizacion]);
-    if (!rows.length)
-      throw new AppError("No se puede cancelar (no existe o ya inició)", 400);
+    if (!rows.length) throw new AppError('No se puede cancelar (no existe o ya inició)', 400);
     return await findById(id);
   } catch (error) {
     logger.error(`Error cancelando papeleta ${id}:`, error);
-    throw error instanceof AppError
-      ? error
-      : new AppError("Error cancelando papeleta", 500);
+    throw error instanceof AppError ? error : new AppError('Error cancelando papeleta', 500);
   }
 };
 
@@ -562,17 +508,12 @@ const cancelar = async (id, observacion_autorizacion = null) => {
  */
 const anular = async (id) => {
   try {
-    const { rows } = await db.query(
-      `DELETE FROM PapeletasSalida WHERE id = $1 RETURNING id`,
-      [id],
-    );
-    if (!rows.length) throw new AppError("Papeleta no encontrada", 404);
+    const { rows } = await db.query(`DELETE FROM PapeletasSalida WHERE id = $1 RETURNING id`, [id]);
+    if (!rows.length) throw new AppError('Papeleta no encontrada', 404);
     return true;
   } catch (error) {
     logger.error(`Error anulando papeleta ${id}:`, error);
-    throw error instanceof AppError
-      ? error
-      : new AppError("Error anulando papeleta", 500);
+    throw error instanceof AppError ? error : new AppError('Error anulando papeleta', 500);
   }
 };
 
@@ -582,18 +523,10 @@ const anular = async (id) => {
  * - por motivo
  * - por día (solicitud y finales)
  */
-const getEstadisticas = async (
-  fechaInicio,
-  fechaFin,
-  campoFecha = "solicitud",
-) => {
+const getEstadisticas = async (fechaInicio, fechaFin, campoFecha = 'solicitud') => {
   try {
-    const { where, params } = buildFilters({
-      fechaInicio,
-      fechaFin,
-      campoFecha,
-    });
-    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+    const { where, params } = buildFilters({ fechaInicio, fechaFin, campoFecha });
+    const whereSQL = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const totalesSQL = `
       SELECT
@@ -620,27 +553,17 @@ const getEstadisticas = async (
 
     const porDiaSQL = `
       SELECT
-        DATE(${
-          campoFecha === "programada"
-            ? "ps.fecha_hora_salida_programada"
-            : campoFecha === "salida_real"
-              ? "ps.fecha_hora_salida_real"
-              : campoFecha === "retorno_real"
-                ? "ps.fecha_hora_retorno_real"
-                : "ps.fecha_solicitud"
-        }) AS fecha,
+        DATE(${campoFecha === 'programada' ? 'ps.fecha_hora_salida_programada'
+          : campoFecha === 'salida_real' ? 'ps.fecha_hora_salida_real'
+          : campoFecha === 'retorno_real' ? 'ps.fecha_hora_retorno_real'
+          : 'ps.fecha_solicitud'}) AS fecha,
         COUNT(*) AS total
       FROM PapeletasSalida ps
       ${whereSQL}
-      GROUP BY DATE(${
-        campoFecha === "programada"
-          ? "ps.fecha_hora_salida_programada"
-          : campoFecha === "salida_real"
-            ? "ps.fecha_hora_salida_real"
-            : campoFecha === "retorno_real"
-              ? "ps.fecha_hora_retorno_real"
-              : "ps.fecha_solicitud"
-      })
+      GROUP BY DATE(${campoFecha === 'programada' ? 'ps.fecha_hora_salida_programada'
+        : campoFecha === 'salida_real' ? 'ps.fecha_hora_salida_real'
+        : campoFecha === 'retorno_real' ? 'ps.fecha_hora_retorno_real'
+        : 'ps.fecha_solicitud'})
       ORDER BY fecha
     `;
 
@@ -664,8 +587,8 @@ const getEstadisticas = async (
       por_dia: dia.rows,
     };
   } catch (error) {
-    logger.error("Error obteniendo estadísticas de papeletas:", error);
-    throw new AppError("Error obteniendo estadísticas de papeletas", 500);
+    logger.error('Error obteniendo estadísticas de papeletas:', error);
+    throw new AppError('Error obteniendo estadísticas de papeletas', 500);
   }
 };
 
