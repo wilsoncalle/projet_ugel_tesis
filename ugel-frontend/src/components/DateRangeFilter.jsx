@@ -15,6 +15,8 @@ const DateRangeFilter = ({
 }) => {
   const [fromInput, setFromInput] = useState('');
   const [toInput, setToInput] = useState('');
+  const [semanaUI, setSemanaUI] = useState(null); // Estado interno para los chips
+  const [diaSeleccionado, setDiaSeleccionado] = useState(null); // Día seleccionado dentro de la semana
 
   const [fromCalendarMonth, setFromCalendarMonth] = useState(new Date().getMonth());
   const [fromCalendarYear, setFromCalendarYear] = useState(new Date().getFullYear());
@@ -86,15 +88,20 @@ const DateRangeFilter = ({
   };
 
   // Helper para construir payload de la semana
-  const buildWeekPayload = (start, end) => {
+  const buildWeekPayload = (start, end, weekIndex, month) => {
     const days = Array.from({ length: 7 }, (_, i) =>
       new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
     );
+    // Obtener el nombre del mes
+    const monthDate = new Date(start.getFullYear(), month, 1);
+    const monthName = format(monthDate, 'MMMM', { locale: es });
+    
     return {
       start: dateToString(start),
       end: dateToString(end),
-      weekNumber: getIsoWeekNumber(start),
-      days: days.map(d => ({
+      monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1), // Mes en lugar de número de semana
+      weekIndex: weekIndex + 1, // S1, S2, etc. (1-based)
+      days: days.map((d, idx) => ({
         date: dateToString(d),
         labelShort: format(d, 'EEEEE', { locale: es }).toUpperCase(), // L, M, X, J, V, S, D
         labelLong: format(d, 'EEEE', { locale: es }),                // lunes, martes, miércoles...
@@ -176,12 +183,39 @@ const DateRangeFilter = ({
   const clearRange = () => {
     setFromInput('');
     setToInput('');
+    setSemanaUI(null); // Limpiar chips al limpiar fechas
+    setDiaSeleccionado(null); // Limpiar día seleccionado
     const today = new Date();
     setFromCalendarMonth(today.getMonth());
     setFromCalendarYear(today.getFullYear());
     setToCalendarMonth(today.getMonth());
     setToCalendarYear(today.getFullYear());
     if (onClear) onClear();
+  };
+
+  // Callback interno para manejar el cambio de semana
+  const handleSemanaChange = (info, primerDia = null) => {
+    setSemanaUI(info); // Actualizar estado interno
+    // Si se proporciona el FIRST día, seleccionarlo automáticamente
+    if (primerDia) {
+      setDiaSeleccionado(primerDia);
+      // Actualizar las fechas para mostrar solo ese día (aunque el rango completo sigue siendo la semana)
+      // IMPORTANTE: Pasar el mismo día como primer y segundo parámetro para indicar que es un día específico
+      onFechaDesdeChange(primerDia, primerDia);
+    }
+    if (onSemanaChange) {
+      onSemanaChange(info); // Llamar callback externo si existe
+    }
+  };
+
+  // Manejar clic en un chip de día
+  const handleDiaClick = (fechaDia) => {
+    setDiaSeleccionado(fechaDia);
+    // Actualizar las fechas para mostrar solo ese día
+    // IMPORTANTE: Llamar a ambos callbacks pasando el mismo día como primer y segundo parámetro
+    // Esto indica que es un solo día específico (fechaDesde = fechaHasta = fechaDia)
+    onFechaDesdeChange(fechaDia, fechaDia);
+    // handleFechaHastaChange detectará que fechaDesde es igual a fechaHasta y actualizará correctamente
   };
 
   const getTodayDate = () => {
@@ -313,25 +347,41 @@ const DateRangeFilter = ({
       const { start, end } = getWeekRange(week);
       // Evita futuro en el inicio (por si toda la semana está en el futuro)
       const startClamped = start > today ? today : start;
-      // Establecer AMBAS fechas: inicio (lunes) y fin (domingo o hoy)
+      // Establecer AMBAS fechas: inicio (lunes) y fin (domingo o hoy) - RANGO COMPLETO
       const startString = dateToString(startClamped);
       const endString = dateToString(end);
       
       // SOLUCIÓN: Crear un evento personalizado con ambas fechas para evitar problemas con el debounce
       if (startString && endString && onFechaDesdeChange && onFechaHastaChange) {
-        // Llamar ambos callbacks inmediatamente - el componente padre debe manejar esto
+        // PRIMERO: Establecer el rango completo (para el backend) con el segundo parámetro
         onFechaDesdeChange(startString, endString); // Pasar endString como segundo parámetro
         onFechaHastaChange(endString, startString); // Pasar startString como segundo parámetro
         
-        // EMITIR SEMANA (si el padre pasó el callback)
+        // SEGUNDO: Inmediatamente establecer el primer día para mostrar en la tabla
+        // Esto actualiza fechaDesde y fechaHasta al mismo día (primer día de la semana)
+        // Usando setTimeout para que el rango completo se establezca primero
+        setTimeout(() => {
+          // Establecer ambas fechas al primer día (pasando el mismo día como primer y segundo parámetro)
+          // Esto indica que es un solo día específico (fechaDesde = fechaHasta = startString)
+          onFechaDesdeChange(startString, startString);
+        }, 50);
+        
+        // EMITIR SEMANA - encontrar el índice de la semana en el array
+        const weekIndex = weeks.findIndex(w => {
+          const weekStart = new Date(w[0].getFullYear(), w[0].getMonth(), w[0].getDate());
+          return isSameDay(weekStart, start);
+        });
+        
         if (onSemanaChange) {
-          onSemanaChange(buildWeekPayload(startClamped, end));
+          const payload = buildWeekPayload(startClamped, end, weekIndex, calendarMonth);
+          // Pasar el primer día como segundo parámetro para seleccionarlo automáticamente
+          onSemanaChange(payload, startString);
         }
         
         // Cerrar el popover después de establecer el rango
         setTimeout(() => {
           close();
-        }, 50);
+        }, 100);
       }
     };
 
@@ -550,7 +600,7 @@ const DateRangeFilter = ({
                     fechaHasta={fechaHasta}
                     onFechaDesdeChange={onFechaDesdeChange}
                     onFechaHastaChange={onFechaHastaChange}
-                    onSemanaChange={onSemanaChange}
+                    onSemanaChange={handleSemanaChange}
                     calendarMonth={fromCalendarMonth}
                     setCalendarMonth={setFromCalendarMonth}
                     calendarYear={fromCalendarYear}
@@ -602,7 +652,7 @@ const DateRangeFilter = ({
                     fechaHasta={fechaHasta}
                     onFechaDesdeChange={onFechaDesdeChange}
                     onFechaHastaChange={onFechaHastaChange}
-                    onSemanaChange={onSemanaChange}
+                    onSemanaChange={handleSemanaChange}
                     calendarMonth={toCalendarMonth}
                     setCalendarMonth={setToCalendarMonth}
                     calendarYear={toCalendarYear}
@@ -614,6 +664,44 @@ const DateRangeFilter = ({
           </Popover>
         </div>
       </div>
+      
+      {/* Chips de semana seleccionada */}
+      {semanaUI && (
+        <div className="mt-3 flex items-center gap-3 flex-wrap">
+          {/* Chip de Mes junto con S1, S2, etc. */}
+          <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold text-sm border border-blue-200 shadow-sm">
+            {semanaUI.monthName} S{semanaUI.weekIndex}
+          </span>
+
+          {/* Chips de días de la semana (botones clickeables) */}
+          <div className="flex flex-wrap gap-2">
+            {semanaUI.days.map((d, idx) => {
+              const hoyISO = new Date().toISOString().slice(0, 10);
+              const isSelected = diaSeleccionado === d.date || 
+                (diaSeleccionado === null && d.date === semanaUI.start && idx === 0) ||
+                (fechaDesde === d.date && fechaHasta === d.date);
+              const isToday = d.date === hoyISO;
+
+              return (
+                <button
+                  key={d.date}
+                  type="button"
+                  onClick={() => handleDiaClick(d.date)}
+                  className={
+                    `px-2 py-1 rounded-lg border text-sm transition-colors cursor-pointer
+                     ${isSelected ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' :
+                     isToday ? 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200' :
+                     'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`
+                  }
+                  title={d.labelLong}
+                >
+                  {d.labelShort}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

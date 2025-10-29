@@ -1,491 +1,689 @@
 /**
- * Repositorio para gestión de papeletas de salida de personal
+ * Repositorio para gestión de Papeletas de Salida
  * Sistema Integral de Control de Acceso - UGEL Talara
  */
 
-const db = require('../../config/database');
-const { AppError } = require('../../middleware/errorHandler');
-const logger = require('../../utils/logger');
+const db = require("../../config/database");
+const { AppError } = require("../../middleware/errorHandler");
+const logger = require("../../utils/logger");
+
+/* =========================================================
+ * Helpers
+ * =======================================================*/
 
 /**
- * Buscar todas las papeletas de salida con filtros y paginación
- * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Papeletas encontradas y total
+ * Genera un código único tipo PS-YYYYMMDD-0001
+ * Usa una secuencia global (papeletas_codigo_seq). Reinicia visualmente por día.
+ * La unicidad real la impone el UNIQUE(codigo_papeleta).
+ */
+const generarCodigoPapeleta = async () => {
+  const { rows } = await db.query(
+    `SELECT nextval('papeletas_codigo_seq') AS n`,
+  );
+  const n = String(rows[0].n).padStart(4, "0");
+  const { rows: today } = await db.query(
+    `SELECT to_char(NOW() AT TIME ZONE 'America/Lima', 'YYYYMMDD') AS d`,
+  );
+  return `PS-${today[0].d}-${n}`;
+};
+
+/** Construye cláusulas dinámicas para filtros comunes */
+const buildFilters = (opts = {}) => {
+  const {
+    search = "",
+    estado,
+    fechaInicio, // aplica sobre fecha_solicitud si no se especifica campoFecha = 'solicitud'
+    fechaFin,
+    campoFecha = "solicitud", // 'solicitud' | 'programada' | 'salida_real' | 'retorno_real'
+    motivoSalidaId,
+    solicitanteId, // personal_solicitante_id
+    autorizaId, // personal_autoriza_id
+    areaDestinoId, // filtra por área del solicitante (join Personal)
+  } = opts;
+
+  const where = [];
+  const params = [];
+  let i = 1;
+
+  // Texto libre
+  if (search) {
+    where.push(`(
+      ps.codigo_papeleta ILIKE $${i}
+      OR p.nombres ILIKE $${i}
+      OR p.apellidos ILIKE $${i}
+      OR p.numero_documento ILIKE $${i}
+    )`);
+    params.push(`%${search}%`);
+    i++;
+  }
+
+  // Estado
+  if (estado) {
+    where.push(`ps.estado = $${i}`);
+    params.push(estado);
+    i++;
+  }
+
+  // Motivo
+  if (motivoSalidaId) {
+    where.push(`ps.motivo_salida_id = $${i}`);
+    params.push(motivoSalidaId);
+    i++;
+  }
+
+  // Solicitante
+  if (solicitanteId) {
+    where.push(`ps.personal_solicitante_id = $${i}`);
+    params.push(solicitanteId);
+    i++;
+  }
+
+  // Autoriza
+  if (autorizaId) {
+    where.push(`ps.personal_autoriza_id = $${i}`);
+    params.push(autorizaId);
+    i++;
+  }
+
+  // Área del solicitante (vía Personal.area_destino_id)
+  if (areaDestinoId) {
+    where.push(`p.area_destino_id = $${i}`);
+    params.push(areaDestinoId);
+    i++;
+  }
+
+  // Fechas
+  const campoMap = {
+    solicitud: "ps.fecha_solicitud",
+    programada: "ps.fecha_hora_salida_programada",
+    salida_real: "ps.fecha_hora_salida_real",
+    retorno_real: "ps.fecha_hora_retorno_real",
+  };
+  const col = campoMap[campoFecha] || campoMap.solicitud;
+
+  if (fechaInicio) {
+    where.push(`${col} >= $${i}`);
+    params.push(fechaInicio);
+    i++;
+  }
+  if (fechaFin) {
+    where.push(`${col} <= $${i}`);
+    params.push(fechaFin);
+    i++;
+  }
+
+  return { where, params, nextIndex: i };
+};
+
+/* =========================================================
+ * Consultas
+ * =======================================================*/
+
+/**
+ * Listado con filtros y paginación
  */
 const findAll = async (options = {}) => {
-  const { 
-    page = 1, 
-    limit = 20, 
-    search = '',
-    fechaInicio,
-    fechaFin,
-    personalId,
-    motivoSalidaId
+  const {
+    page = 1,
+    limit = 20,
+    orderBy = "ps.fecha_solicitud", // columna segura
+    orderDir = "DESC", // ASC | DESC
+    ...filtros
   } = options;
-  
+
   const offset = (page - 1) * limit;
-  
+
   try {
-    // Construir la consulta base
-    let query = `
-      SELECT 
-        rs.id,
-        rs.personal_id,
-        p.tipo_documento as personal_tipo_documento,
-        p.numero_documento as personal_numero_documento,
-        p.nombres as personal_nombres,
-        p.apellidos as personal_apellidos,
-        rs.motivo_salida_id,
-        ms.nombre_motivo,
-        rs.fecha_hora_salida,
-        rs.fecha_hora_retorno_estimada,
-        rs.fecha_hora_retorno_real,
-        rs.observacion_salida,
-        rs.usuario_registro_id,
-        u.nombre_usuario as usuario_registro
-      FROM RegistrosSalidaPersonal rs
-      JOIN Personal p ON rs.personal_id = p.id
-      JOIN MotivosSalidaPersonal ms ON rs.motivo_salida_id = ms.id
-      JOIN Usuarios u ON rs.usuario_registro_id = u.id
-    `;
-    
-    // Construir la cláusula WHERE
-    const whereConditions = [];
-    const queryParams = [];
-    let paramCounter = 1;
-    
-    // Filtro por texto
-    if (search) {
-      whereConditions.push(`(
-        p.nombres ILIKE $${paramCounter} OR 
-        p.apellidos ILIKE $${paramCounter} OR 
-        p.numero_documento ILIKE $${paramCounter}
-      )`);
-      queryParams.push(`%${search}%`);
-      paramCounter++;
-    }
-    
-    // Filtro por rango de fechas
-    if (fechaInicio) {
-      whereConditions.push(`rs.fecha_hora_salida >= $${paramCounter}`);
-      queryParams.push(fechaInicio);
-      paramCounter++;
-    }
-    
-    if (fechaFin) {
-      whereConditions.push(`rs.fecha_hora_salida <= $${paramCounter}`);
-      queryParams.push(fechaFin);
-      paramCounter++;
-    }
-    
-    // Filtro por personal
-    if (personalId) {
-      whereConditions.push(`rs.personal_id = $${paramCounter}`);
-      queryParams.push(personalId);
-      paramCounter++;
-    }
-    
-    // Filtro por motivo de salida
-    if (motivoSalidaId) {
-      whereConditions.push(`rs.motivo_salida_id = $${paramCounter}`);
-      queryParams.push(motivoSalidaId);
-      paramCounter++;
-    }
-    
-    // Agregar condiciones WHERE si existen
-    if (whereConditions.length > 0) {
-      query += ` WHERE ${whereConditions.join(' AND ')}`;
-    }
-    
-    // Consulta para contar el total
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM RegistrosSalidaPersonal rs
-      JOIN Personal p ON rs.personal_id = p.id
-      ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
-    `;
-    
-    // Agregar ordenamiento y paginación
-    query += `
-      ORDER BY rs.fecha_hora_salida DESC
-      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
-    `;
-    
-    // Agregar parámetros de paginación
-    queryParams.push(limit, offset);
-    
-    // Ejecutar consultas en paralelo
-    const [papeletasResult, countResult] = await Promise.all([
-      db.query(query, queryParams),
-      db.query(countQuery, queryParams.slice(0, paramCounter - 1))
+    const { where, params } = buildFilters(filtros);
+    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    // whitelist de ordenamientos seguros
+    const safeOrderCols = new Set([
+      "ps.fecha_solicitud",
+      "ps.fecha_hora_salida_programada",
+      "ps.fecha_hora_retorno_programada",
+      "ps.fecha_hora_salida_real",
+      "ps.fecha_hora_retorno_real",
+      "ps.codigo_papeleta",
     ]);
-    
+    const colOrden = safeOrderCols.has(orderBy)
+      ? orderBy
+      : "ps.fecha_solicitud";
+    const dirOrden = String(orderDir).toUpperCase() === "ASC" ? "ASC" : "DESC";
+
+    const baseSelect = `
+      SELECT
+        ps.id,
+        ps.codigo_papeleta,
+        ps.estado,
+        ps.fecha_solicitud,
+        ps.motivo_salida_id,
+        m.nombre_motivo,
+        ps.sustento_solicitud,
+        ps.fecha_hora_salida_programada,
+        ps.fecha_hora_retorno_programada,
+        ps.fecha_hora_salida_real,
+        ps.fecha_hora_retorno_real,
+        ps.personal_solicitante_id,
+        p.tipo_documento AS solicitante_tipo_documento,
+        p.numero_documento AS solicitante_numero_documento,
+        p.nombres AS solicitante_nombres,
+        p.apellidos AS solicitante_apellidos,
+        p.area_destino_id AS solicitante_area_destino_id,
+        ps.personal_autoriza_id,
+        pa.nombres AS autoriza_nombres,
+        pa.apellidos AS autoriza_apellidos,
+        ps.fecha_autorizacion,
+        ps.observacion_autorizacion,
+        ps.usuario_registro_salida_id,
+        us.nombre_usuario AS usuario_registro_salida,
+        ps.usuario_registro_retorno_id,
+        ur.nombre_usuario AS usuario_registro_retorno
+      FROM PapeletasSalida ps
+      JOIN Personal p ON p.id = ps.personal_solicitante_id
+      JOIN MotivosSalidaPersonal m ON m.id = ps.motivo_salida_id
+      LEFT JOIN Personal pa ON pa.id = ps.personal_autoriza_id
+      LEFT JOIN Usuarios us ON us.id = ps.usuario_registro_salida_id
+      LEFT JOIN Usuarios ur ON ur.id = ps.usuario_registro_retorno_id
+      ${whereSQL}
+      ORDER BY ${colOrden} ${dirOrden}
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+
+    const countSQL = `
+      SELECT COUNT(*) AS total
+      FROM PapeletasSalida ps
+      JOIN Personal p ON p.id = ps.personal_solicitante_id
+      JOIN MotivosSalidaPersonal m ON m.id = ps.motivo_salida_id
+      ${whereSQL}
+    `;
+
+    const queryParams = [...params, limit, offset];
+
+    const [listRes, countRes] = await Promise.all([
+      db.query(baseSelect, queryParams),
+      db.query(countSQL, params),
+    ]);
+
     return {
-      papeletas: papeletasResult.rows,
-      total: parseInt(countResult.rows[0].total)
+      papeletas: listRes.rows,
+      total: parseInt(countRes.rows[0].total, 10) || 0,
     };
-    
   } catch (error) {
-    logger.error('Error en repositorio buscando papeletas de salida:', error);
-    throw new AppError('Error obteniendo papeletas de salida', 500);
+    logger.error("Error listando papeletas:", error);
+    throw new AppError("Error obteniendo papeletas", 500);
   }
 };
 
 /**
- * Buscar papeletas de salida pendientes de retorno con paginación
- * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Papeletas pendientes encontradas y total
+ * Pendientes para garita: aprobadas o en curso sin retorno real
+ * Útil para el vigilante
  */
 const findPendientes = async (options = {}) => {
-  const { page = 1, limit = 20, search = '' } = options;
+  const {
+    page = 1,
+    limit = 20,
+    search = "",
+    areaDestinoId,
+    motivoSalidaId,
+  } = options;
+
   const offset = (page - 1) * limit;
-  
+
   try {
-    // Construir la consulta base
-    let query = `
-      SELECT 
-        rs.id,
-        rs.personal_id,
-        p.tipo_documento as personal_tipo_documento,
-        p.numero_documento as personal_numero_documento,
-        p.nombres as personal_nombres,
-        p.apellidos as personal_apellidos,
-        rs.motivo_salida_id,
-        ms.nombre_motivo,
-        rs.fecha_hora_salida,
-        rs.fecha_hora_retorno_estimada,
-        rs.fecha_hora_retorno_real,
-        rs.observacion_salida,
-        rs.usuario_registro_id,
-        u.nombre_usuario as usuario_registro
-      FROM RegistrosSalidaPersonal rs
-      JOIN Personal p ON rs.personal_id = p.id
-      JOIN MotivosSalidaPersonal ms ON rs.motivo_salida_id = ms.id
-      JOIN Usuarios u ON rs.usuario_registro_id = u.id
-      WHERE rs.fecha_hora_retorno_real IS NULL
-    `;
-    
-    // Agregar filtro de búsqueda si existe
-    const queryParams = [];
-    let paramCounter = 1;
-    
+    const where = [
+      `(ps.estado IN ('APROBADO','EN_CURSO'))`,
+      `ps.fecha_hora_retorno_real IS NULL`,
+    ];
+    const params = [];
+    let i = 1;
+
     if (search) {
-      query += ` AND (
-        p.nombres ILIKE $${paramCounter} OR 
-        p.apellidos ILIKE $${paramCounter} OR 
-        p.numero_documento ILIKE $${paramCounter}
-      )`;
-      queryParams.push(`%${search}%`);
-      paramCounter++;
+      where.push(`(
+        ps.codigo_papeleta ILIKE $${i} OR
+        p.nombres ILIKE $${i} OR
+        p.apellidos ILIKE $${i} OR
+        p.numero_documento ILIKE $${i}
+      )`);
+      params.push(`%${search}%`);
+      i++;
     }
-    
-    // Consulta para contar el total
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM RegistrosSalidaPersonal rs
-      JOIN Personal p ON rs.personal_id = p.id
-      WHERE rs.fecha_hora_retorno_real IS NULL
-      ${search ? `AND (
-        p.nombres ILIKE $1 OR 
-        p.apellidos ILIKE $1 OR 
-        p.numero_documento ILIKE $1
-      )` : ''}
+
+    if (areaDestinoId) {
+      where.push(`p.area_destino_id = $${i}`);
+      params.push(areaDestinoId);
+      i++;
+    }
+
+    if (motivoSalidaId) {
+      where.push(`ps.motivo_salida_id = $${i}`);
+      params.push(motivoSalidaId);
+      i++;
+    }
+
+    const whereSQL = `WHERE ${where.join(" AND ")}`;
+
+    const listSQL = `
+      SELECT
+        ps.id,
+        ps.codigo_papeleta,
+        ps.estado,
+        ps.motivo_salida_id,
+        m.nombre_motivo,
+        ps.fecha_hora_salida_programada,
+        ps.fecha_hora_retorno_programada,
+        ps.fecha_hora_salida_real,
+        ps.fecha_hora_retorno_real,
+        ps.personal_solicitante_id,
+        p.nombres AS solicitante_nombres,
+        p.apellidos AS solicitante_apellidos,
+        p.numero_documento AS solicitante_numero_documento
+      FROM PapeletasSalida ps
+      JOIN Personal p ON p.id = ps.personal_solicitante_id
+      JOIN MotivosSalidaPersonal m ON m.id = ps.motivo_salida_id
+      ${whereSQL}
+      ORDER BY COALESCE(ps.fecha_hora_salida_real, ps.fecha_hora_salida_programada) ASC
+      LIMIT $${i} OFFSET $${i + 1}
     `;
-    
-    // Agregar ordenamiento y paginación
-    query += `
-      ORDER BY rs.fecha_hora_salida ASC
-      LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
+
+    const countSQL = `
+      SELECT COUNT(*) AS total
+      FROM PapeletasSalida ps
+      JOIN Personal p ON p.id = ps.personal_solicitante_id
+      ${whereSQL}
     `;
-    
-    // Agregar parámetros de paginación
-    queryParams.push(limit, offset);
-    
-    // Ejecutar consultas en paralelo
-    const [papeletasResult, countResult] = await Promise.all([
-      db.query(query, queryParams),
-      db.query(countQuery, search ? [`%${search}%`] : [])
+
+    const queryParams = [...params, limit, offset];
+    const [listRes, countRes] = await Promise.all([
+      db.query(listSQL, queryParams),
+      db.query(countSQL, params),
     ]);
-    
+
     return {
-      papeletas: papeletasResult.rows,
-      total: parseInt(countResult.rows[0].total)
+      papeletas: listRes.rows,
+      total: parseInt(countRes.rows[0].total, 10) || 0,
     };
-    
   } catch (error) {
-    logger.error('Error en repositorio buscando papeletas pendientes:', error);
-    throw new AppError('Error obteniendo papeletas pendientes', 500);
+    logger.error("Error listando papeletas pendientes:", error);
+    throw new AppError("Error obteniendo papeletas pendientes", 500);
   }
 };
 
 /**
- * Buscar papeletas pendientes por personal
- * @param {number} personalId - ID del personal
- * @returns {Array} Papeletas pendientes encontradas
+ * Pendientes por personal (sin retorno real)
  */
 const findPendientesByPersonal = async (personalId) => {
   try {
-    const query = `
-      SELECT id
-      FROM RegistrosSalidaPersonal
-      WHERE personal_id = $1 AND fecha_hora_retorno_real IS NULL
+    const sql = `
+      SELECT id, codigo_papeleta, estado
+      FROM PapeletasSalida
+      WHERE personal_solicitante_id = $1
+        AND fecha_hora_retorno_real IS NULL
+        AND estado IN ('APROBADO','EN_CURSO','SOLICITADO')
+      ORDER BY fecha_solicitud DESC
     `;
-    
-    const result = await db.query(query, [personalId]);
-    return result.rows;
-    
+    const { rows } = await db.query(sql, [personalId]);
+    return rows;
   } catch (error) {
-    logger.error(`Error en repositorio buscando papeletas pendientes por personal ID ${personalId}:`, error);
-    throw new AppError('Error obteniendo papeletas pendientes por personal', 500);
+    logger.error(
+      `Error buscando pendientes por personal ${personalId}:`,
+      error,
+    );
+    throw new AppError("Error obteniendo pendientes por personal", 500);
   }
 };
 
 /**
- * Buscar papeleta de salida por ID
- * @param {number} id - ID de la papeleta
- * @returns {Object|null} Papeleta encontrada o null
+ * Detalle por ID
  */
 const findById = async (id) => {
   try {
-    const query = `
-      SELECT 
-        rs.id,
-        rs.personal_id,
-        p.tipo_documento as personal_tipo_documento,
-        p.numero_documento as personal_numero_documento,
-        p.nombres as personal_nombres,
-        p.apellidos as personal_apellidos,
-        rs.motivo_salida_id,
-        ms.nombre_motivo,
-        rs.fecha_hora_salida,
-        rs.fecha_hora_retorno_estimada,
-        rs.fecha_hora_retorno_real,
-        rs.observacion_salida,
-        rs.usuario_registro_id,
-        u.nombre_usuario as usuario_registro
-      FROM RegistrosSalidaPersonal rs
-      JOIN Personal p ON rs.personal_id = p.id
-      JOIN MotivosSalidaPersonal ms ON rs.motivo_salida_id = ms.id
-      JOIN Usuarios u ON rs.usuario_registro_id = u.id
-      WHERE rs.id = $1
+    const sql = `
+      SELECT
+        ps.*,
+        m.nombre_motivo,
+        p.tipo_documento AS solicitante_tipo_documento,
+        p.numero_documento AS solicitante_numero_documento,
+        p.nombres AS solicitante_nombres,
+        p.apellidos AS solicitante_apellidos,
+        pa.nombres AS autoriza_nombres,
+        pa.apellidos AS autoriza_apellidos,
+        us.nombre_usuario AS usuario_registro_salida,
+        ur.nombre_usuario AS usuario_registro_retorno
+      FROM PapeletasSalida ps
+      JOIN MotivosSalidaPersonal m ON m.id = ps.motivo_salida_id
+      JOIN Personal p ON p.id = ps.personal_solicitante_id
+      LEFT JOIN Personal pa ON pa.id = ps.personal_autoriza_id
+      LEFT JOIN Usuarios us ON us.id = ps.usuario_registro_salida_id
+      LEFT JOIN Usuarios ur ON ur.id = ps.usuario_registro_retorno_id
+      WHERE ps.id = $1
     `;
-    
-    const result = await db.query(query, [id]);
-    return result.rows[0] || null;
-    
+    const { rows } = await db.query(sql, [id]);
+    return rows[0] || null;
   } catch (error) {
-    logger.error(`Error en repositorio buscando papeleta por ID ${id}:`, error);
-    throw new AppError('Error obteniendo papeleta de salida', 500);
+    logger.error(`Error buscando papeleta id ${id}:`, error);
+    throw new AppError("Error obteniendo papeleta", 500);
   }
 };
 
 /**
- * Crear nueva papeleta de salida
- * @param {Object} papeletaData - Datos de la papeleta
- * @returns {Object} Papeleta creada
+ * Crear papeleta (ingreso como SOLICITADO por defecto)
  */
-const create = async (papeletaData) => {
+const create = async (data) => {
+  const client = await db.getClient();
   try {
-    const { 
-      personal_id, 
-      motivo_salida_id, 
-      fecha_hora_salida,
-      fecha_hora_retorno_estimada,
-      observacion_salida,
-      usuario_registro_id
-    } = papeletaData;
-    
-    const query = `
-      INSERT INTO RegistrosSalidaPersonal (
-        personal_id, 
-        motivo_salida_id, 
-        fecha_hora_salida,
-        fecha_hora_retorno_estimada,
-        observacion_salida,
-        usuario_registro_id
-      )
-      VALUES ($1, $2, $3, $4, $5, $6)
+    const {
+      personal_solicitante_id,
+      motivo_salida_id,
+      sustento_solicitud,
+      fecha_hora_salida_programada,
+      fecha_hora_retorno_programada,
+      // opcional: creación ya aprobada
+      estado = "SOLICITADO",
+      personal_autoriza_id = null,
+      fecha_autorizacion = null,
+      observacion_autorizacion = null,
+    } = data;
+
+    await client.query("BEGIN");
+
+    const codigo = await generarCodigoPapeleta();
+
+    const insertSQL = `
+      INSERT INTO PapeletasSalida (
+        codigo_papeleta,
+        personal_solicitante_id,
+        estado,
+        fecha_solicitud,
+        motivo_salida_id,
+        sustento_solicitud,
+        fecha_hora_salida_programada,
+        fecha_hora_retorno_programada,
+        personal_autoriza_id,
+        fecha_autorizacion,
+        observacion_autorizacion
+      ) VALUES ($1,$2,$3, CURRENT_TIMESTAMP, $4,$5,$6,$7,$8,$9,$10)
       RETURNING id
     `;
-    
-    const result = await db.query(query, [
-      personal_id, 
-      motivo_salida_id, 
-      fecha_hora_salida,
-      fecha_hora_retorno_estimada,
-      observacion_salida,
-      usuario_registro_id
+
+    const { rows } = await client.query(insertSQL, [
+      codigo,
+      personal_solicitante_id,
+      estado,
+      motivo_salida_id,
+      sustento_solicitud,
+      fecha_hora_salida_programada,
+      fecha_hora_retorno_programada,
+      personal_autoriza_id,
+      fecha_autorizacion,
+      observacion_autorizacion,
     ]);
-    
-    if (result.rows.length === 0) {
-      throw new AppError('Error creando papeleta de salida', 500);
-    }
-    
-    // Obtener la papeleta completa
-    return await findById(result.rows[0].id);
-    
+
+    await client.query("COMMIT");
+    return await findById(rows[0].id);
   } catch (error) {
-    if (error.code === '23503') {
-      // Violación de clave foránea
-      if (error.constraint && error.constraint.includes('personal_id')) {
-        throw new AppError('Personal no encontrado', 404);
-      }
-      if (error.constraint && error.constraint.includes('motivo_salida_id')) {
-        throw new AppError('Motivo de salida no encontrado', 404);
-      }
-      if (error.constraint && error.constraint.includes('usuario_registro_id')) {
-        throw new AppError('Usuario de registro no encontrado', 404);
-      }
+    await db.safeRollback(client);
+    if (
+      error.code === "23505" &&
+      /codigo_papeleta/.test(error.constraint || "")
+    ) {
+      // choque improbable de código -> reintentar una vez
+      logger.warn("Colisión de codigo_papeleta, reintentando…");
+      return await create(data);
     }
-    
-    logger.error('Error en repositorio creando papeleta de salida:', error);
-    throw error instanceof AppError ? error : new AppError('Error creando papeleta de salida', 500);
+    if (error.code === "23503") {
+      if (error.constraint?.includes("personal_solicitante_id"))
+        throw new AppError("Personal solicitante no encontrado", 404);
+      if (error.constraint?.includes("motivo_salida_id"))
+        throw new AppError("Motivo de salida no encontrado", 404);
+      if (error.constraint?.includes("personal_autoriza_id"))
+        throw new AppError("Personal que autoriza no encontrado", 404);
+    }
+    logger.error("Error creando papeleta:", error);
+    throw error instanceof AppError
+      ? error
+      : new AppError("Error creando papeleta", 500);
+  } finally {
+    client.release?.();
   }
 };
 
 /**
- * Registrar retorno de papeleta de salida
- * @param {number} id - ID de la papeleta
- * @returns {Object} Papeleta actualizada
+ * Autorizar/Rechazar papeleta
+ * accion: 'APROBAR' | 'RECHAZAR'
  */
-const registrarRetorno = async (id) => {
+const decidirPapeleta = async (
+  id,
+  { accion, personal_autoriza_id, observacion_autorizacion = null },
+) => {
   try {
-    const query = `
-      UPDATE RegistrosSalidaPersonal 
-      SET fecha_hora_retorno_real = CURRENT_TIMESTAMP
-      WHERE id = $1 AND fecha_hora_retorno_real IS NULL
+    const nextEstado = accion === "APROBAR" ? "APROBADO" : "RECHAZADO";
+    const sql = `
+      UPDATE PapeletasSalida
+      SET estado = $1,
+          personal_autoriza_id = $2,
+          fecha_autorizacion = CURRENT_TIMESTAMP,
+          observacion_autorizacion = $3
+      WHERE id = $4 AND estado IN ('SOLICITADO','RECHAZADO','APROBADO')
       RETURNING id
     `;
-    
-    const result = await db.query(query, [id]);
-    
-    if (result.rows.length === 0) {
-      throw new AppError('Papeleta no encontrada o ya tiene retorno registrado', 404);
-    }
-    
-    // Obtener la papeleta actualizada
+    const { rows } = await db.query(sql, [
+      nextEstado,
+      personal_autoriza_id,
+      observacion_autorizacion,
+      id,
+    ]);
+    if (!rows.length)
+      throw new AppError("Papeleta no encontrada o ya decidida", 404);
     return await findById(id);
-    
   } catch (error) {
-    logger.error(`Error en repositorio registrando retorno para papeleta ID ${id}:`, error);
-    throw error instanceof AppError ? error : new AppError('Error registrando retorno', 500);
+    logger.error(`Error decidiendo papeleta ${id}:`, error);
+    throw error instanceof AppError
+      ? error
+      : new AppError("Error al decidir la papeleta", 500);
   }
 };
 
 /**
- * Anular papeleta de salida
- * @param {number} id - ID de la papeleta
- * @returns {boolean} True si se anuló correctamente
+ * Registrar salida en garita
  */
-const anular = async (id) => {
+const registrarSalida = async (id, usuario_registro_salida_id) => {
   try {
-    const query = `
-      DELETE FROM RegistrosSalidaPersonal
+    const sql = `
+      UPDATE PapeletasSalida
+      SET fecha_hora_salida_real = COALESCE(fecha_hora_salida_real, CURRENT_TIMESTAMP),
+          usuario_registro_salida_id = COALESCE(usuario_registro_salida_id, $2),
+          estado = 'EN_CURSO'
       WHERE id = $1
       RETURNING id
     `;
-    
-    const result = await db.query(query, [id]);
-    
-    if (result.rows.length === 0) {
-      throw new AppError('Papeleta de salida no encontrada', 404);
-    }
-    
-    return true;
-    
+    const { rows } = await db.query(sql, [id, usuario_registro_salida_id]);
+    if (!rows.length) throw new AppError("Papeleta no encontrada", 404);
+    return await findById(id);
   } catch (error) {
-    logger.error(`Error en repositorio anulando papeleta ID ${id}:`, error);
-    throw error instanceof AppError ? error : new AppError('Error anulando papeleta', 500);
+    logger.error(`Error registrando salida en papeleta ${id}:`, error);
+    throw error instanceof AppError
+      ? error
+      : new AppError("Error registrando salida", 500);
   }
 };
 
 /**
- * Obtener estadísticas de papeletas de salida
- * @param {string} fechaInicio - Fecha de inicio para el filtro
- * @param {string} fechaFin - Fecha de fin para el filtro
- * @returns {Object} Estadísticas de papeletas
+ * Registrar retorno en garita
  */
-const getEstadisticas = async (fechaInicio, fechaFin) => {
+const registrarRetorno = async (id, usuario_registro_retorno_id) => {
   try {
-    // Construir las condiciones de fecha
-    const whereCondition = [];
-    const params = [];
-    let paramCounter = 1;
-    
-    if (fechaInicio) {
-      whereCondition.push(`fecha_hora_salida >= $${paramCounter++}`);
-      params.push(fechaInicio);
-    }
-    
-    if (fechaFin) {
-      whereCondition.push(`fecha_hora_salida <= $${paramCounter++}`);
-      params.push(fechaFin);
-    }
-    
-    const whereClause = whereCondition.length > 0 ? `WHERE ${whereCondition.join(' AND ')}` : '';
-    
-    // Estadísticas totales
-    const totalQuery = `
-      SELECT 
-        COUNT(*) as total_papeletas,
-        COUNT(CASE WHEN fecha_hora_retorno_real IS NULL THEN 1 END) as pendientes,
-        COUNT(CASE WHEN fecha_hora_retorno_real IS NOT NULL THEN 1 END) as retornadas
-      FROM RegistrosSalidaPersonal
-      ${whereClause}
+    const sql = `
+      UPDATE PapeletasSalida
+      SET fecha_hora_retorno_real = CURRENT_TIMESTAMP,
+          usuario_registro_retorno_id = $2,
+          estado = 'FINALIZADO'
+      WHERE id = $1 AND fecha_hora_retorno_real IS NULL
+      RETURNING id
     `;
-    
-    // Papeletas por motivo
-    const motivoQuery = `
-      SELECT 
-        m.id,
-        m.nombre_motivo,
-        COUNT(*) as total
-      FROM RegistrosSalidaPersonal rs
-      JOIN MotivosSalidaPersonal m ON rs.motivo_salida_id = m.id
-      ${whereClause}
+    const { rows } = await db.query(sql, [id, usuario_registro_retorno_id]);
+    if (!rows.length)
+      throw new AppError("Papeleta no encontrada o ya finalizada", 404);
+    return await findById(id);
+  } catch (error) {
+    logger.error(`Error registrando retorno en papeleta ${id}:`, error);
+    throw error instanceof AppError
+      ? error
+      : new AppError("Error registrando retorno", 500);
+  }
+};
+
+/**
+ * Cancelar papeleta (por solicitante antes de salir)
+ */
+const cancelar = async (id, observacion_autorizacion = null) => {
+  try {
+    const sql = `
+      UPDATE PapeletasSalida
+      SET estado = 'CANCELADO',
+          observacion_autorizacion = COALESCE($2, observacion_autorizacion)
+      WHERE id = $1 AND fecha_hora_salida_real IS NULL
+      RETURNING id
+    `;
+    const { rows } = await db.query(sql, [id, observacion_autorizacion]);
+    if (!rows.length)
+      throw new AppError("No se puede cancelar (no existe o ya inició)", 400);
+    return await findById(id);
+  } catch (error) {
+    logger.error(`Error cancelando papeleta ${id}:`, error);
+    throw error instanceof AppError
+      ? error
+      : new AppError("Error cancelando papeleta", 500);
+  }
+};
+
+/**
+ * Anular (DELETE físico) — opcional, preferible evitar por auditoría
+ */
+const anular = async (id) => {
+  try {
+    const { rows } = await db.query(
+      `DELETE FROM PapeletasSalida WHERE id = $1 RETURNING id`,
+      [id],
+    );
+    if (!rows.length) throw new AppError("Papeleta no encontrada", 404);
+    return true;
+  } catch (error) {
+    logger.error(`Error anulando papeleta ${id}:`, error);
+    throw error instanceof AppError
+      ? error
+      : new AppError("Error anulando papeleta", 500);
+  }
+};
+
+/**
+ * Estadísticas (por rango y por tipo)
+ * - totales por estado
+ * - por motivo
+ * - por día (solicitud y finales)
+ */
+const getEstadisticas = async (
+  fechaInicio,
+  fechaFin,
+  campoFecha = "solicitud",
+) => {
+  try {
+    const { where, params } = buildFilters({
+      fechaInicio,
+      fechaFin,
+      campoFecha,
+    });
+    const whereSQL = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    const totalesSQL = `
+      SELECT
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE estado = 'SOLICITADO') AS solicitadas,
+        COUNT(*) FILTER (WHERE estado = 'APROBADO') AS aprobadas,
+        COUNT(*) FILTER (WHERE estado = 'RECHAZADO') AS rechazadas,
+        COUNT(*) FILTER (WHERE estado = 'EN_CURSO') AS en_curso,
+        COUNT(*) FILTER (WHERE estado = 'FINALIZADO') AS finalizadas,
+        COUNT(*) FILTER (WHERE estado = 'CANCELADO') AS canceladas,
+        COUNT(*) FILTER (WHERE fecha_hora_retorno_real IS NULL AND estado IN ('APROBADO','EN_CURSO')) AS pendientes_garita
+      FROM PapeletasSalida ps
+      ${whereSQL}
+    `;
+
+    const porMotivoSQL = `
+      SELECT m.id, m.nombre_motivo, COUNT(*) AS total
+      FROM PapeletasSalida ps
+      JOIN MotivosSalidaPersonal m ON m.id = ps.motivo_salida_id
+      ${whereSQL}
       GROUP BY m.id, m.nombre_motivo
       ORDER BY total DESC
     `;
-    
-    // Papeletas por día
-    const diaQuery = `
-      SELECT 
-        DATE(fecha_hora_salida) as fecha,
-        COUNT(*) as total
-      FROM RegistrosSalidaPersonal
-      ${whereClause}
-      GROUP BY DATE(fecha_hora_salida)
+
+    const porDiaSQL = `
+      SELECT
+        DATE(${
+          campoFecha === "programada"
+            ? "ps.fecha_hora_salida_programada"
+            : campoFecha === "salida_real"
+              ? "ps.fecha_hora_salida_real"
+              : campoFecha === "retorno_real"
+                ? "ps.fecha_hora_retorno_real"
+                : "ps.fecha_solicitud"
+        }) AS fecha,
+        COUNT(*) AS total
+      FROM PapeletasSalida ps
+      ${whereSQL}
+      GROUP BY DATE(${
+        campoFecha === "programada"
+          ? "ps.fecha_hora_salida_programada"
+          : campoFecha === "salida_real"
+            ? "ps.fecha_hora_salida_real"
+            : campoFecha === "retorno_real"
+              ? "ps.fecha_hora_retorno_real"
+              : "ps.fecha_solicitud"
+      })
       ORDER BY fecha
     `;
-    
-    // Ejecutar consultas en paralelo
-    const [totalResult, motivoResult, diaResult] = await Promise.all([
-      db.query(totalQuery, params),
-      db.query(motivoQuery, params),
-      db.query(diaQuery, params)
+
+    const [tot, mot, dia] = await Promise.all([
+      db.query(totalesSQL, params),
+      db.query(porMotivoSQL, params),
+      db.query(porDiaSQL, params),
     ]);
-    
+
+    const t = tot.rows[0] || {};
     return {
-      total_papeletas: parseInt(totalResult.rows[0]?.total_papeletas || 0),
-      pendientes: parseInt(totalResult.rows[0]?.pendientes || 0),
-      retornadas: parseInt(totalResult.rows[0]?.retornadas || 0),
-      papeletas_por_motivo: motivoResult.rows,
-      papeletas_por_dia: diaResult.rows
+      total: parseInt(t.total || 0, 10),
+      solicitadas: parseInt(t.solicitadas || 0, 10),
+      aprobadas: parseInt(t.aprobadas || 0, 10),
+      rechazadas: parseInt(t.rechazadas || 0, 10),
+      en_curso: parseInt(t.en_curso || 0, 10),
+      finalizadas: parseInt(t.finalizadas || 0, 10),
+      canceladas: parseInt(t.canceladas || 0, 10),
+      pendientes_garita: parseInt(t.pendientes_garita || 0, 10),
+      por_motivo: mot.rows,
+      por_dia: dia.rows,
     };
-    
   } catch (error) {
-    logger.error('Error en repositorio obteniendo estadísticas de papeletas:', error);
-    throw new AppError('Error obteniendo estadísticas de papeletas', 500);
+    logger.error("Error obteniendo estadísticas de papeletas:", error);
+    throw new AppError("Error obteniendo estadísticas de papeletas", 500);
   }
 };
 
 module.exports = {
+  // listados
   findAll,
   findPendientes,
   findPendientesByPersonal,
+
+  // CRUD
   findById,
   create,
+  decidirPapeleta,
+  registrarSalida,
   registrarRetorno,
+  cancelar,
   anular,
-  getEstadisticas
+
+  // stats
+  getEstadisticas,
 };
