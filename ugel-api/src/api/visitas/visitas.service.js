@@ -1023,6 +1023,23 @@ const getVisitanteDetalle = async (visitanteId, periodo = 'mes') => {
   }
 };
 
+/**
+ * Cerrar automáticamente visitas pendientes según las reglas del sistema
+ * @param {number} usuarioSistemaId - ID del usuario del sistema
+ * @returns {Object} Resultado del cierre automático
+ */
+const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
+  try {
+    logger.info('Servicio: Iniciando cierre automático de visitas...');
+    const result = await repository.cerrarVisitasAutomaticamente(usuarioSistemaId);
+    logger.info('Servicio: Cierre automático completado:', result);
+    return result;
+  } catch (error) {
+    logger.error('Servicio: Error en cierre automático de visitas:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllVisitas,
   getVisitasActivas,
@@ -1030,6 +1047,7 @@ module.exports = {
   createVisita,
   registrarSalidaVisita,
   registrarSalidaVisitaConFechaHora,
+  cerrarVisitasAutomaticamente,
   getEstadisticas,
   exportarAExcel,
   exportarAPDF,

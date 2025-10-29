@@ -323,12 +323,37 @@ const getVisitanteDetalle = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Cerrar automáticamente visitas pendientes
+ * @route POST /api/visitas/cerrar-automatico
+ */
+const cerrarVisitasAutomaticamente = asyncHandler(async (req, res) => {
+  try {
+    // Obtener el ID del usuario del sistema (o usar el usuario que hace la petición)
+    const usuarioSistemaId = req.user?.id || 1; // Fallback a usuario 1 si no hay usuario autenticado
+    
+    logger.info(`Solicitud de cierre automático de visitas por usuario ${usuarioSistemaId}`);
+    
+    const result = await service.cerrarVisitasAutomaticamente(usuarioSistemaId);
+    
+    res.status(200).json({
+      success: true,
+      message: `Cierre automático completado: ${result.cerradas} visitas cerradas`,
+      data: result
+    });
+  } catch (error) {
+    logger.error('Error en cierre automático de visitas:', error);
+    throw error;
+  }
+});
+
 module.exports = {
   getAll,
   getActivas,
   getById,
   create,
   registrarSalida,
+  cerrarVisitasAutomaticamente,
   exportarAExcel,
   exportarAPDF,
   getVisitasPorArea,

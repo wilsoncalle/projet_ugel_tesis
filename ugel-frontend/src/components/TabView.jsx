@@ -14,7 +14,7 @@ const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => 
   return (
     <div className={`space-y-2 ${className}`}>
       {/* Botones de tabs con pill animado */}
-      <div className="bg-muted rounded-full p-1 flex items-center relative overflow-hidden">
+      <div className="bg-muted rounded-full p-1 flex items-center relative overflow-hidden" style={{ minHeight: '2.5rem' }}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
           const isStatsButton = tab.isStatsButton;
@@ -25,7 +25,7 @@ const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => 
               <button
                 key={tab.key}
                 onClick={(event) => handleTabClick(tab.key, event)}
-                className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ml-2 ${
+                className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 ml-2 ${
                   isActive
                     ? "bg-background shadow-md"
                     : "bg-transparent"
@@ -68,7 +68,7 @@ const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => 
             <button
               key={tab.key}
               onClick={(event) => handleTabClick(tab.key, event)}
-              className={`relative z-10 px-4 py-2 rounded-full font-medium text-sm transition-colors duration-300 flex items-center justify-center gap-2 flex-1 ${
+              className={`relative z-10 px-4 py-[0.5rem] rounded-full font-medium text-sm transition-colors duration-300 flex items-center justify-center gap-2 flex-1 ${
                 isActive
                   ? "text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -80,11 +80,12 @@ const TabView = ({ tabs, activeTab, onTabChange, children, className = "" }) => 
               <span>{tab.label}</span>
               {tab.count !== undefined && tab.count > 0 && (
                 <span
-                  className={`py-0.5 px-1.5 rounded-full text-xs font-medium ${
+                  className={`inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full text-xs font-medium ${
                     isActive
                       ? "bg-primary-100 text-primary-800"
                       : "bg-gray-200 text-gray-700"
                   }`}
+                  style={{ lineHeight: '1rem' }}
                 >
                   {tab.count}
                 </span>

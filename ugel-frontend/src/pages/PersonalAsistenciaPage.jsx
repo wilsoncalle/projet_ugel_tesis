@@ -9,6 +9,7 @@ import TabView from '../components/TabView';
 import TableGenerica from '../components/TableGenerica';
 import ModalDetalles from '../components/ModalDetalles';
 import DateRangeFilter from '../components/DateRangeFilter';
+import QuickSearchBar from '../components/QuickSearchBar';
 import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { MagnifyingGlassIcon, ClockIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, UserGroupIcon, CalendarIcon, DocumentArrowDownIcon, ChevronDownIcon, DocumentTextIcon, XMarkIcon, EyeIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
@@ -828,69 +829,89 @@ const PersonalAsistenciaPage = () => {
             <Card className="shadow-lg border border-gray-200 bg-card flex-1 flex flex-col rounded-2xl">
               <div className="p-0 flex flex-col h-full">
                 {/* Título y estadísticas */}
-                <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold text-gray-800">Control de Asistencia de Personal</h2>
-                  
-                  {/* Dropdown de exportación - Solo en historial */}
-                  {activeTab === 'historial' && (
-                    <div className="relative">
-                      <button
-                        onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-                        className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-amber-500 text-amber-600 rounded-full hover:bg-amber-50 transition-all duration-200 shadow-sm hover:shadow-md"
-                      >
-                        <DocumentArrowDownIcon className="h-5 w-5" />
-                        <span className="text-sm font-semibold">Exportar</span>
-                        <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${exportDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-                      
-                      {exportDropdownOpen && (
-                        <>
-                          <div 
-                            className="fixed inset-0 z-10" 
-                            onClick={() => setExportDropdownOpen(false)}
+                <div className="px-0">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-semibold text-gray-800">Control de Asistencia de Personal</h2>
+                    
+                    <div className="flex items-center space-x-3">
+                      {/* Barra de búsqueda rápida - Solo en pestaña de asistencia de hoy */}
+                      {activeTab === 'hoy' && (
+                        <div className="w-80">
+                          <QuickSearchBar
+                            data={asistenciasHoy.filter(a => !a.hora_salida) || []}
+                            activeTab={activeTab}
+                            onSelect={(item) => {
+                              if (item.personal_id) {
+                                registrarSalida(item.personal_id);
+                              }
+                            }}
+                            placeholder="Buscar personal activo..."
                           />
+                        </div>
+                      )}
+                      
+                      {/* Dropdown de exportación - Solo en historial */}
+                      {activeTab === 'historial' && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                            className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-amber-500 text-amber-600 rounded-full hover:bg-amber-50 transition-all duration-200 shadow-sm hover:shadow-md"
+                          >
+                            <DocumentArrowDownIcon className="h-5 w-5" />
+                            <span className="text-sm font-semibold">Exportar</span>
+                            <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${exportDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
                           
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20">
-                            <div className="py-1">
-                              <button
-                                onClick={() => {
-                                  handleExport('excel');
-                                  setExportDropdownOpen(false);
-                                }}
-                                className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-green-50 transition-colors group"
-                              >
-                                <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                                  <DocumentTextIcon className="h-5 w-5 text-green-600" />
-                                </div>
-                                <div>
-                                  <div className="text-sm font-semibold text-green-700">Excel</div>
-                                  <div className="text-xs text-green-600">Formato .xlsx</div>
-                                </div>
-                              </button>
+                          {exportDropdownOpen && (
+                            <>
+                              <div 
+                                className="fixed inset-0 z-10" 
+                                onClick={() => setExportDropdownOpen(false)}
+                              />
                               
-                              <div className="border-t border-gray-100 mx-2"></div>
-                              
-                              <button
-                                onClick={() => {
-                                  handleExport('pdf');
-                                  setExportDropdownOpen(false);
-                                }}
-                                className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-red-50 transition-colors group"
-                              >
-                                <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
-                                  <DocumentArrowDownIcon className="h-5 w-5 text-red-600" />
+                              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20">
+                                <div className="py-1">
+                                  <button
+                                    onClick={() => {
+                                      handleExport('excel');
+                                      setExportDropdownOpen(false);
+                                    }}
+                                    className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-green-50 transition-colors group"
+                                  >
+                                    <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                                      <DocumentTextIcon className="h-5 w-5 text-green-600" />
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-semibold text-green-700">Excel</div>
+                                      <div className="text-xs text-green-600">Formato .xlsx</div>
+                                    </div>
+                                  </button>
+                                  
+                                  <div className="border-t border-gray-100 mx-2"></div>
+                                  
+                                  <button
+                                    onClick={() => {
+                                      handleExport('pdf');
+                                      setExportDropdownOpen(false);
+                                    }}
+                                    className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-red-50 transition-colors group"
+                                  >
+                                    <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
+                                      <DocumentArrowDownIcon className="h-5 w-5 text-red-600" />
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-semibold text-red-700">PDF</div>
+                                      <div className="text-xs text-red-600">Formato .pdf</div>
+                                    </div>
+                                  </button>
                                 </div>
-                                <div>
-                                  <div className="text-sm font-semibold text-red-700">PDF</div>
-                                  <div className="text-xs text-red-600">Formato .pdf</div>
-                                </div>
-                              </button>
-                            </div>
-                          </div>
-                        </>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
+                  </div>
                 </div>
                 
                 {/* TabView */}
@@ -1204,8 +1225,8 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           setMensajePersonal(`${personalEncontrado.label} ya tiene asistencia registrada hoy (${asistenciaExistente.estado_presencia})`);
           setTipoMensaje('warning');
         } else {
-          setMensajePersonal(`${personalEncontrado.label} encontrado. Puede registrar asistencia.`);
-          setTipoMensaje('success');
+          setMensajePersonal('');
+          setTipoMensaje('');
         }
         
         // Buscar el tipo de documento correcto
@@ -1354,8 +1375,8 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
             setMensajePersonal(`${personal.label} ya tiene asistencia registrada hoy (${asistenciaExistente.estado_presencia})`);
             setTipoMensaje('warning');
           } else {
-            setMensajePersonal(`${personal.label} seleccionado. Puede registrar asistencia.`);
-            setTipoMensaje('success');
+            setMensajePersonal('');
+            setTipoMensaje('');
           }
           
           newFormData.numeroDocumento = personal.numero_documento || '';

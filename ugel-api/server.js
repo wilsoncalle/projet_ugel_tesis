@@ -30,10 +30,35 @@ io.on('connection', (socket) => {
   logger.info(`Socket conectado: ${socket.id}`);
 });
 
+// Importar servicios para tareas programadas
+const visitasService = require('./src/api/visitas/visitas.service');
+
+/**
+ * Función para ejecutar el cierre automático de visitas
+ */
+const ejecutarCierreAutomatico = async () => {
+  try {
+    logger.info('Ejecutando cierre automático de visitas programado...');
+    // Usar usuario ID 1 como usuario del sistema para cierres automáticos
+    const resultado = await visitasService.cerrarVisitasAutomaticamente(1);
+    logger.info(`Cierre automático completado: ${resultado.cerradas} visitas cerradas, ${resultado.errores} errores`);
+  } catch (error) {
+    logger.error('Error en cierre automático programado:', error);
+  }
+};
+
 server.listen(PORT, () => {
   logger.info(`Servidor UGEL API ejecutándose en puerto ${PORT}`);
   logger.info(`Entorno: ${config.nodeEnv}`);
   logger.info(`Base de datos: ${config.database.host}:${config.database.port}/${config.database.database}`);
+  
+  // Ejecutar cierre automático al iniciar el servidor
+  ejecutarCierreAutomatico();
+  
+  // Programar ejecución cada 30 minutos (1800000 ms)
+  // También se ejecutará automáticamente cuando se superen las horas límite
+  setInterval(ejecutarCierreAutomatico, 30 * 60 * 1000);
+  logger.info('Tarea programada de cierre automático de visitas iniciada (cada 30 minutos)');
 });
 
 // Manejo de cierre graceful

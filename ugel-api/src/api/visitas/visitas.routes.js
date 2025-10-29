@@ -154,4 +154,15 @@ router.put('/:id/salida',
   controller.registrarSalida
 );
 
+/**
+ * @route   POST /api/visitas/cerrar-automatico
+ * @desc    Cerrar automáticamente visitas pendientes según las reglas del sistema
+ * @access  Private
+ */
+router.post('/cerrar-automatico', 
+  authenticateToken,
+  requireActiveUser,
+  controller.cerrarVisitasAutomaticamente
+);
+
 module.exports = router;

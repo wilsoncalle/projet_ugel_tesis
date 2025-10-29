@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { Users, ClipboardCheck } from 'lucide-react';
 
 // Componente de elemento de navegación reutilizable
 const NavItem = ({ to, icon, label, badge }) => (
@@ -341,33 +342,37 @@ const MainLayout = () => {
                   <span className="text-xs text-gray-500" id="current-date">{currentDate}</span>
                 </div>
                 
-                {/* Navegación entre Visitas, Personal y Asistencia - Solo mostrar en rutas de vigilante */}
+                {/* Navegación entre Visitas y Asistencia */}
                 {isVigilanteRoute && (
-                  <div className="flex gap-2 ml-4">
+                  <div className="flex items-center gap-4 ml-4 border-b border-gray-200">
                     <NavLink
                       to="/vigilante"
                       end
                       className={({ isActive }) => `
-                        px-4 py-2 rounded-lg font-medium transition-colors text-sm
-                        ${isActive 
-                          ? 'bg-blue-600 text-white shadow-md' 
-                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        flex items-center gap-2 py-3 px-2 font-medium text-sm transition-colors
+                        border-b-2
+                        ${isActive
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-800'
                         }
                       `}
                     >
-                      Visitas
+                      <Users className="h-4 w-4" />
+                      <span>Visitas</span>
                     </NavLink>
                     <NavLink
                       to="/vigilante/asistencia"
                       className={({ isActive }) => `
-                        px-4 py-2 rounded-lg font-medium transition-colors text-sm
-                        ${isActive 
-                          ? 'bg-blue-600 text-white shadow-md' 
-                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        flex items-center gap-2 py-3 px-2 font-medium text-sm transition-colors
+                        border-b-2
+                        ${isActive
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-800'
                         }
                       `}
                     >
-                      Asistencia
+                      <ClipboardCheck className="h-4 w-4" />
+                      <span>Asistencia</span>
                     </NavLink>
                   </div>
                 )}

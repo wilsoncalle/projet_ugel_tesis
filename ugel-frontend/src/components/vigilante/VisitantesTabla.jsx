@@ -7,6 +7,7 @@ import TabView from '../TabView';
 import FiltrosVisitas from './FiltrosVisitas';
 import TableGenerica from '../TableGenerica';
 import ModalDetalles from '../ModalDetalles';
+import QuickSearchBar from '../QuickSearchBar';
 import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon, DocumentTextIcon, DocumentArrowDownIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { VisitasAreaCard, VisitasMotivoCard, VisitasTotalesCard, VisitasPersonalCard, VisitantesFrecuentesCard } from '../vigilante_estadisticas';
 
@@ -784,85 +785,103 @@ const VisitantesTabla = ({
     <div className="h-full flex flex-col">
       <Card className="shadow-lg border border-gray-200 bg-card flex-1 flex flex-col rounded-2xl">
         <div className="p-0 flex flex-col h-full">
-          {/* Título de la sección */}
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-800">Gestión de Visitantes</h2>
-            <div className="flex items-center space-x-3">
-              {/* Dropdown de exportación - Solo visible en historial */}
-              {activeTab === 'historial' && (
-                <div className="relative">
-                  <button
-                    onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-amber-500 text-amber-600 rounded-full hover:bg-amber-50 transition-all duration-200 shadow-sm hover:shadow-md"
-                  >
-                    <DocumentArrowDownIcon className="h-5 w-5" />
-                    <span className="text-sm font-semibold">Exportar</span>
-                    <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${exportDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {/* Dropdown Menu */}
-                  {exportDropdownOpen && (
-                    <>
-                      {/* Overlay para cerrar al hacer clic afuera */}
-                      <div 
-                        className="fixed inset-0 z-10" 
-                        onClick={() => setExportDropdownOpen(false)}
-                      />
-                      
-                      {/* Menu desplegable */}
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20 animate-fadeIn">
-                        <div className="py-1">
-                          {/* Opción Excel */}
-                          <button
-                            onClick={() => {
-                              handleExport('excel');
-                              setExportDropdownOpen(false);
-                            }}
-                            className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-green-50 transition-colors group"
-                          >
-                            <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                              <DocumentTextIcon className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div>
-                              <div className="text-sm font-semibold text-green-700">Excel</div>
-                              <div className="text-xs text-green-600">Formato .xlsx</div>
-                            </div>
-                          </button>
-                          
-                          {/* Divider */}
-                          <div className="border-t border-gray-100 mx-2"></div>
-                          
-                          {/* Opción PDF */}
-                          <button
-                            onClick={() => {
-                              handleExport('pdf');
-                              setExportDropdownOpen(false);
-                            }}
-                            className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-red-50 transition-colors group"
-                          >
-                            <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
-                              <DocumentArrowDownIcon className="h-5 w-5 text-red-600" />
-                            </div>
-                            <div>
-                              <div className="text-sm font-semibold text-red-700">PDF</div>
-                              <div className="text-xs text-red-600">Formato .pdf</div>
-                            </div>
-                          </button>
+          {/* Título de la sección y barra de búsqueda */}
+          <div className="px-0">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-gray-800">Gestión de Visitantes</h2>
+              <div className="flex items-center space-x-3">
+                {/* Barra de búsqueda rápida - Solo en pestaña de activos */}
+                {activeTab === 'activos' && (
+                  <div className="w-80">
+                    <QuickSearchBar
+                      data={visitantesActivos || []}
+                      activeTab={activeTab}
+                      onSelect={(item) => {
+                        if (onRegistrarSalida) {
+                          onRegistrarSalida(item.id, item);
+                        }
+                      }}
+                      placeholder="Buscar visitante activo..."
+                    />
+                  </div>
+                )}
+                
+                {/* Dropdown de exportación - Solo visible en historial */}
+                {activeTab === 'historial' && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-amber-500 text-amber-600 rounded-full hover:bg-amber-50 transition-all duration-200 shadow-sm hover:shadow-md"
+                    >
+                      <DocumentArrowDownIcon className="h-5 w-5" />
+                      <span className="text-sm font-semibold">Exportar</span>
+                      <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${exportDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {/* Dropdown Menu */}
+                    {exportDropdownOpen && (
+                      <>
+                        {/* Overlay para cerrar al hacer clic afuera */}
+                        <div 
+                          className="fixed inset-0 z-10" 
+                          onClick={() => setExportDropdownOpen(false)}
+                        />
+                        
+                        {/* Menu desplegable */}
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20 animate-fadeIn">
+                          <div className="py-1">
+                            {/* Opción Excel */}
+                            <button
+                              onClick={() => {
+                                handleExport('excel');
+                                setExportDropdownOpen(false);
+                              }}
+                              className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-green-50 transition-colors group"
+                            >
+                              <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                                <DocumentTextIcon className="h-5 w-5 text-green-600" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-green-700">Excel</div>
+                                <div className="text-xs text-green-600">Formato .xlsx</div>
+                              </div>
+                            </button>
+                            
+                            {/* Divider */}
+                            <div className="border-t border-gray-100 mx-2"></div>
+                            
+                            {/* Opción PDF */}
+                            <button
+                              onClick={() => {
+                                handleExport('pdf');
+                                setExportDropdownOpen(false);
+                              }}
+                              className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-red-50 transition-colors group"
+                            >
+                              <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
+                                <DocumentArrowDownIcon className="h-5 w-5 text-red-600" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-red-700">PDF</div>
+                                <div className="text-xs text-red-600">Formato .pdf</div>
+                              </div>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              
-              {visitantesEnEspera.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-amber-600 font-medium">
-                    {visitantesEnEspera.length} en espera
-                  </span>
-                  <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                </div>
-              )}
+                      </>
+                    )}
+                  </div>
+                )}
+                
+                {visitantesEnEspera.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-amber-600 font-medium">
+                      {visitantesEnEspera.length} en espera
+                    </span>
+                    <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
