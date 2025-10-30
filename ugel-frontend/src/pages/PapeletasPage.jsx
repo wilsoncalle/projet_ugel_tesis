@@ -7,6 +7,7 @@ import FormularioGenerico from "../components/FormularioGenerico";
 import Notification from "../components/Notification";
 import TabView from "../components/TabView";
 import SelectCustom from "../components/SelectCustom";
+import DatePicker from "../components/DatePicker";
 import {
   papeletasSalidaService,
   motivosSalidaService,
@@ -427,24 +428,79 @@ const PapeletasPage = () => {
     {
       name: "fechaHoraSalidaProgramada",
       label: "Salida Programada",
-      type: "datetime-local",
       required: true,
-      placeholder: "",
+      render: ({ value, onChange, error }) => {
+        const raw = value || "";
+        const [datePartRaw, timePartRaw] = raw.split("T");
+        const datePart = datePartRaw || "";
+        const timePart = (timePartRaw || "").slice(0, 5);
+        const handleDate = (d) => onChange(`${d}T${timePart || "00:00"}`);
+        const handleTime = (t) => onChange(`${datePart || new Date().toISOString().slice(0,10)}T${t}`);
+        return (
+          <div className="w-full space-y-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Salida Programada</label>
+            <DatePicker value={datePart} onChange={handleDate} />
+            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+          </div>
+        );
+      }
     },
     {
       name: "fechaHoraRetornoProgramada",
       label: "Retorno Programado",
-      type: "datetime-local",
       required: true,
-      placeholder: "",
+      render: ({ value, onChange, error }) => {
+        const raw = value || "";
+        const [datePartRaw, timePartRaw] = raw.split("T");
+        const datePart = datePartRaw || "";
+        const timePart = (timePartRaw || "").slice(0, 5);
+        const handleDate = (d) => onChange(`${d}T${timePart || "00:00"}`);
+        const handleTime = (t) => onChange(`${datePart || new Date().toISOString().slice(0,10)}T${t}`);
+        return (
+          <div className="w-full space-y-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Retorno Programada</label>
+            <DatePicker value={datePart} onChange={handleDate} />
+            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+          </div>
+        );
+      }
     },
     {
       name: "sustentoSolicitud",
       label: "Sustento / Justificación",
-      type: "textarea",
-      rows: 3,
-      placeholder: "Explique el motivo con claridad…",
-      className: "resize-none",
+      render: ({ value, onChange, error }) => {
+        const textAreaRef = useRef(null);
+        const handleChange = (e) => {
+          onChange(e.target.value);
+          const el = textAreaRef.current;
+          if (el) {
+            el.style.height = 'auto';
+            el.style.height = `${el.scrollHeight}px`;
+          }
+        };
+        return (
+          <div className="w-full space-y-1">
+            <label className="block text-sm font-medium text-gray-700 mb-3">Sustento / Justificación</label>
+            <textarea
+              ref={textAreaRef}
+              value={value || ''}
+              onChange={handleChange}
+              placeholder="Explique el motivo con claridad…"
+              maxLength={250}
+              rows={3}
+              className={`
+                w-full px-3 py-2 border rounded-lg shadow-sm text-sm resize-none overflow-hidden
+                ${error ? 'border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-primary-500 focus:border-primary-500'}
+              `}
+              style={{ height: 'auto' }}
+            />
+            <div className="mt-1 text-xs text-gray-500 text-right">{(value?.length || 0)}/250</div>
+            {error && (
+              <p className="mt-1 text-sm text-red-600">{error}</p>
+            )}
+          </div>
+        );
+      },
     },
   ], [personalOpts, motivosOpts]);
 
