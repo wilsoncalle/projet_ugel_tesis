@@ -920,7 +920,11 @@ const PersonalAsistenciaPage = () => {
                       {activeTab === 'hoy' && (
                         <div className="w-80">
                           <QuickSearchBar
-                            data={asistenciasHoy.filter(a => !a.hora_salida) || []}
+                            data={asistenciasHoy.filter(a => 
+                              a.hora_ingreso && 
+                              !a.hora_salida && 
+                              a.estado_presencia !== 'Ausente'
+                            ) || []}
                             activeTab={activeTab}
                             onSelect={(item) => {
                               if (item.personal_id) {

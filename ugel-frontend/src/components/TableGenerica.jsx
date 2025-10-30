@@ -12,6 +12,8 @@ const TableGenerica = ({
   itemsPerPage = 10,
   searchable = false,
   searchPlaceholder = 'Buscar...',
+  searchValue: externalSearchValue,
+  onSearch: externalOnSearch,
   actions = null,
   minTableWidth = '1200px',
   currentPage: externalCurrentPage,
@@ -22,10 +24,17 @@ const TableGenerica = ({
   ...props
 }) => {
   const [internalCurrentPage, setInternalCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  
+  // Usar search term externo si está disponible, sino usar interno
+  const searchTerm = externalSearchValue !== undefined ? externalSearchValue : internalSearchTerm;
 
-  // Filter data based on search term
+  // Filter data based on search term (solo si no hay búsqueda externa)
   const filteredData = useMemo(() => {
+    if (externalOnSearch || externalSearchValue !== undefined) {
+      // Si hay búsqueda externa, usar datos tal cual
+      return data;
+    }
     if (!searchTerm) return data;
     
     return data.filter(item =>
@@ -33,7 +42,7 @@ const TableGenerica = ({
         String(value).toLowerCase().includes(searchTerm.toLowerCase())
       )
     );
-  }, [data, searchTerm]);
+  }, [data, searchTerm, externalOnSearch, externalSearchValue]);
   
   // Usar paginación externa si está disponible, sino usar interna
   const currentPage = externalCurrentPage !== undefined ? externalCurrentPage : internalCurrentPage;
@@ -56,8 +65,16 @@ const TableGenerica = ({
   };
 
   const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-    onPageChange(1); // Reset to first page when searching
+    const value = e.target.value;
+    if (externalOnSearch) {
+      // Si hay callback externo, usarlo y resetear página
+      externalOnSearch(value);
+      onPageChange(1);
+    } else {
+      // Búsqueda interna
+      setInternalSearchTerm(value);
+      onPageChange(1);
+    }
   };
 
   return (
