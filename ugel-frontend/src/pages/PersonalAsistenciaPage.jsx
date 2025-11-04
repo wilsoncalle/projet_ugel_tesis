@@ -530,7 +530,7 @@ const PersonalAsistenciaPage = () => {
   const estadisticas = {
     total: asistenciasHoy.length,
     presentes: asistenciasHoy.filter(a => a.estado_presencia === 'Presente').length,
-    tardes: asistenciasHoy.filter(a => a.estado_presencia === 'Tarde').length,
+    tardes: asistenciasHoy.filter(a => a.estado_presencia === 'Tarde' || a.estado_presencia === 'Tardanza').length,
     ausentes: asistenciasHoy.filter(a => a.estado_presencia === 'Ausente').length,
     permisos: asistenciasHoy.filter(a => a.estado_presencia === 'Permiso').length
   };
@@ -1291,8 +1291,16 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
         const asistenciaExistente = verificarAsistenciaHoy(personalEncontrado.value);
         
         if (asistenciaExistente) {
-          setMensajePersonal(`${personalEncontrado.label} ya tiene asistencia registrada hoy (${asistenciaExistente.estado_presencia})`);
-          setTipoMensaje('warning');
+          // Si tiene horaIngreso, mostrar que ya tiene asistencia registrada
+          if (asistenciaExistente.hora_ingreso) {
+            const estadoTexto = asistenciaExistente.estado_presencia || 'Sin estado';
+            setMensajePersonal(`${personalEncontrado.label} ya tiene asistencia registrada hoy - Estado: ${estadoTexto}`);
+            setTipoMensaje('warning');
+          } else {
+            // Si no tiene horaIngreso pero tiene registro (estado Ausente), permitir actualizar
+            setMensajePersonal(`${personalEncontrado.label} está marcado como ausente. Puede registrar su ingreso ahora.`);
+            setTipoMensaje('info');
+          }
         } else {
           setMensajePersonal('');
           setTipoMensaje('');
@@ -1414,8 +1422,16 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           const asistenciaExistente = verificarAsistenciaHoy(value.value);
           
           if (asistenciaExistente) {
-            setMensajePersonal(`${personal.label} ya tiene asistencia registrada hoy (${asistenciaExistente.estado_presencia})`);
-            setTipoMensaje('warning');
+            // Si tiene horaIngreso, mostrar que ya tiene asistencia registrada
+            if (asistenciaExistente.hora_ingreso) {
+              const estadoTexto = asistenciaExistente.estado_presencia || 'Sin estado';
+              setMensajePersonal(`${personal.label} ya tiene asistencia registrada hoy - Estado: ${estadoTexto}`);
+              setTipoMensaje('warning');
+            } else {
+              // Si no tiene horaIngreso pero tiene registro (estado Ausente), permitir actualizar
+              setMensajePersonal(`${personal.label} está marcado como ausente. Puede registrar su ingreso ahora.`);
+              setTipoMensaje('info');
+            }
           } else {
             setMensajePersonal('');
             setTipoMensaje('');
@@ -1850,6 +1866,7 @@ const EstadoBadge = ({ estado }) => {
   const configs = {
     'Presente': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircleIcon },
     'Tarde': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: ClockIcon },
+    'Tardanza': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: ClockIcon }, // Mismo color que Tarde
     'Ausente': { bg: 'bg-red-100', text: 'text-red-800', icon: XCircleIcon },
     'Permiso': { bg: 'bg-blue-100', text: 'text-blue-800', icon: ExclamationTriangleIcon }
   };

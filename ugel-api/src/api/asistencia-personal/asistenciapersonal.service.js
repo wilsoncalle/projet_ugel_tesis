@@ -116,12 +116,17 @@ const getAsistenciaById = async (id) => {
 
 /**
  * Determinar estado de presencia según la hora de ingreso
- * @param {string} horaIngreso - Hora en formato HH:MM:SS
+ * IMPORTANTE: Esta función SOLO debe llamarse cuando SÍ hay una horaIngreso.
+ * El estado "Ausente" se asigna al final del día por proceso automático.
+ * @param {string} horaIngreso - Hora en formato HH:MM:SS (debe existir)
  * @returns {string} Estado de presencia: 'Presente' o 'Tardanza'
  */
 const determinarEstadoPresencia = (horaIngreso) => {
+  // Si no hay horaIngreso, no debería llamarse a esta función
+  // Pero por seguridad, retornamos 'Presente' como fallback
   if (!horaIngreso) {
-    return 'Ausente';
+    logger.warn('determinarEstadoPresencia llamada sin horaIngreso. Retornando Presente por defecto.');
+    return 'Presente';
   }
   
   // Separar la hora en componentes
@@ -142,8 +147,8 @@ const determinarEstadoPresencia = (horaIngreso) => {
   const minutosTotales = horas * 60 + minutos;
   const limiteMinutos = 9 * 60 + 15; // 9:15 = 555 minutos
   
-  // Si llega a las 9:00, 9:15 o antes → Presente
-  // Si llega después de las 9:15 → Tardanza
+  // Si llega a las 9:15 o antes → Presente
+  // Si llega después de las 9:15 → Tardanza (sin importar qué tan tarde sea)
   if (minutosTotales <= limiteMinutos) {
     return 'Presente';
   } else {
@@ -191,11 +196,13 @@ const registrarIngreso = async (personalId, usuarioId) => {
     
     if (registroExistente) {
       // Si ya existe un registro con hora de ingreso, no permitir registrar nuevamente
+      // (esto previene duplicados, pero el registro de ingreso NUNCA debe estar bloqueado por el estado)
       if (registroExistente.hora_ingreso) {
         throw new AppError('El personal ya tiene un ingreso registrado para hoy', 400);
       }
       
-      // Si existe un registro pero sin hora de ingreso, actualizarlo
+      // Si existe un registro pero sin hora de ingreso (ej. se marcó como ausente manualmente),
+      // actualizarlo con la hora de ingreso y recalcular el estado
       const asistencia = await repository.updateIngreso(registroExistente.id, horaActual, estadoPresencia, usuarioId);
       
       logger.info(`Ingreso actualizado para personal ID ${personalId} a las ${horaActual} - Estado: ${estadoPresencia}`);
@@ -203,6 +210,7 @@ const registrarIngreso = async (personalId, usuarioId) => {
       return asistencia;
     } else {
       // Si no existe un registro, crear uno nuevo
+      // IMPORTANTE: El registro siempre se crea, sin importar la hora del día
       const asistencia = await repository.create({
         personal_id: personalId,
         fecha: fechaActual,
@@ -322,6 +330,43 @@ const registrarEstadoPresencia = async (personalId, estadoPresencia, usuarioId) 
 };
 
 /**
+ * Marcar como ausentes a todos los personal activos que no tienen horaIngreso registrada
+ * Esta función debe ejecutarse al final del día (ej. 23:59) para marcar ausentes del día anterior
+ * @param {string} fecha - Fecha en formato YYYY-MM-DD (opcional, por defecto usa el día anterior)
+ * @param {number} usuarioSistemaId - ID del usuario del sistema que ejecuta la acción
+ * @returns {Object} Resultado con cantidad de registros actualizados
+ */
+const marcarAusentesAlFinalDelDia = async (fecha = null, usuarioSistemaId = 1) => {
+  try {
+    // Si no se proporciona fecha, usar el día anterior (en zona horaria Lima)
+    let fechaProcesar = fecha;
+    
+    if (!fechaProcesar) {
+      const ahora = new Date();
+      const limaOffset = -5 * 60; // -5 horas en minutos
+      const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
+      const limaTime = new Date(utcTime + (limaOffset * 60000));
+      
+      // Obtener el día anterior
+      limaTime.setDate(limaTime.getDate() - 1);
+      fechaProcesar = limaTime.toISOString().split('T')[0];
+    }
+    
+    logger.info(`Iniciando marcado de ausentes para fecha: ${fechaProcesar}`);
+    
+    const resultado = await repository.marcarAusentesAlFinalDelDia(fechaProcesar, usuarioSistemaId);
+    
+    logger.info(`Marcado de ausentes completado: ${resultado.total} registros procesados (${resultado.registrosCreados} creados, ${resultado.registrosActualizados} actualizados)`);
+    
+    return resultado;
+    
+  } catch (error) {
+    logger.error('Error marcando ausentes al final del día:', error);
+    throw error;
+  }
+};
+
+/**
  * Obtener estadísticas de asistencia
  * @param {Object} options - Opciones de filtrado
  * @returns {Object} Estadísticas de asistencia
@@ -346,5 +391,6 @@ module.exports = {
   registrarIngreso,
   registrarSalida,
   registrarEstadoPresencia,
+  marcarAusentesAlFinalDelDia,
   getEstadisticas
 };

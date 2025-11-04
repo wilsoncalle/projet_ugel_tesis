@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Users, ClipboardCheck, FileText } from 'lucide-react';
+import { papeletasSalidaService } from '../services/api';
 
 // Componente de elemento de navegación reutilizable
 const NavItem = ({ to, icon, label, badge }) => (
@@ -16,12 +17,20 @@ const NavItem = ({ to, icon, label, badge }) => (
         }`
       }
     >
-      {icon}
-      <span>{label}</span>
-      {badge && (
-        <span className="ml-auto inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
-          {badge}
-        </span>
+      {({ isActive }) => (
+        <>
+          {icon}
+          <span>{label}</span>
+          {badge && (
+            <span className={`ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-semibold leading-none rounded-full ${
+              isActive
+                ? 'text-blue-700 bg-blue-100'
+                : 'text-gray-700 bg-gray-300'
+            }`}>
+              {badge}
+            </span>
+          )}
+        </>
       )}
     </NavLink>
   </li>
@@ -149,7 +158,7 @@ const AdminSidebar = () => (
 );
 
 // Sidebar para Recursos Humanos
-const RRHHSidebar = () => (
+const RRHHSidebar = ({ papeletasActivasCount = 0 }) => (
   <>
     <div className="mb-6">
       <SectionHeader title="Recursos Humanos" />
@@ -179,7 +188,8 @@ const RRHHSidebar = () => (
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           } 
-          label="Gestión de Papeletas" 
+          label="Gestión de Papeletas"
+          badge={papeletasActivasCount > 0 ? papeletasActivasCount : null}
         />
       </ul>
     </div>
@@ -218,6 +228,7 @@ const MainLayout = () => {
   );
   const [currentDate, setCurrentDate] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [papeletasActivasCount, setPapeletasActivasCount] = useState(0);
   
   // Determine user role for sidebar display
   const userRole = user?.rol?.toLowerCase() || '';
@@ -256,6 +267,43 @@ const MainLayout = () => {
 
     updateDate();
     const intervalId = setInterval(updateDate, 60000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Cargar papeletas activas (APROBADO y EN_CURSO)
+  useEffect(() => {
+    const cargarPapeletasActivas = async () => {
+      try {
+        // Cargar papeletas con estado APROBADO
+        const aprobadasResponse = await papeletasSalidaService.getAll({
+          estado: 'APROBADO',
+          page: 1,
+          limit: 1 // Solo necesitamos el total
+        });
+        
+        // Cargar papeletas con estado EN_CURSO
+        const enCursoResponse = await papeletasSalidaService.getAll({
+          estado: 'EN_CURSO',
+          page: 1,
+          limit: 1 // Solo necesitamos el total
+        });
+
+        const totalAprobadas = aprobadasResponse.data?.pagination?.total || 0;
+        const totalEnCurso = enCursoResponse.data?.pagination?.total || 0;
+        const total = totalAprobadas + totalEnCurso;
+        
+        setPapeletasActivasCount(total);
+      } catch (error) {
+        console.error('Error al cargar papeletas activas:', error);
+        setPapeletasActivasCount(0);
+      }
+    };
+
+    cargarPapeletasActivas();
+    
+    // Actualizar cada 30 segundos
+    const intervalId = setInterval(cargarPapeletasActivas, 30000);
     
     return () => clearInterval(intervalId);
   }, []);
@@ -387,6 +435,15 @@ const MainLayout = () => {
                     >
                       <FileText className="h-4 w-4" />
                       <span>Papeletas</span>
+                      {papeletasActivasCount > 0 && (
+                        <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-semibold leading-none rounded-full ${
+                          location.pathname === '/vigilante/papeletas'
+                            ? 'text-blue-700 bg-blue-100'
+                            : 'text-gray-700 bg-gray-200'
+                        }`}>
+                          {papeletasActivasCount}
+                        </span>
+                      )}
                     </NavLink>
                   </div>
                 )}
@@ -510,7 +567,7 @@ const MainLayout = () => {
           )}
           
           {userRole.includes('rrhh') && (
-            <RRHHSidebar />
+            <RRHHSidebar papeletasActivasCount={papeletasActivasCount} />
           )}
           
           {/* Si no hay rol específico o rol desconocido, mostrar un menú básico */}

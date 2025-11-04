@@ -572,6 +572,86 @@ const updateEstadoPresencia = async (id, estadoPresencia, usuarioId) => {
 };
 
 /**
+ * Marcar como ausentes a todos los personal activos que no tienen horaIngreso registrada para una fecha
+ * @param {string} fecha - Fecha en formato YYYY-MM-DD
+ * @param {number} usuarioSistemaId - ID del usuario del sistema que ejecuta la acción
+ * @returns {Object} Resultado con cantidad de registros actualizados
+ */
+const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
+  try {
+    // Normalizar fecha a YYYY-MM-DD (zona Lima)
+    fecha = toLimaDateYYYYMMDD(fecha);
+    
+    if (!fecha || typeof fecha !== 'string' || fecha.trim() === '') {
+      throw new AppError('Fecha inválida para marcar ausentes', 400);
+    }
+    
+    // Buscar todos los personal activos que no tienen registro de asistencia con horaIngreso para esta fecha
+    // Primero, crear registros de asistencia para personal que no tiene ninguno (solo para esa fecha)
+    const queryCrearRegistros = `
+      INSERT INTO ControlAsistenciaPersonal (
+        personal_id,
+        fecha,
+        hora_ingreso,
+        hora_salida,
+        estado_presencia,
+        usuario_registro_id
+      )
+      SELECT 
+        p.id,
+        $1::date,
+        NULL,
+        NULL,
+        'Ausente',
+        $2
+      FROM Personal p
+      WHERE p.activo = true
+        AND p.id NOT IN (
+          SELECT DISTINCT personal_id 
+          FROM ControlAsistenciaPersonal 
+          WHERE fecha = $1::date
+        )
+      RETURNING id
+    `;
+    
+    // Actualizar registros existentes que no tienen horaIngreso y no están marcados como ausente
+    const queryActualizarRegistros = `
+      UPDATE ControlAsistenciaPersonal
+      SET 
+        estado_presencia = 'Ausente',
+        usuario_registro_id = $2
+      WHERE fecha = $1::date
+        AND (hora_ingreso IS NULL OR hora_ingreso = '')
+        AND estado_presencia != 'Ausente'
+      RETURNING id
+    `;
+    
+    // Ejecutar ambas consultas
+    const [crearResult, actualizarResult] = await Promise.all([
+      db.query(queryCrearRegistros, [fecha, usuarioSistemaId]),
+      db.query(queryActualizarRegistros, [fecha, usuarioSistemaId])
+    ]);
+    
+    const creados = crearResult.rows.length;
+    const actualizados = actualizarResult.rows.length;
+    const total = creados + actualizados;
+    
+    logger.info(`Marcado de ausentes completado para fecha ${fecha}: ${creados} registros creados, ${actualizados} actualizados (total: ${total})`);
+    
+    return {
+      fecha,
+      registrosCreados: creados,
+      registrosActualizados: actualizados,
+      total
+    };
+    
+  } catch (error) {
+    logger.error(`Error en repositorio marcando ausentes para fecha ${fecha}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error marcando ausentes', 500);
+  }
+};
+
+/**
  * Obtener estadísticas de asistencia
  * @param {string} fechaInicio - Fecha de inicio para el filtro
  * @param {string} fechaFin - Fecha de fin para el filtro
@@ -673,5 +753,6 @@ module.exports = {
   updateIngreso,
   updateSalida,
   updateEstadoPresencia,
+  marcarAusentesAlFinalDelDia,
   getEstadisticas
 };

@@ -32,6 +32,7 @@ io.on('connection', (socket) => {
 
 // Importar servicios para tareas programadas
 const visitasService = require('./src/api/visitas/visitas.service');
+const asistenciaPersonalService = require('./src/api/asistencia-personal/asistenciapersonal.service');
 
 /**
  * Función para ejecutar el cierre automático de visitas
@@ -47,6 +48,48 @@ const ejecutarCierreAutomatico = async () => {
   }
 };
 
+/**
+ * Función para marcar ausentes al final del día
+ * Esta función se ejecuta diariamente a las 23:59 para marcar ausentes del día anterior
+ */
+const ejecutarMarcadoAusentes = async () => {
+  try {
+    logger.info('Ejecutando marcado automático de ausentes...');
+    // Usar usuario ID 1 como usuario del sistema para acciones automáticas
+    const resultado = await asistenciaPersonalService.marcarAusentesAlFinalDelDia(null, 1);
+    logger.info(`Marcado de ausentes completado: ${resultado.total} registros procesados para fecha ${resultado.fecha}`);
+  } catch (error) {
+    logger.error('Error en marcado automático de ausentes:', error);
+  }
+};
+
+/**
+ * Calcular el tiempo hasta la próxima ejecución a las 23:59
+ * @returns {number} Tiempo en milisegundos hasta las 23:59
+ */
+const calcularTiempoHasta2359 = () => {
+  const ahora = new Date();
+  const limaOffset = -5 * 60; // -5 horas en minutos
+  const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
+  const limaTime = new Date(utcTime + (limaOffset * 60000));
+  
+  // Crear fecha objetivo para hoy a las 23:59:00
+  const objetivo = new Date(limaTime);
+  objetivo.setHours(23, 59, 0, 0);
+  
+  // Si ya pasó las 23:59 de hoy, programar para mañana
+  if (limaTime >= objetivo) {
+    objetivo.setDate(objetivo.getDate() + 1);
+  }
+  
+  // Calcular diferencia en milisegundos
+  const diferencia = objetivo.getTime() - limaTime.getTime();
+  
+  logger.info(`Próxima ejecución de marcado de ausentes programada para: ${objetivo.toISOString()} (en ${Math.round(diferencia / 1000 / 60)} minutos)`);
+  
+  return diferencia;
+};
+
 server.listen(PORT, () => {
   logger.info(`Servidor UGEL API ejecutándose en puerto ${PORT}`);
   logger.info(`Entorno: ${config.nodeEnv}`);
@@ -59,6 +102,22 @@ server.listen(PORT, () => {
   // También se ejecutará automáticamente cuando se superen las horas límite
   setInterval(ejecutarCierreAutomatico, 30 * 60 * 1000);
   logger.info('Tarea programada de cierre automático de visitas iniciada (cada 30 minutos)');
+  
+  // Programar marcado de ausentes diariamente a las 23:59
+  const programarMarcadoAusentes = () => {
+    const tiempoHasta2359 = calcularTiempoHasta2359();
+    
+    setTimeout(() => {
+      // Ejecutar el marcado de ausentes
+      ejecutarMarcadoAusentes();
+      
+      // Programar la próxima ejecución (24 horas después)
+      setInterval(ejecutarMarcadoAusentes, 24 * 60 * 60 * 1000);
+    }, tiempoHasta2359);
+  };
+  
+  programarMarcadoAusentes();
+  logger.info('Tarea programada de marcado automático de ausentes iniciada (diariamente a las 23:59)');
 });
 
 // Manejo de cierre graceful
