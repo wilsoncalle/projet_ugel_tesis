@@ -375,7 +375,7 @@ const MainLayout = () => {
                       <span>Asistencia</span>
                     </NavLink>
                     <NavLink
-                      to="/rrhh/papeletas"
+                      to="/vigilante/papeletas"
                       className={({ isActive }) => `
                         flex items-center gap-2 py-3 px-2 font-medium text-sm transition-colors
                         border-b-2

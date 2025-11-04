@@ -39,6 +39,7 @@ import PersonalPage from './pages/PersonalPage';
 import UsuariosPage from './pages/UsuariosPage';
 import CrearPersonalPage from './pages/CrearPersonalPage';
 import PapeletasPage from './pages/PapeletasPage';
+import VigilantePapeletasPage from './pages/VigilantePapeletasPage';
 import AdminCatalogosPage from './pages/AdminCatalogosPage';
 
 // Routes Configuration
@@ -90,6 +91,7 @@ function App() {
             <Route path="/vigilante">
               <Route index element={<ProtectedRoute allowedRoles={['vigilante']} element={<DashboardVigilantePage />} />} />
               <Route path="asistencia" element={<ProtectedRoute allowedRoles={['vigilante']} element={<PersonalAsistenciaPage />} />} />
+              <Route path="papeletas" element={<ProtectedRoute allowedRoles={['vigilante']} element={<VigilantePapeletasPage />} />} />
             </Route>
             
 
