@@ -1,4 +1,5 @@
 import React, { Fragment, useEffect, useMemo, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Popover, Transition, Listbox } from '@headlessui/react';
 import { format, parse, isValid, setHours, setMinutes, setDate } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -20,6 +21,12 @@ const DatePicker = ({
   };
   const startOfLocalDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const todayLocal = useMemo(() => startOfLocalDay(new Date()), []);
+
+  // Helper para verificar si es fin de semana
+  const isWeekend = (date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6; // 0 = domingo, 6 = sábado
+  };
 
   const effectiveMinDate = useMemo(() => {
     if (minDate) {
@@ -103,6 +110,8 @@ const DatePicker = ({
   // ===== Emisión y selección =====
   const handleSelectionChange = (newDate) => {
     if (startOfLocalDay(newDate) < effectiveMinDate) return;
+    // No permitir seleccionar fines de semana
+    if (isWeekend(newDate)) return;
     setSelectedDate(newDate);
     onChange?.(format(newDate, 'yyyy-MM-dd HH:mm'));
   };
@@ -135,6 +144,7 @@ const DatePicker = ({
   const minuteListRef = useRef(null);
   const itemHourRef = useRef(null);
   const itemMinuteRef = useRef(null);
+  const anchorRef = useRef(null);
   
   // Inicializa el scroll al bloque central con la hora/minuto seleccionados
   useEffect(() => {
@@ -246,7 +256,7 @@ const DatePicker = ({
                   const isCurrentMonth = day.getMonth() === calMonth;
                   const isSelected = selectedDay && startOfLocalDay(day).getTime() === startOfLocalDay(selectedDay).getTime();
                   const isToday = day.getTime() === todayLocal.getTime();
-                  const isDisabled = startOfLocalDay(day) < effectiveMinDate;
+                  const isDisabled = startOfLocalDay(day) < effectiveMinDate || isWeekend(day);
                   return (
                     <button
                       key={idx}
@@ -319,6 +329,9 @@ const DatePicker = ({
     );
   };
 
+  // ===== Estado para controlar el renderizado del portal =====
+  const [isPortalVisible, setIsPortalVisible] = useState(false);
+
   // ===== Render principal =====
   return (
     <div className={`${className}`}>
@@ -327,32 +340,65 @@ const DatePicker = ({
         .dp-no-scrollbar::-webkit-scrollbar { display: none; }
       `}</style>
       <Popover className="relative">
-        <Popover.Button as="div" className="w-full">
-          <input
-            type="text"
-            value={value ? format(parseDateTimeString(value), 'dd/MM/yyyy HH:mm') : ''}
-            readOnly
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors pr-10 cursor-pointer"
-            placeholder="DD/MM/AAAA HH:mm"
-          />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 p-1 pointer-events-none">
-            <CalendarIcon className="h-4 w-4 text-gray-400" />
-          </div>
-        </Popover.Button>
+        {({ open, close }) => {
+          // Sincronizar el estado del portal con el estado del Popover
+          useEffect(() => {
+            if (open) {
+              setIsPortalVisible(true);
+            } else {
+              // Cerrar inmediatamente cuando open es false
+              setIsPortalVisible(false);
+            }
+          }, [open]);
 
-        <Transition
-          as={Fragment}
-          enter="transition ease-out duration-200"
-          enterFrom="opacity-0 translate-y-1"
-          enterTo="opacity-100 translate-y-0"
-          leave="transition ease-in duration-150"
-          leaveFrom="opacity-100 translate-y-0"
-          leaveTo="opacity-0 translate-y-1"
-        >
-          <Popover.Panel className="absolute z-50 mt-1 left-0">
-            {({ close }) => <CalendarPanel close={close} />}
-          </Popover.Panel>
-        </Transition>
+          const rect = anchorRef.current?.getBoundingClientRect();
+          const left = rect ? rect.left : 0;
+          const top = rect ? rect.bottom + 4 : 0;
+          
+          return (
+            <>
+              <Popover.Button as="div" className="w-full" ref={anchorRef}>
+                <input
+                  type="text"
+                  value={value ? format(parseDateTimeString(value), 'dd/MM/yyyy HH:mm') : ''}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:border-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors pr-10 cursor-pointer"
+                  placeholder="DD/MM/AAAA HH:mm"
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 p-1 pointer-events-none">
+                  <CalendarIcon className="h-4 w-4 text-gray-400" />
+                </div>
+              </Popover.Button>
+
+              {isPortalVisible && createPortal(
+                <Transition
+                  as={Fragment}
+                  show={open}
+                  enter="transition ease-out duration-200"
+                  enterFrom="opacity-0 translate-y-1"
+                  enterTo="opacity-100 translate-y-0"
+                  leave="transition ease-in duration-150"
+                  leaveFrom="opacity-100 translate-y-0"
+                  leaveTo="opacity-0 translate-y-1"
+                  afterLeave={() => {
+                    setIsPortalVisible(false);
+                  }}
+                >
+                  <div 
+                    className="z-[1001]" 
+                    style={{ position: 'fixed', left, top }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Popover.Panel static>
+                      <CalendarPanel close={close} />
+                    </Popover.Panel>
+                  </div>
+                </Transition>,
+                document.body
+              )}
+            </>
+          );
+        }}
       </Popover>
     </div>
   );
