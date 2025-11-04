@@ -40,7 +40,7 @@ const config = {
     // Roles de usuario válidos
     validRoles: ['Vigilante', 'Administrador', 'RRHH'],
     // Estados de presencia válidos
-    validPresenceStates: ['Presente', 'Ausente', 'Tardanza', 'Falta']
+    validPresenceStates: ['Presente', 'Ausente', 'Tardanza', 'Falta', 'En Permiso']
   },
   
   // Configuraciones de paginación

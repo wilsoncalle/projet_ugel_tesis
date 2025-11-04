@@ -98,10 +98,25 @@ const closePool = async () => {
   }
 };
 
+/**
+ * Realiza rollback de una transacción de forma segura
+ * @param {Object} client - Cliente de PostgreSQL
+ */
+const safeRollback = async (client) => {
+  if (!client) return;
+  try {
+    await client.query('ROLLBACK');
+    logger.info('Rollback realizado correctamente');
+  } catch (error) {
+    logger.error('Error realizando rollback:', error);
+  }
+};
+
 module.exports = {
   query,
   getClient,
   checkConnection,
   closePool,
+  safeRollback,
   pool
 };

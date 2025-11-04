@@ -5,9 +5,11 @@
 
 const repository = require('./asistenciapersonal.repository');
 const personalRepository = require('../personal/personal.repository');
+const papeletasRepository = require('../papeletas-salida/papeletassalida.repository');
 const { AppError } = require('../../middleware/errorHandler');
 const config = require('../../config');
 const logger = require('../../utils/logger');
+const { nowLima, toLimaDateYYYYMMDD } = require('../../utils/fechas');
 
 /**
  * Obtener registros de asistencia con paginación y filtros
@@ -174,22 +176,22 @@ const registrarIngreso = async (personalId, usuarioId) => {
     }
     
     // Obtener fecha y hora actual en zona horaria de Lima (UTC-5)
-    const ahora = new Date();
-    // Obtener la hora en Lima (UTC-5)
-    const limaOffset = -5 * 60; // -5 horas en minutos
-    const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
-    const limaTime = new Date(utcTime + (limaOffset * 60000));
+    const { fecha: fechaActual, hora: horaActual } = nowLima();
     
-    // Obtener fecha actual en formato YYYY-MM-DD (Lima)
-    const fechaActual = limaTime.toISOString().split('T')[0];
-    
-    // Obtener hora actual en formato HH:MM:SS (Lima)
-    const horaActual = limaTime.toTimeString().split(' ')[0];
+    // Verificar si el personal tiene una papeleta activa para esta fecha
+    // Si tiene papeleta activa, debe marcarse como 'En Permiso' (no tardanza ni ausente)
+    const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaActual);
     
     // Determinar estado según la hora de ingreso
-    const estadoPresencia = determinarEstadoPresencia(horaActual);
-    
-    logger.info(`Registrando ingreso - Hora Lima: ${horaActual}, Estado: ${estadoPresencia}`);
+    // Si tiene papeleta activa, siempre es 'En Permiso' (no se marca tardanza)
+    let estadoPresencia;
+    if (papeletaActiva) {
+      estadoPresencia = 'En Permiso';
+      logger.info(`Personal ID ${personalId} tiene papeleta activa (${papeletaActiva.codigo_papeleta}) - Estado: En Permiso`);
+    } else {
+      estadoPresencia = determinarEstadoPresencia(horaActual);
+      logger.info(`Registrando ingreso - Hora Lima: ${horaActual}, Estado: ${estadoPresencia}`);
+    }
     
     // Verificar si ya existe un registro para este personal en la fecha actual
     const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);
@@ -245,8 +247,8 @@ const registrarSalida = async (personalId, usuarioId) => {
       throw new AppError('Personal no encontrado', 404);
     }
     
-    // Obtener fecha actual en formato YYYY-MM-DD
-    const fechaActual = new Date().toISOString().split('T')[0];
+    // Obtener fecha y hora actual en zona horaria de Lima (UTC-5)
+    const { fecha: fechaActual, hora: horaActual } = nowLima();
     
     // Verificar si existe un registro para este personal en la fecha actual
     const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);
@@ -261,7 +263,6 @@ const registrarSalida = async (personalId, usuarioId) => {
     }
     
     // Actualizar el registro con la hora de salida
-    const horaActual = new Date().toTimeString().split(' ')[0];
     const asistencia = await repository.updateSalida(registroExistente.id, horaActual);
     
     logger.info(`Salida registrada para personal ID ${personalId} a las ${horaActual}`);
@@ -294,8 +295,8 @@ const registrarEstadoPresencia = async (personalId, estadoPresencia, usuarioId) 
       throw new AppError(`Estado de presencia inválido. Estados válidos: ${config.validation.validPresenceStates.join(', ')}`, 400);
     }
     
-    // Obtener fecha actual en formato YYYY-MM-DD
-    const fechaActual = new Date().toISOString().split('T')[0];
+    // Obtener fecha actual en formato YYYY-MM-DD (Lima)
+    const { fecha: fechaActual } = nowLima();
     
     // Verificar si ya existe un registro para este personal en la fecha actual
     const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);

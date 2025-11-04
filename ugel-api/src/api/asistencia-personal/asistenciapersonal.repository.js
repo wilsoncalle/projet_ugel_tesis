@@ -290,14 +290,8 @@ const findAll = async (options = {}) => {
       }
       
       // Consulta para contar el total
-      // Solo incluir parámetros que corresponden a las condiciones WHERE, sin los de LIMIT/OFFSET
-      const countParams = queryParams.slice(0, queryParams.length - 2); // Excluir limit y offset
-      const countQuery = `
-        SELECT COUNT(*) as total
-        FROM ControlAsistenciaPersonal ca
-        JOIN Personal p ON ca.personal_id = p.id
-        ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
-      `;
+      // Clonar parámetros ANTES de agregar limit/offset para el countQuery
+      const countParams = [...queryParams];
       
       // Agregar ordenamiento y paginación
       query += `
@@ -305,8 +299,16 @@ const findAll = async (options = {}) => {
         LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
       `;
       
-      // Agregar parámetros de paginación
+      // Agregar parámetros de paginación a queryParams (solo para la query principal)
       queryParams.push(limit, offset);
+      
+      // Construir countQuery con los parámetros correctos (sin limit/offset)
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM ControlAsistenciaPersonal ca
+        JOIN Personal p ON ca.personal_id = p.id
+        ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
+      `;
       
       // Ejecutar consultas en paralelo
       const [asistenciasResult, countResult] = await Promise.all([
@@ -573,6 +575,7 @@ const updateEstadoPresencia = async (id, estadoPresencia, usuarioId) => {
 
 /**
  * Marcar como ausentes a todos los personal activos que no tienen horaIngreso registrada para una fecha
+ * EXCLUYE personal que tiene papeletas activas para esa fecha
  * @param {string} fecha - Fecha en formato YYYY-MM-DD
  * @param {number} usuarioSistemaId - ID del usuario del sistema que ejecuta la acción
  * @returns {Object} Resultado con cantidad de registros actualizados
@@ -587,7 +590,9 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
     }
     
     // Buscar todos los personal activos que no tienen registro de asistencia con horaIngreso para esta fecha
+    // EXCLUIR personal que tiene papeletas activas (APROBADO o EN_CURSO) para esa fecha
     // Primero, crear registros de asistencia para personal que no tiene ninguno (solo para esa fecha)
+    // EXCLUIR personal con papeletas activas
     const queryCrearRegistros = `
       INSERT INTO ControlAsistenciaPersonal (
         personal_id,
@@ -611,18 +616,35 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
           FROM ControlAsistenciaPersonal 
           WHERE fecha = $1::date
         )
+        AND p.id NOT IN (
+          SELECT DISTINCT ps.personal_solicitante_id
+          FROM PapeletasSalida ps
+          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
+            AND DATE(ps.fecha_hora_salida_programada) <= $1::date
+            AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
+            AND ps.fecha_hora_retorno_real IS NULL
+        )
       RETURNING id
     `;
     
     // Actualizar registros existentes que no tienen horaIngreso y no están marcados como ausente
+    // EXCLUIR personal con papeletas activas
     const queryActualizarRegistros = `
-      UPDATE ControlAsistenciaPersonal
+      UPDATE ControlAsistenciaPersonal ca
       SET 
         estado_presencia = 'Ausente',
         usuario_registro_id = $2
-      WHERE fecha = $1::date
-        AND (hora_ingreso IS NULL OR hora_ingreso = '')
-        AND estado_presencia != 'Ausente'
+      WHERE ca.fecha = $1::date
+        AND (ca.hora_ingreso IS NULL OR ca.hora_ingreso = '')
+        AND ca.estado_presencia != 'Ausente'
+        AND ca.personal_id NOT IN (
+          SELECT DISTINCT ps.personal_solicitante_id
+          FROM PapeletasSalida ps
+          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
+            AND DATE(ps.fecha_hora_salida_programada) <= $1::date
+            AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
+            AND ps.fecha_hora_retorno_real IS NULL
+        )
       RETURNING id
     `;
     
@@ -636,7 +658,7 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
     const actualizados = actualizarResult.rows.length;
     const total = creados + actualizados;
     
-    logger.info(`Marcado de ausentes completado para fecha ${fecha}: ${creados} registros creados, ${actualizados} actualizados (total: ${total})`);
+    logger.info(`Marcado de ausentes completado para fecha ${fecha}: ${creados} registros creados, ${actualizados} actualizados (total: ${total}). Personal con papeletas activas excluido.`);
     
     return {
       fecha,
@@ -648,6 +670,52 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
   } catch (error) {
     logger.error(`Error en repositorio marcando ausentes para fecha ${fecha}:`, error);
     throw error instanceof AppError ? error : new AppError('Error marcando ausentes', 500);
+  }
+};
+
+/**
+ * Actualizar estado de presencia por período para un personal específico
+ * Útil para actualizar estados cuando una papeleta finaliza
+ * @param {number} personalId - ID del personal
+ * @param {string} fechaInicio - Fecha de inicio del período (YYYY-MM-DD)
+ * @param {string} fechaFin - Fecha de fin del período (YYYY-MM-DD)
+ * @param {string} estadoAnterior - Estado que debe tener para actualizarse
+ * @param {string} estadoNuevo - Nuevo estado a asignar
+ * @param {number} usuarioId - ID del usuario que realiza la actualización
+ * @returns {Object} Resultado con cantidad de registros actualizados
+ */
+const actualizarEstadoPorPeriodo = async (personalId, fechaInicio, fechaFin, estadoAnterior, estadoNuevo, usuarioId) => {
+  try {
+    const query = `
+      UPDATE ControlAsistenciaPersonal
+      SET 
+        estado_presencia = $1,
+        usuario_registro_id = $2
+      WHERE personal_id = $3
+        AND fecha >= $4::date
+        AND fecha <= $5::date
+        AND estado_presencia = $6
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [estadoNuevo, usuarioId, personalId, fechaInicio, fechaFin, estadoAnterior]);
+    
+    const actualizados = result.rows.length;
+    
+    logger.info(`Actualizados ${actualizados} registros de asistencia para personal ID ${personalId} en período ${fechaInicio} a ${fechaFin} (${estadoAnterior} → ${estadoNuevo})`);
+    
+    return {
+      actualizados,
+      personalId,
+      fechaInicio,
+      fechaFin,
+      estadoAnterior,
+      estadoNuevo
+    };
+    
+  } catch (error) {
+    logger.error(`Error en repositorio actualizando estado por período para personal ID ${personalId}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error actualizando estado por período', 500);
   }
 };
 
@@ -754,5 +822,6 @@ module.exports = {
   updateSalida,
   updateEstadoPresencia,
   marcarAusentesAlFinalDelDia,
+  actualizarEstadoPorPeriodo,
   getEstadisticas
 };

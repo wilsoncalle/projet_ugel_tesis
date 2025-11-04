@@ -439,7 +439,7 @@ const decidirPapeleta = async (id, { accion, personal_autoriza_id, observacion_a
 };
 
 /**
- * Registrar salida en garita
+ * Registrar salida en garita (versión normal, sin transacción)
  */
 const registrarSalida = async (id, usuario_registro_salida_id) => {
   try {
@@ -456,6 +456,55 @@ const registrarSalida = async (id, usuario_registro_salida_id) => {
     return await findById(id);
   } catch (error) {
     logger.error(`Error registrando salida en papeleta ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error registrando salida', 500);
+  }
+};
+
+/**
+ * Registrar salida en garita (versión transaccional)
+ * @param {Object} client - Cliente de PostgreSQL de la transacción
+ * @param {number} id - ID de la papeleta
+ * @param {number} usuario_registro_salida_id - ID del usuario que registra
+ * @returns {Object} Papeleta actualizada
+ */
+const registrarSalidaTx = async (client, id, usuario_registro_salida_id) => {
+  try {
+    const sql = `
+      UPDATE PapeletasSalida
+      SET fecha_hora_salida_real = COALESCE(fecha_hora_salida_real, CURRENT_TIMESTAMP),
+          usuario_registro_salida_id = COALESCE(usuario_registro_salida_id, $2),
+          estado = 'EN_CURSO'
+      WHERE id = $1
+      RETURNING id
+    `;
+    const { rows } = await client.query(sql, [id, usuario_registro_salida_id]);
+    if (!rows.length) throw new AppError('Papeleta no encontrada', 404);
+    
+    // Obtener la papeleta completa dentro de la transacción
+    const findByIdSql = `
+      SELECT
+        ps.*,
+        m.nombre_motivo,
+        p.tipo_documento AS solicitante_tipo_documento,
+        p.numero_documento AS solicitante_numero_documento,
+        p.nombres AS solicitante_nombres,
+        p.apellidos AS solicitante_apellidos,
+        pa.nombres AS autoriza_nombres,
+        pa.apellidos AS autoriza_apellidos,
+        us.nombre_usuario AS usuario_registro_salida,
+        ur.nombre_usuario AS usuario_registro_retorno
+      FROM PapeletasSalida ps
+      JOIN MotivosSalidaPersonal m ON m.id = ps.motivo_salida_id
+      JOIN Personal p ON p.id = ps.personal_solicitante_id
+      LEFT JOIN Personal pa ON pa.id = ps.personal_autoriza_id
+      LEFT JOIN Usuarios us ON us.id = ps.usuario_registro_salida_id
+      LEFT JOIN Usuarios ur ON ur.id = ps.usuario_registro_retorno_id
+      WHERE ps.id = $1
+    `;
+    const { rows: papeletaRows } = await client.query(findByIdSql, [id]);
+    return papeletaRows[0] || null;
+  } catch (error) {
+    logger.error(`Error registrando salida en papeleta ${id} (transacción):`, error);
     throw error instanceof AppError ? error : new AppError('Error registrando salida', 500);
   }
 };
@@ -514,6 +563,44 @@ const anular = async (id) => {
   } catch (error) {
     logger.error(`Error anulando papeleta ${id}:`, error);
     throw error instanceof AppError ? error : new AppError('Error anulando papeleta', 500);
+  }
+};
+
+/**
+ * Verificar si un personal tiene una papeleta activa para una fecha específica
+ * Una papeleta está activa si:
+ * - Estado es 'EN_CURSO' o 'APROBADO'
+ * - La fecha está dentro del rango: fecha_hora_salida_programada <= fecha <= fecha_hora_retorno_programada
+ * @param {number} personalId - ID del personal
+ * @param {string} fecha - Fecha en formato YYYY-MM-DD
+ * @returns {Object|null} Papeleta activa encontrada o null
+ */
+const encontrarPapeletaActivaPorFecha = async (personalId, fecha) => {
+  try {
+    const sql = `
+      SELECT 
+        ps.id,
+        ps.codigo_papeleta,
+        ps.estado,
+        ps.personal_solicitante_id,
+        ps.fecha_hora_salida_programada,
+        ps.fecha_hora_retorno_programada,
+        ps.fecha_hora_salida_real,
+        ps.fecha_hora_retorno_real
+      FROM PapeletasSalida ps
+      WHERE ps.personal_solicitante_id = $1
+        AND ps.estado IN ('APROBADO', 'EN_CURSO')
+        AND DATE(ps.fecha_hora_salida_programada) <= $2::date
+        AND DATE(ps.fecha_hora_retorno_programada) >= $2::date
+        AND ps.fecha_hora_retorno_real IS NULL
+      ORDER BY ps.fecha_hora_salida_programada DESC
+      LIMIT 1
+    `;
+    const { rows } = await db.query(sql, [personalId, fecha]);
+    return rows[0] || null;
+  } catch (error) {
+    logger.error(`Error buscando papeleta activa para personal ${personalId} en fecha ${fecha}:`, error);
+    throw new AppError('Error verificando papeleta activa', 500);
   }
 };
 
@@ -603,9 +690,13 @@ module.exports = {
   create,
   decidirPapeleta,
   registrarSalida,
+  registrarSalidaTx,
   registrarRetorno,
   cancelar,
   anular,
+
+  // helpers
+  encontrarPapeletaActivaPorFecha,
 
   // stats
   getEstadisticas,
