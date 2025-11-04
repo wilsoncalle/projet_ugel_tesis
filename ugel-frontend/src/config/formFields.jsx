@@ -452,6 +452,17 @@ export const usuariosFormFields = [
       return null;
     }
   },
+  {
+    name: 'personal_id',
+    label: 'Personal Vinculado',
+    type: 'select',
+    required: false,
+    placeholder: 'Vincular a un trabajador...',
+    options: [], // UsuariosPage.jsx se encargará de rellenar esto
+    showOnCreate: true,
+    showOnEdit: true,
+    validation: (value) => null // Sin validación, es opcional
+  },
 ];
 
 export const transformUsuarios = (data) => {
@@ -462,14 +473,27 @@ export const transformUsuarios = (data) => {
       email: item.email,
       rol: item.rol,
       activo: item.activo,
+      // El 'personal_id' para el formulario
+      personal_id: item.personal_id,
+      // El texto para la columna de la tabla
+      personal_vinculado: item.personal_nombres
+        ? `${item.personal_nombres} ${item.personal_apellidos}`
+        : 'No vinculado',
     }));
   } else if (data && typeof data === 'object') {
+    // Lo mismo para el modo edición (cuando se carga un solo item)
     return {
       id: data.id,
       nombre_usuario: data.nombre_usuario || data.username,
       email: data.email,
       rol: data.rol,
       activo: data.activo,
+      // El 'personal_id' para el formulario
+      personal_id: data.personal_id,
+      // El texto para la columna de la tabla
+      personal_vinculado: data.personal_nombres
+        ? `${data.personal_nombres} ${data.personal_apellidos}`
+        : 'No vinculado',
     };
   }
   return data;
@@ -481,7 +505,15 @@ export const transformUsuariosToBackend = (data) => {
     email: (data.email ?? '').trim(),
     contrasena: data.hash_contrasena,
     rol: data.rol,
+    // Mapea el 'personal_id' del form al 'personalId' que espera el servicio
+    personalId: data.personal_id || null,
   };
+
+  // Borra la contraseña si está vacía (para que no falle al editar)
+  if (!transformed.contrasena) {
+    delete transformed.contrasena;
+  }
+
   console.log('transformUsuariosToBackend - Datos de entrada:', data);
   console.log('transformUsuariosToBackend - Datos transformados:', transformed);
   return transformed;
@@ -521,6 +553,13 @@ export const getTableColumns = (moduleName) => {
         minWidth: '120px',
         maxWidth: '140px',
         width: '120px'
+      },
+      {
+        key: 'personal_vinculado',
+        title: 'Personal Vinculado',
+        minWidth: '200px',
+        maxWidth: '300px',
+        width: 'auto'
       },
       {
         key: 'activo',

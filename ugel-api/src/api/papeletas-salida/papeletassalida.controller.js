@@ -4,7 +4,8 @@
  */
 
 const service = require("./papeletassalida.service");
-const { asyncHandler } = require("../../middleware/errorHandler");
+const personalRepository = require("../personal/personal.repository");
+const { asyncHandler, AppError } = require("../../middleware/errorHandler");
 const logger = require("../../utils/logger");
 
 /**
@@ -98,9 +99,45 @@ const create = asyncHandler(async (req, res) => {
  */
 const decidir = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { accion, personalAutorizaId, observacionAutorizacion } = req.body;
+  const { accion, observacionAutorizacion } = req.body;
+  
+  // 1. Intentar obtener personalAutorizaId del body primero
+  let personalAutorizaId = req.body.personalAutorizaId;
+  
+  // 2. Si no viene en el body, intentar obtenerlo del token
+  if (!personalAutorizaId) {
+    personalAutorizaId = req.user?.personal_id ?? req.user?.personalId ?? null;
+  }
+  
+  // 3. Si aún no tenemos personalId, buscar por nombre de usuario o email
+  // (Asumiendo que el nombre de usuario o email coincide con algún campo del personal)
+  if (!personalAutorizaId && req.user) {
+    // Intentar buscar el personal por nombre de usuario o email
+    // Nota: Esto requiere que haya una relación entre Usuario y Personal
+    // Si no existe, se lanzará un error claro
+    try {
+      // Si el nombre de usuario es un DNI, intentar buscar por documento
+      const nombreUsuario = req.user.nombreUsuario;
+      if (nombreUsuario && /^\d{8}$/.test(nombreUsuario)) {
+        const personal = await personalRepository.findByDocumento('DNI', nombreUsuario);
+        if (personal) {
+          personalAutorizaId = personal.id;
+        }
+      }
+    } catch (error) {
+      logger.warn(`No se pudo obtener personal por nombre de usuario: ${error.message}`);
+    }
+  }
+  
+  // 4. Si aún no tenemos personalId, lanzar error claro
+  if (!personalAutorizaId) {
+    throw new AppError(
+      "Usuario no autorizado o no vinculado a un registro de personal. Debe indicar el personal que autoriza.",
+      403
+    );
+  }
 
-  logger.info(`Decidir papeleta ID: ${id} (accion=${accion})`);
+  logger.info(`Decidir papeleta ID: ${id} (accion=${accion}) por Personal ID: ${personalAutorizaId}`);
 
   const papeleta = await service.decidirPapeleta(id, {
     accion,

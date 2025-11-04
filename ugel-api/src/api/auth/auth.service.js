@@ -5,6 +5,7 @@
 
 const bcrypt = require('bcryptjs');
 const repository = require('./auth.repository');
+const personalRepository = require('../personal/personal.repository');
 const { generateToken, verifyTokenSilent } = require('../../middleware/authHandler');
 const { AppError } = require('../../middleware/errorHandler');
 const config = require('../../config');
@@ -79,13 +80,39 @@ const loginUser = async (loginData) => {
     throw new AppError('Credenciales inválidas', 401);
   }
   
+  // Buscar personal asociado al usuario
+  let personalId = user.personal_id || null;
+  
+  // Si no hay personal_id en el usuario, intentar buscarlo por documento (si el nombre de usuario es un DNI)
+  if (!personalId) {
+    try {
+      const nombreUsuario = user.nombre_usuario;
+      // Si el nombre de usuario es un DNI de 8 dígitos, buscar personal por documento
+      if (nombreUsuario && /^\d{8}$/.test(nombreUsuario)) {
+        const personal = await personalRepository.findByDocumento('DNI', nombreUsuario);
+        if (personal) {
+          personalId = personal.id;
+          logger.info(`Personal encontrado para usuario ${nombreUsuario}: ID ${personalId}`);
+        }
+      }
+    } catch (error) {
+      logger.warn(`No se pudo obtener personal para usuario ${user.nombre_usuario}: ${error.message}`);
+    }
+  }
+  
+  // Agregar personalId al objeto user para incluirlo en el token
+  const userWithPersonal = {
+    ...user,
+    personal_id: personalId
+  };
+  
   // Generar token
-  const token = generateToken(user);
+  const token = generateToken(userWithPersonal);
   
   // Remover datos sensibles
   const { hash_contrasena, ...userWithoutPassword } = user;
   
-  logger.info(`Login exitoso para usuario: ${user.nombre_usuario}`);
+  logger.info(`Login exitoso para usuario: ${user.nombre_usuario}${personalId ? ` (Personal ID: ${personalId})` : ''}`);
   
   return {
     usuario: userWithoutPassword,

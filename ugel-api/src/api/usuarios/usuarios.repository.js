@@ -17,16 +17,21 @@ const findAll = async (options = {}) => {
   const offset = (page - 1) * limit;
   
   try {
-    // Construir la consulta base
+    // Construir la consulta base con LEFT JOIN
     let query = `
       SELECT 
-        id,
-        nombre_usuario,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios
+        u.id,
+        u.nombre_usuario,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id,
+        p.nombres AS personal_nombres,
+        p.apellidos AS personal_apellidos,
+        p.numero_documento AS personal_documento
+      FROM Usuarios u
+      LEFT JOIN Personal p ON u.personal_id = p.id
     `;
     
     // Construir la cláusula WHERE
@@ -36,26 +41,26 @@ const findAll = async (options = {}) => {
     
     // Filtro por texto
     if (search) {
-      whereConditions.push(`(nombre_usuario ILIKE $${paramCounter} OR email ILIKE $${paramCounter})`);
+      whereConditions.push(`(u.nombre_usuario ILIKE $${paramCounter} OR u.email ILIKE $${paramCounter} OR p.nombres ILIKE $${paramCounter} OR p.apellidos ILIKE $${paramCounter})`);
       queryParams.push(`%${search}%`);
       paramCounter++;
     }
     
     // Filtro por estado activo - por defecto solo mostrar activos
     if (activo !== undefined) {
-      whereConditions.push(`activo = $${paramCounter}`);
+      whereConditions.push(`u.activo = $${paramCounter}`);
       queryParams.push(activo);
       paramCounter++;
     } else {
       // Por defecto, solo mostrar usuarios activos
-      whereConditions.push(`activo = $${paramCounter}`);
+      whereConditions.push(`u.activo = $${paramCounter}`);
       queryParams.push(true);
       paramCounter++;
     }
     
     // Filtro por rol
     if (rol) {
-      whereConditions.push(`rol = $${paramCounter}`);
+      whereConditions.push(`u.rol = $${paramCounter}`);
       queryParams.push(rol);
       paramCounter++;
     }
@@ -67,14 +72,15 @@ const findAll = async (options = {}) => {
     
     // Consulta para contar el total
     const countQuery = `
-      SELECT COUNT(*) as total
-      FROM Usuarios
+      SELECT COUNT(u.*) as total
+      FROM Usuarios u
+      LEFT JOIN Personal p ON u.personal_id = p.id
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
     // Agregar ordenamiento y paginación
     query += `
-      ORDER BY nombre_usuario ASC
+      ORDER BY u.nombre_usuario ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
     `;
     
@@ -107,15 +113,20 @@ const findById = async (id) => {
   try {
     const query = `
       SELECT 
-        id,
-        nombre_usuario,
-        hash_contrasena,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios 
-      WHERE id = $1
+        u.id,
+        u.nombre_usuario,
+        u.hash_contrasena,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id,
+        p.nombres AS personal_nombres,
+        p.apellidos AS personal_apellidos,
+        p.numero_documento AS personal_documento
+      FROM Usuarios u
+      LEFT JOIN Personal p ON u.personal_id = p.id
+      WHERE u.id = $1
     `;
     
     const result = await db.query(query, [id]);
@@ -136,15 +147,20 @@ const findByUsername = async (nombreUsuario) => {
   try {
     const query = `
       SELECT 
-        id,
-        nombre_usuario,
-        hash_contrasena,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios 
-      WHERE LOWER(nombre_usuario) = LOWER($1)
+        u.id,
+        u.nombre_usuario,
+        u.hash_contrasena,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id,
+        p.nombres AS personal_nombres,
+        p.apellidos AS personal_apellidos,
+        p.numero_documento AS personal_documento
+      FROM Usuarios u
+      LEFT JOIN Personal p ON u.personal_id = p.id
+      WHERE LOWER(u.nombre_usuario) = LOWER($1)
     `;
     
     const result = await db.query(query, [nombreUsuario]);
@@ -165,15 +181,20 @@ const findByEmail = async (email) => {
   try {
     const query = `
       SELECT 
-        id,
-        nombre_usuario,
-        hash_contrasena,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios 
-      WHERE LOWER(email) = LOWER($1)
+        u.id,
+        u.nombre_usuario,
+        u.hash_contrasena,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id,
+        p.nombres AS personal_nombres,
+        p.apellidos AS personal_apellidos,
+        p.numero_documento AS personal_documento
+      FROM Usuarios u
+      LEFT JOIN Personal p ON u.personal_id = p.id
+      WHERE LOWER(u.email) = LOWER($1)
     `;
     
     const result = await db.query(query, [email]);
@@ -195,14 +216,19 @@ const findByUsernameOrEmail = async (nombreUsuario, email) => {
   try {
     const query = `
       SELECT 
-        id,
-        nombre_usuario,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios 
-      WHERE LOWER(nombre_usuario) = LOWER($1) OR LOWER(email) = LOWER($2)
+        u.id,
+        u.nombre_usuario,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id,
+        p.nombres AS personal_nombres,
+        p.apellidos AS personal_apellidos,
+        p.numero_documento AS personal_documento
+      FROM Usuarios u
+      LEFT JOIN Personal p ON u.personal_id = p.id
+      WHERE LOWER(u.nombre_usuario) = LOWER($1) OR LOWER(u.email) = LOWER($2)
     `;
     
     const result = await db.query(query, [nombreUsuario, email]);
@@ -221,11 +247,11 @@ const findByUsernameOrEmail = async (nombreUsuario, email) => {
  */
 const create = async (usuarioData) => {
   try {
-    const { nombre_usuario, hash_contrasena, email, rol, activo = true } = usuarioData;
+    const { nombre_usuario, hash_contrasena, email, rol, activo = true, personal_id = null } = usuarioData;
     
     const query = `
-      INSERT INTO Usuarios (nombre_usuario, hash_contrasena, email, rol, activo)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO Usuarios (nombre_usuario, hash_contrasena, email, rol, activo, personal_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING 
         id,
         nombre_usuario,
@@ -233,10 +259,11 @@ const create = async (usuarioData) => {
         email,
         rol,
         activo,
-        fecha_creacion
+        fecha_creacion,
+        personal_id
     `;
     
-    const result = await db.query(query, [nombre_usuario, hash_contrasena, email, rol, activo]);
+    const result = await db.query(query, [nombre_usuario, hash_contrasena, email, rol, activo, personal_id]);
     
     if (result.rows.length === 0) {
       throw new AppError('Error creando usuario', 500);
@@ -252,6 +279,15 @@ const create = async (usuarioData) => {
       }
       if (error.constraint && error.constraint.includes('email')) {
         throw new AppError('El email ya está registrado', 409);
+      }
+      if (error.constraint && error.constraint.includes('personal_id')) {
+        throw new AppError('Esta persona ya está vinculada a otro usuario', 409);
+      }
+    }
+    if (error.code === '23503') {
+      // Violación de clave foránea
+      if (error.constraint && error.constraint.includes('personal_id')) {
+        throw new AppError('El personal seleccionado no existe', 404);
       }
     }
     
@@ -294,6 +330,18 @@ const update = async (id, usuarioData) => {
       queryParams.push(usuarioData.activo);
     }
     
+    // Agregar hash_contrasena a la actualización
+    if (usuarioData.hash_contrasena !== undefined) {
+      updateFields.push(`hash_contrasena = $${paramCounter++}`);
+      queryParams.push(usuarioData.hash_contrasena);
+    }
+    
+    // Agregar personal_id a la actualización
+    if (usuarioData.personal_id !== undefined) {
+      updateFields.push(`personal_id = $${paramCounter++}`);
+      queryParams.push(usuarioData.personal_id);
+    }
+    
     // Si no hay campos para actualizar
     if (updateFields.length === 0) {
       const currentUsuario = await findById(id);
@@ -311,7 +359,8 @@ const update = async (id, usuarioData) => {
         email,
         rol,
         activo,
-        fecha_creacion
+        fecha_creacion,
+        personal_id
     `;
     
     const result = await db.query(query, queryParams);
@@ -330,6 +379,15 @@ const update = async (id, usuarioData) => {
       }
       if (error.constraint && error.constraint.includes('email')) {
         throw new AppError('El email ya está registrado', 409);
+      }
+      if (error.constraint && error.constraint.includes('personal_id')) {
+        throw new AppError('Esta persona ya está vinculada a otro usuario', 409);
+      }
+    }
+    if (error.code === '23503') {
+      // Violación de clave foránea
+      if (error.constraint && error.constraint.includes('personal_id')) {
+        throw new AppError('El personal seleccionado no existe', 404);
       }
     }
     
@@ -476,7 +534,40 @@ const findDeleted = async (options = {}) => {
 };
 
 /**
- * Buscar usuario por ID incluyendo eliminados
+ * Buscar usuario por personal_id
+ * @param {number} personalId - ID del personal
+ * @returns {Object|null} Usuario encontrado o null
+ */
+const findByPersonalId = async (personalId) => {
+  try {
+    const query = `
+      SELECT 
+        u.id,
+        u.nombre_usuario,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id,
+        p.nombres AS personal_nombres,
+        p.apellidos AS personal_apellidos,
+        p.numero_documento AS personal_documento
+      FROM Usuarios u
+      LEFT JOIN Personal p ON u.personal_id = p.id
+      WHERE u.personal_id = $1
+    `;
+    
+    const result = await db.query(query, [personalId]);
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando usuario por personal_id ${personalId}:`, error);
+    throw new AppError('Error obteniendo usuario', 500);
+  }
+};
+
+/**
+ * Buscar usuario por ID (incluyendo eliminados)
  * @param {number} id - ID del usuario
  * @returns {Object|null} Usuario encontrado o null
  */
@@ -484,14 +575,19 @@ const findByIdIncludingDeleted = async (id) => {
   try {
     const query = `
       SELECT 
-        id,
-        nombre_usuario,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios 
-      WHERE id = $1
+        u.id,
+        u.nombre_usuario,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id,
+        p.nombres AS personal_nombres,
+        p.apellidos AS personal_apellidos,
+        p.numero_documento AS personal_documento
+      FROM Usuarios u
+      LEFT JOIN Personal p ON u.personal_id = p.id
+      WHERE u.id = $1
     `;
     
     const result = await db.query(query, [id]);
@@ -537,6 +633,7 @@ module.exports = {
   findByUsername,
   findByEmail,
   findByUsernameOrEmail,
+  findByPersonalId,
   create,
   update,
   updatePassword,

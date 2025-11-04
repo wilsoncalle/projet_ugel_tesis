@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Users, ClipboardCheck } from 'lucide-react';
+import { Users, ClipboardCheck, FileText } from 'lucide-react';
 
 // Componente de elemento de navegación reutilizable
 const NavItem = ({ to, icon, label, badge }) => (
@@ -342,7 +342,7 @@ const MainLayout = () => {
                   <span className="text-xs text-gray-500" id="current-date">{currentDate}</span>
                 </div>
                 
-                {/* Navegación entre Visitas y Asistencia */}
+                {/* Navegación entre Visitas, Asistencia y Papeletas */}
                 {isVigilanteRoute && (
                   <div className="flex items-center gap-4 ml-4 border-b border-gray-200">
                     <NavLink
@@ -373,6 +373,20 @@ const MainLayout = () => {
                     >
                       <ClipboardCheck className="h-4 w-4" />
                       <span>Asistencia</span>
+                    </NavLink>
+                    <NavLink
+                      to="/rrhh/papeletas"
+                      className={({ isActive }) => `
+                        flex items-center gap-2 py-3 px-2 font-medium text-sm transition-colors
+                        border-b-2
+                        ${isActive
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-800'
+                        }
+                      `}
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Papeletas</span>
                     </NavLink>
                   </div>
                 )}

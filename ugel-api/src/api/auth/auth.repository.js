@@ -16,15 +16,16 @@ const findByUsername = async (nombreUsuario) => {
   try {
     const query = `
       SELECT 
-        id,
-        nombre_usuario,
-        hash_contrasena,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios 
-      WHERE nombre_usuario = $1
+        u.id,
+        u.nombre_usuario,
+        u.hash_contrasena,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id
+      FROM Usuarios u
+      WHERE u.nombre_usuario = $1
     `;
     
     const result = await db.query(query, [nombreUsuario]);
@@ -45,15 +46,16 @@ const findById = async (id) => {
   try {
     const query = `
       SELECT 
-        id,
-        nombre_usuario,
-        hash_contrasena,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios 
-      WHERE id = $1
+        u.id,
+        u.nombre_usuario,
+        u.hash_contrasena,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id
+      FROM Usuarios u
+      WHERE u.id = $1
     `;
     
     const result = await db.query(query, [id]);
@@ -75,14 +77,15 @@ const findByUsernameOrEmail = async (nombreUsuario, email) => {
   try {
     const query = `
       SELECT 
-        id,
-        nombre_usuario,
-        email,
-        rol,
-        activo,
-        fecha_creacion
-      FROM Usuarios 
-      WHERE nombre_usuario = $1 OR email = $2
+        u.id,
+        u.nombre_usuario,
+        u.email,
+        u.rol,
+        u.activo,
+        u.fecha_creacion,
+        u.personal_id
+      FROM Usuarios u
+      WHERE u.nombre_usuario = $1 OR u.email = $2
     `;
     
     const result = await db.query(query, [nombreUsuario, email]);

@@ -5,6 +5,7 @@
 
 const bcrypt = require('bcryptjs');
 const repository = require('./usuarios.repository');
+const personalRepository = require('../personal/personal.repository');
 const { AppError } = require('../../middleware/errorHandler');
 const config = require('../../config');
 const logger = require('../../utils/logger');
@@ -76,7 +77,7 @@ const getUsuarioById = async (id) => {
  */
 const createUsuario = async (usuarioData, creatorId) => {
   try {
-    const { nombreUsuario, email, contrasena, rol } = usuarioData;
+    const { nombreUsuario, email, contrasena, rol, personalId } = usuarioData;
     
     // Verificar si el usuario ya existe
     const existingUsuario = await repository.findByUsernameOrEmail(nombreUsuario, email);
@@ -94,6 +95,21 @@ const createUsuario = async (usuarioData, creatorId) => {
       throw new AppError(`Rol inválido. Roles válidos: ${config.validation.validRoles.join(', ')}`, 400);
     }
     
+    // Validar personalId si se proporciona
+    if (personalId) {
+      // Verificar que el personal no esté ya vinculado a otro usuario
+      const existingLink = await repository.findByPersonalId(personalId);
+      if (existingLink) {
+        throw new AppError('Esta persona ya está vinculada a otro usuario', 409);
+      }
+      
+      // Verificar que el personal existe
+      const personal = await personalRepository.findById(personalId);
+      if (!personal) {
+        throw new AppError('El personal seleccionado no existe', 404);
+      }
+    }
+    
     // Hashear la contraseña
     const hashedPassword = await bcrypt.hash(contrasena, config.security.bcryptRounds);
     
@@ -103,7 +119,8 @@ const createUsuario = async (usuarioData, creatorId) => {
       hash_contrasena: hashedPassword,
       email,
       rol,
-      activo: true
+      activo: true,
+      personal_id: personalId || null
     });
     
     // Eliminar datos sensibles
@@ -134,7 +151,7 @@ const updateUsuario = async (id, usuarioData, updaterId) => {
       throw new AppError('Usuario no encontrado', 404);
     }
     
-    const { nombreUsuario, email, rol, activo } = usuarioData;
+    const { nombreUsuario, email, rol, activo, personalId, contrasena } = usuarioData;
     const updateData = {};
     
     // Preparar datos a actualizar
@@ -169,6 +186,39 @@ const updateUsuario = async (id, usuarioData, updaterId) => {
     
     if (activo !== undefined) {
       updateData.activo = activo;
+    }
+    
+    // Procesar contraseña si se proporciona
+    if (contrasena !== undefined && contrasena !== null && contrasena !== '') {
+      // Validar longitud mínima
+      if (contrasena.length < config.validation.minPasswordLength) {
+        throw new AppError(`La contraseña debe tener al menos ${config.validation.minPasswordLength} caracteres`, 400);
+      }
+      
+      // Hashear la contraseña antes de guardarla
+      const hashedPassword = await bcrypt.hash(contrasena, config.security.bcryptRounds);
+      updateData.hash_contrasena = hashedPassword;
+      
+      logger.info(`Contraseña actualizada para usuario ID ${id}`);
+    }
+    
+    // Agregar personalId a los datos de actualización
+    if (personalId !== undefined) {
+      // Validar personalId si se proporciona (no es null)
+      if (personalId !== null) {
+        // Verificar que el personal no esté ya vinculado a otro usuario
+        const existingLink = await repository.findByPersonalId(personalId);
+        if (existingLink && existingLink.id !== parseInt(id)) {
+          throw new AppError('Esta persona ya está vinculada a otro usuario', 409);
+        }
+        
+        // Verificar que el personal existe
+        const personal = await personalRepository.findById(personalId);
+        if (!personal) {
+          throw new AppError('El personal seleccionado no existe', 404);
+        }
+      }
+      updateData.personal_id = personalId; // Puede ser null para desvincular
     }
     
     // Si no hay datos para actualizar

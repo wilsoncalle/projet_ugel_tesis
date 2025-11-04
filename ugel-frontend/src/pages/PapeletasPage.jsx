@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Card from "../components/Card";
 import TableGenerica from "../components/TableGenerica";
 import Button from "../components/Button";
 import ModalGenerico from "../components/ModalGenerico";
+import ModalDetalles from "../components/ModalDetalles";
 import FormularioGenerico from "../components/FormularioGenerico";
 import Notification from "../components/Notification";
 import TabView from "../components/TabView";
 import SelectCustom from "../components/SelectCustom";
 import DatePicker from "../components/DatePicker";
+import { EyeIcon, CheckCircleIcon, XCircleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import {
   papeletasSalidaService,
   motivosSalidaService,
@@ -36,6 +38,8 @@ const PapeletasPage = () => {
 
   // Modales / formulario
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedPapeleta, setSelectedPapeleta] = useState(null);
   const [formError, setFormError] = useState(null);
   const [notification, setNotification] = useState(null);
 
@@ -250,36 +254,55 @@ const PapeletasPage = () => {
     {
       key: "acciones",
       title: "Acciones",
-      render: (_, row) => {
-        const est = row.estado;
+      render: (row) => {
+        const est = String(row?.estado || "").trim().toUpperCase();
         const puedeDecidir = est === "SOLICITADO";
+        const puedeCancelar = est === "APROBADO" || est === "EN_CURSO";
+        
         return (
-          <div className="flex gap-2">
+          <div className="flex justify-left space-x-1">
+            {/* Botón Ver - siempre visible */}
+            <button
+              onClick={() => {
+                console.log('Ver detalles - row:', row);
+                console.log('Ver detalles - row.raw:', row.raw);
+                onVerDetalle(row.raw);
+              }}
+              className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+              title="Ver Detalles"
+            >
+              <EyeIcon className="h-4 w-4" />
+            </button>
+            
+            {/* Botones de acción según estado */}
             {puedeDecidir && (
               <>
-                <Button
-                  size="sm"
-                  variant="success"
-                  onClick={() => onDecidir(row.raw.id, "APROBAR")}
+                <button
+                  onClick={() => onDecidir(row.raw?.id || row.id, "APROBAR")}
+                  className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors"
+                  title="Aprobar"
                 >
-                  Aprobar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => onDecidir(row.raw.id, "RECHAZAR")}
+                  <CheckCircleIcon className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => onDecidir(row.raw?.id || row.id, "RECHAZAR")}
+                  className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors"
+                  title="Rechazar"
                 >
-                  Rechazar
-                </Button>
+                  <XCircleIcon className="h-4 w-4" />
+                </button>
               </>
             )}
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onVerDetalle(row.raw)}
-            >
-              Ver
-            </Button>
+            
+            {puedeCancelar && (
+              <button
+                onClick={() => onDecidir(row.raw?.id || row.id, "CANCELAR")}
+                className="p-2 bg-orange-600 text-white rounded-full hover:bg-orange-700 transition-colors"
+                title="Cancelar"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
         );
       },
@@ -287,41 +310,67 @@ const PapeletasPage = () => {
   ];
 
   // ---------- ACTIONS ----------
+  const handleCloseDetailModal = useCallback(() => {
+    setIsDetailModalOpen(false);
+    setTimeout(() => {
+      setSelectedPapeleta(null);
+    }, 300);
+  }, []);
+
+  const onVerDetalle = useCallback((ps) => {
+    console.log('onVerDetalle - ps:', ps);
+    if (!ps) {
+      console.error('onVerDetalle: ps es null o undefined');
+      return;
+    }
+    setSelectedPapeleta(ps);
+    setIsDetailModalOpen(true);
+  }, []);
+
   const onDecidir = async (id, accion) => {
     try {
-      await papeletasSalidaService.decidir(id, {
-        accion, // 'APROBAR' | 'RECHAZAR'
-        // En backend se tomará req.user.id como autorizador, si necesitas explícito:
-        // personalAutorizaId: user.personalId
-      });
+      // Usar el método correcto según la acción
+      if (accion === "CANCELAR") {
+        await papeletasSalidaService.cancelar(id, {
+          observacionAutorizacion: null
+        });
+      } else {
+        await papeletasSalidaService.decidir(id, {
+          accion, // 'APROBAR' | 'RECHAZAR'
+          // En backend se tomará req.user.id como autorizador, si necesitas explícito:
+          // personalAutorizaId: user.personalId
+        });
+      }
+      
+      const mensajes = {
+        APROBAR: "aprobada",
+        RECHAZAR: "rechazada",
+        CANCELAR: "cancelada"
+      };
       setNotification({
-        message: `Papeleta ${accion === "APROBAR" ? "aprobada" : "rechazada"} correctamente`,
+        message: `Papeleta ${mensajes[accion] || "actualizada"} correctamente`,
         type: "success",
         duration: 2500,
       });
       await loadPapeletas();
+      // Cerrar modal de detalles si está abierto
+      if (isDetailModalOpen) {
+        handleCloseDetailModal();
+      }
     } catch (e) {
       console.error("Error al decidir:", e);
+      const errorMessage = 
+        e?.response?.data?.message || 
+        e?.response?.data?.error || 
+        JSON.stringify(e?.response?.data) || 
+        e.message ||
+        "No se pudo completar la acción. Inténtalo nuevamente.";
       setNotification({
-        message:
-          e?.response?.data?.message ||
-          "No se pudo completar la acción. Inténtalo nuevamente.",
+        message: errorMessage,
         type: "error",
         duration: 4000,
       });
     }
-  };
-
-  const onVerDetalle = (ps) => {
-    // Solo lectura: abrimos modal con los campos, deshabilitados
-    setFormError(null);
-    setIsModalOpen(true);
-    setTimeout(() => {
-      const form = document.getElementById("papeleta-form");
-      if (!form) return;
-      // Cargamos valores actuales al form genérico mediante evento personalizado (si tu FormularioGenerico lo soporta)
-      // En caso contrario, puedes reutilizar otro componente de detalle
-    }, 0);
   };
 
   // ---------- CREATE MODAL ----------
@@ -434,12 +483,24 @@ const PapeletasPage = () => {
         const [datePartRaw, timePartRaw] = raw.split("T");
         const datePart = datePartRaw || "";
         const timePart = (timePartRaw || "").slice(0, 5);
-        const handleDate = (d) => onChange(`${d}T${timePart || "00:00"}`);
+        // DatePicker ahora devuelve 'yyyy-MM-dd HH:mm', necesitamos convertir a formato ISO
+        const handleDate = (d) => {
+          // Si d incluye hora (formato 'yyyy-MM-dd HH:mm'), convertir a formato ISO
+          if (d.includes(' ')) {
+            const [date, time] = d.split(' ');
+            onChange(`${date}T${time}:00`);
+          } else {
+            // Si solo es fecha, mantener el comportamiento anterior
+            onChange(`${d}T${timePart || "00:00"}`);
+          }
+        };
         const handleTime = (t) => onChange(`${datePart || new Date().toISOString().slice(0,10)}T${t}`);
+        // Pasar el valor completo al DatePicker si tiene hora, sino solo la fecha
+        const datePickerValue = datePart && timePart ? `${datePart} ${timePart}` : datePart;
         return (
           <div className="w-full space-y-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Salida Programada</label>
-            <DatePicker value={datePart} onChange={handleDate} />
+            <DatePicker value={datePickerValue} onChange={handleDate} type="salida" />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
         );
@@ -454,12 +515,24 @@ const PapeletasPage = () => {
         const [datePartRaw, timePartRaw] = raw.split("T");
         const datePart = datePartRaw || "";
         const timePart = (timePartRaw || "").slice(0, 5);
-        const handleDate = (d) => onChange(`${d}T${timePart || "00:00"}`);
+        // DatePicker ahora devuelve 'yyyy-MM-dd HH:mm', necesitamos convertir a formato ISO
+        const handleDate = (d) => {
+          // Si d incluye hora (formato 'yyyy-MM-dd HH:mm'), convertir a formato ISO
+          if (d.includes(' ')) {
+            const [date, time] = d.split(' ');
+            onChange(`${date}T${time}:00`);
+          } else {
+            // Si solo es fecha, mantener el comportamiento anterior
+            onChange(`${d}T${timePart || "00:00"}`);
+          }
+        };
         const handleTime = (t) => onChange(`${datePart || new Date().toISOString().slice(0,10)}T${t}`);
+        // Pasar el valor completo al DatePicker si tiene hora, sino solo la fecha
+        const datePickerValue = datePart && timePart ? `${datePart} ${timePart}` : datePart;
         return (
           <div className="w-full space-y-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Retorno Programada</label>
-            <DatePicker value={datePart} onChange={handleDate} />
+            <DatePicker value={datePickerValue} onChange={handleDate} type="retorno" />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
         );
@@ -588,6 +661,107 @@ const PapeletasPage = () => {
           layout="grid"
         />
       </ModalGenerico>
+
+      {/* Modal de Detalles */}
+      <ModalDetalles
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+        data={selectedPapeleta}
+        title="Detalles de Papeleta de Salida"
+        size="lg"
+        fields={[
+          {
+            key: 'codigo_papeleta',
+            label: 'Código de Papeleta',
+            render: (value, data) => {
+              console.log('Modal - codigo_papeleta:', value, 'data:', data);
+              return value || data?.codigo_papeleta || '—';
+            }
+          },
+          {
+            key: 'solicitante',
+            label: 'Solicitante',
+            render: (value, data) => {
+              const nombres = data?.solicitante_nombres || data?.nombres || '';
+              const apellidos = data?.solicitante_apellidos || data?.apellidos || '';
+              const nombreCompleto = `${nombres} ${apellidos}`.trim();
+              return nombreCompleto || '—';
+            }
+          },
+          {
+            key: 'nombre_motivo',
+            label: 'Motivo de Salida',
+            render: (value, data) => {
+              return value || data?.nombre_motivo || data?.motivo || '—';
+            }
+          },
+          {
+            key: 'fecha_hora_salida_programada',
+            label: 'Fecha y Hora de Salida Programada',
+            render: (value, data) => {
+              const fechaValue = value || data?.fecha_hora_salida_programada;
+              if (!fechaValue) return '—';
+              try {
+                const fecha = new Date(fechaValue);
+                return fecha.toLocaleString('es-PE');
+              } catch {
+                return fechaValue;
+              }
+            }
+          },
+          {
+            key: 'fecha_hora_retorno_programada',
+            label: 'Fecha y Hora de Retorno Programada',
+            render: (value, data) => {
+              const fechaValue = value || data?.fecha_hora_retorno_programada;
+              if (!fechaValue) return '—';
+              try {
+                const fecha = new Date(fechaValue);
+                return fecha.toLocaleString('es-PE');
+              } catch {
+                return fechaValue;
+              }
+            }
+          },
+          {
+            key: 'sustento_solicitud',
+            label: 'Sustento / Justificación',
+            render: (value, data) => {
+              return value || data?.sustento_solicitud || 'No especificado';
+            }
+          },
+          {
+            key: 'estado',
+            label: 'Estado',
+            render: (value, data) => {
+              const estadoValue = value || data?.estado;
+              const estadoMap = {
+                SOLICITADO: 'Solicitado',
+                APROBADO: 'Aprobado',
+                EN_CURSO: 'En curso',
+                FINALIZADO: 'Finalizado',
+                RECHAZADO: 'Rechazado',
+                CANCELADO: 'Cancelado'
+              };
+              return estadoMap[estadoValue] || estadoValue || '—';
+            }
+          },
+          {
+            key: 'fecha_solicitud',
+            label: 'Fecha de Solicitud',
+            render: (value, data) => {
+              const fechaValue = value || data?.fecha_solicitud;
+              if (!fechaValue) return '—';
+              try {
+                const fecha = new Date(fechaValue);
+                return fecha.toLocaleString('es-PE');
+              } catch {
+                return fechaValue;
+              }
+            }
+          }
+        ]}
+      />
 
       {/* Notifications */}
       {notification && (

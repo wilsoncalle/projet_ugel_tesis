@@ -251,7 +251,7 @@ const decidirPapeleta = async (
     });
   } catch (error) {
     logger.error(`Error al decidir papeleta ${id}:`, error);
-    throw error;
+    throw error instanceof AppError ? error : new AppError("Error al decidir la papeleta", 500);
   }
 };
 

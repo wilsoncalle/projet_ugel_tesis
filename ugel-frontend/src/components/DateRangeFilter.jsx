@@ -222,6 +222,12 @@ const DateRangeFilter = ({
 
   // Manejar clic en un chip de día
   const handleDiaClick = (fechaDia) => {
+    // Validar que no sea un día futuro
+    const fechaDiaObj = parseDate(fechaDia);
+    if (fechaDiaObj && isFutureDate(fechaDiaObj)) {
+      return; // No permitir seleccionar días futuros
+    }
+    
     setDiaSeleccionado(fechaDia);
     // Actualizar las fechas para mostrar solo ese día
     // IMPORTANTE: Llamar a ambos callbacks pasando el mismo día como primer y segundo parámetro
@@ -749,24 +755,30 @@ const DateRangeFilter = ({
                   const parsedDateForRender = parseDate(d.date);
                   const dayOfWeek = parsedDateForRender ? parsedDateForRender.getDay() : -1;
                   const isSunday = dayOfWeek === 0; // Ya no hay sábados en la lista
+                  
+                  // Validar si es un día futuro
+                  const isFuture = parsedDateForRender ? isFutureDate(parsedDateForRender) : false;
 
                   return (
                     <button
                       key={d.date}
                       type="button"
-                      onClick={() => handleDiaClick(d.date)}
+                      onClick={() => !isFuture && handleDiaClick(d.date)}
+                      disabled={isFuture}
                       className={`
-                        ${isSelected ? 'px-4' : 'px-3'} py-1.5 text-xs font-medium transition-colors cursor-pointer border-r border-gray-300 last:border-r-0
-                        ${isSelected 
-                          ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                        ${isSelected ? 'px-4' : 'px-3'} py-1.5 text-xs font-medium transition-colors border-r border-gray-300 last:border-r-0
+                        ${isFuture 
+                          ? 'text-gray-300 bg-gray-50 cursor-not-allowed opacity-50' 
+                          : isSelected 
+                          ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer' 
                           : isToday 
-                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
+                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 cursor-pointer' 
                           : isSunday
-                          ? 'bg-orange-50 text-orange-700 hover:bg-orange-100'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
+                          ? 'bg-orange-50 text-orange-700 hover:bg-orange-100 cursor-pointer'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 cursor-pointer'
                         }
                       `}
-                      title={d.labelLong}
+                      title={isFuture ? 'No se puede seleccionar días futuros' : d.labelLong}
                     >
                       {isSelected ? d.labelLong.charAt(0).toUpperCase() + d.labelLong.slice(1) : d.labelShort}
                     </button>

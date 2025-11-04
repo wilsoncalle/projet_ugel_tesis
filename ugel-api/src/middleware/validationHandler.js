@@ -281,8 +281,8 @@ const schemas = {
     // Decidir (aprobar/rechazar)
     decidir: Joi.object({
       accion: Joi.string().valid("APROBAR", "RECHAZAR").required(),
-      personalAutorizaId: Joi.number().integer().positive().required(),
-      observacionAutorizacion: Joi.string().max(500).allow("", null),
+      personalAutorizaId: Joi.number().integer().positive().optional(), // Opcional, se usa req.user.personal_id como fallback
+      observacionAutorizacion: Joi.string().max(500).allow("", null).optional(),
     }),
 
     // Cancelar (antes de salida real)

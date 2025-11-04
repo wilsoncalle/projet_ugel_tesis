@@ -1,12 +1,46 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import CatalogoPage from '../components/CatalogoPage';
 import Input from '../components/Input';
 import SelectCustom from '../components/SelectCustom';
-import { usuariosService } from '../services/api';
+import { usuariosService, personalService } from '../services/api';
 import { usuariosFormFields, getTableColumns, transformUsuarios, transformUsuariosToBackend } from '../config/formFields.jsx';
 
 const UsuariosPage = () => {
   const tableColumns = getTableColumns('usuarios');
+
+  // Estado para guardar la lista del personal
+  const [personalOptions, setPersonalOptions] = useState([]);
+  const [loadingPersonal, setLoadingPersonal] = useState(true);
+
+  // Effect para cargar la lista de personal al abrir la página
+  useEffect(() => {
+    const loadPersonal = async () => {
+      try {
+        // Cargar personal igual que en RegistroForm.jsx (sin parámetros)
+        const res = await personalService.getAll();
+        
+        // El backend devuelve: { success: true, data: [...], pagination: {...} }
+        const data = res?.data?.data || res?.data || [];
+
+        // Filtrar solo personal activo en el frontend
+        const personalActivo = data.filter(p => p.activo !== false);
+
+        const options = personalActivo.map(p => ({
+          value: p.id,
+          label: `${p.nombres} ${p.apellidos} (${p.numero_documento || 's/doc'})`
+        }));
+
+        setPersonalOptions(options);
+      } catch (err) {
+        console.error("Error cargando la lista de personal:", err);
+        console.error("Error details:", err.response?.data || err.message);
+      } finally {
+        setLoadingPersonal(false);
+      }
+    };
+
+    loadPersonal();
+  }, []); // El array vacío asegura que solo se ejecute una vez
 
   // Render fields with shared components
   const renderedFields = usuariosFormFields.map(field => {
@@ -24,8 +58,64 @@ const UsuariosPage = () => {
       const maxLengths = {
         nombre_usuario: 150,
         email: 150,
-        hash_contrasena: 150,
+        hash_contrasena: 255,
       };
+      
+      // Para el campo de contraseña, agregar indicador de longitud
+      if (field.name === 'hash_contrasena') {
+        return {
+          ...field,
+          render: ({ value, onChange, error }) => {
+            const passwordLength = (value || '').length;
+            const minLength = 8;
+            const maxLength = 255;
+            const isValidLength = passwordLength >= minLength && passwordLength <= maxLength;
+            
+            return (
+              <div>
+                <Input
+                  label={labels[field.name]}
+                  type={types[field.name]}
+                  name={field.name}
+                  value={value || ''}
+                  onChange={(e) => onChange(e.target.value)}
+                  maxLength={maxLengths[field.name]}
+                  placeholder={field.placeholder}
+                  autoComplete="new-password"
+                  error={error}
+                />
+                {/* Indicador de longitud de contraseña */}
+                {value && (
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className={`text-xs ${
+                      passwordLength < minLength 
+                        ? 'text-red-600' 
+                        : passwordLength > maxLength 
+                        ? 'text-red-600' 
+                        : 'text-gray-600'
+                    }`}>
+                      {passwordLength < minLength 
+                        ? `Mínimo ${minLength} caracteres (${passwordLength}/${minLength})`
+                        : `${passwordLength} / ${maxLength} caracteres`
+                      }
+                    </span>
+                    {isValidLength && passwordLength >= minLength && (
+                      <span className="text-xs text-green-600">✓</span>
+                    )}
+                  </div>
+                )}
+                {/* Mensaje de ayuda */}
+                {!value && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Mínimo {minLength} caracteres, máximo {maxLength} caracteres
+                  </p>
+                )}
+              </div>
+            );
+          }
+        };
+      }
+      
       return {
         ...field,
         render: ({ value, onChange, error }) => (
@@ -38,9 +128,7 @@ const UsuariosPage = () => {
             maxLength={maxLengths[field.name]}
             placeholder={field.placeholder}
             autoComplete={
-              field.name === 'hash_contrasena'
-                ? 'new-password'
-                : field.name === 'email'
+              field.name === 'email'
                 ? 'off'
                 : 'off'
             }
@@ -62,6 +150,32 @@ const UsuariosPage = () => {
               options={fullField.options || []}
               placeholder="Seleccione rol"
               isSearchable={false}
+            />
+            {error && (
+              <p className="mt-1 text-sm text-red-600">{error}</p>
+            )}
+          </div>
+        )
+      };
+    }
+
+    // Renderizar el campo 'personal_id'
+    if (field.name === 'personal_id') {
+      return {
+        ...field,
+        render: ({ value, onChange, error }) => (
+          <div>
+            <SelectCustom
+              label="Personal Vinculado"
+              // Busca la opción actual en base al 'value' (que será el ID)
+              value={personalOptions.find(opt => opt.value === value) || null}
+              // Al cambiar, guardamos solo el 'value' (el ID)
+              onChange={(selected) => onChange(selected?.value || null)}
+              options={personalOptions}
+              placeholder="Seleccione un trabajador..."
+              isLoading={loadingPersonal}
+              isSearchable={true}
+              isClearable={true} // Para poder desvincular (enviar null)
             />
             {error && (
               <p className="mt-1 text-sm text-red-600">{error}</p>

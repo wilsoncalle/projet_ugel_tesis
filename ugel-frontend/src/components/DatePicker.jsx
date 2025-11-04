@@ -12,6 +12,13 @@ const DatePicker = ({
   className = '',
   includeToday = true,
   minDate,
+  // NUEVO: Restricción de horas
+  minHour = 7,   // 07:00
+  maxHour = 19,  // 19:59
+  // estrategia: "hide" (oculta fuera de rango) | "disable" (las muestra deshabilitadas)
+  hourRenderStrategy = "disable",
+  // NUEVO: Tipo de fecha para determinar hora inicial
+  type = "salida", // "salida" | "retorno"
 }) => {
   // ===== Helpers =====
   const parseDateTimeString = (dateTimeString) => {
@@ -26,6 +33,17 @@ const DatePicker = ({
   const isWeekend = (date) => {
     const day = date.getDay();
     return day === 0 || day === 6; // 0 = domingo, 6 = sábado
+  };
+
+  // Helper para verificar si una hora está permitida
+  const isHourAllowed = (hour) => hour >= minHour && hour <= maxHour;
+
+  // Helper para ajustar la hora al rango permitido
+  const clampHour = (date) => {
+    const h = date.getHours();
+    if (h < minHour) return setHours(date, minHour);
+    if (h > maxHour) return setHours(date, maxHour);
+    return date;
   };
 
   const effectiveMinDate = useMemo(() => {
@@ -73,9 +91,22 @@ const DatePicker = ({
 
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
   const minutes = useMemo(() => Array.from({ length: 60 }, (_, i) => i), []);
-  const hoursLoop = useMemo(() => [...hours, ...hours, ...hours], [hours]);
+  
+  // Filtrar horas permitidas si la estrategia es "hide"
+  const allowedHours = useMemo(() => {
+    if (hourRenderStrategy === "hide") {
+      return hours.filter(h => h >= minHour && h <= maxHour);
+    }
+    return hours;
+  }, [hourRenderStrategy, minHour, maxHour, hours]);
+  
+  const hoursLoop = useMemo(() => {
+    const base = hourRenderStrategy === "hide" ? allowedHours : hours;
+    return [...base, ...base, ...base];
+  }, [hourRenderStrategy, allowedHours, hours]);
+  
   const minutesLoop = useMemo(() => [...minutes, ...minutes, ...minutes], [minutes]);
-  const BLOCK_HOURS = 24;
+  const BLOCK_HOURS = hourRenderStrategy === "hide" ? allowedHours.length : 24;
   const BLOCK_MINUTES = 60;
 
   // ===== Lógica del Calendario =====
@@ -112,24 +143,56 @@ const DatePicker = ({
     if (startOfLocalDay(newDate) < effectiveMinDate) return;
     // No permitir seleccionar fines de semana
     if (isWeekend(newDate)) return;
-    setSelectedDate(newDate);
-    onChange?.(format(newDate, 'yyyy-MM-dd HH:mm'));
+    
+    // Asegura que la hora esté en rango
+    let fixed = clampHour(newDate);
+    setSelectedDate(fixed);
+    onChange?.(format(fixed, 'yyyy-MM-dd HH:mm'));
   };
 
   const handleSelectDay = (day) => {
-    const currentHour = selectedDate.getHours();
-    const currentMinute = selectedDate.getMinutes();
-    let newDate = setHours(day, currentHour);
-    newDate = setMinutes(newDate, currentMinute);
+    const dayStart = startOfLocalDay(day);
+    const isToday = dayStart.getTime() === todayLocal.getTime();
+    const now = new Date();
+    
+    let hour, minute;
+    
+    if (isToday) {
+      // Si es el día actual
+      if (type === "salida") {
+        // Para fecha de salida: usar la hora actual
+        hour = now.getHours();
+        minute = now.getMinutes();
+      } else {
+        // Para fecha de retorno: usar minHour (07:00)
+        hour = minHour;
+        minute = 0;
+      }
+    } else {
+      // Si es un día futuro: siempre comenzar en minHour (07:00)
+      hour = minHour;
+      minute = 0;
+    }
+    
+    // Asegurar que la hora esté en el rango permitido
+    if (hour < minHour) hour = minHour;
+    if (hour > maxHour) hour = maxHour;
+    
+    let newDate = setHours(day, hour);
+    newDate = setMinutes(newDate, minute);
+    
     handleSelectionChange(newDate);
   };
   
   const handleSelectHour = (hour) => {
+    if (!isHourAllowed(hour)) return; // bloquea clicks fuera del rango si strategy === "disable"
     const newDate = setHours(selectedDate, hour);
     handleSelectionChange(newDate);
   };
 
   const handleSelectMinute = (minute) => {
+    // Solo permite minutos si la hora actual está permitida
+    if (!isHourAllowed(selectedDate.getHours())) return;
     const newDate = setMinutes(selectedDate, minute);
     handleSelectionChange(newDate);
   };
@@ -152,15 +215,30 @@ const DatePicker = ({
     const minuteContainer = minuteListRef.current;
     const hourItemH = itemHourRef.current?.offsetHeight || 32;
     const minuteItemH = itemMinuteRef.current?.offsetHeight || 32;
+
+    // Asegura hora válida antes de centrar
+    let toCenter = selectedDate;
+    if (!isHourAllowed(toCenter.getHours())) {
+      toCenter = setHours(toCenter, Math.min(Math.max(toCenter.getHours(), minHour), maxHour));
+      setSelectedDate(toCenter);
+    }
+
     if (hourContainer) {
-      const idx = selectedDate.getHours();
-      hourContainer.scrollTop = (BLOCK_HOURS + idx) * hourItemH;
+      const hour = toCenter.getHours();
+      let scrollIdx;
+      if (hourRenderStrategy === "hide") {
+        const hourIndex = allowedHours.indexOf(hour);
+        scrollIdx = hourIndex >= 0 ? hourIndex : (allowedHours.length > 0 ? 0 : 0);
+      } else {
+        scrollIdx = hour;
+      }
+      hourContainer.scrollTop = (BLOCK_HOURS + scrollIdx) * hourItemH;
     }
     if (minuteContainer) {
-      const idx = selectedDate.getMinutes();
+      const idx = toCenter.getMinutes();
       minuteContainer.scrollTop = (BLOCK_MINUTES + idx) * minuteItemH;
     }
-  }, [selectedDate]);
+  }, [selectedDate, minHour, maxHour, hourRenderStrategy, allowedHours]);
 
   // Recentrado para efecto infinito
   const onScrollHours = () => {
@@ -295,12 +373,31 @@ const DatePicker = ({
              <div ref={hourListRef} onScroll={onScrollHours} className="overflow-y-auto max-h-[224px] pr-1 dp-no-scrollbar">
                      {hoursLoop.map((h, idx) => {
                          const isSelected = value && h === currentHour;
+                         const disabled = !isHourAllowed(h);
+                         
+                         // Para "hide", ya está filtrado en hoursLoop, así que solo renderizar
+                         // Para "disable", renderizar todos pero deshabilitar los fuera de rango
+                         const getRefIndex = () => {
+                           if (hourRenderStrategy === "hide") {
+                             const hourIndex = allowedHours.indexOf(currentHour);
+                             return hourIndex >= 0 ? BLOCK_HOURS + hourIndex : null;
+                           }
+                           return BLOCK_HOURS + currentHour;
+                         };
+                         const refIndex = getRefIndex();
+                         
                          return (
                              <button
                                key={`h-${idx}`}
-                               ref={idx === BLOCK_HOURS + currentHour ? itemHourRef : null}
+                               ref={idx === refIndex ? itemHourRef : null}
                                onClick={() => handleSelectHour(h)}
-                               className={`w-8 h-8 rounded-full text-sm flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}
+                               disabled={hourRenderStrategy === "disable" ? disabled : false}
+                               className={[
+                                 "w-8 h-8 rounded-full text-sm flex items-center justify-center transition-colors",
+                                 isSelected ? "bg-blue-600 text-white" : "hover:bg-gray-100",
+                                 disabled && hourRenderStrategy === "disable" ? "opacity-30 cursor-not-allowed hover:bg-transparent" : ""
+                               ].join(" ")}
+                               title={disabled ? "Fuera del horario permitido" : undefined}
                              >
                                {h}
                              </button>
