@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import Card from '../Card';
 import Button from '../Button';
 import Input from '../Input';
@@ -6,6 +6,7 @@ import SelectCustom from '../SelectCustom';
 import Badge from '../Badge';
 import { PlusIcon, ClipboardDocumentListIcon, UserGroupIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { tiposDocumentoService, motivosVisitaService, personalService, areasService, visitantesService, registrarVisitaCompleta, getVisitantesActivos } from '../../services/api';
+import { formatHora } from '../../utils/dateHelpers';
 
 const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterVisit, onFormChange, activeTab = 'activos', onTabChange, onBuscarHistorial, refs = {} }, ref) => {
   // Estados del formulario de visitante (compartido entre tabs)
@@ -130,6 +131,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
   }, [formVisitante.tipoDocumentoId, formVisitante.numeroDocumento, buscandoVisitante, documentoYaBuscado]);
 
   // Limpiar formularios al cambiar de tab
+  // CORRECCIÓN: Agregar dependencias necesarias para evitar valores stale
   useEffect(() => {
     // Solo limpiar si realmente cambió el tab (no en el montaje inicial)
     if (previousTab !== activeTab) {
@@ -171,7 +173,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
       // Actualizar el tab anterior
       setPreviousTab(activeTab);
     }
-  }, [activeTab, previousTab]);
+  }, [activeTab, previousTab, empleados, formVisitante, onFormChange]);
   
   const cargarDatosIniciales = async () => {
     setLoadingData(true);
@@ -353,9 +355,10 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
   };
 
   // Buscar visitante por documento
-  const buscarVisitante = async () => {
+  // RETORNA el visitante encontrado directamente (o null) para evitar problemas de asincronía
+  const buscarVisitante = useCallback(async () => {
     if (!formVisitante.tipoDocumentoId || !formVisitante.numeroDocumento) {
-      return;
+      return null;
     }
 
     // Crear clave única para el documento actual
@@ -387,7 +390,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           setMensajeVisitante('Este visitante ya está en la lista de espera');
           setTipoMensaje('error');
           setDocumentoYaBuscado(documentoActual);
-          return;
+          return null;
         }
         
         // Verificar si el visitante ya tiene una visita activa
@@ -396,9 +399,10 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
           setTipoMensaje('error');
           setDocumentoYaBuscado(documentoActual);
-          return;
+          return null;
         }
         
+        // Actualizar estado
         setVisitanteEncontrado(visitante);
         setFormVisitante(prev => ({
           ...prev,
@@ -432,6 +436,9 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           apellidos: '',
           visitanteId: null
         });
+        
+        // RETORNAR el visitante encontrado para uso inmediato
+        return visitante;
       } else {
         // Verificar si el visitante ya está en la lista de espera (incluso si no está en la BD)
         const yaEnEspera = visitantesEnEspera.find(v => 
@@ -443,7 +450,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           setMensajeVisitante('Este visitante ya está en la lista de espera');
           setTipoMensaje('error');
           setDocumentoYaBuscado(documentoActual);
-          return;
+          return null;
         }
         
         // SEGUNDO: Si no se encontró en BD local, consultar RENIEC (solo para DNI de 8 dígitos)
@@ -496,7 +503,8 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
                 visitanteId: null
               });
               
-              return;
+              // RETORNAR el visitante encontrado
+              return datosDNI;
             }
           } catch (dniError) {
             console.log('Error consultando DNI externo:', dniError.message);
@@ -506,7 +514,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
               setMensajeVisitante('DNI no encontrado en la base de datos nacional. Complete los datos manualmente.');
               setTipoMensaje('info');
               setDocumentoYaBuscado(documentoActual);
-              return;
+              return null;
             }
             
             // Para otros errores, continuar con mensaje genérico
@@ -521,6 +529,7 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
           visitanteId: null
         }));
         setDocumentoYaBuscado(documentoActual);
+        return null;
       }
     } catch (error) {
       
@@ -538,10 +547,11 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
       }
       
       setDocumentoYaBuscado(documentoActual);
+      return null;
     } finally {
       setBuscandoVisitante(false);
     }
-  };
+  }, [formVisitante.tipoDocumentoId, formVisitante.numeroDocumento, visitantesEnEspera, tiposDocumento, onAddVisitor]);
 
   // Manejar cambios en el formulario de visitante
   const handleVisitanteChange = (field, value) => {
@@ -749,20 +759,28 @@ const RegistroForm = forwardRef(({ visitantesEnEspera, onAddVisitor, onRegisterV
     }
 
     // Si no tenemos visitanteId, intentar buscar el visitante primero
+    // CORRECCIÓN: Usar el valor retornado directamente en lugar de depender del estado
     if (!formVisitante.visitanteId && formVisitante.tipoDocumentoId && formVisitante.numeroDocumento) {
       try {
-        await buscarVisitante();
-        // Esperar un momento para que se actualice el estado
-        await new Promise(resolve => setTimeout(resolve, 100));
+        const visitanteEncontrado = await buscarVisitante();
         
-        // Si después de buscar tenemos un visitanteId, verificar si tiene visita activa
-        if (formVisitante.visitanteId) {
-          const visitaActiva = await verificarVisitaActiva(formVisitante.visitanteId);
+        // Si se encontró un visitante, usar su ID directamente
+        if (visitanteEncontrado && visitanteEncontrado.id) {
+          // Verificar si tiene visita activa usando el ID del visitante encontrado
+          const visitaActiva = await verificarVisitaActiva(visitanteEncontrado.id);
           if (visitaActiva) {
             setMensajeVisitante('El visitante ya tiene una visita activa. Registre su salida primero.');
             setTipoMensaje('error');
             return;
           }
+          
+          // Actualizar el estado con el visitante encontrado
+          setFormVisitante(prev => ({
+            ...prev,
+            nombres: visitanteEncontrado.nombres || prev.nombres,
+            apellidos: visitanteEncontrado.apellidos || prev.apellidos,
+            visitanteId: visitanteEncontrado.id
+          }));
         }
       } catch (error) {
         console.error('Error al buscar visitante:', error);

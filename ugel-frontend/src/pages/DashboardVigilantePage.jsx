@@ -13,6 +13,7 @@ import useKeyboardShortcuts from '../hooks/useKeyboardShortcuts';
 import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp';
 import { createVisitaWithOfflineSupport, registrarSalidaWithOfflineSupport, isOfflineResponse, getResponseMessage } from '../services/offlineApiService';
 import { getPendingVisitas, getPendingSalidas, getVisitasActivasCompletas } from '../utils/offlineDB';
+import { formatHora } from '../utils/dateHelpers';
 
 // Función para consultar RENIEC
 const consultarRENIEC = async (numeroDocumento) => {
@@ -167,8 +168,9 @@ const DashboardVigilantePage = () => {
           }
           
           if (datosActualizados.hora_ingreso && v.hora_ingreso) {
-            const horaOffline = v.hora_ingreso?.substring(0, 5);
-            const horaActualizada = datosActualizados.hora_ingreso?.substring(0, 5);
+            // CORRECCIÓN: Usar helper para formatear horas de forma consistente
+            const horaOffline = formatHora(v.hora_ingreso);
+            const horaActualizada = formatHora(datosActualizados.hora_ingreso);
             mismaHora = horaOffline === horaActualizada;
           }
           
@@ -522,18 +524,10 @@ const DashboardVigilantePage = () => {
             ...visita,
             // Preservar la fecha y hora de ingreso original
             fecha_ingreso: visita.fecha_ingreso || visita.fechaIngreso || new Date().toISOString().split('T')[0],
-            hora_ingreso: visita.hora_ingreso || visita.horaIngreso || new Date().toLocaleTimeString('es-PE', { 
-              hour12: false, 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            }),
+            hora_ingreso: formatHora(visita.hora_ingreso || visita.horaIngreso || new Date()),
             // Agregar datos de salida
             fecha_salida: new Date(timestamp).toISOString(),
-            hora_salida: new Date(timestamp).toLocaleTimeString('es-PE', { 
-              hour12: false, 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            }),
+            hora_salida: formatHora(new Date(timestamp)),
             _wasOfflineExit: true,
             _offlineExitTimestamp: timestamp,
             _originalOfflineId: visitaId
@@ -724,16 +718,9 @@ const DashboardVigilantePage = () => {
                 const fechaAPI = v.fecha_ingreso?.split('T')[0];
                 const mismaFecha = fechaAPI === fechaOffline;
                 
-                // Comparar horas (usar hora_ingreso si está disponible, sino extraer de fecha_ingreso)
-                let horaOffline = visitaOffline.hora_ingreso?.substring(0, 5);
-                let horaAPI = '';
-                
-                if (v.hora_ingreso) {
-                  horaAPI = v.hora_ingreso.substring(0, 5);
-                } else if (v.fecha_ingreso && v.fecha_ingreso.includes('T')) {
-                  horaAPI = new Date(v.fecha_ingreso).toTimeString().substring(0, 5);
-                }
-                
+                // CORRECCIÓN: Usar helper para formatear horas de forma consistente
+                const horaOffline = formatHora(visitaOffline.hora_ingreso);
+                const horaAPI = formatHora(v.hora_ingreso || v.fecha_ingreso);
                 const mismaHora = horaAPI === horaOffline;
                 
                 // También considerar visitas sin salida (activas)
@@ -958,12 +945,8 @@ const DashboardVigilantePage = () => {
   // Handlers para el formulario de registro
   const handleAddVisitor = (visitanteData) => {
     const currentDate = new Date();
-    // Generar hora en formato HH:MM usando toLocaleTimeString para evitar problemas de zona horaria
-    const horaFormateada = currentDate.toLocaleTimeString('es-PE', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
+    // CORRECCIÓN: Usar helper para formatear horas de forma consistente
+    const horaFormateada = formatHora(currentDate);
     
     const nuevoVisitante = {
       id: Date.now(), // ID temporal
@@ -979,12 +962,9 @@ const DashboardVigilantePage = () => {
   };
   
   // Handler para cambios en tiempo real en el formulario
+  // NOTA: Actualmente aplica los mismos datos de visita a TODOS los visitantes en espera
+  // Si en el futuro se necesita permitir datos individuales por visitante, se puede modificar
   const handleFormChange = (formData) => {
-    console.warn('🚀 [Dashboard] handleFormChange LLAMADO');
-    console.warn('🚀 [Dashboard] formData:', JSON.stringify(formData, null, 2));
-    console.warn('🚀 [Dashboard] visitantesEnEspera.length:', visitantesEnEspera.length);
-    console.warn('🚀 [Dashboard] visitantesEnEspera:', visitantesEnEspera);
-    
     // Actualizar los visitantes en espera con los datos de la visita
     // IMPORTANTE: Solo actualizar si hay datos significativos (no vacíos)
     const tieneDatosSignificativos = formData.visita && 
@@ -995,9 +975,6 @@ const DashboardVigilantePage = () => {
       (!formData.visita.empleadoId && !formData.visita.motivoId && !formData.visita.lugar);
     
     if (tieneDatosSignificativos && visitantesEnEspera.length > 0 && !datosEstanVacios) {
-      console.warn('🚀 [Dashboard] ✅ Condición cumplida, actualizando visitantes...');
-      console.warn('🚀 [Dashboard] formData.visita:', formData.visita);
-      
       // Crear un objeto con los datos de la visita
       const visitaData = {
         empleado: formData.visita.empleado,
@@ -1011,15 +988,13 @@ const DashboardVigilantePage = () => {
         nombre_area: formData.visita.lugar || ''
       };
       
-      console.log('[Dashboard] visitaData a aplicar:', visitaData);
-      
-      // Actualizar todos los visitantes en espera con los mismos datos de visita
+      // CORRECCIÓN: Actualizar todos los visitantes en espera con los mismos datos de visita
+      // NOTA: Si se necesita permitir datos individuales por visitante, se puede modificar
+      // para aplicar solo a visitantes específicos o usar un ID de visitante en formData
       const visitantesActualizados = visitantesEnEspera.map(visitante => ({
         ...visitante,
         ...visitaData
       }));
-      
-      console.log('[Dashboard] visitantesActualizados:', visitantesActualizados);
       
       setVisitantesEnEspera(visitantesActualizados);
     }
@@ -1029,12 +1004,8 @@ const DashboardVigilantePage = () => {
       if (formData.visitante && Object.values(formData.visitante).some(val => val)) {
         // Crear una vista previa del visitante con ID temporal
         const currentDate = new Date();
-        // Generar hora en formato HH:MM usando toLocaleTimeString para evitar problemas de zona horaria
-        const horaFormateada = currentDate.toLocaleTimeString('es-PE', { 
-          hour12: false, 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        });
+        // CORRECCIÓN: Usar helper para formatear horas de forma consistente
+        const horaFormateada = formatHora(currentDate);
         
         const previewVisitante = {
           id: 'preview',
@@ -1198,12 +1169,8 @@ const DashboardVigilantePage = () => {
             }
           }
 
-          // Extraer la hora de ingreso del visitante (que ya fue generada al agregarlo a la lista)
-          const horaIngresoOriginal = visitante.horaIngreso || new Date().toLocaleTimeString('es-PE', { 
-            hour12: false, 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          });
+          // CORRECCIÓN: Usar helper para formatear horas de forma consistente
+          const horaIngresoOriginal = formatHora(visitante.horaIngreso || new Date());
           
           // Extraer los datos de visita del visitante (priorizando los que ya tiene guardados)
           // Los datos vienen de SelectCustom que usa 'value' en lugar de 'id'

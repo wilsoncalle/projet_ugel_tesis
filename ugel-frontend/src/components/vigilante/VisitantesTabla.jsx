@@ -10,6 +10,7 @@ import ModalDetalles from '../ModalDetalles';
 import QuickSearchBar from '../QuickSearchBar';
 import { UsersIcon, ClockIcon, ArrowRightOnRectangleIcon, TrashIcon, EyeIcon, DocumentTextIcon, DocumentArrowDownIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { VisitasAreaCard, VisitasMotivoCard, VisitasTotalesCard, VisitasPersonalCard, VisitantesFrecuentesCard } from '../vigilante_estadisticas';
+import { formatHora } from '../../utils/dateHelpers';
 
 const VisitantesTabla = ({
   visitantesActivos,
@@ -90,11 +91,7 @@ const VisitantesTabla = ({
             nombre_motivo: vistaPreviaVisita?.motivo?.label || '',
             nombre_area: vistaPreviaVisita?.lugar || '',
             fecha_ingreso: new Date().toLocaleDateString(),
-            hora_ingreso: new Date().toLocaleTimeString('es-PE', { 
-              hour12: false, 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            }),
+            hora_ingreso: formatHora(new Date()),
             isPreview: true
           };
           
@@ -436,78 +433,25 @@ const VisitantesTabla = ({
             return <div className="text-sm text-gray-900">-</div>;
           }
           
+          // CORRECCIÓN: Usar helper para formatear horas de forma consistente
           let horaFormateada = '';
           
           // Para visitantes activos (estructura diferente)
           if (activeTab === 'activos') {
             // Si es un visitante en espera (local)
             if ((visitantesEnEspera || []).some(v => v.id === row.id)) {
-              horaFormateada = row.horaIngreso || '';
+              horaFormateada = formatHora(row.horaIngreso);
             } 
             // Si es un visitante activo (de la API) o visita offline
             else {
-              console.log('[VisitantesTabla] Procesando hora para fila:', {
-                id: row.id,
-                hora_ingreso: row.hora_ingreso,
-                horaIngreso: row.horaIngreso,
-                fecha_ingreso: row.fecha_ingreso,
-                _isOffline: row._isOffline
-              });
-              
-              try {
-                // Prioridad 1: Usar hora_ingreso directo si existe
-                if (row.hora_ingreso) {
-                  horaFormateada = row.hora_ingreso.substring(0, 5);
-                  console.log('[VisitantesTabla] Usando hora_ingreso:', horaFormateada);
-                }
-                // Prioridad 2: Usar horaIngreso si existe
-                else if (row.horaIngreso) {
-                  horaFormateada = row.horaIngreso.substring(0, 5);
-                  console.log('[VisitantesTabla] Usando horaIngreso:', horaFormateada);
-                }
-                // Prioridad 3: Extraer de fecha_ingreso solo si es una fecha completa con hora
-                else if (row.fecha_ingreso && row.fecha_ingreso.includes('T')) {
-                  const fecha = new Date(row.fecha_ingreso);
-                  if (!isNaN(fecha.getTime())) {
-                    horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
-                    console.log('[VisitantesTabla] Usando fecha_ingreso con hora:', horaFormateada);
-                  }
-                }
-              } catch (e) {
-                console.error('Error al formatear hora de ingreso:', e);
-              }
+              // Usar helper formatHora que maneja múltiples formatos
+              horaFormateada = formatHora(row.hora_ingreso || row.horaIngreso || row.fecha_ingreso);
             }
           } 
           // Para historial (formato plano)
           else {
-            try {
-              // Prioridad 1: Usar hora_ingreso directo si existe (para visitas offline)
-              if (row.hora_ingreso) {
-                horaFormateada = row.hora_ingreso.substring(0, 5);
-                console.log('[VisitantesTabla] Historial - Usando hora_ingreso:', horaFormateada);
-              }
-              // Prioridad 2: Usar horaIngreso si existe
-              else if (row.horaIngreso) {
-                horaFormateada = row.horaIngreso.substring(0, 5);
-                console.log('[VisitantesTabla] Historial - Usando horaIngreso:', horaFormateada);
-              }
-              // Prioridad 3: Extraer de fecha_ingreso solo si es una fecha completa con hora
-              else if (row.fecha_ingreso) {
-                if (row.fecha_ingreso.includes('T')) {
-                  const fecha = new Date(row.fecha_ingreso);
-                  if (!isNaN(fecha.getTime())) {
-                    horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
-                    console.log('[VisitantesTabla] Historial - Usando fecha_ingreso con hora:', horaFormateada);
-                  }
-                } else {
-                  // Si es solo fecha (YYYY-MM-DD), usar hora por defecto
-                  horaFormateada = '00:00';
-                  console.log('[VisitantesTabla] Historial - Solo fecha, usando hora por defecto');
-                }
-              }
-            } catch (e) {
-              console.error('Error al formatear hora de ingreso en historial:', e);
-            }
+            // Usar helper formatHora que maneja múltiples formatos
+            horaFormateada = formatHora(row.hora_ingreso || row.horaIngreso || row.fecha_ingreso) || '00:00';
           }
           
           return (
@@ -570,18 +514,8 @@ const VisitantesTabla = ({
           }
           
           // Extraer la hora de la fecha_salida
-          let horaFormateada = '';
-          try {
-            const fechaSalida = row.fecha_salida;
-            if (fechaSalida) {
-              const fecha = new Date(fechaSalida);
-              if (!isNaN(fecha.getTime())) {
-                horaFormateada = fecha.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
-              }
-            }
-          } catch (e) {
-            console.error('Error al formatear hora de salida:', e);
-          }
+          // CORRECCIÓN: Usar helper para formatear horas de forma consistente
+          const horaFormateada = formatHora(row.fecha_salida || row.hora_salida);
           
           return (
             <div className="text-sm text-gray-900 px-1">
