@@ -538,27 +538,6 @@ const MainLayout = () => {
           </button>
         </div>
         
-        {/* Información del usuario */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-              </div>
-                </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {user?.nombre || 'Usuario'}
-              </p>
-              <p className="text-xs text-gray-500 truncate">
-                {user?.rol || 'Sin rol asignado'}
-              </p>
-                </div>
-          </div>
-        </div>
-        
         {/* Contenido del sidebar */}
         <div className="px-4 py-2 overflow-y-auto h-[calc(100vh-120px)]">
           {/* Renderizar el menú según el rol del usuario */}

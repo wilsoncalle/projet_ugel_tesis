@@ -290,6 +290,42 @@ const getPersonalDetalle = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Exportar asistencias a Excel
+ * @route GET /api/asistencia-personal/export/excel
+ */
+const exportarAExcel = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de exportación a Excel con filtros:', req.query);
+  
+  const filtros = req.query;
+  const buffer = await service.exportarAExcel(filtros);
+  
+  const fecha = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename=Asistencias_${fecha}.xlsx`);
+  res.setHeader('Content-Length', buffer.length);
+  
+  res.send(buffer);
+});
+
+/**
+ * Exportar asistencias a PDF
+ * @route GET /api/asistencia-personal/export/pdf
+ */
+const exportarAPDF = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de exportación a PDF con filtros:', req.query);
+  
+  const filtros = req.query;
+  const buffer = await service.exportarAPDF(filtros);
+  
+  const fecha = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=Asistencias_${fecha}.pdf`);
+  res.setHeader('Content-Length', buffer.length);
+  
+  res.send(buffer);
+});
+
 module.exports = {
   getAll,
   getHoy,
@@ -302,5 +338,7 @@ module.exports = {
   getEstadisticasAusencias,
   getEstadisticasAreas,
   getEstadisticasPersonal,
-  getPersonalDetalle
+  getPersonalDetalle,
+  exportarAExcel,
+  exportarAPDF
 };

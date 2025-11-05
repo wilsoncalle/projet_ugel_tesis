@@ -131,16 +131,21 @@ const PersonalCard = () => {
     useOriginalDataForMetrics: true,
   };
 
+  // Asegurar que data sea un array
+  const safeData = Array.isArray(data) ? data : [];
+  const top10Data = safeData.slice(0, 10);
+  const totalAsistencias = safeData.reduce((sum, p) => sum + parseInt(p.dias_asistidos || 0), 0);
+
   return (
     <>
       <EstadisticasCard
-        data={data.slice(0, 10)}
-        chartData={data.slice(0, 10)}
+        data={top10Data}
+        chartData={top10Data}
         loading={loading}
         error={error}
         periodo={periodo}
         onPeriodoChange={setPeriodo}
-        totalVisitas={data.reduce((sum, p) => sum + parseInt(p.dias_asistidos || 0), 0)}
+        totalVisitas={totalAsistencias}
         config={config}
       />
       

@@ -155,4 +155,26 @@ router.get('/estadisticas/personal-detalle/:personalId',
   controller.getPersonalDetalle
 );
 
+/**
+ * @route   GET /api/asistencia-personal/export/excel
+ * @desc    Exportar asistencias a Excel
+ * @access  Private
+ */
+router.get('/export/excel',
+  authenticateToken,
+  requireActiveUser,
+  controller.exportarAExcel
+);
+
+/**
+ * @route   GET /api/asistencia-personal/export/pdf
+ * @desc    Exportar asistencias a PDF
+ * @access  Private
+ */
+router.get('/export/pdf',
+  authenticateToken,
+  requireActiveUser,
+  controller.exportarAPDF
+);
+
 module.exports = router;

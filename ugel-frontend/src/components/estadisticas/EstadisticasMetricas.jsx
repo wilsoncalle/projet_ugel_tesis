@@ -147,7 +147,9 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
   // Procesamiento para datos tipo áreas, personal o visitantes (array de objetos)
   else if (Array.isArray(data)) {
     // Determinar campo de conteo según el tipo
-    const countField = type === 'visitantes' ? 'num_visitas' : 'visitas';
+    const countField = type === 'visitantes' ? 'num_visitas' : 
+                       type === 'personal' ? 'dias_asistidos' : 
+                       type === 'areas' ? 'asistencias' : 'visitas';
     
     const total = data.reduce((sum, item) => sum + parseInt(item[countField] || 0), 0);
     
@@ -164,7 +166,7 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
     // Determinar el campo de nombre según el tipo
     const getItemName = (item) => {
       if (type === 'personal') {
-        return item?.nombre_personal || 'N/A';
+        return item?.personal || item?.nombre_personal || 'N/A';
       }
       if (type === 'visitantes') {
         return item?.visitante || 'N/A';
@@ -178,29 +180,35 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
       return 'por área';
     };
 
+    const getCountSuffix = () => {
+      if (type === 'personal') return 'días';
+      if (type === 'areas') return 'asistencias';
+      return 'visitas';
+    };
+
     metricas = [
       {
         titulo: totalLabel,
         valor: total.toLocaleString(),
-        visitas: `${total.toLocaleString()} visitas`,
+        visitas: `${total.toLocaleString()} ${getCountSuffix()}`,
         icono: <Users className="h-5 w-5" />,
       },
       {
         titulo: maxLabel,
         valor: getItemName(maxItem),
-        visitas: `${maxItem ? parseInt(maxItem[countField]).toLocaleString() : 0} visitas`,
+        visitas: `${maxItem ? parseInt(maxItem[countField]).toLocaleString() : 0} ${getCountSuffix()}`,
         icono: <TrendingUp className="h-5 w-5" />,
       },
       {
         titulo: minLabel,
         valor: getItemName(minItem),
-        visitas: `${minItem ? parseInt(minItem[countField]).toLocaleString() : 0} visitas`,
+        visitas: `${minItem ? parseInt(minItem[countField]).toLocaleString() : 0} ${getCountSuffix()}`,
         icono: <TrendingDown className="h-5 w-5" />,
       },
       {
         titulo: averageLabel,
         valor: average,
-        visitas: `${average} visitas ${getAverageSuffix()}`,
+        visitas: `${average} ${getCountSuffix()} ${getAverageSuffix()}`,
         icono: <BarChart3 className="h-5 w-5" />,
       }
     ];
