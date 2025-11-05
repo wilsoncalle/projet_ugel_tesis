@@ -4,9 +4,8 @@ import {
   UserCheck, 
   Clock, 
   TrendingUp,
-  BarChart3,
-  PieChart,
-  Calendar,
+  RefreshCw,
+  Download,
   AlertCircle
 } from 'lucide-react';
 
@@ -16,11 +15,11 @@ import useDashboardData from '../hooks/useDashboardData';
 // Componentes del dashboard
 import { 
   KPICard, 
-  DashboardFilters, 
   ViewToggle, 
   LoadingDashboard, 
   ErrorDashboard 
 } from '../components/dashboard';
+import SelectCustom from '../components/SelectCustom';
 
 // Componentes de estadísticas de Personal
 import {
@@ -119,17 +118,60 @@ const DashboardAdminPage = () => {
           Período: periodo,
           Fecha: fecha,
         },
-        {
-          Métrica: 'Visitas Sin Salida',
-          Valor: datosVisitas.visitasSinSalida,
-          Período: periodo,
-          Fecha: fecha,
-        },
       ];
       
       exportToCSV(dataExport, `estadisticas-visitas-${periodo}-${Date.now()}.csv`);
     }
   }, [vistaActiva, datosPersonal, datosVisitas, periodo]);
+
+  // Formatear datos para calendario de asistencias
+  const formatearDatosCalendarioAsistencias = (flujoDiario) => {
+    if (!flujoDiario || flujoDiario.length === 0) return [];
+    
+    return flujoDiario
+      .filter(item => (item.asistencias || item.total || 0) > 0) // Solo días con asistencias
+      .map(item => {
+        const numAsistencias = item.asistencias || item.total || 0;
+        // Crear detalles simulados basados en el número de asistencias
+        const detalles = Array.from({ length: Math.min(numAsistencias, 5) }, (_, i) => ({
+          estado_presencia: i === 0 ? 'Presente' : (i % 3 === 0 ? 'Tardanza' : 'Presente'),
+          hora_ingreso: `0${7 + i}:${30 + (i * 10) % 60}`.slice(-5),
+          personal: `Personal ${i + 1}`,
+          area: 'Área General'
+        }));
+        
+        return {
+          fecha: item.dia || item.fecha,
+          asistencias_dia: numAsistencias,
+          detalles: detalles
+        };
+      });
+  };
+
+  // Formatear datos para calendario de visitas
+  const formatearDatosCalendarioVisitas = (flujoDiario) => {
+    if (!flujoDiario || flujoDiario.length === 0) return [];
+    
+    return flujoDiario
+      .filter(item => (item.visitas || item.total || 0) > 0) // Solo días con visitas
+      .map(item => {
+        const numVisitas = item.visitas || item.total || 0;
+        // Crear detalles simulados basados en el número de visitas
+        const detalles = Array.from({ length: Math.min(numVisitas, 5) }, (_, i) => ({
+          hora_ingreso: `${8 + i}:${(i * 15) % 60}`.padStart(5, '0'),
+          hora_salida: i % 2 === 0 ? `${10 + i}:${(i * 15) % 60}`.padStart(5, '0') : null,
+          area: `Área ${i + 1}`,
+          personal: `Personal visitado ${i + 1}`,
+          motivo: ['Reunión', 'Trámite', 'Consulta', 'Entrega'][i % 4]
+        }));
+        
+        return {
+          fecha: item.dia || item.fecha,
+          visitas_dia: numVisitas,
+          detalles: detalles
+        };
+      });
+  };
 
   // Mostrar estado de carga
   if (loading) {
@@ -157,31 +199,70 @@ const DashboardAdminPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-50 p-6">
       <div className="max-w-[1600px] mx-auto space-y-6">
         
-        {/* Header del Dashboard */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <BarChart3 className="w-6 h-6 text-white" />
-            </div>
+        {/* Header del Dashboard con Filtros Integrados */}
+        <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 p-6 border border-slate-100 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            
+            {/* Título */}
             <div>
-              <h1 className="text-3xl font-bold text-slate-800">
+              <h1 className="text-2xl font-bold text-slate-800">
                 Dashboard Administrativo
               </h1>
-              <p className="text-slate-600">
+              <p className="text-sm text-slate-500">
                 Vista unificada de estadísticas de personal y visitas
               </p>
             </div>
+
+            {/* Controles */}
+            <div className="flex flex-wrap items-center gap-3">
+              
+              {/* Selector de período */}
+              <div className="w-full sm:w-56">
+                <SelectCustom
+                  value={[
+                    { value: 'hoy', label: 'Hoy' },
+                    { value: 'semana', label: 'Esta Semana' },
+                    { value: 'mes', label: 'Este Mes' },
+                    { value: 'anio', label: 'Este Año' },
+                    { value: 'todo', label: 'Todo el Historial' }
+                  ].find(op => op.value === periodo)}
+                  onChange={(selectedOption) => cambiarPeriodo(selectedOption?.value || 'mes')}
+                  options={[
+                    { value: 'hoy', label: 'Hoy' },
+                    { value: 'semana', label: 'Esta Semana' },
+                    { value: 'mes', label: 'Este Mes' },
+                    { value: 'anio', label: 'Este Año' },
+                    { value: 'todo', label: 'Todo el Historial' }
+                  ]}
+                  placeholder="Seleccionar período"
+                  isClearable={false}
+                />
+              </div>
+
+              {/* Botón de refrescar */}
+              <button
+                onClick={refresh}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Actualizar datos"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Actualizar</span>
+              </button>
+
+              {/* Botón de exportar */}
+              <button
+                onClick={handleExport}
+                disabled={loading}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Exportar datos"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Exportar</span>
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Filtros Globales */}
-        <DashboardFilters
-          periodo={periodo}
-          onPeriodoChange={cambiarPeriodo}
-          onRefresh={refresh}
-          onExport={handleExport}
-          loading={loading}
-        />
 
         {/* KPIs Principales - Siempre visibles */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -236,7 +317,7 @@ const DashboardAdminPage = () => {
               
               {/* Título de sección */}
               <div className="flex items-center gap-3">
-                <UserCheck className="w-6 h-6 text-blue-600" />
+                {/* <UserCheck className="w-6 h-6" /> */}
                 <h2 className="text-2xl font-bold text-slate-800">
                   Estadísticas de Personal
                 </h2>
@@ -264,7 +345,7 @@ const DashboardAdminPage = () => {
 
                 {/* Calendario */}
                 <div className="lg:col-span-2">
-                  <CalendarioAsistencias />
+                  <CalendarioAsistencias asistenciasPorFecha={formatearDatosCalendarioAsistencias(datosPersonal.flujoDiario)} />
                 </div>
               </div>
             </div>
@@ -276,7 +357,7 @@ const DashboardAdminPage = () => {
               
               {/* Título de sección */}
               <div className="flex items-center gap-3">
-                <Users className="w-6 h-6 text-green-600" />
+               {/* <Users className="w-6 h-6 "/> */}
                 <h2 className="text-2xl font-bold text-slate-800">
                   Estadísticas de Visitas
                 </h2>
@@ -304,44 +385,12 @@ const DashboardAdminPage = () => {
 
                 {/* Calendario */}
                 <div className="lg:col-span-2">
-                  <CalendarioVisitas />
+                  <CalendarioVisitas visitasPorFecha={formatearDatosCalendarioVisitas(datosVisitas.flujoDiario)} />
                 </div>
               </div>
             </div>
           </>
         )}
-
-        {/* Footer informativo */}
-        <div className="mt-12 p-6 bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-800 mb-2">
-                Información del Dashboard
-              </h3>
-              <div className="text-sm text-slate-600 space-y-1">
-                <p>
-                  • Los datos se actualizan automáticamente según el período seleccionado
-                </p>
-                <p>
-                  • Haz clic en el botón "Actualizar" para refrescar los datos manualmente
-                </p>
-                <p>
-                  • Usa el botón "Exportar" para descargar los datos en formato CSV
-                </p>
-                <p>
-                  • Haz clic en el ícono de maximizar en cada tarjeta para ver más detalles
-                </p>
-                <p>
-                  • Los indicadores de tendencia (↑ ↓) comparan con el período anterior
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   );

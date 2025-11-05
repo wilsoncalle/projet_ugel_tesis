@@ -1,5 +1,5 @@
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid, Legend as RechartsLegend } from 'recharts';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -11,7 +11,6 @@ import {
 } from 'chart.js';
 import { Bar as BarChart } from 'react-chartjs-2';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import { Area } from '@ant-design/plots';
 
 ChartJS.register(
   CategoryScale,
@@ -358,7 +357,7 @@ const BarChartComponent = ({ data, loading, height = 400, config }) => {
       },
       tooltip: {
         enabled: true,
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+        backgroundColor: 'rgba(236, 235, 235, 0.9)',
         padding: 12,
         cornerRadius: 10,
         titleFont: {
@@ -433,8 +432,7 @@ const BarChartComponent = ({ data, loading, height = 400, config }) => {
   );
 };
 
-// ---------- AREA (tipo montaña) ----------
-// ---------- ÁREA (tipo montaña suave con degradado bonito) ----------
+// ---------- AREA (tipo olas suaves con degradado hermoso) ----------
 const LineChartComponent = ({ data, loading, height = 400, config }) => {
   if (loading) {
     return (
@@ -485,143 +483,110 @@ const LineChartComponent = ({ data, loading, height = 400, config }) => {
     );
   }
 
-  const hasMultipleSeries =
-    data.datasets && data.datasets.length > 1;
+  const hasMultipleSeries = data.datasets && data.datasets.length > 1;
 
-  // Aplanamos los datos para Ant Design
-  const chartData = [];
-  data.labels.forEach((label, index) => {
-    data.datasets.forEach((ds, dsIndex) => {
-      chartData.push({
-        fecha: label,
-        valor: ds.data[index],
-        serie: ds.label || `Serie ${dsIndex + 1}`,
-      });
+  // Transformar datos para Recharts
+  const chartData = data.labels.map((label, index) => {
+    const point = { name: label };
+    data.datasets.forEach((dataset, dsIndex) => {
+      const key = dataset.label || `serie${dsIndex}`;
+      point[key] = dataset.data[index];
     });
+    return point;
   });
 
-  const baseLineColors = ['#0EA5E9', '#6366F1', '#22C55E', '#F97316'];
+  const seriesColors = [
+    { line: '#0EA5E9', gradientId: 'colorBlue' },
+    { line: '#8B5CF6', gradientId: 'colorPurple' },
+    { line: '#10B981', gradientId: 'colorGreen' },
+    { line: '#F59E0B', gradientId: 'colorOrange' },
+  ];
 
-  const areaConfig = {
-    data: chartData,
-    xField: 'fecha',
-    yField: 'valor',
-    height,
-    smooth: true,          // curvas suaves (menos “picos”)
-    isStack: false,
-    seriesField: hasMultipleSeries ? 'serie' : undefined,
-
-    // color de la línea
-    color: hasMultipleSeries ? baseLineColors : [baseLineColors[0]],
-
-    // quitamos los puntos para que no se vea “pinchado”
-    point: false,
-
-    // degradado: línea sólida arriba -> transparente abajo
-    areaStyle: hasMultipleSeries
-      ? ({ seriesIndex }) => {
-          const base = baseLineColors[seriesIndex % baseLineColors.length];
-          return {
-            // 0: justo en la línea, 1: parte baja totalmente transparente
-            fill: `l(270) 0:${hexToRgba(base, 0.55)} 0.45:${hexToRgba(
-              base,
-              0.22
-            )} 1:${hexToRgba(base, 0)}`,
-          };
-        }
-      : {
-          fill: `l(270) 0:${hexToRgba(baseLineColors[0], 0.55)} 0.45:${hexToRgba(
-            baseLineColors[0],
-            0.22
-          )} 1:${hexToRgba(baseLineColors[0], 0)}`,
-        },
-
-    lineStyle: {
-      lineWidth: 2.5,
-    },
-
-    xAxis: {
-      label: {
-        style: {
-          fill: '#64748B',
-          fontSize: 12,
-        },
-      },
-      line: {
-        style: {
-          stroke: '#E2E8F0',
-        },
-      },
-      tickLine: null,
-    },
-    yAxis: {
-      label: {
-        style: {
-          fill: '#64748B',
-          fontSize: 12,
-        },
-        formatter: (v) => `${v}`,
-      },
-      grid: {
-        line: {
-          style: {
-            stroke: '#E5E7EB',
-            lineWidth: 1,
-          },
-        },
-      },
-    },
-    tooltip: {
-      showTitle: true,
-      title: 'Fecha',
-      shared: true,
-      showCrosshairs: true,
-      formatter: (datum) => ({
-        name:
-          (hasMultipleSeries ? datum.serie : config.tooltipSuffix) ||
-          'Visitas',
-        value: datum.valor.toLocaleString(),
-      }),
-      domStyles: {
-        'g2-tooltip': {
-          background: 'rgba(15,23,42,0.95)',
-          color: '#fff',
-          borderRadius: '10px',
-          padding: '12px 14px',
-          boxShadow: '0 15px 30px rgba(15,23,42,0.35)',
-        },
-      },
-    },
-    legend: {
-      position: 'top',
-      itemName: {
-        style: {
-          fill: '#0f172a',
-          fontWeight: 500,
-        },
-      },
-    },
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-700">
+          <p className="font-semibold text-sm mb-2">{label}</p>
+          {payload.map((entry, index) => (
+            <p key={index} className="text-xs" style={{ color: entry.color }}>
+              <span className="font-bold">{entry.name}:</span>{' '}
+              {entry.value.toLocaleString()} {config.tooltipSuffix || 'visitas'}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
     <div className="w-full" style={{ height: `${height}px` }}>
-      <Area {...areaConfig} />
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+        >
+          <defs>
+            {seriesColors.map((color, idx) => (
+              <linearGradient
+                key={color.gradientId}
+                id={color.gradientId}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0%" stopColor={color.line} stopOpacity={0.45} />
+                <stop offset="50%" stopColor={color.line} stopOpacity={0.15} />
+                <stop offset="100%" stopColor={color.line} stopOpacity={0} />
+              </linearGradient>
+            ))}
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+          <XAxis
+            dataKey="name"
+            stroke="#64748B"
+            style={{ fontSize: '12px' }}
+            tickLine={false}
+          />
+          <YAxis
+            stroke="#64748B"
+            style={{ fontSize: '12px' }}
+            tickLine={false}
+            tickFormatter={(value) => value.toLocaleString()}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          {hasMultipleSeries && (
+            <RechartsLegend
+              wrapperStyle={{
+                paddingTop: '20px',
+                fontSize: '13px',
+                fontWeight: '500',
+              }}
+            />
+          )}
+          {data.datasets.map((dataset, index) => {
+            const key = dataset.label || `serie${index}`;
+            const color = seriesColors[index % seriesColors.length];
+            return (
+              <Area
+                key={key}
+                type="monotone"
+                dataKey={key}
+                stroke={color.line}
+                strokeWidth={3}
+                fillOpacity={1}
+                fill={`url(#${color.gradientId})`}
+                animationDuration={1200}
+                animationEasing="ease-in-out"
+              />
+            );
+          })}
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 };
-
-/**
- * Convierte un color hex a rgba con opacidad
- */
-function hexToRgba(hex, alpha = 1) {
-  const clean = hex.replace('#', '');
-  const bigint = parseInt(clean, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 
 // ---------- WRAPPER GENÉRICO ----------
 

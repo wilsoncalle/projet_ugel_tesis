@@ -19,26 +19,26 @@ const KPICard = ({
   const colorSchemes = {
     blue: {
       bg: 'from-blue-500 to-blue-600',
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
+      iconBg: 'bg-slate-100 group-hover:bg-blue-100',
+      iconColor: 'text-slate-400 group-hover:text-blue-600',
       light: 'bg-blue-50',
     },
     green: {
       bg: 'from-green-500 to-green-600',
-      iconBg: 'bg-green-100',
-      iconColor: 'text-green-600',
+      iconBg: 'bg-slate-100 group-hover:bg-green-100',
+      iconColor: 'text-slate-400 group-hover:text-green-600',
       light: 'bg-green-50',
     },
     purple: {
       bg: 'from-purple-500 to-purple-600',
-      iconBg: 'bg-purple-100',
-      iconColor: 'text-purple-600',
+      iconBg: 'bg-slate-100 group-hover:bg-purple-100',
+      iconColor: 'text-slate-400 group-hover:text-purple-600',
       light: 'bg-purple-50',
     },
     orange: {
       bg: 'from-orange-500 to-orange-600',
-      iconBg: 'bg-orange-100',
-      iconColor: 'text-orange-600',
+      iconBg: 'bg-slate-100 group-hover:bg-orange-100',
+      iconColor: 'text-slate-400 group-hover:text-orange-600',
       light: 'bg-orange-50',
     },
   };

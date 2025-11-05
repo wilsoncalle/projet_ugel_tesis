@@ -107,38 +107,38 @@ const useDashboardData = () => {
     try {
       const token = localStorage.getItem('token');
       
-      // Helper para hacer fetch con manejo de errores
-      const fetchSafe = async (url) => {
-        try {
-          const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (!response.ok) {
-            console.warn(`Endpoint no disponible: ${url}`);
-            return { success: false, data: null };
-          }
-          return await response.json();
-        } catch (error) {
-          console.warn(`Error en endpoint: ${url}`, error);
-          return { success: false, data: null };
-        }
-      };
-      
       // Fetch paralelo de todas las estadísticas de visitas
-      const [totales, motivo, area, frecuentes] = await Promise.all([
-        fetchSafe(`http://localhost:3000/api/visitas/estadisticas/totales?periodo=${periodo}`),
-        fetchSafe(`http://localhost:3000/api/visitas/estadisticas/motivo?periodo=${periodo}`),
-        fetchSafe(`http://localhost:3000/api/visitas/estadisticas/area?periodo=${periodo}`),
-        fetchSafe(`http://localhost:3000/api/visitas/estadisticas/visitantes-frecuentes?periodo=${periodo}`),
+      const [totalesRes, motivoRes, areaRes, frecuentesRes] = await Promise.all([
+        fetch(`http://localhost:3000/api/visitas/totales?periodo=${periodo}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`http://localhost:3000/api/visitas/por-motivo?periodo=${periodo}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`http://localhost:3000/api/visitas/por-area?periodo=${periodo}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`http://localhost:3000/api/visitas/visitantes-frecuentes?periodo=${periodo}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
       ]);
 
-      const flujoDiario = totales.data?.flujo_diario || totales.data?.flujoDiario || [];
+      const totales = await totalesRes.json();
+      const motivo = await motivoRes.json();
+      const area = await areaRes.json();
+      const frecuentes = await frecuentesRes.json();
+
+      const flujoDiario = totales.data?.flujoDiario || [];
+      
+      // Calcular visitas de hoy del flujo diario
+      const hoy = new Date().toISOString().split('T')[0];
+      const visitasHoy = flujoDiario.find(item => item.dia?.startsWith(hoy))?.visitas || 0;
 
       setDatosVisitas({
         totalVisitas: totales.data?.total || 0,
         visitantesFrecuentes: frecuentes.data?.length || 0,
-        visitasHoy: totales.data?.hoy || 0,
-        visitasSinSalida: totales.data?.sin_salida || 0,
+        visitasHoy: visitasHoy,
+        visitasSinSalida: 0, // Este dato no está disponible en el endpoint actual
         flujoDiario: flujoDiario,
         porMotivo: motivo.data || [],
         porArea: area.data || [],
@@ -146,16 +146,7 @@ const useDashboardData = () => {
 
     } catch (err) {
       console.error('Error al obtener datos de visitas:', err);
-      // No lanzar error, solo registrar
-      setDatosVisitas({
-        totalVisitas: 0,
-        visitantesFrecuentes: 0,
-        visitasHoy: 0,
-        visitasSinSalida: 0,
-        flujoDiario: [],
-        porMotivo: [],
-        porArea: [],
-      });
+      throw err;
     }
   }, [periodo]);
 
