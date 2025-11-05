@@ -840,6 +840,8 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
       paramCounter++;
     }
     
+    // Agregar condición de estado_presencia
+    whereCondition.push(`estado_presencia IN ('Presente', 'Tardanza')`);
     const whereClause = whereCondition.length > 0 ? `WHERE ${whereCondition.join(' AND ')}` : '';
     
     // Total de asistencias
@@ -847,7 +849,6 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
       SELECT COUNT(*) as total
       FROM ControlAsistenciaPersonal
       ${whereClause}
-      AND estado_presencia IN ('Presente', 'Tardanza')
     `;
     
     // Flujo diario
@@ -857,7 +858,6 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
         COUNT(*) AS asistencias
       FROM ControlAsistenciaPersonal
       ${whereClause}
-      AND estado_presencia IN ('Presente', 'Tardanza')
       GROUP BY dia
       ORDER BY dia
     `;
@@ -918,6 +918,12 @@ const getEstadisticasPuntualidad = async (fechaInicio, fechaFin) => {
       ORDER BY dia
     `;
     
+    // Condiciones para hora de llegada
+    const horaLlegadaConditions = [...whereCondition];
+    horaLlegadaConditions.push(`estado_presencia IN ('Presente', 'Tardanza')`);
+    horaLlegadaConditions.push(`hora_ingreso IS NOT NULL`);
+    const horaLlegadaWhereClause = `WHERE ${horaLlegadaConditions.join(' AND ')}`;
+    
     // Distribución de hora de llegada
     const horaLlegadaQuery = `
       SELECT
@@ -925,9 +931,7 @@ const getEstadisticasPuntualidad = async (fechaInicio, fechaFin) => {
         COUNT(*) AS cantidad,
         SUM(CASE WHEN estado_presencia = 'Tardanza' THEN 1 ELSE 0 END) AS tardanzas
       FROM ControlAsistenciaPersonal
-      ${whereClause}
-      AND estado_presencia IN ('Presente', 'Tardanza')
-      AND hora_ingreso IS NOT NULL
+      ${horaLlegadaWhereClause}
       GROUP BY hora
       ORDER BY hora
     `;
@@ -948,10 +952,10 @@ const getEstadisticasPuntualidad = async (fechaInicio, fechaFin) => {
 };
 
 /**
- * Obtener estadísticas de ausencias y justificaciones
+ * Obtener estadísticas de salidas por motivo (papeletas)
  * @param {string} fechaInicio - Fecha de inicio
  * @param {string} fechaFin - Fecha de fin
- * @returns {Object} Estadísticas de ausencias
+ * @returns {Object} Estadísticas de salidas por motivo
  */
 const getEstadisticasAusencias = async (fechaInicio, fechaFin) => {
   try {
@@ -963,57 +967,60 @@ const getEstadisticasAusencias = async (fechaInicio, fechaFin) => {
     let paramCounter = 1;
     
     if (fechaInicio) {
-      whereCondition.push(`c.fecha >= $${paramCounter}::date`);
+      whereCondition.push(`DATE(ps.fecha_hora_salida_real) >= $${paramCounter}::date`);
       params.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
-      whereCondition.push(`c.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+      whereCondition.push(`DATE(ps.fecha_hora_salida_real) < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
       paramCounter++;
     }
     
-    const whereClause = whereCondition.length > 0 ? `WHERE ${whereCondition.join(' AND ')}` : '';
+    // Condiciones para estadísticas de motivos
+    const motivosConditions = [...whereCondition];
+    motivosConditions.push(`ps.estado IN ('EN_CURSO', 'FINALIZADO')`);
+    motivosConditions.push(`ps.fecha_hora_salida_real IS NOT NULL`);
+    const motivosWhereClause = `WHERE ${motivosConditions.join(' AND ')}`;
     
-    // Resumen por tipo de ausencia
-    const tipoAusenciaQuery = `
+    // Distribución por motivo de salida
+    const motivosSalidaQuery = `
       SELECT
-        estado_presencia AS tipo_ausencia,
+        m.nombre_motivo AS tipo_ausencia,
         COUNT(*) AS total
-      FROM ControlAsistenciaPersonal
-      ${whereClause.replace('c.fecha', 'fecha')}
-      AND estado_presencia IN ('Ausente', 'En Permiso', 'Falta')
-      GROUP BY estado_presencia
+      FROM PapeletasSalida ps
+      JOIN MotivosSalidaPersonal m ON ps.motivo_salida_id = m.id
+      ${motivosWhereClause}
+      GROUP BY m.nombre_motivo
       ORDER BY total DESC
     `;
     
-    // Faltas por persona (Top 10)
-    const faltasPorPersonaQuery = `
+    // Top 10 personal con más salidas
+    const topSalidasQuery = `
       SELECT
         CONCAT(p.nombres, ' ', p.apellidos) AS personal,
         COUNT(*) AS faltas
-      FROM ControlAsistenciaPersonal c
-      JOIN Personal p ON c.personal_id = p.id
-      ${whereClause}
-      AND c.estado_presencia = 'Ausente'
+      FROM PapeletasSalida ps
+      JOIN Personal p ON ps.personal_solicitante_id = p.id
+      ${motivosWhereClause}
       GROUP BY personal
       ORDER BY faltas DESC
       LIMIT 10
     `;
     
-    const [tipoAusenciaResult, faltasPorPersonaResult] = await Promise.all([
-      db.query(tipoAusenciaQuery, params),
-      db.query(faltasPorPersonaQuery, params)
+    const [motivosResult, topSalidasResult] = await Promise.all([
+      db.query(motivosSalidaQuery, params),
+      db.query(topSalidasQuery, params)
     ]);
     
     return {
-      por_tipo: tipoAusenciaResult.rows,
-      top_faltas: faltasPorPersonaResult.rows
+      por_tipo: motivosResult.rows,
+      top_faltas: topSalidasResult.rows
     };
   } catch (error) {
-    logger.error('Error obteniendo estadísticas de ausencias:', error);
-    throw new AppError('Error obteniendo estadísticas de ausencias', 500);
+    logger.error('Error obteniendo estadísticas de salidas:', error);
+    throw new AppError('Error obteniendo estadísticas de salidas', 500);
   }
 };
 
@@ -1155,6 +1162,105 @@ const getEstadisticasPersonal = async (fechaInicio, fechaFin, personalId = null)
   }
 };
 
+/**
+ * Obtener detalle completo de un personal específico
+ * @param {number} personalId - ID del personal
+ * @param {string} fechaInicio - Fecha de inicio
+ * @param {string} fechaFin - Fecha de fin
+ * @returns {Object} Detalle completo del personal
+ */
+const getPersonalDetalle = async (personalId, fechaInicio, fechaFin) => {
+  try {
+    fechaInicio = toLimaDateYYYYMMDD(fechaInicio);
+    fechaFin = toLimaDateYYYYMMDD(fechaFin);
+    
+    const whereCondition = [];
+    const params = [personalId];
+    let paramCounter = 2;
+    
+    whereCondition.push(`ca.personal_id = $1`);
+    
+    if (fechaInicio) {
+      whereCondition.push(`ca.fecha >= $${paramCounter}::date`);
+      params.push(fechaInicio);
+      paramCounter++;
+    }
+    
+    if (fechaFin) {
+      whereCondition.push(`ca.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+      params.push(fechaFin);
+      paramCounter++;
+    }
+    
+    const whereClause = `WHERE ${whereCondition.join(' AND ')}`;
+    
+    // Resumen general
+    const resumenQuery = `
+      SELECT
+        COUNT(*) AS total_asistencias,
+        COUNT(CASE WHEN estado_presencia = 'Presente' THEN 1 END) AS dias_puntuales,
+        COUNT(CASE WHEN estado_presencia = 'Tardanza' THEN 1 END) AS dias_tarde,
+        COUNT(CASE WHEN estado_presencia = 'Ausente' THEN 1 END) AS dias_ausente,
+        MAX(fecha) AS ultima_asistencia
+      FROM ControlAsistenciaPersonal ca
+      ${whereClause}
+    `;
+    
+    // Asistencias por fecha (para calendario)
+    const asistenciasPorFechaQuery = `
+      SELECT
+        DATE(ca.fecha) AS fecha,
+        COUNT(*) AS asistencias_dia,
+        json_agg(
+          json_build_object(
+            'estado_presencia', ca.estado_presencia,
+            'hora_ingreso', TO_CHAR(ca.hora_ingreso, 'HH24:MI'),
+            'hora_salida', TO_CHAR(ca.hora_salida, 'HH24:MI'),
+            'personal', CONCAT(p.nombres, ' ', p.apellidos),
+            'area', a.nombre_area
+          ) ORDER BY ca.hora_ingreso
+        ) AS detalles
+      FROM ControlAsistenciaPersonal ca
+      JOIN Personal p ON ca.personal_id = p.id
+      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
+      ${whereClause}
+      GROUP BY DATE(ca.fecha)
+      ORDER BY fecha DESC
+    `;
+    
+    // Historial detallado
+    const historialQuery = `
+      SELECT
+        ca.fecha,
+        ca.estado_presencia,
+        TO_CHAR(ca.hora_ingreso, 'HH24:MI') AS hora_ingreso,
+        TO_CHAR(ca.hora_salida, 'HH24:MI') AS hora_salida,
+        a.nombre_area AS area
+      FROM ControlAsistenciaPersonal ca
+      JOIN Personal p ON ca.personal_id = p.id
+      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
+      ${whereClause}
+      ORDER BY ca.fecha DESC
+      LIMIT 100
+    `;
+    
+    const [resumenResult, asistenciasPorFechaResult, historialResult] = await Promise.all([
+      db.query(resumenQuery, params),
+      db.query(asistenciasPorFechaQuery, params),
+      db.query(historialQuery, params)
+    ]);
+    
+    return {
+      ...resumenResult.rows[0],
+      asistencias_por_fecha: asistenciasPorFechaResult.rows,
+      historial: historialResult.rows
+    };
+  } catch (error) {
+    logger.error('Error obteniendo detalle del personal:', error);
+    throw new AppError('Error obteniendo detalle del personal', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -1170,5 +1276,6 @@ module.exports = {
   getEstadisticasPuntualidad,
   getEstadisticasAusencias,
   getEstadisticasAreas,
-  getEstadisticasPersonal
+  getEstadisticasPersonal,
+  getPersonalDetalle
 };

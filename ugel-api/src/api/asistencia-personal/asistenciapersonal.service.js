@@ -431,7 +431,7 @@ const getEstadisticasAusencias = async (options = {}) => {
     const stats = await repository.getEstadisticasAusencias(fechaInicio, fechaFin);
     return stats;
   } catch (error) {
-    logger.error('Error obteniendo estadísticas de ausencias:', error);
+    logger.error('Error obteniendo estadísticas de salidas:', error);
     throw error;
   }
 };
@@ -470,6 +470,24 @@ const getEstadisticasPersonal = async (options = {}) => {
   }
 };
 
+/**
+ * Obtener detalle completo de un personal
+ * @param {number} personalId - ID del personal
+ * @param {Object} options - Opciones de filtrado
+ * @returns {Object} Detalle del personal
+ */
+const getPersonalDetalle = async (personalId, options = {}) => {
+  const { fechaInicio, fechaFin } = options;
+  
+  try {
+    const detalle = await repository.getPersonalDetalle(personalId, fechaInicio, fechaFin);
+    return detalle;
+  } catch (error) {
+    logger.error('Error obteniendo detalle del personal:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllAsistencias,
   getAsistenciasHoy,
@@ -483,5 +501,6 @@ module.exports = {
   getEstadisticasPuntualidad,
   getEstadisticasAusencias,
   getEstadisticasAreas,
-  getEstadisticasPersonal
+  getEstadisticasPersonal,
+  getPersonalDetalle
 };

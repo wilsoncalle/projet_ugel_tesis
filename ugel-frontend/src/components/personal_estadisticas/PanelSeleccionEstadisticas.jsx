@@ -16,8 +16,8 @@ const PanelSeleccionEstadisticas = ({ categoriaActiva, onCategoriaChange }) => {
     },
     {
       id: 'ausencias',
-      titulo: 'Ausencias y Justificaciones',
-      descripcion: 'Faltas, permisos y licencias',
+      titulo: 'Salidas por Motivo',
+      descripcion: 'Papeletas de salida del personal',
       icono: UserX
     },
     {

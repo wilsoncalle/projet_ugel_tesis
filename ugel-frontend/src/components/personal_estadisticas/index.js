@@ -5,3 +5,5 @@ export { default as AusenciasCard } from './AusenciasCard';
 export { default as AreasCard } from './AreasCard';
 export { default as PersonalCard } from './PersonalCard';
 export { default as PanelSeleccionEstadisticas } from './PanelSeleccionEstadisticas';
+export { default as CalendarioAsistencias } from './CalendarioAsistencias';
+export { default as ModalPersonalDetalle } from './ModalPersonalDetalle';

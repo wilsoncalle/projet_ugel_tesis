@@ -8,6 +8,51 @@ const { asyncHandler, AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 
 /**
+ * Convierte un período en fechas de inicio y fin
+ * @param {string} periodo - 'hoy', 'semana', 'mes', 'anio', 'todo'
+ * @returns {Object} { fechaInicio, fechaFin }
+ */
+const convertirPeriodoAFechas = (periodo) => {
+  const hoy = new Date();
+  let fechaInicio, fechaFin;
+
+  switch (periodo) {
+    case 'hoy':
+      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
+      break;
+    
+    case 'semana':
+      const diaSemana = hoy.getDay();
+      const diasHastaLunes = diaSemana === 0 ? 6 : diaSemana - 1;
+      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - diasHastaLunes);
+      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
+      break;
+    
+    case 'mes':
+      fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
+      break;
+    
+    case 'anio':
+      fechaInicio = new Date(hoy.getFullYear(), 0, 1);
+      fechaFin = new Date(hoy.getFullYear(), 11, 31, 23, 59, 59);
+      break;
+    
+    case 'todo':
+    default:
+      fechaInicio = null;
+      fechaFin = null;
+      break;
+  }
+
+  return {
+    fechaInicio: fechaInicio ? fechaInicio.toISOString().split('T')[0] : null,
+    fechaFin: fechaFin ? fechaFin.toISOString().split('T')[0] : null
+  };
+};
+
+/**
  * Obtener registros de asistencia con paginación y filtros
  * @route GET /api/asistencia-personal
  */
@@ -137,7 +182,10 @@ const registrarEstado = asyncHandler(async (req, res) => {
 const getEstadisticasTotales = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas totales de asistencia');
   
-  const stats = await service.getEstadisticasTotales(req.query);
+  const { periodo } = req.query;
+  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  
+  const stats = await service.getEstadisticasTotales({ fechaInicio, fechaFin });
   
   res.json({
     success: true,
@@ -153,7 +201,10 @@ const getEstadisticasTotales = asyncHandler(async (req, res) => {
 const getEstadisticasPuntualidad = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas de puntualidad');
   
-  const stats = await service.getEstadisticasPuntualidad(req.query);
+  const { periodo } = req.query;
+  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  
+  const stats = await service.getEstadisticasPuntualidad({ fechaInicio, fechaFin });
   
   res.json({
     success: true,
@@ -169,7 +220,10 @@ const getEstadisticasPuntualidad = asyncHandler(async (req, res) => {
 const getEstadisticasAusencias = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas de ausencias');
   
-  const stats = await service.getEstadisticasAusencias(req.query);
+  const { periodo } = req.query;
+  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  
+  const stats = await service.getEstadisticasAusencias({ fechaInicio, fechaFin });
   
   res.json({
     success: true,
@@ -185,7 +239,10 @@ const getEstadisticasAusencias = asyncHandler(async (req, res) => {
 const getEstadisticasAreas = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas por áreas');
   
-  const stats = await service.getEstadisticasAreas(req.query);
+  const { periodo } = req.query;
+  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  
+  const stats = await service.getEstadisticasAreas({ fechaInicio, fechaFin });
   
   res.json({
     success: true,
@@ -201,12 +258,35 @@ const getEstadisticasAreas = asyncHandler(async (req, res) => {
 const getEstadisticasPersonal = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas por personal');
   
-  const stats = await service.getEstadisticasPersonal(req.query);
+  const { periodo, personalId } = req.query;
+  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  
+  const stats = await service.getEstadisticasPersonal({ fechaInicio, fechaFin, personalId });
   
   res.json({
     success: true,
     message: 'Estadísticas por personal obtenidas exitosamente',
     data: stats
+  });
+});
+
+/**
+ * Obtener detalle completo de un personal
+ * @route GET /api/asistencia-personal/estadisticas/personal-detalle/:personalId
+ */
+const getPersonalDetalle = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de detalle de personal');
+  
+  const { personalId } = req.params;
+  const { periodo } = req.query;
+  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  
+  const detalle = await service.getPersonalDetalle(personalId, { fechaInicio, fechaFin });
+  
+  res.json({
+    success: true,
+    message: 'Detalle del personal obtenido exitosamente',
+    data: detalle
   });
 });
 
@@ -221,5 +301,6 @@ module.exports = {
   getEstadisticasPuntualidad,
   getEstadisticasAusencias,
   getEstadisticasAreas,
-  getEstadisticasPersonal
+  getEstadisticasPersonal,
+  getPersonalDetalle
 };

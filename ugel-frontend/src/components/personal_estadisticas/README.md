@@ -14,41 +14,73 @@ Panel lateral que permite seleccionar la categoría de estadística a visualizar
 
 ### Componentes de Tarjetas
 
-#### AsistenciasTotalesCard.jsx
-Muestra:
-- Total de asistencias por período
-- Flujo diario de asistencias (gráfico de líneas/barras)
+Todos los componentes de tarjetas utilizan el componente genérico `EstadisticasCard` de `../estadisticas` y sus respectivos hooks personalizados.
 
+#### AsistenciasTotalesCard.jsx
+**Hook**: `useAsistenciasTotales`  
+**Tipo de gráfico**: Líneas (Line Chart)  
 **Endpoint**: `/api/asistencia-personal/estadisticas/totales`
 
-#### PuntualidadCard.jsx
 Muestra:
-- Distribución de puntuales vs tardanzas vs faltas
-- Gráfico de barras apiladas por día
-- Histograma de hora de llegada
+- Total de asistencias por período
+- Flujo diario de asistencias con gráfico de líneas
+- Métricas: Total, día con más/menos asistencias, promedio diario
 
+#### PuntualidadCard.jsx
+**Hook**: `useAsistenciasPuntualidad`  
+**Tipo de gráfico**: Pie/Doughnut  
 **Endpoint**: `/api/asistencia-personal/estadisticas/puntualidad`
 
-#### AusenciasCard.jsx
 Muestra:
-- Resumen de ausencias por tipo (Falta, Permiso, Licencia)
-- Top 10 de personal con más faltas
+- Distribución de asistencias por estado de presencia
+- Gráfico circular con porcentajes
+- Métricas: Total de registros, estado más/menos frecuente
 
+#### AusenciasCard.jsx
+**Hook**: `useAsistenciasAusencias`  
+**Tipo de gráfico**: Pie/Doughnut  
 **Endpoint**: `/api/asistencia-personal/estadisticas/ausencias`
 
-#### AreasCard.jsx
 Muestra:
-- Asistencias por área (gráfico de barras horizontales)
-- Porcentaje de asistencia por área
+- Distribución de ausencias por tipo (Falta, Permiso, Licencia)
+- Gráfico circular con porcentajes
+- Métricas: Total de ausencias, tipo más/menos frecuente
 
+#### AreasCard.jsx
+**Hook**: `useAsistenciasAreas`  
+**Tipo de gráfico**: Barras horizontales  
 **Endpoint**: `/api/asistencia-personal/estadisticas/areas`
 
+Muestra:
+- Asistencias por área con gráfico de barras horizontales
+- Top 15 áreas con más asistencias
+- Métricas: Total, área con más/menos asistencias, promedio por área
+
 #### PersonalCard.jsx
+**Hook**: `useAsistenciasPersonal`  
+**Tipo de gráfico**: Barras horizontales  
+**Endpoint**: `/api/asistencia-personal/estadisticas/personal`
+
 Muestra:
 - Top 10 de personal con mayor asistencia
-- Ficha detallada de asistencia por persona (al seleccionar)
+- Gráfico de barras horizontales con gradientes
+- Métricas: Total, personal con más/menos asistencias, promedio
 
-**Endpoint**: `/api/asistencia-personal/estadisticas/personal`
+## Hooks Personalizados
+
+Todos los hooks están ubicados en `/src/hooks/`:
+
+- `useAsistenciasTotales.js`
+- `useAsistenciasPuntualidad.js`
+- `useAsistenciasAusencias.js`
+- `useAsistenciasAreas.js`
+- `useAsistenciasPersonal.js`
+
+Cada hook maneja:
+- Estado de carga (`loading`)
+- Manejo de errores (`error`)
+- Selección de período (`periodo`, `setPeriodo`)
+- Transformación de datos del backend al formato esperado por los gráficos
 
 ## Uso
 
@@ -67,12 +99,23 @@ import {
 
 ## Parámetros de Consulta
 
-Todos los endpoints aceptan los siguientes parámetros:
-- `fechaInicio`: Fecha de inicio del período (YYYY-MM-DD)
-- `fechaFin`: Fecha de fin del período (YYYY-MM-DD)
-- `personalId`: ID del personal (opcional, solo para PersonalCard)
+Todos los endpoints aceptan el parámetro:
+- `periodo`: Período de tiempo ('hoy', 'semana', 'mes', 'anio', 'todo')
 
-## Gráficos Recomendados
+El backend convierte automáticamente el período en fechas de inicio y fin.
 
-- **Chart.js** (react-chartjs-2) para gráficos de líneas, barras y doughnut
-- **Recharts** como alternativa
+## Componentes Reutilizados
+
+- **EstadisticasCard**: Componente genérico de tarjeta con selector de período y botón de expandir
+- **EstadisticasChart**: Renderiza gráficos de tipo pie, bar o line según configuración
+- **EstadisticasModal**: Modal expandido con métricas y tabla detallada
+- **EstadisticasMetricas**: Muestra métricas calculadas (total, máximo, mínimo, promedio)
+- **EstadisticasTabla**: Tabla con búsqueda, ordenamiento y paginación
+
+## Tecnologías Utilizadas
+
+- **Chart.js** (react-chartjs-2) para gráficos de barras
+- **Recharts** para gráficos de pie/doughnut
+- **Ant Design Plots** para gráficos de líneas
+- **Lucide React** para iconos
+- **Framer Motion** para animaciones

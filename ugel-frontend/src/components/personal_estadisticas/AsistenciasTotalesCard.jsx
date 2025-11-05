@@ -1,11 +1,59 @@
+import { EstadisticasCard } from '../estadisticas';
+import useAsistenciasTotales from '../../hooks/useAsistenciasTotales';
+
 const AsistenciasTotalesCard = () => {
+  const { data, loading, error, periodo, setPeriodo, totalAsistencias } = useAsistenciasTotales();
+
+  const config = {
+    title: 'Total de Asistencias',
+    subtitle: 'Flujo de asistencias por día en el período seleccionado',
+    chartType: 'line',
+    chartHeight: 400,
+    layout: 'stacked',
+    showMetrics: true,
+    exportFilename: 'asistencias-totales',
+    
+    // Configuración del gráfico
+    chartConfig: {
+      tooltipSuffix: 'Asistencias',
+      emptyTitle: 'No hay asistencias registradas',
+      emptySubtitle: 'en este período',
+    },
+    
+    // Configuración de las métricas
+    metricsConfig: {
+      type: 'totales',
+      totalLabel: 'Total de Asistencias',
+      maxLabel: 'Día con Más Asistencias',
+      minLabel: 'Día con Menos Asistencias',
+      averageLabel: 'Promedio Diario',
+    },
+    
+    // Configuración de la tabla
+    tableConfig: {
+      type: 'totales',
+      title: 'Detalle por Día',
+      searchPlaceholder: 'Buscar fecha...',
+      nameLabel: 'Fecha',
+      countLabel: 'Asistencias',
+      distributionLabel: 'Distribución',
+      nameKey: 'fecha',
+      countKey: 'asistencias',
+      sortByName: 'fecha',
+      sortByCount: 'asistencias',
+    },
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-gray-200 p-6">
-      <h3 className="text-lg font-semibold text-gray-800 mb-4">
-        Total de Asistencias
-      </h3>
-      <p className="text-gray-600">Contenido de estadísticas de asistencias totales</p>
-    </div>
+    <EstadisticasCard
+      data={data}
+      loading={loading}
+      error={error}
+      periodo={periodo}
+      onPeriodoChange={setPeriodo}
+      totalVisitas={totalAsistencias}
+      config={config}
+    />
   );
 };
 

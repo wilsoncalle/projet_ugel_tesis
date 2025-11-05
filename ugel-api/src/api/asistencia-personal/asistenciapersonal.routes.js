@@ -144,4 +144,15 @@ router.get('/estadisticas/personal',
   controller.getEstadisticasPersonal
 );
 
+/**
+ * @route   GET /api/asistencia-personal/estadisticas/personal-detalle/:personalId
+ * @desc    Obtener detalle completo de un personal específico
+ * @access  Private
+ */
+router.get('/estadisticas/personal-detalle/:personalId', 
+  authenticateToken,
+  requireActiveUser,
+  controller.getPersonalDetalle
+);
+
 module.exports = router;
