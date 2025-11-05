@@ -1,6 +1,12 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronDown, Check } from 'lucide-react';
+import { X, ChevronDown, Check, AlertTriangle, XCircle } from 'lucide-react';
 
 const SelectCustom = ({
   options = [],
@@ -24,12 +30,14 @@ const SelectCustom = ({
   const [query, setQuery] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [calculatedMenuWidth, setCalculatedMenuWidth] = useState('250px');
-  const [menuPosition, setMenuPosition] = useState({ openUpwards: false, alignRight: false });
+  const [menuPosition, setMenuPosition] = useState({
+    openUpwards: false,
+    alignRight: false,
+  });
   const [focusedIndex, setFocusedIndex] = useState(-1);
 
-  // NUEVO: guardamos el rect del ancla cuando abrimos y lo actualizamos en scroll/resize
   const [anchorRect, setAnchorRect] = useState(null);
-  const [menuHeight, setMenuHeight] = useState(240); // fallback; luego medimos real
+  const [menuHeight, setMenuHeight] = useState(240);
   const menuRef = useRef(null);
 
   const inputRef = useRef(null);
@@ -38,12 +46,19 @@ const SelectCustom = ({
 
   const filteredOptions = useMemo(() => {
     if (!query) return options;
-    return options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()));
+    return options.filter((o) =>
+      o.label.toLowerCase().includes(query.toLowerCase())
+    );
   }, [options, query]);
 
   const calculatePositionAndWidth = useCallback(() => {
     if (!containerRef.current) {
-      return { width: '250px', openUpwards: false, alignRight: false, rect: null };
+      return {
+        width: '250px',
+        openUpwards: false,
+        alignRight: false,
+        rect: null,
+      };
     }
     const container = containerRef.current;
     const rect = container.getBoundingClientRect();
@@ -78,7 +93,10 @@ const SelectCustom = ({
 
   const scrollToOption = useCallback((index) => {
     if (optionRefs.current[index]) {
-      optionRefs.current[index].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      optionRefs.current[index].scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+      });
     }
   }, []);
 
@@ -94,7 +112,8 @@ const SelectCustom = ({
   );
 
   const openMenu = useCallback(() => {
-    const { width, openUpwards, alignRight, rect } = calculatePositionAndWidth();
+    const { width, openUpwards, alignRight, rect } =
+      calculatePositionAndWidth();
     setCalculatedMenuWidth(width);
     setMenuPosition({ openUpwards, alignRight });
     setAnchorRect(rect);
@@ -128,7 +147,8 @@ const SelectCustom = ({
         case 'ArrowDown':
           e.preventDefault();
           setFocusedIndex((prev) => {
-            const next = prev < filteredOptions.length - 1 ? prev + 1 : 0;
+            const next =
+              prev < filteredOptions.length - 1 ? prev + 1 : 0;
             setTimeout(() => scrollToOption(next), 0);
             return next;
           });
@@ -136,7 +156,8 @@ const SelectCustom = ({
         case 'ArrowUp':
           e.preventDefault();
           setFocusedIndex((prev) => {
-            const next = prev > 0 ? prev - 1 : filteredOptions.length - 1;
+            const next =
+              prev > 0 ? prev - 1 : filteredOptions.length - 1;
             setTimeout(() => scrollToOption(next), 0);
             return next;
           });
@@ -169,17 +190,24 @@ const SelectCustom = ({
           break;
       }
     },
-    [isOpen, filteredOptions, focusedIndex, handleOptionSelect, openMenu, scrollToOption]
+    [
+      isOpen,
+      filteredOptions,
+      focusedIndex,
+      handleOptionSelect,
+      openMenu,
+      scrollToOption,
+    ]
   );
 
-  // Recalcular posición mientras esté abierto
   useEffect(() => {
     if (!isOpen) return;
     let tid;
     const recalc = () => {
       clearTimeout(tid);
       tid = setTimeout(() => {
-        const { width, openUpwards, alignRight, rect } = calculatePositionAndWidth();
+        const { width, openUpwards, alignRight, rect } =
+          calculatePositionAndWidth();
         setCalculatedMenuWidth(width);
         setMenuPosition({ openUpwards, alignRight });
         setAnchorRect(rect);
@@ -194,11 +222,12 @@ const SelectCustom = ({
     };
   }, [isOpen, calculatePositionAndWidth]);
 
-  // Cerrar al click fuera
   useEffect(() => {
     const handleClickOutside = (ev) => {
-      if (containerRef.current && !containerRef.current.contains(ev.target)) {
-        // si el click es dentro del portal (menú), no cerrar aquí
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(ev.target)
+      ) {
         if (menuRef.current && menuRef.current.contains(ev.target)) return;
         setIsOpen(false);
         setIsTyping(false);
@@ -207,13 +236,12 @@ const SelectCustom = ({
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () =>
+      document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Medir altura real del menú cuando se abre para posicionar hacia arriba con precisión
   useEffect(() => {
     if (!isOpen) return;
-    // medir en el siguiente frame
     const id = requestAnimationFrame(() => {
       if (menuRef.current) {
         setMenuHeight(menuRef.current.offsetHeight || 240);
@@ -234,7 +262,10 @@ const SelectCustom = ({
     [isOpen, isSearchable, openMenu]
   );
 
-  const handleOptionHover = useCallback((index) => setFocusedIndex(index), []);
+  const handleOptionHover = useCallback(
+    (index) => setFocusedIndex(index),
+    []
+  );
 
   const handleClear = useCallback(
     (e) => {
@@ -248,15 +279,39 @@ const SelectCustom = ({
     [onChange]
   );
 
-  const getInputValue = useCallback(() => (isTyping ? query : value ? value.label : ''), [isTyping, query, value]);
-  const getPlaceholder = useCallback(() => ((isTyping || !value) ? placeholder : ''), [isTyping, value, placeholder]);
+  const getInputValue = useCallback(
+    () => (isTyping ? query : value ? value.label : ''),
+    [isTyping, query, value]
+  );
+  const getPlaceholder = useCallback(
+    () => (isTyping || !value ? placeholder : ''),
+    [isTyping, value, placeholder]
+  );
 
-  // ======= POSICIONAMIENTO DEL PORTAL =======
+  // ===== Helpers de estado visual =====
+  const getStatusClasses = (option) => {
+    if (!option) return '';
+    if (option.estado === 'permiso') {
+      return 'bg-blue-50';
+    }
+    if (option.estado === 'ausente') {
+      return 'bg-red-50';
+    }
+    return '';
+  };
+
+  const getStatusLabel = (option) => {
+    if (!option) return '';
+    if (option.estado === 'permiso') return 'Con papeleta de salida';
+    if (option.estado === 'ausente') return 'Fuera del recinto';
+    return '';
+  };
+
   const menuLeft = (() => {
     if (!anchorRect) return 0;
     const menuW = parseInt(calculatedMenuWidth, 10);
     if (menuPosition.alignRight) {
-      return Math.max(anchorRect.right - menuW, 8); // margen mínimo
+      return Math.max(anchorRect.right - menuW, 8);
     }
     return Math.max(anchorRect.left, 8);
   })();
@@ -266,7 +321,10 @@ const SelectCustom = ({
     if (menuPosition.openUpwards) {
       return Math.max(anchorRect.top - (menuHeight + 4), 8);
     }
-    return Math.min(anchorRect.bottom + 4, window.innerHeight - 8);
+    return Math.min(
+      anchorRect.bottom + 4,
+      window.innerHeight - 8
+    );
   })();
 
   return (
@@ -284,12 +342,12 @@ const SelectCustom = ({
             transition-all duration-200
             ${error
               ? 'border-red-500 focus-within:border-red-500'
-              : (isOpen || isTyping)
-                ? 'border-blue-500 ring-2 ring-blue-100'
-                : 'border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100'
-            }
+              : isOpen || isTyping
+              ? 'border-blue-500 ring-2 ring-blue-100'
+              : 'border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100'}
             ${isDisabled ? 'bg-gray-50 cursor-not-allowed' : 'bg-white'}
-            ${(isOpen || isTyping) ? '' : 'hover:border-gray-400'}
+            ${isOpen || isTyping ? '' : 'hover:border-gray-400'}
+            ${value ? getStatusClasses(value) : ''}
           `}
           onClick={handleInputClick}
         >
@@ -316,7 +374,9 @@ const SelectCustom = ({
             role="combobox"
             aria-expanded={isOpen}
             aria-haspopup="listbox"
-            aria-activedescendant={focusedIndex >= 0 ? `option-${focusedIndex}` : undefined}
+            aria-activedescendant={
+              focusedIndex >= 0 ? `option-${focusedIndex}` : undefined
+            }
             {...props}
           />
 
@@ -333,7 +393,11 @@ const SelectCustom = ({
               </button>
             )}
 
-            <div className={`text-gray-400 p-1 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+            <div
+              className={`text-gray-400 p-1 transition-transform duration-200 ${
+                isOpen ? 'rotate-180' : ''
+              }`}
+            >
               <ChevronDown className="w-4 h-4" />
             </div>
           </div>
@@ -341,11 +405,12 @@ const SelectCustom = ({
       </div>
       {error && (
         <p className="mt-1 text-sm text-red-600">
-          {typeof error === 'string' ? error : 'Este campo es requerido'}
+          {typeof error === 'string'
+            ? error
+            : 'Este campo es requerido'}
         </p>
       )}
 
-      {/* ===== PORTAL DEL MENÚ ===== */}
       {isOpen &&
         createPortal(
           <div
@@ -385,18 +450,44 @@ const SelectCustom = ({
                   className={`
                     px-3 py-2 text-sm cursor-pointer border-b border-gray-100 last:border-b-0
                     transition-colors duration-100
-                    ${focusedIndex === index
-                      ? 'bg-blue-50 text-blue-900'
-                      : 'hover:bg-blue-50 hover:text-blue-900'
+                    flex items-center justify-between gap-2
+                    ${getStatusClasses(option)}
+                    ${
+                      focusedIndex === index
+                        ? 'bg-blue-50 text-blue-900'
+                        : 'hover:bg-blue-50 hover:text-blue-900'
                     }
-                    ${value?.value === option.value ? 'bg-blue-100 text-blue-900 font-medium' : 'text-gray-900'}
+                    ${
+                      value?.value === option.value
+                        ? 'bg-blue-100 text-blue-900 font-medium'
+                        : 'text-gray-900'
+                    }
                   `}
                   style={{
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    fontFamily:
+                      'system-ui, -apple-system, sans-serif',
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span>{option.label}</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="truncate">{option.label}</span>
+                    {getStatusLabel(option) && (
+                      <span className="text-xs text-gray-500 truncate">
+                        {getStatusLabel(option)}
+                        {option.detallePapeleta
+                          ? ` • ${option.detallePapeleta}`
+                          : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {option.estado === 'permiso' && (
+                      <AlertTriangle className="w-4 h-4 text-blue-500" />
+                    )}
+                    {option.estado === 'ausente' && (
+                      <XCircle className="w-4 h-4 text-red-500" />
+                    )}
+
                     {value?.value === option.value && (
                       <Check className="w-4 h-4 text-blue-600" />
                     )}

@@ -84,4 +84,64 @@ router.post('/estado',
   controller.registrarEstado
 );
 
+/**
+ * @route   GET /api/asistencia-personal/estadisticas/totales
+ * @desc    Obtener estadísticas de total de asistencias
+ * @access  Private
+ */
+router.get('/estadisticas/totales', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateDateRange,
+  controller.getEstadisticasTotales
+);
+
+/**
+ * @route   GET /api/asistencia-personal/estadisticas/puntualidad
+ * @desc    Obtener estadísticas de puntualidad y tardanzas
+ * @access  Private
+ */
+router.get('/estadisticas/puntualidad', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateDateRange,
+  controller.getEstadisticasPuntualidad
+);
+
+/**
+ * @route   GET /api/asistencia-personal/estadisticas/ausencias
+ * @desc    Obtener estadísticas de ausencias y justificaciones
+ * @access  Private
+ */
+router.get('/estadisticas/ausencias', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateDateRange,
+  controller.getEstadisticasAusencias
+);
+
+/**
+ * @route   GET /api/asistencia-personal/estadisticas/areas
+ * @desc    Obtener estadísticas por áreas
+ * @access  Private
+ */
+router.get('/estadisticas/areas', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateDateRange,
+  controller.getEstadisticasAreas
+);
+
+/**
+ * @route   GET /api/asistencia-personal/estadisticas/personal
+ * @desc    Obtener estadísticas por personal
+ * @access  Private
+ */
+router.get('/estadisticas/personal', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateDateRange,
+  controller.getEstadisticasPersonal
+);
+
 module.exports = router;

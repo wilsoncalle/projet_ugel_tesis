@@ -41,11 +41,50 @@ const findAll = async (options = {}) => {
         a.nombre_area as area_nombre,
         p.tipo_contrato_id,
         tc.nombre_tipo as tipo_contrato_nombre,
-        p.activo
+        p.activo,
+        
+        -- Estado de asistencia de hoy
+        ca.estado_presencia,
+        
+        -- Verificar si tiene papeleta activa
+        CASE
+          WHEN EXISTS (
+            SELECT 1
+            FROM PapeletasSalida ps
+            WHERE ps.personal_solicitante_id = p.id
+              AND ps.estado IN ('APROBADO', 'EN_CURSO')
+              AND ps.fecha_hora_salida_programada <= NOW()
+              AND (
+                ps.fecha_hora_retorno_real IS NULL
+                AND ps.fecha_hora_retorno_programada >= NOW()
+              )
+          )
+          THEN TRUE
+          ELSE FALSE
+        END AS tiene_papeleta_activa,
+        
+        -- Código de la papeleta activa (si existe)
+        (
+          SELECT ps.codigo_papeleta
+          FROM PapeletasSalida ps
+          WHERE ps.personal_solicitante_id = p.id
+            AND ps.estado IN ('APROBADO', 'EN_CURSO')
+            AND ps.fecha_hora_salida_programada <= NOW()
+            AND (
+              ps.fecha_hora_retorno_real IS NULL
+              AND ps.fecha_hora_retorno_programada >= NOW()
+            )
+          ORDER BY ps.fecha_solicitud DESC
+          LIMIT 1
+        ) AS codigo_papeleta_activa
+        
       FROM Personal p
       LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
       LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
       LEFT JOIN Cargos c ON p.cargo_id = c.id
+      LEFT JOIN ControlAsistenciaPersonal ca 
+        ON ca.personal_id = p.id 
+        AND ca.fecha = CURRENT_DATE
     `;
     
     // Construir la cláusula WHERE

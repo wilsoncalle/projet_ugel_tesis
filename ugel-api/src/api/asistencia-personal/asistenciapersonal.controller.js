@@ -130,11 +130,96 @@ const registrarEstado = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener estadísticas de total de asistencias
+ * @route GET /api/asistencia-personal/estadisticas/totales
+ */
+const getEstadisticasTotales = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de estadísticas totales de asistencia');
+  
+  const stats = await service.getEstadisticasTotales(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas totales obtenidas exitosamente',
+    data: stats
+  });
+});
+
+/**
+ * Obtener estadísticas de puntualidad y tardanzas
+ * @route GET /api/asistencia-personal/estadisticas/puntualidad
+ */
+const getEstadisticasPuntualidad = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de estadísticas de puntualidad');
+  
+  const stats = await service.getEstadisticasPuntualidad(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas de puntualidad obtenidas exitosamente',
+    data: stats
+  });
+});
+
+/**
+ * Obtener estadísticas de ausencias y justificaciones
+ * @route GET /api/asistencia-personal/estadisticas/ausencias
+ */
+const getEstadisticasAusencias = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de estadísticas de ausencias');
+  
+  const stats = await service.getEstadisticasAusencias(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas de ausencias obtenidas exitosamente',
+    data: stats
+  });
+});
+
+/**
+ * Obtener estadísticas por áreas
+ * @route GET /api/asistencia-personal/estadisticas/areas
+ */
+const getEstadisticasAreas = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de estadísticas por áreas');
+  
+  const stats = await service.getEstadisticasAreas(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas por áreas obtenidas exitosamente',
+    data: stats
+  });
+});
+
+/**
+ * Obtener estadísticas por personal
+ * @route GET /api/asistencia-personal/estadisticas/personal
+ */
+const getEstadisticasPersonal = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de estadísticas por personal');
+  
+  const stats = await service.getEstadisticasPersonal(req.query);
+  
+  res.json({
+    success: true,
+    message: 'Estadísticas por personal obtenidas exitosamente',
+    data: stats
+  });
+});
+
 module.exports = {
   getAll,
   getHoy,
   getById,
   registrarIngreso,
   registrarSalida,
-  registrarEstado
+  registrarEstado,
+  getEstadisticasTotales,
+  getEstadisticasPuntualidad,
+  getEstadisticasAusencias,
+  getEstadisticasAreas,
+  getEstadisticasPersonal
 };

@@ -385,6 +385,91 @@ const getEstadisticas = async (options = {}) => {
   }
 };
 
+/**
+ * Obtener estadísticas de total de asistencias
+ * @param {Object} options - Opciones de filtrado
+ * @returns {Object} Estadísticas de total de asistencias
+ */
+const getEstadisticasTotales = async (options = {}) => {
+  const { fechaInicio, fechaFin } = options;
+  
+  try {
+    const stats = await repository.getEstadisticasTotales(fechaInicio, fechaFin);
+    return stats;
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas totales:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas de puntualidad y tardanzas
+ * @param {Object} options - Opciones de filtrado
+ * @returns {Object} Estadísticas de puntualidad
+ */
+const getEstadisticasPuntualidad = async (options = {}) => {
+  const { fechaInicio, fechaFin } = options;
+  
+  try {
+    const stats = await repository.getEstadisticasPuntualidad(fechaInicio, fechaFin);
+    return stats;
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas de puntualidad:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas de ausencias y justificaciones
+ * @param {Object} options - Opciones de filtrado
+ * @returns {Object} Estadísticas de ausencias
+ */
+const getEstadisticasAusencias = async (options = {}) => {
+  const { fechaInicio, fechaFin } = options;
+  
+  try {
+    const stats = await repository.getEstadisticasAusencias(fechaInicio, fechaFin);
+    return stats;
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas de ausencias:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas por áreas
+ * @param {Object} options - Opciones de filtrado
+ * @returns {Object} Estadísticas por áreas
+ */
+const getEstadisticasAreas = async (options = {}) => {
+  const { fechaInicio, fechaFin } = options;
+  
+  try {
+    const stats = await repository.getEstadisticasAreas(fechaInicio, fechaFin);
+    return stats;
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas por áreas:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas por personal
+ * @param {Object} options - Opciones de filtrado
+ * @returns {Object} Estadísticas por personal
+ */
+const getEstadisticasPersonal = async (options = {}) => {
+  const { fechaInicio, fechaFin, personalId } = options;
+  
+  try {
+    const stats = await repository.getEstadisticasPersonal(fechaInicio, fechaFin, personalId);
+    return stats;
+  } catch (error) {
+    logger.error('Error obteniendo estadísticas por personal:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllAsistencias,
   getAsistenciasHoy,
@@ -393,5 +478,10 @@ module.exports = {
   registrarSalida,
   registrarEstadoPresencia,
   marcarAusentesAlFinalDelDia,
-  getEstadisticas
+  getEstadisticas,
+  getEstadisticasTotales,
+  getEstadisticasPuntualidad,
+  getEstadisticasAusencias,
+  getEstadisticasAreas,
+  getEstadisticasPersonal
 };

@@ -13,6 +13,7 @@ import QuickSearchBar from '../components/QuickSearchBar';
 import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { MagnifyingGlassIcon, ClockIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, UserGroupIcon, CalendarIcon, DocumentArrowDownIcon, ChevronDownIcon, DocumentTextIcon, XMarkIcon, EyeIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { AsistenciasTotalesCard, PuntualidadCard, AusenciasCard, AreasCard, PersonalCard, PanelSeleccionEstadisticas } from '../components/personal_estadisticas';
 
 // Variantes de animación
 const containerVariants = {
@@ -100,6 +101,9 @@ const PersonalAsistenciaPage = () => {
   
   // Estado para exportación
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  
+  // Estado para categoría de estadísticas
+  const [categoriaEstadisticas, setCategoriaEstadisticas] = useState('total-asistencias');
   
   // Referencias
   const registroFormRef = useRef(null);
@@ -886,6 +890,12 @@ const PersonalAsistenciaPage = () => {
       key: 'historial',
       label: 'Historial de Asistencias',
       icon: <CalendarIcon className="h-4 w-4" />
+    },
+    {
+      key: 'estadisticas',
+      label: 'Estadísticas',
+      icon: null,
+      isStatsButton: true
     }
   ];
 
@@ -1008,23 +1018,47 @@ const PersonalAsistenciaPage = () => {
                   className="flex-1 flex flex-col"
                 >
                   <div className="flex-1 flex flex-col">
-                    {/* Indicadores arriba de la tabla, dentro del contenedor blanco */}
-                    <div className="px-0 pt-0 pb-2">
-                      <IndicadoresAsistencia estadisticas={estadisticas} />
-                    </div>
+                    {activeTab === 'estadisticas' ? (
+                      // Mostrar estadísticas cuando estemos en el tab de estadísticas
+                      categoriaEstadisticas === 'total-asistencias' ? (
+                        <AsistenciasTotalesCard />
+                      ) : categoriaEstadisticas === 'puntualidad' ? (
+                        <PuntualidadCard />
+                      ) : categoriaEstadisticas === 'ausencias' ? (
+                        <AusenciasCard />
+                      ) : categoriaEstadisticas === 'areas' ? (
+                        <AreasCard />
+                      ) : categoriaEstadisticas === 'personal' ? (
+                        <PersonalCard />
+                      ) : (
+                        <div className="h-full flex items-center justify-center">
+                          <div className="text-center text-gray-500">
+                            <div className="text-4xl mb-4">📊</div>
+                            <p>Seleccione una categoría de estadísticas</p>
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      <>
+                        {/* Indicadores arriba de la tabla, dentro del contenedor blanco */}
+                        <div className="px-0 pt-0 pb-2">
+                          <IndicadoresAsistencia estadisticas={estadisticas} />
+                        </div>
 
-                    <div className="flex-1">
-                      <TableGenerica
-                        columns={getColumns()}
-                        data={getTabData()}
-                        {...getPaginationProps()}
-                        emptyMessage={
-                          activeTab === 'hoy'
-                            ? 'No hay asistencias registradas hoy'
-                            : 'No se encontraron registros para los filtros aplicados'
-                        }
-                      />
-                    </div>
+                        <div className="flex-1">
+                          <TableGenerica
+                            columns={getColumns()}
+                            data={getTabData()}
+                            {...getPaginationProps()}
+                            emptyMessage={
+                              activeTab === 'hoy'
+                                ? 'No hay asistencias registradas hoy'
+                                : 'No se encontraron registros para los filtros aplicados'
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </TabView>
               </div>
@@ -1041,7 +1075,14 @@ const PersonalAsistenciaPage = () => {
                 animate="show"
                 exit="exit"
               >
-                {activeTab === 'historial' ? (
+                {activeTab === 'estadisticas' ? (
+                  <motion.div variants={itemVariants}>
+                    <PanelSeleccionEstadisticas
+                      categoriaActiva={categoriaEstadisticas}
+                      onCategoriaChange={setCategoriaEstadisticas}
+                    />
+                  </motion.div>
+                ) : activeTab === 'historial' ? (
                   <>
                     <motion.div variants={itemVariants}>
                       <DateRangeFilter
