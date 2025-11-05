@@ -14,7 +14,7 @@ const PDFDocument = require('pdfkit-table');
 const { getTheme } = require('../../config/exportStyles');
 
 // Estados de presencia válidos
-const VALID_PRESENCE_STATES = ['Presente', 'Tardanza', 'Ausente', 'En Permiso', 'Comisión'];
+const VALID_PRESENCE_STATES = ['Presente', 'Tardanza', 'Ausente', 'Permiso', 'Comisión'];
 
 /**
  * Obtener registros de asistencia con paginación y filtros
@@ -191,8 +191,8 @@ const registrarIngreso = async (personalId, usuarioId) => {
     // Si tiene papeleta activa, siempre es 'En Permiso' (no se marca tardanza)
     let estadoPresencia;
     if (papeletaActiva) {
-      estadoPresencia = 'En Permiso';
-      logger.info(`Personal ID ${personalId} tiene papeleta activa (${papeletaActiva.codigo_papeleta}) - Estado: En Permiso`);
+      estadoPresencia = 'Permiso';
+      logger.info(`Personal ID ${personalId} tiene papeleta activa (${papeletaActiva.codigo_papeleta}) - Estado: Permiso`);
     } else {
       estadoPresencia = determinarEstadoPresencia(horaActual);
       logger.info(`Registrando ingreso - Hora Lima: ${horaActual}, Estado: ${estadoPresencia}`);

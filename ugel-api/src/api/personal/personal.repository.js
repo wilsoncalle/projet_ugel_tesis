@@ -53,10 +53,13 @@ const findAll = async (options = {}) => {
             FROM PapeletasSalida ps
             WHERE ps.personal_solicitante_id = p.id
               AND ps.estado IN ('APROBADO', 'EN_CURSO')
-              AND ps.fecha_hora_salida_programada <= NOW()
+              AND ps.fecha_hora_retorno_real IS NULL
               AND (
-                ps.fecha_hora_retorno_real IS NULL
-                AND ps.fecha_hora_retorno_programada >= NOW()
+                -- Papeleta aprobada con salida programada que ya pasó
+                (ps.estado = 'APROBADO' AND ps.fecha_hora_salida_programada <= NOW())
+                OR
+                -- Papeleta en curso (salida real ya registrada, esperando retorno)
+                (ps.estado = 'EN_CURSO' AND ps.fecha_hora_salida_real IS NOT NULL)
               )
           )
           THEN TRUE
@@ -69,10 +72,13 @@ const findAll = async (options = {}) => {
           FROM PapeletasSalida ps
           WHERE ps.personal_solicitante_id = p.id
             AND ps.estado IN ('APROBADO', 'EN_CURSO')
-            AND ps.fecha_hora_salida_programada <= NOW()
+            AND ps.fecha_hora_retorno_real IS NULL
             AND (
-              ps.fecha_hora_retorno_real IS NULL
-              AND ps.fecha_hora_retorno_programada >= NOW()
+              -- Papeleta aprobada con salida programada que ya pasó
+              (ps.estado = 'APROBADO' AND ps.fecha_hora_salida_programada <= NOW())
+              OR
+              -- Papeleta en curso (salida real ya registrada, esperando retorno)
+              (ps.estado = 'EN_CURSO' AND ps.fecha_hora_salida_real IS NOT NULL)
             )
           ORDER BY ps.fecha_solicitud DESC
           LIMIT 1

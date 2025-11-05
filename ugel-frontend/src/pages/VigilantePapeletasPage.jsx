@@ -145,26 +145,22 @@ const VigilantePapeletasPage = () => {
     }
   };
 
+  // Efecto consolidado para cargar papeletas
   useEffect(() => {
-    loadPapeletas({ page: 1 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // recargar al cambiar pestaña
-  useEffect(() => {
-    loadPapeletas({ page: 1 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
-
-  // Debounce para búsqueda
-  useEffect(() => {
+    // Limpiar timeout anterior si existe
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    searchTimeoutRef.current = setTimeout(() => {
+    // Si hay búsqueda, aplicar debounce
+    if (search) {
+      searchTimeoutRef.current = setTimeout(() => {
+        loadPapeletas({ page: 1 });
+      }, 500);
+    } else {
+      // Sin búsqueda, cargar inmediatamente
       loadPapeletas({ page: 1 });
-    }, 500);
+    }
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -172,7 +168,7 @@ const VigilantePapeletasPage = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [activeTab, search]);
 
   // ---------- UI HELPERS ----------
   const estadoBadge = (estado) => {

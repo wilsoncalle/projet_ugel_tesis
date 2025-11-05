@@ -724,7 +724,18 @@ const RegistroForm = forwardRef(
 
       switch (field) {
         case 'numeroDocumento':
-          validatedValue = value.slice(0, 20);
+          // Si es DNI, limitar a 8 dígitos
+          const tipoDNI = tiposDocumento.find(
+            (tipo) =>
+              tipo.label?.toLowerCase().includes('dni') ||
+              tipo.label?.toLowerCase().includes('documento nacional')
+          );
+          
+          if (tipoDNI && formVisitante.tipoDocumentoId === tipoDNI.value) {
+            validatedValue = value.slice(0, 8);
+          } else {
+            validatedValue = value.slice(0, 20);
+          }
           break;
         case 'nombres':
           validatedValue = value.slice(0, 150);
@@ -804,7 +815,7 @@ const RegistroForm = forwardRef(
           
           if (empleadoSeleccionado.estado === 'permiso') {
             setMensajeEstadoEmpleado(
-              `El empleado tiene una papeleta de salida en curso${
+              `El empleado tiene un permiso de salida activo${
                 empleadoSeleccionado.detallePapeleta 
                   ? ` (código ${empleadoSeleccionado.detallePapeleta})` 
                   : ''
@@ -812,7 +823,7 @@ const RegistroForm = forwardRef(
             );
             setTipoMensajeEmpleado('warning');
           } else if (empleadoSeleccionado.estado === 'ausente') {
-            setMensajeEstadoEmpleado('El empleado figura como ausente en el control de asistencia de hoy.');
+            setMensajeEstadoEmpleado('El empleado registra ausencia hoy.');
             setTipoMensajeEmpleado('error');
           } else {
             setMensajeEstadoEmpleado(null);
@@ -1488,7 +1499,16 @@ const RegistroForm = forwardRef(
                           )
                         }
                         placeholder=""
-                        maxLength="20"
+                        maxLength={
+                          tiposDocumento.find(
+                            (tipo) =>
+                              (tipo.label?.toLowerCase().includes('dni') ||
+                               tipo.label?.toLowerCase().includes('documento nacional')) &&
+                              tipo.value === formVisitante.tipoDocumentoId
+                          )
+                            ? 8
+                            : 20
+                        }
                         className="rounded-r-none border-r-0"
                         style={{
                           borderTopRightRadius: '0',

@@ -1034,7 +1034,23 @@ const getVisitanteDetalle = async (visitanteId, fechaInicio = null, fechaFin = n
     throw new AppError('Error obteniendo detalle del visitante', 500);
   }
 };
+// Helper: convierte cualquier Date o valor de fecha a 'YYYY-MM-DD'
+const toPgDateString = (value) => {
+  // Si ya viene como 'YYYY-MM-DD', lo reutilizamos
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
 
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) {
+    return null;
+  }
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 /**
  * Cerrar automáticamente visitas según las reglas:
  * - Si se registró después de las 5:00 p.m., cerrar a las 6:00 p.m.
@@ -1046,7 +1062,7 @@ const getVisitanteDetalle = async (visitanteId, fechaInicio = null, fechaFin = n
 const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
   try {
     logger.info('Iniciando cierre automático de visitas...');
-    
+
     // Obtener todas las visitas activas (sin salida) del día actual y anteriores
     const query = `
       SELECT 
@@ -1060,62 +1076,76 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
         AND DATE(fecha_ingreso) <= CURRENT_DATE
       ORDER BY fecha_ingreso ASC
     `;
-    
+
     const result = await db.query(query);
     const visitasActivas = result.rows;
-    
+
     logger.info(`Se encontraron ${visitasActivas.length} visitas activas para procesar`);
-    
+
     let cerradas = 0;
     let errores = 0;
+
     const ahora = new Date();
     const horaActual = ahora.getHours();
     const minutoActual = ahora.getMinutes();
-    
+
     for (const visita of visitasActivas) {
       try {
-        const fechaIngreso = new Date(visita.fecha_ingreso);
         const horaIngreso = visita.hora_ingreso;
-        const fechaIngresoDate = visita.fecha_ingreso_fecha;
-        
+        const fechaIngresoFechaRaw = visita.fecha_ingreso_fecha; // viene de DATE(fecha_ingreso)
+
+        // Normalizamos la fecha de ingreso a 'YYYY-MM-DD'
+        const fechaIngresoDateStr = toPgDateString(fechaIngresoFechaRaw);
+        if (!fechaIngresoDateStr) {
+          logger.error(`No se pudo parsear fecha_ingreso_fecha para visita ID ${visita.id}:`, fechaIngresoFechaRaw);
+          errores++;
+          continue;
+        }
+
+        // Comparar solo fechas (día) para saber si es día anterior
+        const fechaIngresoDateObj = new Date(fechaIngresoDateStr); // 00:00 de ese día
+        const fechaActual = new Date();
+        fechaActual.setHours(0, 0, 0, 0);
+        fechaIngresoDateObj.setHours(0, 0, 0, 0);
+
+        const esDiaAnterior = fechaIngresoDateObj < fechaActual;
+
         // Determinar hora de salida según las reglas
         let horaSalida = 17; // 5:00 p.m. por defecto
         let minutoSalida = 0;
-        
+
         // Si se registró después de las 5:00 p.m., cerrar a las 6:00 p.m.
         if (horaIngreso >= 17) {
           horaSalida = 18; // 6:00 p.m.
         }
-        
-        // Verificar si ya pasó la hora límite para cerrar
-        // Para visitas después de 5:00 p.m., cerrar solo si ya pasaron las 6:00 p.m.
-        // Para el resto, cerrar solo si ya pasaron las 5:00 p.m.
+
         const horaCierre = horaIngreso >= 17 ? 18 : 17;
-        
-        // Verificar si la fecha es anterior al día actual
-        const fechaIngresoDateObj = new Date(fechaIngresoDate);
-        const fechaActual = new Date();
-        fechaActual.setHours(0, 0, 0, 0);
-        fechaIngresoDateObj.setHours(0, 0, 0, 0);
-        
-        const esDiaAnterior = fechaIngresoDateObj < fechaActual;
-        
-        // Si es día anterior, cerrar siempre
-        // Si es día actual, cerrar solo si ya pasó la hora límite
-        if (!esDiaAnterior && (horaActual < horaCierre || (horaActual === horaCierre && minutoActual < 0))) {
-          // Aún no es hora de cerrar esta visita
-          continue;
+
+        // Si es día actual, solo cerrar si ya pasó la hora límite
+        if (!esDiaAnterior) {
+          const yaPasoHoraCierre =
+            horaActual > horaCierre ||
+            (horaActual === horaCierre && minutoActual >= minutoSalida);
+
+          if (!yaPasoHoraCierre) {
+            // Aún no es hora de cerrar esta visita
+            continue;
+          }
         }
-        
-        // Construir fecha y hora de salida
-        // Para días anteriores, usar la fecha de ingreso
-        // Para el día actual, usar la fecha actual
-        const fechaActualStr = new Date().toISOString().split('T')[0];
-        const fechaSalidaStr = esDiaAnterior ? fechaIngresoDate : fechaActualStr;
+
+        // Construir fecha y hora de salida:
+        // - Para días anteriores, usar la fecha de ingreso
+        // - Para el día actual, usar la fecha actual
+        const fechaActualStr = toPgDateString(new Date());
+        const fechaSalidaStr = esDiaAnterior ? fechaIngresoDateStr : fechaActualStr;
+
         const horaSalidaStr = `${String(horaSalida).padStart(2, '0')}:${String(minutoSalida).padStart(2, '0')}:00`;
+
+        // IMPORTANTE: aquí ya es 'YYYY-MM-DD HH:MM:SS' (sin GMT, sin texto raro)
         const fechaHoraSalida = `${fechaSalidaStr} ${horaSalidaStr}`;
-        
-        // Actualizar la visita con fecha y hora de salida
+
+        logger.info(`Cerrando visita ID ${visita.id} con fechaHoraSalida = ${fechaHoraSalida}`);
+
         const updateQuery = `
           UPDATE RegistrosVisitas 
           SET 
@@ -1124,33 +1154,30 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
           WHERE id = $3
           RETURNING id
         `;
-        
+
         await db.query(updateQuery, [fechaHoraSalida, usuarioSistemaId, visita.id]);
-        
+
         logger.info(`Visita ID ${visita.id} cerrada automáticamente a las ${horaSalidaStr}`);
         cerradas++;
-        
       } catch (error) {
         logger.error(`Error cerrando visita ID ${visita.id}:`, error);
         errores++;
       }
     }
-    
+
     logger.info(`Cierre automático completado: ${cerradas} visitas cerradas, ${errores} errores`);
-    
+
     return {
       total: visitasActivas.length,
       cerradas,
       errores,
-      pendientes: visitasActivas.length - cerradas - errores
+      pendientes: visitasActivas.length - cerradas - errores,
     };
-    
   } catch (error) {
     logger.error('Error en cierre automático de visitas:', error);
     throw new AppError('Error en cierre automático de visitas', 500);
   }
 };
-
 module.exports = {
   findAll,
   findActivas,

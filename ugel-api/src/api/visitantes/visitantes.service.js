@@ -136,6 +136,15 @@ const createVisitante = async (visitanteData) => {
       throw new AppError('Tipo de documento inactivo', 400);
     }
     
+    // Validar longitud de DNI (debe ser exactamente 8 dígitos)
+    const esDNI = tipoDocumento.codigo === 'DNI' || 
+                  tipoDocumento.nombre_tipo?.toLowerCase().includes('dni') ||
+                  tipoDocumento.nombre_tipo?.toLowerCase().includes('documento nacional');
+    
+    if (esDNI && numeroDocumento.length !== 8) {
+      throw new AppError('El DNI debe tener exactamente 8 dígitos', 400);
+    }
+    
     // Verificar si ya existe un visitante con el mismo documento
     const existingVisitante = await repository.findByDocumento(tipoDocumentoId, numeroDocumento);
     if (existingVisitante) {
@@ -178,6 +187,8 @@ const updateVisitante = async (id, visitanteData) => {
     const updateData = {};
     
     // Preparar datos a actualizar (enviar en camelCase al repositorio)
+    let tipoDocumentoParaValidar = null;
+    
     if (tipoDocumentoId !== undefined) {
       // Verificar que el tipo de documento exista y esté activo
       const tipoDocumento = await tiposDocumentoRepository.findById(tipoDocumentoId);
@@ -188,10 +199,25 @@ const updateVisitante = async (id, visitanteData) => {
         throw new AppError('Tipo de documento inactivo', 400);
       }
       
+      tipoDocumentoParaValidar = tipoDocumento;
       updateData.tipoDocumentoId = tipoDocumentoId;
     }
     
     if (numeroDocumento !== undefined) {
+      // Validar longitud de DNI si se está actualizando el número de documento
+      if (!tipoDocumentoParaValidar) {
+        // Si no se está cambiando el tipo, obtener el tipo actual
+        tipoDocumentoParaValidar = await tiposDocumentoRepository.findById(existingVisitante.tipo_documento_id);
+      }
+      
+      const esDNI = tipoDocumentoParaValidar.codigo === 'DNI' || 
+                    tipoDocumentoParaValidar.nombre_tipo?.toLowerCase().includes('dni') ||
+                    tipoDocumentoParaValidar.nombre_tipo?.toLowerCase().includes('documento nacional');
+      
+      if (esDNI && numeroDocumento.length !== 8) {
+        throw new AppError('El DNI debe tener exactamente 8 dígitos', 400);
+      }
+      
       // Si se cambia el documento, verificar que no exista otro visitante con ese documento
       if (tipoDocumentoId !== existingVisitante.tipo_documento_id || numeroDocumento !== existingVisitante.numero_documento) {
         const duplicateVisitante = await repository.findByDocumento(

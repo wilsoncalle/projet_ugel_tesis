@@ -153,40 +153,36 @@ const PapeletasPage = () => {
     }
   };
 
+  // Cargar combos al inicio
   useEffect(() => {
-    (async () => {
-      await loadCombos();
-      await loadPapeletas({ page: 1 });
-    })();
+    loadCombos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // recargar al cambiar pestaña
+  // Efecto consolidado para cargar papeletas
   useEffect(() => {
-    loadPapeletas({ page: 1 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
-
-  // Debounce para búsqueda
-  useEffect(() => {
-    // Limpiar timeout anterior
+    // Limpiar timeout anterior si existe
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // Crear nuevo timeout
-    searchTimeoutRef.current = setTimeout(() => {
+    // Si hay búsqueda, aplicar debounce
+    if (search) {
+      searchTimeoutRef.current = setTimeout(() => {
+        loadPapeletas({ page: 1 });
+      }, 500);
+    } else {
+      // Sin búsqueda, cargar inmediatamente
       loadPapeletas({ page: 1 });
-    }, 500); // Esperar 500ms después de que el usuario deje de escribir
+    }
 
-    // Cleanup
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
+  }, [activeTab, search]);
 
   // ---------- UI HELPERS ----------
   const estadoBadge = (estado) => {

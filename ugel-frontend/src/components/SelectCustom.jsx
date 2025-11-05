@@ -451,7 +451,7 @@ const SelectCustom = ({
                     px-3 py-2 text-sm cursor-pointer border-b border-gray-100 last:border-b-0
                     transition-colors duration-100
                     flex items-center justify-between gap-2
-                    ${getStatusClasses(option)}
+  
                     ${
                       focusedIndex === index
                         ? 'bg-blue-50 text-blue-900'
