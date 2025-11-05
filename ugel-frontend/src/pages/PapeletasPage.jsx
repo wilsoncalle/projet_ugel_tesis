@@ -39,7 +39,10 @@ const PapeletasPage = () => {
   // Modales / formulario
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isRechazoModalOpen, setIsRechazoModalOpen] = useState(false);
   const [selectedPapeleta, setSelectedPapeleta] = useState(null);
+  const [papeletaADecidirid, setPapeletaADecidir] = useState(null);
+  const [observacionRechazo, setObservacionRechazo] = useState("");
   const [formError, setFormError] = useState(null);
   const [notification, setNotification] = useState(null);
 
@@ -324,6 +327,14 @@ const PapeletasPage = () => {
   }, []);
 
   const onDecidir = async (id, accion) => {
+    // Si es RECHAZAR, abrir modal para observación
+    if (accion === "RECHAZAR") {
+      setPapeletaADecidir(id);
+      setObservacionRechazo("");
+      setIsRechazoModalOpen(true);
+      return;
+    }
+
     try {
       // Usar el método correcto según la acción
       if (accion === "CANCELAR") {
@@ -332,9 +343,7 @@ const PapeletasPage = () => {
         });
       } else {
         await papeletasSalidaService.decidir(id, {
-          accion, // 'APROBAR' | 'RECHAZAR'
-          // En backend se tomará req.user.id como autorizador, si necesitas explícito:
-          // personalAutorizaId: user.personalId
+          accion, // 'APROBAR'
         });
       }
       
@@ -367,6 +376,52 @@ const PapeletasPage = () => {
         duration: 4000,
       });
     }
+  };
+
+  // ---------- RECHAZO MODAL ----------
+  const handleConfirmarRechazo = async () => {
+    if (!papeletaADecidirid) return;
+
+    try {
+      await papeletasSalidaService.decidir(papeletaADecidirid, {
+        accion: "RECHAZAR",
+        observacionAutorizacion: observacionRechazo.trim() || null,
+      });
+
+      setNotification({
+        message: "Papeleta rechazada correctamente",
+        type: "success",
+        duration: 2500,
+      });
+      
+      setIsRechazoModalOpen(false);
+      setPapeletaADecidir(null);
+      setObservacionRechazo("");
+      
+      await loadPapeletas();
+      
+      if (isDetailModalOpen) {
+        handleCloseDetailModal();
+      }
+    } catch (e) {
+      console.error("Error al rechazar:", e);
+      const errorMessage = 
+        e?.response?.data?.message || 
+        e?.response?.data?.error || 
+        e.message ||
+        "No se pudo rechazar la papeleta.";
+      setNotification({
+        message: errorMessage,
+        type: "error",
+        duration: 4000,
+      });
+    }
+  };
+
+  const handleCancelarRechazo = () => {
+    setIsRechazoModalOpen(false);
+    setPapeletaADecidir(null);
+    setObservacionRechazo("");
   };
 
   // ---------- CREATE MODAL ----------
@@ -743,6 +798,29 @@ const PapeletasPage = () => {
             }
           },
           {
+            key: 'observacion_autorizacion',
+            label: 'Observación de Autorización',
+            render: (value, data) => {
+              const observacion = value || data?.observacion_autorizacion;
+              const estado = data?.estado;
+              
+              // Solo mostrar si hay observación o si está rechazado
+              if (!observacion && estado !== 'RECHAZADO') return null;
+              
+              return (
+                <div className={`p-3 rounded-lg ${
+                  estado === 'RECHAZADO' 
+                    ? 'bg-red-50 border border-red-200' 
+                    : 'bg-gray-50 border border-gray-200'
+                }`}>
+                  <p className="text-sm whitespace-pre-wrap">
+                    {observacion || 'Sin observación especificada'}
+                  </p>
+                </div>
+              );
+            }
+          },
+          {
             key: 'fecha_solicitud',
             label: 'Fecha de Solicitud',
             render: (value, data) => {
@@ -758,6 +836,55 @@ const PapeletasPage = () => {
           }
         ]}
       />
+
+      {/* Modal de Rechazo con Observación */}
+      <ModalGenerico
+        isOpen={isRechazoModalOpen}
+        onClose={handleCancelarRechazo}
+        title="Rechazar Papeleta de Salida"
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            ¿Está seguro de que desea rechazar esta papeleta? Puede agregar una observación explicando el motivo del rechazo (opcional).
+          </p>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Observación (Opcional)
+            </label>
+            <textarea
+              value={observacionRechazo}
+              onChange={(e) => setObservacionRechazo(e.target.value)}
+              placeholder="Escriba el motivo del rechazo..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+              rows={4}
+              maxLength={500}
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {observacionRechazo.length}/500 caracteres
+            </p>
+          </div>
+
+          <div className="flex gap-3 justify-end pt-4 border-t">
+            <Button
+              onClick={handleCancelarRechazo}
+              variant="outline"
+              size="md"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarRechazo}
+              variant="danger"
+              size="md"
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Rechazar Papeleta
+            </Button>
+          </div>
+        </div>
+      </ModalGenerico>
 
       {/* Notifications */}
       {notification && (

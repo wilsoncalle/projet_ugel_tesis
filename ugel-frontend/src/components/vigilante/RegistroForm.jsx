@@ -1094,6 +1094,11 @@ const RegistroForm = forwardRef(
               lugar: '',
             });
 
+            // Limpiar mensajes de estado del empleado
+            setMensajeEstadoEmpleado(null);
+            setTipoMensajeEmpleado(null);
+            setEmpleadoSeleccionadoActual(null);
+
             limpiarBusqueda();
           }
         } catch (error) {
@@ -1189,49 +1194,59 @@ const RegistroForm = forwardRef(
           visitanteId: null,
         });
 
+        // Limpiar mensajes de estado del empleado
+        setMensajeEstadoEmpleado(null);
+        setTipoMensajeEmpleado(null);
+        setEmpleadoSeleccionadoActual(null);
+
         limpiarBusqueda();
       }
     };
 
     const handleRegisterVisit = () => {
-      if (!isVisitaFormValid || visitantesEnEspera.length === 0)
-        return;
+  if (!isVisitaFormValid || !visitantesEnEspera || visitantesEnEspera.length === 0)
+    return;
 
-      const visitaData = {
-        empleadoId: formVisitaActivos.empleadoId,
-        motivoId: formVisitaActivos.motivoId,
-        lugar: formVisitaActivos.lugar,
-        empleado: empleados.find(
-          (emp) => emp.value === formVisitaActivos.empleadoId
-        ),
-        motivo: motivos.find(
-          (mot) => mot.value === formVisitaActivos.motivoId
-        ),
-        lugarId: formVisitaActivos.lugar,
-      };
+  const visitaData = {
+    empleadoId: formVisitaActivos.empleadoId,
+    motivoId: formVisitaActivos.motivoId,
+    lugar: formVisitaActivos.lugar,
+    empleado: empleados.find(
+      (emp) => emp.value === formVisitaActivos.empleadoId
+    ),
+    motivo: motivos.find(
+      (mot) => mot.value === formVisitaActivos.motivoId
+    ),
+    lugarId: formVisitaActivos.lugar,
+  };
 
-      onRegisterVisit(visitaData);
+  onRegisterVisit(visitaData);
 
-      updateFormVisitaActivos({
+  updateFormVisitaActivos({
+    empleadoId: '',
+    motivoId: '',
+    lugar: '',
+    _tab: 'activos',
+  });
+  resetearFiltrosActivos();
+
+  // AGREGAR ESTAS 3 LÍNEAS PARA LIMPIAR LOS MENSAJES:
+  setMensajeEstadoEmpleado(null);
+  setTipoMensajeEmpleado(null);
+  setEmpleadoSeleccionadoActual(null);
+
+  if (onFormChange) {
+    onFormChange({
+      visitante: formVisitante,
+      visita: {
         empleadoId: '',
         motivoId: '',
         lugar: '',
         _tab: 'activos',
-      });
-      resetearFiltrosActivos();
-
-      if (onFormChange) {
-        onFormChange({
-          visitante: formVisitante,
-          visita: {
-            empleadoId: '',
-            motivoId: '',
-            lugar: '',
-            _tab: 'activos',
-          },
-        });
-      }
-    };
+      },
+    });
+  }
+};
 
     const limpiarBusqueda = () => {
       setMensajeVisitante('');
@@ -1329,6 +1344,7 @@ const RegistroForm = forwardRef(
 
         setMensajeEstadoEmpleado(null);
         setTipoMensajeEmpleado(null);
+        setEmpleadoSeleccionadoActual(null);
 
         if (onFormChange) {
           onFormChange({
@@ -1615,6 +1631,7 @@ const RegistroForm = forwardRef(
             <div
               className={`flex-1 flex flex-col overflow-visible border border-gray-200 rounded-xl p-3 ${
                 activeTab === 'activos' &&
+                visitantesEnEspera &&
                 visitantesEnEspera.length === 0
                   ? 'opacity-50 pointer-events-none'
                   : ''
@@ -1625,8 +1642,9 @@ const RegistroForm = forwardRef(
                   ? 'Datos de la Visita'
                   : 'Buscar Visita'}
                 {activeTab === 'activos' &&
+                  visitantesEnEspera &&
                   visitantesEnEspera.length === 0 && (
-                    <span className="text-sm text-gray-500 ml-2">
+                    <span key="mensaje-agregar" className="text-sm text-gray-500 ml-2">
                       (Agregue un visitante primero)
                     </span>
                   )}
@@ -1831,6 +1849,7 @@ const RegistroForm = forwardRef(
                   disabled={
                     activeTab === 'activos' &&
                     (!isVisitaFormValid ||
+                      !visitantesEnEspera ||
                       visitantesEnEspera.length === 0)
                   }
                   variant="primary"
@@ -1907,10 +1926,6 @@ const RegistroForm = forwardRef(
               key: 'personal_solicitante_nombre',
             },
             {
-              label: 'Área',
-              key: 'area_destino_nombre',
-            },
-            {
               label: 'Motivo',
               key: 'motivo_nombre',
             },
@@ -1951,10 +1966,6 @@ const RegistroForm = forwardRef(
             {
               label: 'Autorizado por',
               key: 'personal_autoriza_nombre',
-            },
-            {
-              label: 'Observación',
-              key: 'observacion_autorizacion',
             },
           ]}
         />
