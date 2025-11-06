@@ -2,10 +2,10 @@ import React from 'react';
 import { Users, UserCheck } from 'lucide-react';
 
 /**
- * Componente de toggle para alternar entre vistas de Personal y Visitas
+ * Componente de toggle para alternar entre vistas
  */
-const ViewToggle = ({ vistaActiva, onCambiarVista }) => {
-  const tabs = [
+const ViewToggle = ({ vistaActiva, onCambiarVista, tabs: customTabs }) => {
+  const defaultTabs = [
     {
       key: 'personal',
       label: 'Personal',
@@ -19,6 +19,8 @@ const ViewToggle = ({ vistaActiva, onCambiarVista }) => {
       description: 'Visitantes y estadísticas de visitas'
     }
   ];
+
+  const tabs = customTabs || defaultTabs;
 
   return (
     <div className="mb-6">

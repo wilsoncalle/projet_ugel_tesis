@@ -62,7 +62,7 @@ const KPICard = ({
 
   return (
     <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 p-6 border border-slate-100 hover:shadow-xl hover:shadow-slate-300/50 transition-all duration-300 group">
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-slate-600 mb-1">{title}</p>
           <h3 className="text-3xl font-bold text-slate-900 mb-2 group-hover:text-slate-700 transition-colors">
@@ -92,14 +92,6 @@ const KPICard = ({
             <Icon className={`w-6 h-6 ${colors.iconColor}`} />
           </div>
         )}
-      </div>
-
-      {/* Barra de progreso decorativa */}
-      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div 
-          className={`h-full bg-gradient-to-r ${colors.bg} rounded-full transition-all duration-1000 ease-out`}
-          style={{ width: '75%' }}
-        ></div>
       </div>
     </div>
   );
