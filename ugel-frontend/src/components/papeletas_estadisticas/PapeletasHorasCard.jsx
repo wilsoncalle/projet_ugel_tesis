@@ -2,48 +2,49 @@ import { EstadisticasCard } from '../estadisticas';
 import usePapeletasHoras from '../../hooks/usePapeletasHoras';
 
 const PapeletasHorasCard = () => {
-  const { data, loading, error, periodo, setPeriodo, resumen } = usePapeletasHoras();
+  const { data, loading, error, periodo, setPeriodo, resumen, totalPapeletas } = usePapeletasHoras();
 
   const config = {
-    title: 'Horas Autorizadas vs Usadas',
-    subtitle: 'Desviación promedio por personal (Top 10)',
+    title: 'Empleados con Más Solicitudes',
+    subtitle: 'Ranking de personal con más papeletas (Top 10)',
     chartType: 'bar',
     chartHeight: 400,
     layout: 'stacked',
     showMetrics: true,
-    exportFilename: 'papeletas-horas',
+    exportFilename: 'papeletas-empleados',
     
     // Configuración del gráfico
     chartConfig: {
       labelKey: 'personal',
-      valueKey: 'desviacion',
-      datasetLabel: 'Desviación (min)',
-      tooltipSuffix: 'min',
-      emptyTitle: 'No hay datos de horas',
+      valueKey: 'papeletas',
+      datasetLabel: 'Papeletas',
+      tooltipSuffix: 'papeletas',
+      emptyTitle: 'No hay datos de empleados',
       emptySubtitle: 'en este período',
     },
     
     // Configuración de las métricas
     metricsConfig: {
-      type: 'horas',
-      totalLabel: 'Total de Registros',
-      maxLabel: 'Mayor Desviación',
-      minLabel: 'Menor Desviación',
-      averageLabel: 'Promedio General',
+      type: 'areas',
+      totalLabel: 'Total de Papeletas',
+      maxLabel: 'Empleado con Más Solicitudes',
+      minLabel: 'Empleado con Menos Solicitudes',
+      averageLabel: 'Promedio por Empleado',
+      itemSuffix: 'papeletas',
     },
     
     // Configuración de la tabla
     tableConfig: {
-      type: 'horas',
-      title: 'Detalle por Personal',
-      searchPlaceholder: 'Buscar personal...',
-      nameLabel: 'Personal',
-      countLabel: 'Desviación (min)',
-      distributionLabel: 'Desviación',
+      type: 'areas',
+      title: 'Detalle por Empleado',
+      searchPlaceholder: 'Buscar empleado...',
+      nameLabel: 'Empleado',
+      countLabel: 'Papeletas',
+      distributionLabel: 'Distribución',
       nameKey: 'personal',
-      countKey: 'desviacion',
+      countKey: 'papeletas',
       sortByName: 'personal',
-      sortByCount: 'desviacion',
+      sortByCount: 'papeletas',
     },
   };
 
@@ -54,7 +55,7 @@ const PapeletasHorasCard = () => {
       error={error}
       periodo={periodo}
       onPeriodoChange={setPeriodo}
-      totalVisitas={resumen?.total_registros || 0}
+      totalVisitas={totalPapeletas}
       config={config}
     />
   );

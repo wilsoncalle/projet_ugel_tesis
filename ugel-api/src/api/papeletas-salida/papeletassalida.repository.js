@@ -763,71 +763,63 @@ const getEstadisticasMotivos = async (fechaInicio, fechaFin, periodo = 'mes') =>
 };
 
 /**
- * Estadísticas específicas para RRHH - Horas autorizadas vs usadas
+ * Estadísticas específicas - Empleados con más solicitudes de salida
  */
 const getEstadisticasHoras = async (fechaInicio, fechaFin, periodo = 'mes') => {
   try {
     const { where, params } = buildFilters({ fechaInicio, fechaFin, campoFecha: 'solicitud' });
     const whereSQL = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-    const horasSQL = `
+    // Ranking de empleados con más papeletas (Top 10)
+    const rankingSQL = `
       SELECT
-        ps.id,
-        ps.codigo_papeleta,
         CONCAT(p.nombres, ' ', p.apellidos) AS personal,
-        p.area_destino_id,
-        ad.nombre_area,
-        EXTRACT(EPOCH FROM (ps.fecha_hora_retorno_programada - ps.fecha_hora_salida_programada)) / 60.0 AS minutos_programados,
-        EXTRACT(EPOCH FROM (ps.fecha_hora_retorno_real - ps.fecha_hora_salida_real)) / 60.0 AS minutos_reales,
-        (EXTRACT(EPOCH FROM (ps.fecha_hora_retorno_real - ps.fecha_hora_salida_real)) -
-         EXTRACT(EPOCH FROM (ps.fecha_hora_retorno_programada - ps.fecha_hora_salida_programada))) / 60.0 AS minutos_desviacion
+        COUNT(*) AS total_papeletas,
+        ad.nombre_area
       FROM PapeletasSalida ps
       JOIN Personal p ON ps.personal_solicitante_id = p.id
       LEFT JOIN AreasDestino ad ON p.area_destino_id = ad.id
       ${whereSQL}
-        AND ps.fecha_hora_salida_real IS NOT NULL
-        AND ps.fecha_hora_retorno_real IS NOT NULL
-      ORDER BY minutos_desviacion DESC
+      GROUP BY p.id, p.nombres, p.apellidos, ad.nombre_area
+      ORDER BY total_papeletas DESC
+      LIMIT 10
     `;
 
-    const { rows } = await db.query(horasSQL, params);
+    // Promedio de papeletas por empleado
+    const promedioSQL = `
+      WITH papeletas_por_persona AS (
+        SELECT
+          ps.personal_solicitante_id,
+          COUNT(*) AS total_papeletas
+        FROM PapeletasSalida ps
+        ${whereSQL}
+        GROUP BY ps.personal_solicitante_id
+      )
+      SELECT
+        COUNT(*) AS total_empleados,
+        COALESCE(SUM(total_papeletas), 0) AS total_papeletas_global,
+        COALESCE(AVG(total_papeletas), 0) AS promedio_por_empleado
+      FROM papeletas_por_persona
+    `;
 
-    // Calcular promedios
-    const totalRegistros = rows.length;
-    const promedioDesviacion = totalRegistros > 0
-      ? rows.reduce((sum, row) => sum + parseFloat(row.minutos_desviacion || 0), 0) / totalRegistros
-      : 0;
+    const [ranking, promedio] = await Promise.all([
+      db.query(rankingSQL, params),
+      db.query(promedioSQL, params),
+    ]);
 
-    // Agrupar por persona
-    const porPersona = {};
-    rows.forEach(row => {
-      if (!porPersona[row.personal]) {
-        porPersona[row.personal] = {
-          personal: row.personal,
-          total_papeletas: 0,
-          desviacion_total: 0,
-        };
-      }
-      porPersona[row.personal].total_papeletas++;
-      porPersona[row.personal].desviacion_total += parseFloat(row.minutos_desviacion || 0);
-    });
-
-    const porPersonaArray = Object.values(porPersona).map(item => ({
-      ...item,
-      desviacion_promedio: item.total_papeletas > 0 ? item.desviacion_total / item.total_papeletas : 0,
-    })).sort((a, b) => Math.abs(b.desviacion_promedio) - Math.abs(a.desviacion_promedio));
+    const resumenData = promedio.rows[0] || {};
 
     return {
-      detalle: rows,
+      por_persona: ranking.rows,
       resumen: {
-        total_registros: totalRegistros,
-        promedio_desviacion_minutos: promedioDesviacion,
+        total_empleados: parseInt(resumenData.total_empleados || 0, 10),
+        total_papeletas: parseInt(resumenData.total_papeletas_global || 0, 10),
+        promedio_por_empleado: parseFloat(resumenData.promedio_por_empleado || 0).toFixed(2),
       },
-      por_persona: porPersonaArray.slice(0, 10), // Top 10
     };
   } catch (error) {
-    logger.error('Error obteniendo estadísticas de horas:', error);
-    throw new AppError('Error obteniendo estadísticas de horas', 500);
+    logger.error('Error obteniendo estadísticas de empleados:', error);
+    throw new AppError('Error obteniendo estadísticas de empleados', 500);
   }
 };
 
@@ -849,7 +841,6 @@ const getEstadisticasAreas = async (fechaInicio, fechaFin, periodo = 'mes') => {
       JOIN Personal p ON ps.personal_solicitante_id = p.id
       JOIN AreasDestino ad ON p.area_destino_id = ad.id
       ${whereSQL}
-        AND ps.estado IN ('APROBADO', 'EN_CURSO', 'FINALIZADO')
       GROUP BY ad.id, ad.nombre_area
       ORDER BY total_papeletas DESC
     `;
@@ -865,7 +856,6 @@ const getEstadisticasAreas = async (fechaInicio, fechaFin, periodo = 'mes') => {
       JOIN Personal p ON ps.personal_solicitante_id = p.id
       LEFT JOIN AreasDestino ad ON p.area_destino_id = ad.id
       ${whereSQL}
-        AND ps.estado IN ('APROBADO', 'EN_CURSO', 'FINALIZADO')
       GROUP BY p.id, personal, ad.nombre_area
       ORDER BY total_papeletas DESC
       LIMIT 10

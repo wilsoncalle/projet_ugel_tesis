@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 
 /**
- * Hook para estadísticas de horas autorizadas vs usadas
+ * Hook personalizado para obtener estadísticas de empleados con más solicitudes
  */
 const usePapeletasHoras = (initialPeriod = 'mes') => {
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [periodo, setPeriodo] = useState(initialPeriod);
   const [resumen, setResumen] = useState(null);
+  const [totalPapeletas, setTotalPapeletas] = useState(0);
 
   // Calcular fechas según el período
   const calcularFechas = useCallback((periodo) => {
@@ -74,14 +75,16 @@ const usePapeletasHoras = (initialPeriod = 'mes') => {
       if (result.success && result.data) {
         const { por_persona, resumen: resumenData } = result.data;
 
-        // Transformar datos al formato esperado por EstadisticasCard
+        // Transformar datos al formato esperado por EstadisticasCard (array de objetos para barras)
         const transformedData = por_persona.map(item => ({
           personal: item.personal,
-          desviacion: parseFloat(item.desviacion_promedio)
+          papeletas: parseInt(item.total_papeletas),
+          area: item.nombre_area
         }));
         
         setData(transformedData);
         setResumen(resumenData);
+        setTotalPapeletas(parseInt(resumenData?.total_papeletas || 0));
       }
     } catch (err) {
       console.error('Error al obtener estadísticas de horas:', err);
@@ -102,6 +105,7 @@ const usePapeletasHoras = (initialPeriod = 'mes') => {
     periodo,
     setPeriodo,
     resumen,
+    totalPapeletas,
     refetch: fetchData
   };
 };

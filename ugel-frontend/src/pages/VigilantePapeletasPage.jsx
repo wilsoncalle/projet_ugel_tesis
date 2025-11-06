@@ -406,21 +406,21 @@ const VigilantePapeletasPage = () => {
 
           {/* Contenido según pestaña activa */}
           {activeTab === "estadisticas" ? (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Panel selector de estadísticas (izquierda) */}
-              <div className="lg:col-span-1">
-                <PanelSeleccionEstadisticas 
-                  categoriaActiva={categoriaEstadisticas}
-                  onCategoriaChange={setCategoriaEstadisticas}
-                />
-              </div>
-              
-              {/* Contenido de la estadística seleccionada (derecha) */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              {/* Contenido de la estadística seleccionada (izquierda) */}
               <div className="lg:col-span-3">
                 {categoriaEstadisticas === 'estado' && <PapeletasEstadoCard />}
                 {categoriaEstadisticas === 'motivos' && <PapeletasMotivosCard />}
                 {categoriaEstadisticas === 'horas' && <PapeletasHorasCard />}
                 {categoriaEstadisticas === 'areas' && <PapeletasAreasCard />}
+              </div>
+              
+              {/* Panel selector de estadísticas (derecha) */}
+              <div className="lg:col-span-1">
+                <PanelSeleccionEstadisticas 
+                  categoriaActiva={categoriaEstadisticas}
+                  onCategoriaChange={setCategoriaEstadisticas}
+                />
               </div>
             </div>
           ) : (

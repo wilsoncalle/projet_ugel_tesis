@@ -1,4 +1,4 @@
-import { BarChart, FileText, Clock, Building2 } from 'lucide-react';
+import { BarChart, FileText, Users, Building2 } from 'lucide-react';
 import PapeletasEstadoCard from './PapeletasEstadoCard';
 import PapeletasMotivosCard from './PapeletasMotivosCard';
 import PapeletasHorasCard from './PapeletasHorasCard';
@@ -24,9 +24,9 @@ const PanelSeleccionEstadisticas = ({ categoriaActiva, onCategoriaChange }) => {
     },
     {
       id: 'horas',
-      titulo: 'Horas',
-      descripcion: 'Cumplimiento del tiempo autorizado',
-      icono: Clock
+      titulo: 'Empleados',
+      descripcion: 'Ranking de solicitudes por empleado',
+      icono: Users
     },
     {
       id: 'areas',

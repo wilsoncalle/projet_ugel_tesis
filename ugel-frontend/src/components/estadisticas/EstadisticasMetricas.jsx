@@ -167,18 +167,21 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
     
     // Determinar el campo de nombre según el tipo
     const getItemName = (item) => {
+      if (!item) return 'N/A';
       if (type === 'personal') {
         return item?.personal || item?.nombre_personal || 'N/A';
       }
       if (type === 'visitantes') {
         return item?.visitante || 'N/A';
       }
-      return item?.nombre_area || 'N/A';
+      // Para áreas, puede tener 'nombre_area' o 'personal' (cuando es ranking de empleados)
+      return item?.nombre_area || item?.personal || 'N/A';
     };
 
     const getAverageSuffix = () => {
       if (type === 'personal') return 'por persona';
       if (type === 'visitantes') return 'por visitante';
+      if (type === 'areas' && data[0]?.personal) return 'por empleado';
       return 'por área';
     };
 
