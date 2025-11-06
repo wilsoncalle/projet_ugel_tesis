@@ -7,6 +7,13 @@ import Notification from "../components/Notification";
 import TabView from "../components/TabView";
 import { EyeIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/outline";
 import { papeletasSalidaService } from "../services/api";
+import { 
+  PanelSeleccionEstadisticas,
+  PapeletasEstadoCard,
+  PapeletasMotivosCard,
+  PapeletasHorasCard,
+  PapeletasAreasCard
+} from "../components/papeletas_estadisticas";
 
 /**
  * Vista Vigilante — Papeletas de Salida
@@ -18,7 +25,7 @@ const VigilantePapeletasPage = () => {
   // ---------- STATE ----------
   const [loading, setLoading] = useState(true);
   const [papeletas, setPapeletas] = useState([]);
-  const [activeTab, setActiveTab] = useState("todas"); // todas | aprobado | en_curso | finalizado
+  const [activeTab, setActiveTab] = useState("todas"); // todas | aprobado | en_curso | finalizado | estadisticas
   const [search, setSearch] = useState("");
   const [pagination, setPagination] = useState({
     page: 1,
@@ -26,6 +33,9 @@ const VigilantePapeletasPage = () => {
     total: 0,
     totalPages: 1,
   });
+
+  // Estado para la categoría de estadísticas
+  const [categoriaEstadisticas, setCategoriaEstadisticas] = useState('estado');
 
   // Modales
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -373,6 +383,7 @@ const VigilantePapeletasPage = () => {
     { key: "aprobado", label: "Aprobado", count: counts.aprobado },
     { key: "en_curso", label: "En curso", count: counts.en_curso },
     { key: "finalizado", label: "Finalizado", count: counts.finalizado },
+    { key: "estadisticas", label: "Estadísticas", icon: null, isStatsButton: true },
   ];
 
   // ---------- RENDER ----------
@@ -393,26 +404,46 @@ const VigilantePapeletasPage = () => {
           {/* Tabs */}
           <TabView tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
-          {/* Table */}
-          <Card>
-            <TableGenerica
-              columns={columns}
-              data={rows}
-              isLoading={loading}
-              emptyMessage="No hay papeletas para mostrar"
-              searchable={true}
-              searchPlaceholder="Buscar por código de papeleta..."
-              searchValue={search}
-              onSearch={(value) => {
-                setSearch(value);
-              }}
-              pagination={true}
-              itemsPerPage={pagination.limit}
-              currentPage={pagination.page}
-              totalItems={pagination.total}
-              onPageChange={(newPage) => loadPapeletas({ page: newPage })}
-            />
-          </Card>
+          {/* Contenido según pestaña activa */}
+          {activeTab === "estadisticas" ? (
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Panel selector de estadísticas (izquierda) */}
+              <div className="lg:col-span-1">
+                <PanelSeleccionEstadisticas 
+                  categoriaActiva={categoriaEstadisticas}
+                  onCategoriaChange={setCategoriaEstadisticas}
+                />
+              </div>
+              
+              {/* Contenido de la estadística seleccionada (derecha) */}
+              <div className="lg:col-span-3">
+                {categoriaEstadisticas === 'estado' && <PapeletasEstadoCard />}
+                {categoriaEstadisticas === 'motivos' && <PapeletasMotivosCard />}
+                {categoriaEstadisticas === 'horas' && <PapeletasHorasCard />}
+                {categoriaEstadisticas === 'areas' && <PapeletasAreasCard />}
+              </div>
+            </div>
+          ) : (
+            <Card>
+              <TableGenerica
+                columns={columns}
+                data={rows}
+                isLoading={loading}
+                emptyMessage="No hay papeletas para mostrar"
+                searchable={true}
+                searchPlaceholder="Buscar por código de papeleta..."
+                searchValue={search}
+                onSearch={(value) => {
+                  setSearch(value);
+                }}
+                pagination={true}
+                itemsPerPage={pagination.limit}
+                currentPage={pagination.page}
+                totalItems={pagination.total}
+                onPageChange={(newPage) => loadPapeletas({ page: newPage })}
+              />
+            </Card>
+          )}
         </div>
       </div>
 

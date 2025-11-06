@@ -245,6 +245,86 @@ const getStats = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /api/papeletas-salida/estadisticas/estado
+ * Estadísticas de estado de papeletas
+ */
+const getStatsEstado = asyncHandler(async (req, res) => {
+  logger.info("Solicitud de estadísticas de estado de papeletas");
+
+  const stats = await service.getEstadisticasEstado({
+    fechaInicio: req.query.fechaInicio,
+    fechaFin: req.query.fechaFin,
+    periodo: req.query.periodo,
+  });
+
+  res.json({
+    success: true,
+    message: "Estadísticas de estado obtenidas exitosamente",
+    data: stats,
+  });
+});
+
+/**
+ * GET /api/papeletas-salida/estadisticas/motivos
+ * Estadísticas de motivos de salida
+ */
+const getStatsMotivos = asyncHandler(async (req, res) => {
+  logger.info("Solicitud de estadísticas de motivos de papeletas");
+
+  const stats = await service.getEstadisticasMotivos({
+    fechaInicio: req.query.fechaInicio,
+    fechaFin: req.query.fechaFin,
+    periodo: req.query.periodo,
+  });
+
+  res.json({
+    success: true,
+    message: "Estadísticas de motivos obtenidas exitosamente",
+    data: stats,
+  });
+});
+
+/**
+ * GET /api/papeletas-salida/estadisticas/horas
+ * Estadísticas de horas autorizadas vs usadas
+ */
+const getStatsHoras = asyncHandler(async (req, res) => {
+  logger.info("Solicitud de estadísticas de horas de papeletas");
+
+  const stats = await service.getEstadisticasHoras({
+    fechaInicio: req.query.fechaInicio,
+    fechaFin: req.query.fechaFin,
+    periodo: req.query.periodo,
+  });
+
+  res.json({
+    success: true,
+    message: "Estadísticas de horas obtenidas exitosamente",
+    data: stats,
+  });
+});
+
+/**
+ * GET /api/papeletas-salida/estadisticas/areas
+ * Estadísticas de áreas y colaboradores
+ */
+const getStatsAreas = asyncHandler(async (req, res) => {
+  logger.info("Solicitud de estadísticas de áreas de papeletas");
+
+  const stats = await service.getEstadisticasAreas({
+    fechaInicio: req.query.fechaInicio,
+    fechaFin: req.query.fechaFin,
+    periodo: req.query.periodo,
+  });
+
+  res.json({
+    success: true,
+    message: "Estadísticas de áreas obtenidas exitosamente",
+    data: stats,
+  });
+});
+
 module.exports = {
   // listados
   getAll,
@@ -261,4 +341,8 @@ module.exports = {
 
   // stats
   getStats,
+  getStatsEstado,
+  getStatsMotivos,
+  getStatsHoras,
+  getStatsAreas,
 };

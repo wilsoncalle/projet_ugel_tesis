@@ -15,6 +15,7 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
     minLabel = 'Menos Frecuente',
     countLabel = 'Total de Elementos',
     averageLabel = 'Promedio',
+    itemSuffix = 'visitas', // Sufijo para los items (visitas, papeletas, etc.)
   } = config;
 
   let metricas = [];
@@ -57,25 +58,25 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
       {
         titulo: totalLabel,
         valor: totalVisitas.toLocaleString(),
-        visitas: `${totalVisitas.toLocaleString()} visitas en el período`,
+        visitas: `${totalVisitas.toLocaleString()} ${itemSuffix} en el período`,
         icono: <Users className="h-5 w-5" />,
       },
       {
         titulo: maxLabel,
         valor: maxDia || 'N/A',
-        visitas: `${maxValue.toLocaleString()} visitas`,
+        visitas: `${maxValue.toLocaleString()} ${itemSuffix}`,
         icono: <TrendingUp className="h-5 w-5" />,
       },
       {
         titulo: minLabel,
         valor: minDia || 'N/A',
-        visitas: `${minValue.toLocaleString()} visitas`,
+        visitas: `${minValue.toLocaleString()} ${itemSuffix}`,
         icono: <TrendingDown className="h-5 w-5" />,
       },
       {
         titulo: averageLabel,
         valor: promedioDiario,
-        visitas: `${promedioDiario} visitas por día`,
+        visitas: `${promedioDiario} ${itemSuffix} por día`,
         icono: <BarChart3 className="h-5 w-5" />,
       }
     ];
@@ -120,19 +121,19 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
       {
         titulo: totalLabel,
         valor: totalVisitas.toLocaleString(),
-        visitas: `${totalVisitas.toLocaleString()} visitas en total`,
+        visitas: `${totalVisitas.toLocaleString()} ${itemSuffix} en total`,
         icono: <Users className="h-5 w-5" />,
       },
       {
         titulo: maxLabel,
         valor: maxItem || 'N/A',
-        visitas: `${maxValue.toLocaleString()} visitas (${maxPercentage}%)`,
+        visitas: `${maxValue.toLocaleString()} ${itemSuffix} (${maxPercentage}%)`,
         icono: <TrendingUp className="h-5 w-5" />,
       },
       {
         titulo: minLabel,
         valor: minItem || 'N/A',
-        visitas: `${minValue.toLocaleString()} visitas (${minPercentage}%)`,
+        visitas: `${minValue.toLocaleString()} ${itemSuffix} (${minPercentage}%)`,
         icono: <TrendingDown className="h-5 w-5" />,
       },
       {
@@ -149,7 +150,8 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
     // Determinar campo de conteo según el tipo
     const countField = type === 'visitantes' ? 'num_visitas' : 
                        type === 'personal' ? 'dias_asistidos' : 
-                       type === 'areas' ? 'asistencias' : 'visitas';
+                       type === 'areas' ? (data[0]?.papeletas !== undefined ? 'papeletas' : 'asistencias') :
+                       type === 'horas' ? 'desviacion' : 'visitas';
     
     const total = data.reduce((sum, item) => sum + parseInt(item[countField] || 0), 0);
     
@@ -182,7 +184,8 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
 
     const getCountSuffix = () => {
       if (type === 'personal') return 'días';
-      if (type === 'areas') return 'asistencias';
+      if (type === 'horas') return 'min';
+      if (type === 'areas') return countField === 'papeletas' ? 'papeletas' : 'asistencias';
       return 'visitas';
     };
 

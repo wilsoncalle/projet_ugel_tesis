@@ -559,6 +559,58 @@ const getEstadisticas = async (options = {}) => {
   }
 };
 
+/**
+ * Obtener estadísticas de estado de papeletas
+ */
+const getEstadisticasEstado = async (options = {}) => {
+  try {
+    const { fechaInicio, fechaFin, periodo } = options;
+    return await repository.getEstadisticasEstado(fechaInicio, fechaFin, periodo);
+  } catch (error) {
+    logger.error("Error obteniendo estadísticas de estado:", error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas de motivos de salida
+ */
+const getEstadisticasMotivos = async (options = {}) => {
+  try {
+    const { fechaInicio, fechaFin, periodo } = options;
+    return await repository.getEstadisticasMotivos(fechaInicio, fechaFin, periodo);
+  } catch (error) {
+    logger.error("Error obteniendo estadísticas de motivos:", error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas de horas autorizadas vs usadas
+ */
+const getEstadisticasHoras = async (options = {}) => {
+  try {
+    const { fechaInicio, fechaFin, periodo } = options;
+    return await repository.getEstadisticasHoras(fechaInicio, fechaFin, periodo);
+  } catch (error) {
+    logger.error("Error obteniendo estadísticas de horas:", error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener estadísticas de áreas y colaboradores
+ */
+const getEstadisticasAreas = async (options = {}) => {
+  try {
+    const { fechaInicio, fechaFin, periodo } = options;
+    return await repository.getEstadisticasAreas(fechaInicio, fechaFin, periodo);
+  } catch (error) {
+    logger.error("Error obteniendo estadísticas de áreas:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   // listados
   getAllPapeletas,
@@ -575,4 +627,8 @@ module.exports = {
 
   // stats
   getEstadisticas,
+  getEstadisticasEstado,
+  getEstadisticasMotivos,
+  getEstadisticasHoras,
+  getEstadisticasAreas,
 };
