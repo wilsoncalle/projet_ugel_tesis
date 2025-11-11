@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import Card from '../Card';
 import Button from '../Button';
 import Input from '../Input';
@@ -92,6 +92,9 @@ const RegistroForm = forwardRef(
 
     const { documentoInput, busquedaInput } = refs;
 
+    // Ref para rastrear el conteo anterior de visitantes en espera
+    const previousWaitingCount = useRef(visitantesEnEspera?.length || 0);
+
     useImperativeHandle(ref, () => ({
       getCurrentFormData: () => {
         if (activeTab === 'activos') {
@@ -115,6 +118,9 @@ const RegistroForm = forwardRef(
         } else {
           handleBuscarHistorial();
         }
+      },
+      resetVisitForm: () => {
+        handleLimpiarFormularioVisita();
       },
     }));
 
@@ -198,6 +204,15 @@ const RegistroForm = forwardRef(
         setPreviousTab(activeTab);
       }
     }, [activeTab, previousTab, empleados, formVisitante, onFormChange]);
+
+    // Detectar cuando la lista de visitantes en espera queda vacía y limpiar el formulario
+    useEffect(() => {
+      const current = visitantesEnEspera?.length || 0;
+      if (previousWaitingCount.current > 0 && current === 0 && activeTab === 'activos') {
+        handleLimpiarFormularioVisita();
+      }
+      previousWaitingCount.current = current;
+    }, [visitantesEnEspera, activeTab]);
 
     const cargarDatosIniciales = async () => {
       setLoadingData(true);

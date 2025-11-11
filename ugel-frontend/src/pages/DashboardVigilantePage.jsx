@@ -1548,7 +1548,14 @@ const DashboardVigilantePage = () => {
 
   const handleEliminarVisitanteEspera = (visitanteId) => {
     // Filtrar el visitante de la lista de espera
-    setVisitantesEnEspera(prev => prev.filter(v => v.id !== visitanteId));
+    setVisitantesEnEspera(prev => {
+      const next = prev.filter(v => v.id !== visitanteId);
+      // Si la lista queda vacía, limpiar el formulario de visita
+      if (next.length === 0) {
+        requestAnimationFrame(() => registroFormRef.current?.resetVisitForm?.());
+      }
+      return next;
+    });
   };
 
   const confirmarRegistrarSalida = async () => {
