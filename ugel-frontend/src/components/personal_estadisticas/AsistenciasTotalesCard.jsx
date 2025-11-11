@@ -2,25 +2,32 @@ import { EstadisticasCard } from '../estadisticas';
 import useAsistenciasTotales from '../../hooks/useAsistenciasTotales';
 
 const AsistenciasTotalesCard = () => {
-  const { data, loading, error, periodo, setPeriodo, totalAsistencias } = useAsistenciasTotales();
+  const { 
+    dataAsistencias, 
+    dataInasistencias, 
+    dataPermisos, 
+    loading, 
+    error, 
+    periodo, 
+    setPeriodo, 
+    totalAsistencias,
+    totalInasistencias,
+    totalPermisos
+  } = useAsistenciasTotales();
 
-  const config = {
+  const configAsistencias = {
     title: 'Total de Asistencias',
-    subtitle: 'Flujo de asistencias por día en el período seleccionado',
+    subtitle: 'Personal que asistió (Presente + Tardanza)',
     chartType: 'line',
-    chartHeight: 400,
+    chartHeight: 300,
     layout: 'stacked',
     showMetrics: true,
-    exportFilename: 'asistencias-totales',
-    
-    // Configuración del gráfico
+    exportFilename: 'asistencias',
     chartConfig: {
       tooltipSuffix: 'Asistencias',
       emptyTitle: 'No hay asistencias registradas',
       emptySubtitle: 'en este período',
     },
-    
-    // Configuración de las métricas
     metricsConfig: {
       type: 'totales',
       totalLabel: 'Total de Asistencias',
@@ -28,8 +35,6 @@ const AsistenciasTotalesCard = () => {
       minLabel: 'Día con Menos Asistencias',
       averageLabel: 'Promedio Diario',
     },
-    
-    // Configuración de la tabla
     tableConfig: {
       type: 'totales',
       title: 'Detalle por Día',
@@ -44,16 +49,106 @@ const AsistenciasTotalesCard = () => {
     },
   };
 
+  const configInasistencias = {
+    title: 'Total de Inasistencias',
+    subtitle: 'Personal que no asistió',
+    chartType: 'line',
+    chartHeight: 300,
+    layout: 'stacked',
+    showMetrics: true,
+    exportFilename: 'inasistencias',
+    chartConfig: {
+      tooltipSuffix: 'Inasistencias',
+      emptyTitle: 'No hay inasistencias registradas',
+      emptySubtitle: 'en este período',
+    },
+    metricsConfig: {
+      type: 'totales',
+      totalLabel: 'Total de Inasistencias',
+      maxLabel: 'Día con Más Inasistencias',
+      minLabel: 'Día con Menos Inasistencias',
+      averageLabel: 'Promedio Diario',
+    },
+    tableConfig: {
+      type: 'totales',
+      title: 'Detalle por Día',
+      searchPlaceholder: 'Buscar fecha...',
+      nameLabel: 'Fecha',
+      countLabel: 'Inasistencias',
+      distributionLabel: 'Distribución',
+      nameKey: 'fecha',
+      countKey: 'inasistencias',
+      sortByName: 'fecha',
+      sortByCount: 'inasistencias',
+    },
+  };
+
+  const configPermisos = {
+    title: 'Total de Permisos',
+    subtitle: 'Personal con permiso',
+    chartType: 'line',
+    chartHeight: 300,
+    layout: 'stacked',
+    showMetrics: true,
+    exportFilename: 'permisos',
+    chartConfig: {
+      tooltipSuffix: 'Permisos',
+      emptyTitle: 'No hay permisos registrados',
+      emptySubtitle: 'en este período',
+    },
+    metricsConfig: {
+      type: 'totales',
+      totalLabel: 'Total de Permisos',
+      maxLabel: 'Día con Más Permisos',
+      minLabel: 'Día con Menos Permisos',
+      averageLabel: 'Promedio Diario',
+    },
+    tableConfig: {
+      type: 'totales',
+      title: 'Detalle por Día',
+      searchPlaceholder: 'Buscar fecha...',
+      nameLabel: 'Fecha',
+      countLabel: 'Permisos',
+      distributionLabel: 'Distribución',
+      nameKey: 'fecha',
+      countKey: 'permisos',
+      sortByName: 'fecha',
+      sortByCount: 'permisos',
+    },
+  };
+
   return (
-    <EstadisticasCard
-      data={data}
-      loading={loading}
-      error={error}
-      periodo={periodo}
-      onPeriodoChange={setPeriodo}
-      totalVisitas={totalAsistencias}
-      config={config}
-    />
+    <>
+      <EstadisticasCard
+        data={dataAsistencias}
+        loading={loading}
+        error={error}
+        periodo={periodo}
+        onPeriodoChange={setPeriodo}
+        totalVisitas={totalAsistencias}
+        config={configAsistencias}
+      />
+      
+      <EstadisticasCard
+        data={dataInasistencias}
+        loading={loading}
+        error={error}
+        periodo={periodo}
+        onPeriodoChange={setPeriodo}
+        totalVisitas={totalInasistencias}
+        config={configInasistencias}
+      />
+      
+      <EstadisticasCard
+        data={dataPermisos}
+        loading={loading}
+        error={error}
+        periodo={periodo}
+        onPeriodoChange={setPeriodo}
+        totalVisitas={totalPermisos}
+        config={configPermisos}
+      />
+    </>
   );
 };
 

@@ -1,8 +1,16 @@
-import { X } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { X, FileDown, FileSpreadsheet } from 'lucide-react';
 import EstadisticasChart from './EstadisticasChart';
 import EstadisticasTabla from './EstadisticasTabla';
 import EstadisticasMetricas from './EstadisticasMetricas';
 import SelectCustom from '../SelectCustom';
+import {
+  captureChartJSImage,
+  captureRechartsImage,
+  generatePdfReport,
+  generateExcelReport,
+  prepareTableData
+} from '../../utils/exportHelpers';
 
 /**
  * Componente genérico para modales de estadísticas
@@ -28,6 +36,11 @@ const EstadisticasModal = ({
   totalVisitas,
   config = {}
 }) => {
+  // Estados para exportación
+  const [exporting, setExporting] = useState(false);
+  const chartContainerRef = useRef(null);
+  const chartRef = useRef(null);
+  
   // Usar chartData si está disponible, sino usar data
   const dataParaGrafico = chartData || data;
   const {
@@ -44,7 +57,73 @@ const EstadisticasModal = ({
     exportFilename = 'estadisticas',
   } = config;
 
-  // Función para exportar datos
+  // Función para exportar a PDF o Excel
+  const handleExportAdvanced = async (format) => {
+    try {
+      setExporting(true);
+
+      // Capturar imagen del gráfico
+      let chartImage = null;
+      if (chartType === 'bar') {
+        // Chart.JS (Bar charts)
+        chartImage = captureChartJSImage(chartRef);
+      } else {
+        // Recharts (Pie, Line, Area)
+        chartImage = await captureRechartsImage(chartContainerRef);
+      }
+
+      // Preparar datos de la tabla
+      const tableData = prepareTableData(data, {
+        nameKey: tableConfig.nameKey || 'nombre',
+        countKey: tableConfig.countKey || 'count',
+        total: totalVisitas
+      });
+
+      // Configuración del reporte
+      const reportConfig = {
+        titulo: title,
+        subtitulo: chartTitle,
+        periodo: periodo,
+        tablas: [
+          {
+            titulo: 'Detalle de Datos',
+            columnas: chartType === 'pie' 
+              ? ['Motivo', 'Cantidad', 'Porcentaje']
+              : ['Nombre', 'Cantidad', 'Porcentaje'],
+            datos: tableData
+          }
+        ],
+        graficos: chartImage ? [
+          {
+            titulo: chartTitle,
+            imagen: chartImage,
+            width: 170,
+            height: 100
+          }
+        ] : [],
+        resumen: {
+          'Total': totalVisitas?.toLocaleString() || '0',
+          'Registros': data?.length || data?.labels?.length || 0
+        },
+        nombreArchivo: exportFilename
+      };
+
+      // Generar reporte según formato
+      if (format === 'pdf') {
+        await generatePdfReport(reportConfig);
+      } else if (format === 'excel') {
+        await generateExcelReport(reportConfig);
+      }
+
+    } catch (error) {
+      console.error('[Export] Error exportando:', error);
+      alert('Error al exportar. Por favor, intente nuevamente.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Función para exportar datos (CSV - legacy)
   const handleExport = (datos) => {
     const headers = chartType === 'pie' 
       ? ['Motivo', 'Cantidad', 'Porcentaje']
@@ -88,6 +167,26 @@ const EstadisticasModal = ({
             {title}
           </h2>
           <div className="flex items-center space-x-4">
+            {/* Botones de exportación */}
+            <button
+              onClick={() => handleExportAdvanced('pdf')}
+              disabled={exporting || loading}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Exportar a PDF"
+            >
+              <FileDown className="h-4 w-4" />
+              <span className="text-sm font-medium">PDF</span>
+            </button>
+            <button
+              onClick={() => handleExportAdvanced('excel')}
+              disabled={exporting || loading}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Exportar a Excel"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="text-sm font-medium">Excel</span>
+            </button>
+            
             {/* Select de periodo sincronizado */}
             <div className="w-48">
               <SelectCustom
@@ -137,8 +236,9 @@ const EstadisticasModal = ({
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">
                       {chartTitle}
                     </h3>
-                    <div className="flex justify-center">
+                    <div className="flex justify-center" ref={chartContainerRef}>
                       <EstadisticasChart 
+                        ref={chartRef}
                         type={chartType}
                         data={dataParaGrafico} 
                         loading={loading} 
@@ -168,15 +268,18 @@ const EstadisticasModal = ({
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">
                       {chartTitle}
                     </h3>
-                    <EstadisticasChart 
-                      type={chartType}
-                      data={dataParaGrafico} 
-                      loading={loading} 
-                      size={chartSize}
-                      height={chartHeight}
-                      totalVisitas={totalVisitas}
-                      config={chartConfig}
-                    />
+                    <div ref={chartContainerRef}>
+                      <EstadisticasChart 
+                        ref={chartRef}
+                        type={chartType}
+                        data={dataParaGrafico} 
+                        loading={loading} 
+                        size={chartSize}
+                        height={chartHeight}
+                        totalVisitas={totalVisitas}
+                        config={chartConfig}
+                      />
+                    </div>
                   </div>
                   
                   {/* Tabla detallada */}

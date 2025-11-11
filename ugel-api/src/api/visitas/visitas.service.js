@@ -720,11 +720,11 @@ const getVisitasPorArea = async (periodo = 'todo') => {
         break;
       case 'mes':
         fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'anio':
         fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'todo':
       default:
@@ -770,11 +770,11 @@ const getVisitasPorMotivo = async (periodo = 'todo') => {
         break;
       case 'mes':
         fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'anio':
         fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'todo':
       default:
@@ -825,11 +825,11 @@ const getVisitasTotales = async (periodo = 'mes') => {
         break;
       case 'mes':
         fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'anio':
         fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'todo':
       default:
@@ -886,11 +886,11 @@ const getVisitasPorPersonal = async (periodo = 'mes') => {
         break;
       case 'mes':
         fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'anio':
         fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'todo':
       default:
@@ -941,11 +941,11 @@ const getVisitantesFrecuentes = async (periodo = 'mes') => {
         break;
       case 'mes':
         fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'anio':
         fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'todo':
       default:
@@ -997,11 +997,11 @@ const getVisitanteDetalle = async (visitanteId, periodo = 'mes') => {
         break;
       case 'mes':
         fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'anio':
         fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), 11, 31, 23, 59, 59);
+        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
         break;
       case 'todo':
       default:

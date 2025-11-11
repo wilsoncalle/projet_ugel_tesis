@@ -4,6 +4,11 @@ import useAsistenciasAreas from '../../hooks/useAsistenciasAreas';
 const AreasCard = () => {
   const { data, loading, error, periodo, setPeriodo } = useAsistenciasAreas();
 
+  // Calcular el total de asistencias desde los datos
+  const totalAsistencias = Array.isArray(data) 
+    ? data.reduce((sum, item) => sum + parseInt(item.asistencias || 0), 0)
+    : 0;
+
   const config = {
     title: 'Asistencia por Áreas',
     subtitle: 'Datos visualizados por período',
@@ -26,6 +31,7 @@ const AreasCard = () => {
     // Configuración de las métricas
     metricsConfig: {
       type: 'areas',
+      countField: 'asistencias',
       totalLabel: 'Total de Asistencias',
       maxLabel: 'Área con Más Asistencias',
       minLabel: 'Área con Menos Asistencias',
@@ -54,6 +60,7 @@ const AreasCard = () => {
       error={error}
       periodo={periodo}
       onPeriodoChange={setPeriodo}
+      totalVisitas={totalAsistencias}
       config={config}
     />
   );

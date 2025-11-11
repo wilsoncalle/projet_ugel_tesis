@@ -4,6 +4,11 @@ import useVisitasArea from '../../hooks/useVisitasArea';
 const VisitasAreaCard = () => {
   const { data, loading, error, periodo, setPeriodo } = useVisitasArea();
 
+  // Calcular el total de visitas desde los datos
+  const totalVisitas = Array.isArray(data) 
+    ? data.reduce((sum, item) => sum + parseInt(item.visitas || 0), 0)
+    : 0;
+
   const config = {
     title: 'Visitas por Área',
     subtitle: 'Datos visualizados por período',
@@ -54,6 +59,7 @@ const VisitasAreaCard = () => {
       error={error}
       periodo={periodo}
       onPeriodoChange={setPeriodo}
+      totalVisitas={totalVisitas}
       config={config}
     />
   );

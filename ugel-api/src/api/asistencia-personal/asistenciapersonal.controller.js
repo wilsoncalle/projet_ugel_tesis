@@ -6,6 +6,7 @@
 const service = require('./asistenciapersonal.service');
 const { asyncHandler, AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
+const { nowLima } = require('../../utils/fechas');
 
 /**
  * Convierte un período en fechas de inicio y fin
@@ -13,7 +14,9 @@ const logger = require('../../utils/logger');
  * @returns {Object} { fechaInicio, fechaFin }
  */
 const convertirPeriodoAFechas = (periodo) => {
-  const hoy = new Date();
+  const { fecha: hoyLima } = nowLima();
+  const [year, month, day] = hoyLima.split('-').map(Number);
+  const hoy = new Date(year, month - 1, day);
   let fechaInicio, fechaFin;
 
   switch (periodo) {
@@ -31,12 +34,12 @@ const convertirPeriodoAFechas = (periodo) => {
     
     case 'mes':
       fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59);
+      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
       break;
     
     case 'anio':
       fechaInicio = new Date(hoy.getFullYear(), 0, 1);
-      fechaFin = new Date(hoy.getFullYear(), 11, 31, 23, 59, 59);
+      fechaFin = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
       break;
     
     case 'todo':
@@ -46,9 +49,18 @@ const convertirPeriodoAFechas = (periodo) => {
       break;
   }
 
+  // Formatear fechas a YYYY-MM-DD
+  const formatFecha = (date) => {
+    if (!date) return null;
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   return {
-    fechaInicio: fechaInicio ? fechaInicio.toISOString().split('T')[0] : null,
-    fechaFin: fechaFin ? fechaFin.toISOString().split('T')[0] : null
+    fechaInicio: formatFecha(fechaInicio),
+    fechaFin: formatFecha(fechaFin)
   };
 };
 

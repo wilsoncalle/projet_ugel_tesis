@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid, Legend as RechartsLegend } from 'recharts';
 import {
   Chart as ChartJS,
@@ -220,7 +220,7 @@ const PieChartComponent = ({ data, loading, size = 300, totalVisitas = 0, config
 
 // ---------- BAR ----------
 
-const BarChartComponent = ({ data, loading, height = 400, config }) => {
+const BarChartComponent = forwardRef(({ data, loading, height = 400, config }, ref) => {
   if (loading) {
     return (
       <div
@@ -427,10 +427,10 @@ const BarChartComponent = ({ data, loading, height = 400, config }) => {
       className="w-full h-full"
       style={{ height: `${height}px` }}
     >
-      <BarChart data={chartData} options={options} />
+      <BarChart ref={ref} data={chartData} options={options} />
     </div>
   );
-};
+});
 
 // ---------- AREA (tipo olas suaves con degradado hermoso) ----------
 const LineChartComponent = ({ data, loading, height = 400, config }) => {
@@ -594,7 +594,7 @@ const LineChartComponent = ({ data, loading, height = 400, config }) => {
  * @param {Object} props
  * @param {'pie'|'doughnut'|'bar'|'line'} props.type
  */
-const EstadisticasChart = ({
+const EstadisticasChart = forwardRef(({
   type = 'pie',
   data,
   loading,
@@ -602,7 +602,7 @@ const EstadisticasChart = ({
   height,
   totalVisitas,
   config = {},
-}) => {
+}, ref) => {
   const defaultConfig = {
     labelKey: 'nombre',
     valueKey: 'valor',
@@ -630,6 +630,7 @@ const EstadisticasChart = ({
   if (type === 'bar') {
     return (
       <BarChartComponent
+        ref={ref}
         data={data}
         loading={loading}
         height={height}
@@ -650,6 +651,6 @@ const EstadisticasChart = ({
   }
 
   return null;
-};
+});
 
 export default EstadisticasChart;

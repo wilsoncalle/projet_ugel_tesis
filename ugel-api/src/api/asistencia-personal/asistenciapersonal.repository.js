@@ -976,36 +976,97 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
       paramCounter++;
     }
     
-    // Agregar condición de estado_presencia
-    whereCondition.push(`estado_presencia IN ('Presente', 'Tardanza')`);
     const whereClause = whereCondition.length > 0 ? `WHERE ${whereCondition.join(' AND ')}` : '';
     
-    // Total de asistencias
-    const totalQuery = `
+    // Total de asistencias (Presente + Tardanza)
+    const totalAsistenciasQuery = `
       SELECT COUNT(*) as total
       FROM ControlAsistenciaPersonal
       ${whereClause}
+      ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Presente', 'Tardanza')
     `;
     
-    // Flujo diario
-    const flujoDiarioQuery = `
+    // Total de inasistencias (Ausente + Falta)
+    const totalInasistenciasQuery = `
+      SELECT COUNT(*) as total
+      FROM ControlAsistenciaPersonal
+      ${whereClause}
+      ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Ausente', 'Falta')
+    `;
+    
+    // Total de permisos (Permiso + En Permiso + Comisión)
+    const totalPermisosQuery = `
+      SELECT COUNT(*) as total
+      FROM ControlAsistenciaPersonal
+      ${whereClause}
+      ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Permiso', 'En Permiso', 'Comisión')
+    `;
+    
+    // Flujo diario de asistencias
+    const flujoDiarioAsistenciasQuery = `
       SELECT 
         DATE(fecha) AS dia,
         COUNT(*) AS asistencias
       FROM ControlAsistenciaPersonal
       ${whereClause}
+      ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Presente', 'Tardanza')
       GROUP BY dia
       ORDER BY dia
     `;
     
-    const [totalResult, flujoDiarioResult] = await Promise.all([
-      db.query(totalQuery, params),
-      db.query(flujoDiarioQuery, params)
+    // Flujo diario de inasistencias
+    const flujoDiarioInasistenciasQuery = `
+      SELECT 
+        DATE(fecha) AS dia,
+        COUNT(*) AS inasistencias
+      FROM ControlAsistenciaPersonal
+      ${whereClause}
+      ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Ausente', 'Falta')
+      GROUP BY dia
+      ORDER BY dia
+    `;
+    
+    // Flujo diario de permisos
+    const flujoDiarioPermisosQuery = `
+      SELECT 
+        DATE(fecha) AS dia,
+        COUNT(*) AS permisos
+      FROM ControlAsistenciaPersonal
+      ${whereClause}
+      ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Permiso', 'En Permiso', 'Comisión')
+      GROUP BY dia
+      ORDER BY dia
+    `;
+    
+    const [
+      totalAsistenciasResult,
+      totalInasistenciasResult,
+      totalPermisosResult,
+      flujoDiarioAsistenciasResult,
+      flujoDiarioInasistenciasResult,
+      flujoDiarioPermisosResult
+    ] = await Promise.all([
+      db.query(totalAsistenciasQuery, params),
+      db.query(totalInasistenciasQuery, params),
+      db.query(totalPermisosQuery, params),
+      db.query(flujoDiarioAsistenciasQuery, params),
+      db.query(flujoDiarioInasistenciasQuery, params),
+      db.query(flujoDiarioPermisosQuery, params)
     ]);
     
     return {
-      total: parseInt(totalResult.rows[0]?.total || 0),
-      flujo_diario: flujoDiarioResult.rows
+      asistencias: {
+        total: parseInt(totalAsistenciasResult.rows[0]?.total || 0),
+        flujo_diario: flujoDiarioAsistenciasResult.rows
+      },
+      inasistencias: {
+        total: parseInt(totalInasistenciasResult.rows[0]?.total || 0),
+        flujo_diario: flujoDiarioInasistenciasResult.rows
+      },
+      permisos: {
+        total: parseInt(totalPermisosResult.rows[0]?.total || 0),
+        flujo_diario: flujoDiarioPermisosResult.rows
+      }
     };
   } catch (error) {
     logger.error('Error obteniendo estadísticas totales:', error);

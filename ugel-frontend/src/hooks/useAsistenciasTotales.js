@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 
 const useAsistenciasTotales = () => {
-  const [data, setData] = useState(null);
+  const [dataAsistencias, setDataAsistencias] = useState(null);
+  const [dataInasistencias, setDataInasistencias] = useState(null);
+  const [dataPermisos, setDataPermisos] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [periodo, setPeriodo] = useState('mes');
   const [totalAsistencias, setTotalAsistencias] = useState(0);
+  const [totalInasistencias, setTotalInasistencias] = useState(0);
+  const [totalPermisos, setTotalPermisos] = useState(0);
 
   useEffect(() => {
     const fetchAsistenciasTotales = async () => {
@@ -31,27 +35,59 @@ const useAsistenciasTotales = () => {
         const result = await response.json();
 
         if (result.success && result.data) {
-          // Transformar los datos al formato esperado por el gráfico de líneas
-          const flujoDiario = result.data.flujo_diario || result.data.flujoDiario || [];
-          const total = result.data.total || 0;
-
-          // Formatear datos para el gráfico
-          const labels = flujoDiario.map(item => {
+          // Procesar datos de ASISTENCIAS
+          const asistencias = result.data.asistencias || {};
+          const flujoDiarioAsistencias = asistencias.flujo_diario || [];
+          const labelsAsistencias = flujoDiarioAsistencias.map(item => {
             const fecha = new Date(item.dia);
             return fecha.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
           });
+          const valuesAsistencias = flujoDiarioAsistencias.map(item => parseInt(item.asistencias, 10));
 
-          const values = flujoDiario.map(item => parseInt(item.asistencias, 10));
-
-          setData({
-            labels,
+          setDataAsistencias({
+            labels: labelsAsistencias,
             datasets: [{
               label: 'Asistencias',
-              data: values
+              data: valuesAsistencias
             }]
           });
+          setTotalAsistencias(asistencias.total || 0);
 
-          setTotalAsistencias(total);
+          // Procesar datos de INASISTENCIAS
+          const inasistencias = result.data.inasistencias || {};
+          const flujoDiarioInasistencias = inasistencias.flujo_diario || [];
+          const labelsInasistencias = flujoDiarioInasistencias.map(item => {
+            const fecha = new Date(item.dia);
+            return fecha.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+          });
+          const valuesInasistencias = flujoDiarioInasistencias.map(item => parseInt(item.inasistencias, 10));
+
+          setDataInasistencias({
+            labels: labelsInasistencias,
+            datasets: [{
+              label: 'Inasistencias',
+              data: valuesInasistencias
+            }]
+          });
+          setTotalInasistencias(inasistencias.total || 0);
+
+          // Procesar datos de PERMISOS
+          const permisos = result.data.permisos || {};
+          const flujoDiarioPermisos = permisos.flujo_diario || [];
+          const labelsPermisos = flujoDiarioPermisos.map(item => {
+            const fecha = new Date(item.dia);
+            return fecha.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+          });
+          const valuesPermisos = flujoDiarioPermisos.map(item => parseInt(item.permisos, 10));
+
+          setDataPermisos({
+            labels: labelsPermisos,
+            datasets: [{
+              label: 'Permisos',
+              data: valuesPermisos
+            }]
+          });
+          setTotalPermisos(permisos.total || 0);
         }
       } catch (err) {
         console.error('Error al obtener estadísticas totales:', err);
@@ -65,12 +101,16 @@ const useAsistenciasTotales = () => {
   }, [periodo]);
 
   return {
-    data,
+    dataAsistencias,
+    dataInasistencias,
+    dataPermisos,
     loading,
     error,
     periodo,
     setPeriodo,
-    totalAsistencias
+    totalAsistencias,
+    totalInasistencias,
+    totalPermisos
   };
 };
 

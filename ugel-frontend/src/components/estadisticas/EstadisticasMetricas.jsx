@@ -16,6 +16,7 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
     countLabel = 'Total de Elementos',
     averageLabel = 'Promedio',
     itemSuffix = 'visitas', // Sufijo para los items (visitas, papeletas, etc.)
+    countField = null, // Campo personalizado para contar (opcional)
   } = config;
 
   let metricas = [];
@@ -147,20 +148,21 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
   
   // Procesamiento para datos tipo áreas, personal o visitantes (array de objetos)
   else if (Array.isArray(data)) {
-    // Determinar campo de conteo según el tipo
-    const countField = type === 'visitantes' ? 'num_visitas' : 
-                       type === 'personal' ? 'dias_asistidos' : 
-                       type === 'areas' ? (data[0]?.papeletas !== undefined ? 'papeletas' : 'asistencias') :
-                       type === 'horas' ? 'desviacion' : 'visitas';
+    // Determinar campo de conteo según el tipo o usar el especificado en config
+    const fieldToCount = countField || 
+                         (type === 'visitantes' ? 'num_visitas' : 
+                          type === 'personal' ? 'dias_asistidos' : 
+                          type === 'areas' ? 'visitas' :
+                          type === 'horas' ? 'desviacion' : 'visitas');
     
-    const total = data.reduce((sum, item) => sum + parseInt(item[countField] || 0), 0);
+    const total = data.reduce((sum, item) => sum + parseInt(item[fieldToCount] || 0), 0);
     
     const maxItem = data.length > 0 ? data.reduce((max, item) => 
-      parseInt(item[countField]) > parseInt(max[countField]) ? item : max
+      parseInt(item[fieldToCount]) > parseInt(max[fieldToCount]) ? item : max
     ) : null;
     
     const minItem = data.length > 0 ? data.reduce((min, item) => 
-      parseInt(item[countField]) < parseInt(min[countField]) ? item : min
+      parseInt(item[fieldToCount]) < parseInt(min[fieldToCount]) ? item : min
     ) : null;
     
     const average = data.length > 0 ? (total / data.length).toFixed(1) : 0;
@@ -188,7 +190,7 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
     const getCountSuffix = () => {
       if (type === 'personal') return 'días';
       if (type === 'horas') return 'min';
-      if (type === 'areas') return countField === 'papeletas' ? 'papeletas' : 'asistencias';
+      if (type === 'areas') return 'asistencias';
       return 'visitas';
     };
 
@@ -202,13 +204,13 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
       {
         titulo: maxLabel,
         valor: getItemName(maxItem),
-        visitas: `${maxItem ? parseInt(maxItem[countField]).toLocaleString() : 0} ${getCountSuffix()}`,
+        visitas: `${maxItem ? parseInt(maxItem[fieldToCount]).toLocaleString() : 0} ${getCountSuffix()}`,
         icono: <TrendingUp className="h-5 w-5" />,
       },
       {
         titulo: minLabel,
         valor: getItemName(minItem),
-        visitas: `${minItem ? parseInt(minItem[countField]).toLocaleString() : 0} ${getCountSuffix()}`,
+        visitas: `${minItem ? parseInt(minItem[fieldToCount]).toLocaleString() : 0} ${getCountSuffix()}`,
         icono: <TrendingDown className="h-5 w-5" />,
       },
       {
