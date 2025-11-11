@@ -38,7 +38,7 @@ const ModalPersonalDetalle = ({ isOpen, onClose, personal, periodo }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3000/api/asistencia-personal/estadisticas/personal-detalle/${personal.personal_id}?periodo=${periodo}`,
+        `/api/asistencia-personal/estadisticas/personal-detalle/${personal.personal_id}?periodo=${periodo}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

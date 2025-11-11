@@ -50,16 +50,16 @@ const useDashboardData = () => {
       
       // Fetch paralelo de todas las estadísticas de personal
       const [totalesRes, ausenciasRes, puntualidadRes, areasRes] = await Promise.all([
-        fetch(`http://localhost:3000/api/asistencia-personal/estadisticas/totales?periodo=${periodo}`, {
+        fetch(`/api/asistencia-personal/estadisticas/totales?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`http://localhost:3000/api/asistencia-personal/estadisticas/ausencias?periodo=${periodo}`, {
+        fetch(`/api/asistencia-personal/estadisticas/ausencias?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`http://localhost:3000/api/asistencia-personal/estadisticas/puntualidad?periodo=${periodo}`, {
+        fetch(`/api/asistencia-personal/estadisticas/puntualidad?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`http://localhost:3000/api/asistencia-personal/estadisticas/areas?periodo=${periodo}`, {
+        fetch(`/api/asistencia-personal/estadisticas/areas?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
       ]);
@@ -109,16 +109,16 @@ const useDashboardData = () => {
       
       // Fetch paralelo de todas las estadísticas de visitas
       const [totalesRes, motivoRes, areaRes, frecuentesRes] = await Promise.all([
-        fetch(`http://localhost:3000/api/visitas/totales?periodo=${periodo}`, {
+        fetch(`/api/visitas/totales?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`http://localhost:3000/api/visitas/por-motivo?periodo=${periodo}`, {
+        fetch(`/api/visitas/por-motivo?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`http://localhost:3000/api/visitas/por-area?periodo=${periodo}`, {
+        fetch(`/api/visitas/por-area?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`http://localhost:3000/api/visitas/visitantes-frecuentes?periodo=${periodo}`, {
+        fetch(`/api/visitas/visitantes-frecuentes?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
       ]);

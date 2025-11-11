@@ -14,7 +14,7 @@ const useAsistenciasAusencias = () => {
 
         const token = localStorage.getItem('token');
         const response = await fetch(
-          `http://localhost:3000/api/asistencia-personal/estadisticas/ausencias?periodo=${periodo}`,
+          `/api/asistencia-personal/estadisticas/ausencias?periodo=${periodo}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,

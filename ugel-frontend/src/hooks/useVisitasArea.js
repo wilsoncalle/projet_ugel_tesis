@@ -20,7 +20,7 @@ const useVisitasArea = () => {
       console.log(`[useVisitasArea] Obteniendo datos para periodo: ${periodoSeleccionado}`);
       
       // Llamar al endpoint del backend
-      const response = await fetch(`http://localhost:3000/api/visitas/por-area?periodo=${periodoSeleccionado}`, {
+      const response = await fetch(`/api/visitas/por-area?periodo=${periodoSeleccionado}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

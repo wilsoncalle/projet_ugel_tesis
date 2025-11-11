@@ -14,7 +14,7 @@ const useAsistenciasPuntualidad = () => {
 
         const token = localStorage.getItem('token');
         const response = await fetch(
-          `http://localhost:3000/api/asistencia-personal/estadisticas/puntualidad?periodo=${periodo}`,
+          `/api/asistencia-personal/estadisticas/puntualidad?periodo=${periodo}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,

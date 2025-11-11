@@ -646,7 +646,7 @@ const VisitantesTabla = ({
       
       // Construir la URL completa del endpoint de exportación
       const queryString = params.toString();
-      const url = `http://localhost:3000/api/visitas/export/${format}${queryString ? '?' + queryString : ''}`;
+      const url = `/api/visitas/export/${format}${queryString ? '?' + queryString : ''}`;
       
       // Crear un enlace temporal para la descarga con autenticación
       const link = document.createElement('a');

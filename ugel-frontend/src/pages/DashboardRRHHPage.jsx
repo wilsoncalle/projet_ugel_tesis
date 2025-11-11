@@ -76,7 +76,7 @@ const DashboardRRHHPage = () => {
       const token = localStorage.getItem('token');
       
       const response = await fetch(
-        `http://localhost:3000/api/papeletas-salida/estadisticas/estado?periodo=${periodo}`,
+        `/api/papeletas-salida/estadisticas/estado?periodo=${periodo}`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
@@ -116,10 +116,10 @@ const DashboardRRHHPage = () => {
       const token = localStorage.getItem('token');
       
       const [totalesRes, puntualidadRes] = await Promise.all([
-        fetch(`http://localhost:3000/api/asistencia-personal/estadisticas/totales?periodo=${periodo}`, {
+        fetch(`/api/asistencia-personal/estadisticas/totales?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`http://localhost:3000/api/asistencia-personal/estadisticas/puntualidad?periodo=${periodo}`, {
+        fetch(`/api/asistencia-personal/estadisticas/puntualidad?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);

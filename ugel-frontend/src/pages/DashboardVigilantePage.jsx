@@ -217,9 +217,9 @@ const DashboardVigilantePage = () => {
   const obtenerDatosReferencia = async () => {
     try {
       const [empleadosRes, motivosRes, areasRes] = await Promise.all([
-        fetch('http://localhost:3000/api/personal').then(r => r.json()).catch(() => ({data: []})),
-        fetch('http://localhost:3000/api/motivos-visita').then(r => r.json()).catch(() => ({data: []})),
-        fetch('http://localhost:3000/api/areas').then(r => r.json()).catch(() => ({data: []}))
+        fetch('/api/personal').then(r => r.json()).catch(() => ({data: []})),
+        fetch('/api/motivos-visita').then(r => r.json()).catch(() => ({data: []})),
+        fetch('/api/areas').then(r => r.json()).catch(() => ({data: []}))
       ]);
       
       return {
@@ -255,7 +255,7 @@ const DashboardVigilantePage = () => {
       if (socketInstance) return socketInstance;
 
     // Conexión Socket.IO para actualizaciones en tiempo real
-    const socket = io('http://localhost:3000', {
+    const socket = io({
       transports: ['websocket'],
         autoConnect: false,
         reconnection: false,

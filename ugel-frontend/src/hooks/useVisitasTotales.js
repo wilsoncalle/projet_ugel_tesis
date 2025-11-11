@@ -15,7 +15,7 @@ const useVisitasTotales = () => {
 
         const token = localStorage.getItem('token');
         const response = await fetch(
-          `http://localhost:3000/api/visitas/totales?periodo=${periodo}`,
+          `/api/visitas/totales?periodo=${periodo}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,

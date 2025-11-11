@@ -56,7 +56,7 @@ const usePapeletasMotivos = (initialPeriod = 'mes') => {
       params.append('periodo', periodo);
 
       const response = await fetch(
-        `http://localhost:3000/api/papeletas-salida/estadisticas/motivos?${params.toString()}`,
+        `/api/papeletas-salida/estadisticas/motivos?${params.toString()}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

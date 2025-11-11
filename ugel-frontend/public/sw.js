@@ -3,7 +3,8 @@
 
 const CACHE_NAME = 'ugel-access-cache-v2';
 const OFFLINE_URL = '/offline.html';
-const API_BASE_URL = 'http://localhost:3000/api';
+// Usar ruta relativa para que funcione con el proxy en dev y producción
+const API_BASE_URL = '/api';
 
 // Assets estáticos para cachear
 const STATIC_ASSETS = [
@@ -66,14 +67,14 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   // Ignorar peticiones cross-origin no API
-  if (url.origin !== self.location.origin && !url.href.includes(API_BASE_URL)) {
+  if (url.origin !== self.location.origin && !url.pathname.startsWith('/api/')) {
     return;
   }
 
   // Estrategia para peticiones GET
   if (request.method === 'GET') {
     // API: Network First (intentar red primero, luego cache)
-    if (url.href.includes('/api/')) {
+    if (url.pathname.startsWith('/api/')) {
       event.respondWith(networkFirstStrategy(request));
       return;
     }

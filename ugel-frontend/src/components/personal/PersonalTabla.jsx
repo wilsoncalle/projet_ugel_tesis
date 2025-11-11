@@ -324,7 +324,7 @@ const PersonalTabla = ({
       if (filtros.fechaHasta) params.append('fechaFin', filtros.fechaHasta);
       
       const queryString = params.toString();
-      const url = `http://localhost:3000/api/personal/export/${format}${queryString ? '?' + queryString : ''}`;
+      const url = `/api/personal/export/${format}${queryString ? '?' + queryString : ''}`;
       
       fetch(url, {
         method: 'GET',

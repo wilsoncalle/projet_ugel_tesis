@@ -57,7 +57,7 @@ const usePapeletasEstado = (initialPeriod = 'mes') => {
       params.append('periodo', periodo);
 
       const response = await fetch(
-        `http://localhost:3000/api/papeletas-salida/estadisticas/estado?${params.toString()}`,
+        `/api/papeletas-salida/estadisticas/estado?${params.toString()}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
