@@ -323,14 +323,12 @@ const DashboardAdminPage = () => {
                 </h2>
               </div>
 
+              {/* Asistencias Totales - Ocupa todo el ancho con layout interno */}
+              <AsistenciasTotalesCard />
+
               {/* Grid de tarjetas de Personal */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* Asistencias Totales */}
-                <div className="lg:col-span-2">
-                  <AsistenciasTotalesCard />
-                </div>
-
                 {/* Puntualidad y Tardanzas */}
                 <PuntualidadCard />
 

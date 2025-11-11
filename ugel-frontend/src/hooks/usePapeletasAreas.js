@@ -8,7 +8,7 @@ const usePapeletasAreas = (initialPeriod = 'mes') => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [periodo, setPeriodo] = useState(initialPeriod);
-  const [porPersona, setPorPersona] = useState([]);
+  const [totalPapeletas, setTotalPapeletas] = useState(0);
 
   // Calcular fechas según el período
   const calcularFechas = useCallback((periodo) => {
@@ -80,7 +80,11 @@ const usePapeletasAreas = (initialPeriod = 'mes') => {
           papeletas: parseInt(item.total_papeletas)
         }));
         
+        // Calcular total de papeletas
+        const total = transformedData.reduce((sum, item) => sum + item.papeletas, 0);
+        
         setData(transformedData);
+        setTotalPapeletas(total);
       }
     } catch (err) {
       console.error('Error al obtener estadísticas de áreas:', err);
@@ -100,6 +104,7 @@ const usePapeletasAreas = (initialPeriod = 'mes') => {
     error,
     periodo,
     setPeriodo,
+    totalPapeletas,
     refetch: fetchData
   };
 };

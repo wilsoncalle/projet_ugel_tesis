@@ -190,6 +190,8 @@ const EstadisticasMetricas = ({ data, totalVisitas = 0, config = {} }) => {
     const getCountSuffix = () => {
       if (type === 'personal') return 'días';
       if (type === 'horas') return 'min';
+      // Usar itemSuffix si está definido, sino usar valores por defecto
+      if (itemSuffix && itemSuffix !== 'visitas') return itemSuffix;
       if (type === 'areas') return 'asistencias';
       return 'visitas';
     };

@@ -2,7 +2,7 @@ import { EstadisticasCard } from '../estadisticas';
 import usePapeletasAreas from '../../hooks/usePapeletasAreas';
 
 const PapeletasAreasCard = () => {
-  const { data, loading, error, periodo, setPeriodo } = usePapeletasAreas();
+  const { data, loading, error, periodo, setPeriodo, totalPapeletas } = usePapeletasAreas();
 
   const config = {
     title: 'Papeletas por Área',
@@ -26,10 +26,12 @@ const PapeletasAreasCard = () => {
     // Configuración de las métricas
     metricsConfig: {
       type: 'areas',
+      countField: 'papeletas',
       totalLabel: 'Total de Papeletas',
       maxLabel: 'Área con Más Papeletas',
       minLabel: 'Área con Menos Papeletas',
       averageLabel: 'Promedio por Área',
+      itemSuffix: 'papeletas',
     },
     
     // Configuración de la tabla
@@ -54,6 +56,7 @@ const PapeletasAreasCard = () => {
       error={error}
       periodo={periodo}
       onPeriodoChange={setPeriodo}
+      totalVisitas={totalPapeletas}
       config={config}
     />
   );

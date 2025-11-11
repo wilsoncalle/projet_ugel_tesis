@@ -26,6 +26,7 @@ const PapeletasHorasCard = () => {
     // Configuración de las métricas
     metricsConfig: {
       type: 'areas',
+      countField: 'papeletas',
       totalLabel: 'Total de Papeletas',
       maxLabel: 'Empleado con Más Solicitudes',
       minLabel: 'Empleado con Menos Solicitudes',

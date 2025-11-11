@@ -118,7 +118,8 @@ const AsistenciasTotalesCard = () => {
   };
 
   return (
-    <>
+    <div className="space-y-6">
+      {/* Total de Asistencias - Ocupa todo el ancho */}
       <EstadisticasCard
         data={dataAsistencias}
         loading={loading}
@@ -129,26 +130,29 @@ const AsistenciasTotalesCard = () => {
         config={configAsistencias}
       />
       
-      <EstadisticasCard
-        data={dataInasistencias}
-        loading={loading}
-        error={error}
-        periodo={periodo}
-        onPeriodoChange={setPeriodo}
-        totalVisitas={totalInasistencias}
-        config={configInasistencias}
-      />
-      
-      <EstadisticasCard
-        data={dataPermisos}
-        loading={loading}
-        error={error}
-        periodo={periodo}
-        onPeriodoChange={setPeriodo}
-        totalVisitas={totalPermisos}
-        config={configPermisos}
-      />
-    </>
+      {/* Inasistencias y Permisos - Lado a lado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <EstadisticasCard
+          data={dataInasistencias}
+          loading={loading}
+          error={error}
+          periodo={periodo}
+          onPeriodoChange={setPeriodo}
+          totalVisitas={totalInasistencias}
+          config={configInasistencias}
+        />
+        
+        <EstadisticasCard
+          data={dataPermisos}
+          loading={loading}
+          error={error}
+          periodo={periodo}
+          onPeriodoChange={setPeriodo}
+          totalVisitas={totalPermisos}
+          config={configPermisos}
+        />
+      </div>
+    </div>
   );
 };
 
