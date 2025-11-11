@@ -259,7 +259,7 @@ const ProfilePage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Columna Izquierda - Información del Usuario */}
           <div className="lg:col-span-1">
-            <Card className="h-full">
+            <Card className="h-sm">
               <div className="text-center">
                 {/* Avatar */}
                 <div className="w-32 h-32 md:w-36 md:h-36 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
@@ -409,60 +409,60 @@ const ProfilePage = () => {
               </p>
 
               <form onSubmit={handleUpdatePassword} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Contraseña Actual - ocupa toda la fila (col-span-2 en md+) */}
-                  <div className="md:col-span-2 relative">
-                    <Input
-                      label="Contraseña Actual"
-                      name="currentPassword"
-                      type={showCurrentPassword ? 'text' : 'password'}
-                      value={passwordData.currentPassword}
-                      onChange={handlePasswordChange}
-                      error={passwordErrors.currentPassword}
-                      placeholder="Ingrese su contraseña actual"
-                    />
-                  </div>
-
-                  {/* Nueva Contraseña */}
-                  <div className="relative">
-                    <Input
-                      label="Nueva Contraseña"
-                      name="newPassword"
-                      type={showNewPassword ? 'text' : 'password'}
-                      value={passwordData.newPassword}
-                      onChange={handlePasswordChange}
-                      error={passwordErrors.newPassword}
-                      placeholder="Nueva contraseña"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      La contraseña debe tener al menos 8 caracteres.
-                    </p>
-                  </div>
-
-                  {/* Confirmar Contraseña */}
-                  <div className="relative">
-                    <Input
-                      label="Confirmar Nueva Contraseña"
-                      name="confirmPassword"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={passwordData.confirmPassword}
-                      onChange={handlePasswordChange}
-                      error={passwordErrors.confirmPassword}
-                      placeholder="Confirma tu contraseña"
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Fila 1: Contraseña actual (col 1) */}
+                <div className="relative">
+                  <Input
+                    label="Contraseña Actual"
+                    name="currentPassword"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={passwordData.currentPassword}
+                    onChange={handlePasswordChange}
+                    error={passwordErrors.currentPassword}
+                    placeholder="Ingrese su contraseña actual"
+                  />
                 </div>
 
-                <div className="flex justify-end pt-2">
+                {/* Fila 1: Nueva contraseña (col 2) */}
+                <div className="relative">
+                  <Input
+                    label="Nueva Contraseña"
+                    name="newPassword"
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={passwordData.newPassword}
+                    onChange={handlePasswordChange}
+                    error={passwordErrors.newPassword}
+                    placeholder="Nueva contraseña"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    La contraseña debe tener al menos 8 caracteres.
+                  </p>
+                </div>
+
+                {/* Fila 2: Confirmar contraseña (col 1) */}
+                <div className="relative">
+                  <Input
+                    label="Confirmar Nueva Contraseña"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={passwordData.confirmPassword}
+                    onChange={handlePasswordChange}
+                    error={passwordErrors.confirmPassword}
+                    placeholder="Confirma tu contraseña"
+                  />
+                </div>
+                {/* Fila 2: Botón (col 2, alineado a la altura del input) */}
+                <div className="flex items-end justify-start md:justify-end">
                   <Button
                     type="submit"
                     disabled={loadingPassword}
-                    className="min-w-[180px]"
+                    className="w-full md:w-auto md:min-w-[180px]"
                   >
                     {loadingPassword ? 'Actualizando...' : 'Actualizar contraseña'}
                   </Button>
                 </div>
-              </form>
+              </div>
+            </form>
             </Card>
           </div>
         </div>

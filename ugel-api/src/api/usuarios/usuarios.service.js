@@ -465,13 +465,13 @@ const updatePassword = async (userId, passwordData) => {
     }
     
     // Verificar contraseña actual
-    const isPasswordValid = await bcrypt.compare(currentPassword, usuario.contrasena);
+    const isPasswordValid = await bcrypt.compare(currentPassword, usuario.hash_contrasena);
     if (!isPasswordValid) {
       throw new AppError('La contraseña actual es incorrecta', 400);
     }
     
     // Verificar que la nueva contraseña sea diferente
-    const isSamePassword = await bcrypt.compare(newPassword, usuario.contrasena);
+    const isSamePassword = await bcrypt.compare(newPassword, usuario.hash_contrasena);
     if (isSamePassword) {
       throw new AppError('La nueva contraseña debe ser diferente a la actual', 400);
     }
