@@ -635,22 +635,21 @@ const restore = async (id) => {
  */
 const updateProfile = async (id, profileData) => {
   try {
-    const { nombre_usuario, correo } = profileData;
+    const { nombre_usuario, email } = profileData;
     
     const query = `
       UPDATE Usuarios
       SET 
         nombre_usuario = $1,
-        correo = $2,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3 AND deleted_at IS NULL
-      RETURNING id, nombre_usuario, correo, rol, activo, created_at, updated_at
+        email = $2
+      WHERE id = $3 AND activo = true
+      RETURNING id, nombre_usuario, email, rol, activo, fecha_creacion
     `;
     
-    const result = await db.query(query, [nombre_usuario, correo, id]);
+    const result = await db.query(query, [nombre_usuario, email, id]);
     
     if (result.rows.length === 0) {
-      throw new AppError('Usuario no encontrado', 404);
+      throw new AppError('Usuario no encontrado o inactivo', 404);
     }
     
     return result.rows[0];

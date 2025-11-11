@@ -402,7 +402,14 @@ const restoreUsuario = async (id, userId) => {
  */
 const updateProfile = async (userId, profileData) => {
   try {
-    const { nombre_usuario, correo } = profileData;
+    // Mapear campos del frontend (nombreUsuario, email) a campos de BD (nombre_usuario, email)
+    const nombre_usuario = profileData.nombreUsuario || profileData.nombre_usuario;
+    const email = profileData.email;
+    
+    // Validar que los campos requeridos estén presentes
+    if (!nombre_usuario || !email) {
+      throw new AppError('Nombre de usuario y email son requeridos', 400);
+    }
     
     // Verificar que el usuario existe
     const usuario = await repository.findById(userId);
@@ -410,9 +417,9 @@ const updateProfile = async (userId, profileData) => {
       throw new AppError('Usuario no encontrado', 404);
     }
     
-    // Verificar si el correo ya está en uso por otro usuario
-    if (correo && correo !== usuario.correo) {
-      const existingUser = await repository.findByEmail(correo);
+    // Verificar si el email ya está en uso por otro usuario
+    if (email && email !== usuario.email) {
+      const existingUser = await repository.findByEmail(email);
       if (existingUser && existingUser.id !== userId) {
         throw new AppError('El correo electrónico ya está en uso', 400);
       }
@@ -429,7 +436,7 @@ const updateProfile = async (userId, profileData) => {
     // Actualizar perfil
     const updatedUser = await repository.updateProfile(userId, {
       nombre_usuario,
-      correo
+      email
     });
     
     logger.info(`Perfil actualizado para usuario ID ${userId}`);

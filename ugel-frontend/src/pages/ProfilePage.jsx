@@ -67,6 +67,10 @@ const ProfilePage = () => {
 
     if (!formData.nombre_usuario || formData.nombre_usuario.trim() === '') {
       newErrors.nombre_usuario = 'El nombre de usuario es requerido';
+    } else if (/\s/.test(formData.nombre_usuario)) {
+      newErrors.nombre_usuario = 'El nombre de usuario no puede contener espacios';
+    } else if (formData.nombre_usuario.trim().length < 3) {
+      newErrors.nombre_usuario = 'El nombre de usuario debe tener al menos 3 caracteres';
     }
 
     if (!formData.email || formData.email.trim() === '') {
@@ -89,7 +93,13 @@ const ProfilePage = () => {
     setErrorMessage('');
 
     try {
-      const response = await usuariosService.updatePerfil(formData);
+      // Transformar datos al formato que espera el backend
+      const dataToSend = {
+        nombreUsuario: formData.nombre_usuario.trim(),
+        email: formData.email.trim(),
+      };
+      
+      const response = await usuariosService.updatePerfil(dataToSend);
       
       if (response.data.success) {
         setSuccessMessage('Perfil actualizado exitosamente');

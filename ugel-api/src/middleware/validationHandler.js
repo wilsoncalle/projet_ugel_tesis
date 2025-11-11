@@ -165,8 +165,12 @@ const schemas = {
     }).min(1),
 
     updateProfile: Joi.object({
-      nombre_usuario: Joi.string().min(3).max(100).required(),
-      correo: Joi.string().email().max(150).required(),
+      nombreUsuario: Joi.string().min(3).max(100).required()
+        .regex(/^[^\s]+$/, 'no spaces')
+        .messages({
+          'string.pattern.name': 'El nombre de usuario no puede contener espacios'
+        }),
+      email: Joi.string().email().max(150).required(),
     }),
 
     updatePassword: Joi.object({
