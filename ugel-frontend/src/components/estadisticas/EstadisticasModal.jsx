@@ -79,6 +79,21 @@ const EstadisticasModal = ({
         total: totalVisitas
       });
 
+      // Determinar nombres de columnas según el contexto
+      const getColumnNames = () => {
+        // Si tableConfig tiene labels personalizados, usarlos
+        if (tableConfig.nameLabel && tableConfig.countLabel) {
+          return [tableConfig.nameLabel, tableConfig.countLabel, 'Porcentaje'];
+        }
+        
+        // Nombres por defecto según tipo de gráfico
+        if (chartType === 'pie') {
+          return ['Motivo', 'Cantidad', 'Porcentaje'];
+        }
+        
+        return ['Nombre', 'Cantidad', 'Porcentaje'];
+      };
+
       // Configuración del reporte
       const reportConfig = {
         titulo: title,
@@ -86,10 +101,8 @@ const EstadisticasModal = ({
         periodo: periodo,
         tablas: [
           {
-            titulo: 'Detalle de Datos',
-            columnas: chartType === 'pie' 
-              ? ['Motivo', 'Cantidad', 'Porcentaje']
-              : ['Nombre', 'Cantidad', 'Porcentaje'],
+            titulo: tableConfig.title || 'Detalle de Datos',
+            columnas: getColumnNames(),
             datos: tableData
           }
         ],

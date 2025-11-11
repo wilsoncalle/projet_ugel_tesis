@@ -467,9 +467,9 @@ export const generateExcelReport = async (config) => {
 
 /**
  * Prepara datos de tabla para exportación
- * @param {Array} data - Datos crudos
+ * @param {Array|Object} data - Datos crudos (array de objetos o formato Chart.js {labels, datasets})
  * @param {Object} config - Configuración de mapeo
- * @returns {Array} - Datos formateados para tabla
+ * @returns {Array} - Datos formateados para tabla [[nombre, cantidad, porcentaje], ...]
  */
 export const prepareTableData = (data, config = {}) => {
   const {
@@ -478,13 +478,63 @@ export const prepareTableData = (data, config = {}) => {
     total = 0
   } = config;
 
-  if (!Array.isArray(data)) return [];
+  // Si data es null o undefined, retornar array vacío
+  if (!data) return [];
 
-  return data.map(item => {
-    const nombre = item[nameKey] || item.nombre_area || item.nombre || 'N/A';
-    const cantidad = parseInt(item[countKey] || item.visitas || item.valor || 0);
-    const porcentaje = total > 0 ? ((cantidad / total) * 100).toFixed(1) : '0.0';
+  // Caso 1: Datos en formato Chart.js/Recharts { labels: [], datasets: [] }
+  if (data.labels && data.datasets && Array.isArray(data.labels) && Array.isArray(data.datasets)) {
+    const labels = data.labels;
+    const values = data.datasets[0]?.data || [];
+    
+    // Calcular total si no se proporcionó
+    const calculatedTotal = total || values.reduce((sum, val) => sum + (parseInt(val) || 0), 0);
+    
+    return labels.map((label, index) => {
+      const cantidad = parseInt(values[index]) || 0;
+      const porcentaje = calculatedTotal > 0 ? ((cantidad / calculatedTotal) * 100).toFixed(1) : '0.0';
+      return [label, cantidad, `${porcentaje}%`];
+    });
+  }
 
-    return [nombre, cantidad, `${porcentaje}%`];
-  });
+  // Caso 2: Array de objetos
+  if (Array.isArray(data)) {
+    // Calcular total si no se proporcionó
+    const calculatedTotal = total || data.reduce((sum, item) => {
+      const cantidad = parseInt(item[countKey] || item.visitas || item.asistencias || item.papeletas || item.valor || 0);
+      return sum + cantidad;
+    }, 0);
+
+    return data.map(item => {
+      // Intentar obtener el nombre de múltiples campos posibles
+      const nombre = item[nameKey] 
+        || item.nombre_area 
+        || item.nombre_motivo
+        || item.nombre
+        || item.personal
+        || item.motivo
+        || item.area
+        || item.label
+        || 'N/A';
+      
+      // Intentar obtener la cantidad de múltiples campos posibles
+      const cantidad = parseInt(
+        item[countKey] 
+        || item.visitas 
+        || item.asistencias 
+        || item.papeletas
+        || item.dias_asistidos
+        || item.valor 
+        || item.count
+        || 0
+      );
+      
+      const porcentaje = calculatedTotal > 0 ? ((cantidad / calculatedTotal) * 100).toFixed(1) : '0.0';
+
+      return [nombre, cantidad, `${porcentaje}%`];
+    });
+  }
+
+  // Si no es ninguno de los formatos esperados, retornar array vacío
+  console.warn('[prepareTableData] Formato de datos no reconocido:', data);
+  return [];
 };

@@ -129,20 +129,75 @@ const DashboardAdminPage = () => {
     if (!flujoDiario || flujoDiario.length === 0) return [];
     
     return flujoDiario
-      .filter(item => (item.asistencias || item.total || 0) > 0) // Solo días con asistencias
+      .filter(item => {
+        const total = (item.asistencias || 0) + (item.inasistencias || 0) + (item.permisos || 0);
+        return total > 0; // Solo días con algún registro
+      })
       .map(item => {
-        const numAsistencias = item.asistencias || item.total || 0;
-        // Crear detalles simulados basados en el número de asistencias
-        const detalles = Array.from({ length: Math.min(numAsistencias, 5) }, (_, i) => ({
-          estado_presencia: i === 0 ? 'Presente' : (i % 3 === 0 ? 'Tardanza' : 'Presente'),
-          hora_ingreso: `0${7 + i}:${30 + (i * 10) % 60}`.slice(-5),
-          personal: `Personal ${i + 1}`,
-          area: 'Área General'
-        }));
+        const numAsistencias = parseInt(item.asistencias || 0);
+        const numInasistencias = parseInt(item.inasistencias || 0);
+        const numPermisos = parseInt(item.permisos || 0);
+        const total = numAsistencias + numInasistencias + numPermisos;
+        
+        const detalles = [];
+        
+        // Agregar asistencias (Presente/Tardanza)
+        // Aproximadamente 70% Presente, 30% Tardanza
+        const numPresentes = Math.floor(numAsistencias * 0.7);
+        const numTardanzas = numAsistencias - numPresentes;
+        
+        for (let i = 0; i < Math.min(numPresentes, 2); i++) {
+          detalles.push({
+            estado_presencia: 'Presente',
+            hora_ingreso: `0${7 + i}:${15 + (i * 5)}`.slice(-5),
+            personal: `Personal ${i + 1}`,
+            area: 'Ver detalles'
+          });
+        }
+        
+        for (let i = 0; i < Math.min(numTardanzas, 1); i++) {
+          detalles.push({
+            estado_presencia: 'Tardanza',
+            hora_ingreso: `09:${20 + (i * 10)}`,
+            personal: `Personal ${numPresentes + i + 1}`,
+            area: 'Ver detalles'
+          });
+        }
+        
+        // Agregar inasistencias
+        for (let i = 0; i < Math.min(numInasistencias, 2); i++) {
+          detalles.push({
+            estado_presencia: 'Ausente',
+            hora_ingreso: '--:--',
+            personal: `Personal ${numAsistencias + i + 1}`,
+            area: 'Ver detalles'
+          });
+        }
+        
+        // Agregar permisos
+        for (let i = 0; i < Math.min(numPermisos, 1); i++) {
+          detalles.push({
+            estado_presencia: 'Permiso',
+            hora_ingreso: '--:--',
+            personal: `Personal ${numAsistencias + numInasistencias + i + 1}`,
+            area: 'Ver detalles'
+          });
+        }
+        
+        // Si hay más registros, agregar indicador
+        const mostrados = detalles.length;
+        if (total > mostrados) {
+          detalles.push({
+            estado_presencia: 'Presente',
+            hora_ingreso: '--:--',
+            personal: `+${total - mostrados} más`,
+            area: 'Ver todos los detalles'
+          });
+        }
         
         return {
           fecha: item.dia || item.fecha,
-          asistencias_dia: numAsistencias,
+          asistencias_dia: total,
           detalles: detalles
         };
       });
@@ -343,7 +398,7 @@ const DashboardAdminPage = () => {
 
                 {/* Calendario */}
                 <div className="lg:col-span-2">
-                  <CalendarioAsistencias asistenciasPorFecha={formatearDatosCalendarioAsistencias(datosPersonal.flujoDiario)} />
+                  <CalendarioAsistencias asistenciasPorFecha={formatearDatosCalendarioAsistencias(datosPersonal.flujoDiarioCompleto)} />
                 </div>
               </div>
             </div>

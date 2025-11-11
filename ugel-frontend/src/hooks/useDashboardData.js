@@ -1,6 +1,49 @@
 import { useState, useEffect, useCallback } from 'react';
 
 /**
+ * Combina flujos diarios de asistencias, inasistencias y permisos
+ * @param {Array} asistencias - Flujo diario de asistencias
+ * @param {Array} inasistencias - Flujo diario de inasistencias
+ * @param {Array} permisos - Flujo diario de permisos
+ * @returns {Array} - Flujo combinado por fecha
+ */
+const combinarFlujosDiarios = (asistencias, inasistencias, permisos) => {
+  const mapaFechas = new Map();
+
+  // Procesar asistencias
+  asistencias.forEach(item => {
+    const fecha = item.dia;
+    if (!mapaFechas.has(fecha)) {
+      mapaFechas.set(fecha, { dia: fecha, asistencias: 0, inasistencias: 0, permisos: 0 });
+    }
+    mapaFechas.get(fecha).asistencias = parseInt(item.asistencias || 0);
+  });
+
+  // Procesar inasistencias
+  inasistencias.forEach(item => {
+    const fecha = item.dia;
+    if (!mapaFechas.has(fecha)) {
+      mapaFechas.set(fecha, { dia: fecha, asistencias: 0, inasistencias: 0, permisos: 0 });
+    }
+    mapaFechas.get(fecha).inasistencias = parseInt(item.inasistencias || 0);
+  });
+
+  // Procesar permisos
+  permisos.forEach(item => {
+    const fecha = item.dia;
+    if (!mapaFechas.has(fecha)) {
+      mapaFechas.set(fecha, { dia: fecha, asistencias: 0, inasistencias: 0, permisos: 0 });
+    }
+    mapaFechas.get(fecha).permisos = parseInt(item.permisos || 0);
+  });
+
+  // Convertir a array y ordenar por fecha
+  return Array.from(mapaFechas.values()).sort((a, b) => 
+    new Date(a.dia) - new Date(b.dia)
+  );
+};
+
+/**
  * Hook personalizado para manejar todos los datos del dashboard administrativo
  * Combina datos de Personal (Asistencias) y Visitas
  */
@@ -18,6 +61,7 @@ const useDashboardData = () => {
     puntualidad: 0,
     tardanzas: 0,
     flujoDiario: [],
+    flujoDiarioCompleto: [], // Incluye todos los estados
     porArea: [],
     porEstado: [],
   });
@@ -69,8 +113,22 @@ const useDashboardData = () => {
       const puntualidad = await puntualidadRes.json();
       const areas = await areasRes.json();
 
-      // Procesar datos
-      const flujoDiario = totales.data?.flujo_diario || totales.data?.flujoDiario || [];
+      // Procesar datos - Nueva estructura con asistencias/inasistencias/permisos
+      const asistenciasData = totales.data?.asistencias || {};
+      const inasistenciasData = totales.data?.inasistencias || {};
+      const permisosData = totales.data?.permisos || {};
+      
+      const flujoDiario = asistenciasData.flujo_diario || [];
+      const flujoDiarioInasistencias = inasistenciasData.flujo_diario || [];
+      const flujoDiarioPermisos = permisosData.flujo_diario || [];
+      
+      // Combinar todos los flujos diarios por fecha
+      const flujoDiarioCompleto = combinarFlujosDiarios(
+        flujoDiario,
+        flujoDiarioInasistencias,
+        flujoDiarioPermisos
+      );
+      
       const estadosPuntualidad = puntualidad.data?.labels || [];
       const valoresPuntualidad = puntualidad.data?.datasets?.[0]?.data || [];
       
@@ -82,12 +140,13 @@ const useDashboardData = () => {
       const totalTardanza = indexTardanza >= 0 ? valoresPuntualidad[indexTardanza] : 0;
 
       setDatosPersonal({
-        totalAsistencias: totales.data?.total || 0,
-        totalAusencias: ausencias.data?.total || 0,
+        totalAsistencias: asistenciasData.total || 0,
+        totalAusencias: inasistenciasData.total || 0,
         puntualidad: totalPuntual,
         tardanzas: totalTardanza,
         flujoDiario: flujoDiario,
-        porArea: areas.data || [],
+        flujoDiarioCompleto: flujoDiarioCompleto,
+        porArea: areas.data?.por_area || areas.data || [],
         porEstado: estadosPuntualidad.map((label, idx) => ({
           estado: label,
           cantidad: valoresPuntualidad[idx]
