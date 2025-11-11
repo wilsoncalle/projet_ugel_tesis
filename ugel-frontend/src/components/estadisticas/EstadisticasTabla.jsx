@@ -168,17 +168,6 @@ const EstadisticasTabla = ({ data, totalVisitas, onExport, config = {} }) => {
                 className="pl-10 pr-4 py-2 w-64 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
-            
-            {/* Botón Exportar */}
-            {onExport && (
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 hover:border-gray-300 transition-all duration-200"
-              >
-                <Download className="h-4 w-4" />
-                Exportar
-              </button>
-            )}
           </div>
         </div>
       </div>

@@ -11,7 +11,7 @@ const NavItem = ({ to, icon, label, badge, end = false }) => (
       to={to}
       end={end}   // <- importante
       className={({ isActive }) =>
-        `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
+        `flex items-center px-2 py-2 text-sm font-medium rounded-2xl transition-colors duration-150 ${
           isActive 
             ? 'bg-blue-100 text-blue-800' 
             : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
@@ -537,7 +537,7 @@ const MainLayout = () => {
       {!isVigilanteRoute && (
         <aside 
           id="sidebar"
-          className={`fixed left-0 top-0 z-20 h-screen w-72 bg-white shadow-lg pt-16 transition-all duration-300 
+          className={`fixed left-0 top-0 z-20 h-screen w-56 bg-white shadow-lg pt-16 transition-all duration-300 
                      ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
                      md:translate-x-0`}
           onScroll={handleSidebarScroll}
@@ -556,7 +556,7 @@ const MainLayout = () => {
         </div>
         
         {/* Contenido del sidebar */}
-        <div className="px-4 py-2 overflow-y-auto h-[calc(100vh-120px)]">
+        <div className="px-2 py-2 overflow-y-auto h-[calc(100vh-120px)]">
           {/* Renderizar el menú según el rol del usuario */}
           {userRole.includes('admin') && (
             <AdminSidebar />
@@ -588,7 +588,7 @@ const MainLayout = () => {
           // Give additional top padding for vigilante routes because the
           // navbar includes an extra tab row there (the nav becomes taller).
           isVigilanteRoute ? 'pt-20' : 'pt-16'
-        } ${isVigilanteRoute ? 'ml-0' : 'ml-0 md:ml-72'}`}
+        } ${isVigilanteRoute ? 'ml-0' : 'ml-0 md:ml-56'}`}
       >
         {/* Contenido principal */}
         <div className={isVigilanteRoute ? 'bg-gray-50' : 'px-6 py-6 bg-gray-50'}>
