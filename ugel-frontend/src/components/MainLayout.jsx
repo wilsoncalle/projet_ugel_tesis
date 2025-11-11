@@ -584,9 +584,11 @@ const MainLayout = () => {
       
       {/* Contenido principal */}
       <main 
-        className={`pt-16 min-h-screen transition-all duration-300 ease-in-out ${
-          isVigilanteRoute ? 'ml-0' : 'ml-0 md:ml-72'
-        }`}
+        className={`min-h-screen transition-all duration-300 ease-in-out ${
+          // Give additional top padding for vigilante routes because the
+          // navbar includes an extra tab row there (the nav becomes taller).
+          isVigilanteRoute ? 'pt-20' : 'pt-16'
+        } ${isVigilanteRoute ? 'ml-0' : 'ml-0 md:ml-72'}`}
       >
         {/* Contenido principal */}
         <div className={isVigilanteRoute ? 'bg-gray-50' : 'px-6 py-6 bg-gray-50'}>

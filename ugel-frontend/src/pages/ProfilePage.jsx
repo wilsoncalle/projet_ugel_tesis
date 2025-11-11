@@ -200,7 +200,9 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-1">
+    // Keep page background and padding but avoid forcing full viewport height here.
+    // The layout component is responsible for the main min-h-screen and top offset.
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-4">
       <div className="max-w-7xl mx-auto">
         {/* Header tipo Bootstrap: título a la izq, botón a la der */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -344,7 +346,7 @@ const ProfilePage = () => {
 
                   <div>
                     <Input
-                      label="email Electrónico"
+                      label="Correo Electrónico"
                       name="email"
                       type="email"
                       value={formData.email}
