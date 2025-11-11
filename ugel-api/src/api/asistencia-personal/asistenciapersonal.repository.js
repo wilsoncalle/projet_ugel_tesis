@@ -65,7 +65,7 @@ const findAll = async (options = {}) => {
         throw new AppError('Fecha inválida para consulta de asistencia', 400);
       }
       
-      // Construir la consulta base con LEFT JOIN
+      // Construir la consulta base con LEFT JOIN incluyendo papeletas activas
       let query = `
         SELECT 
           COALESCE(ca.id, NULL) as id,
@@ -79,7 +79,11 @@ const findAll = async (options = {}) => {
           COALESCE(ca.fecha, $${paramCounter}::date) as fecha,
           ca.hora_ingreso,
           ca.hora_salida,
-          COALESCE(ca.estado_presencia, 'Ausente') as estado_presencia,
+          CASE
+            WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
+            WHEN pa.personal_solicitante_id IS NOT NULL THEN 'Permiso'
+            ELSE 'Ausente'
+          END as estado_presencia,
           ca.usuario_registro_id,
           u.nombre_usuario as usuario_registro,
           ca.fecha_registro
@@ -88,6 +92,14 @@ const findAll = async (options = {}) => {
         LEFT JOIN Cargos c ON p.cargo_id = c.id
         LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
           AND ca.fecha = $${paramCounter}::date
+        LEFT JOIN (
+          SELECT DISTINCT ps.personal_solicitante_id, $${paramCounter}::date as fecha_papeleta
+          FROM PapeletasSalida ps
+          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
+            AND DATE(ps.fecha_hora_salida_programada) <= $${paramCounter}::date
+            AND DATE(ps.fecha_hora_retorno_programada) >= $${paramCounter}::date
+            AND ps.fecha_hora_retorno_real IS NULL
+        ) pa ON pa.personal_solicitante_id = p.id
         LEFT JOIN Usuarios u ON ca.usuario_registro_id = u.id
       `;
       
@@ -132,7 +144,13 @@ const findAll = async (options = {}) => {
       
       // Filtro por estado de presencia
       if (estadoPresencia) {
-        whereConditions.push(`COALESCE(ca.estado_presencia, 'Ausente') = $${paramCounter}`);
+        whereConditions.push(`
+          CASE
+            WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
+            WHEN pa.personal_solicitante_id IS NOT NULL THEN 'Permiso'
+            ELSE 'Ausente'
+          END = $${paramCounter}
+        `);
         queryParams.push(estadoPresencia);
         paramCounter++;
       }
@@ -168,7 +186,13 @@ const findAll = async (options = {}) => {
       }
       
       if (estadoPresencia) {
-        countWhereConditions.push(`COALESCE(ca.estado_presencia, 'Ausente') = $${countParamCounter}`);
+        countWhereConditions.push(`
+          CASE
+            WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
+            WHEN pa.personal_solicitante_id IS NOT NULL THEN 'Permiso'
+            ELSE 'Ausente'
+          END = $${countParamCounter}
+        `);
         countParamsSimplified.push(estadoPresencia);
         countParamCounter++;
       }
@@ -178,6 +202,14 @@ const findAll = async (options = {}) => {
         FROM Personal p
         LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
           AND ca.fecha = $1::date
+        LEFT JOIN (
+          SELECT DISTINCT ps.personal_solicitante_id, $1::date as fecha_papeleta
+          FROM PapeletasSalida ps
+          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
+            AND DATE(ps.fecha_hora_salida_programada) <= $1::date
+            AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
+            AND ps.fecha_hora_retorno_real IS NULL
+        ) pa ON pa.personal_solicitante_id = p.id
         WHERE ${countWhereConditions.join(' AND ')}
       `;
       
@@ -578,9 +610,10 @@ const updateEstadoPresencia = async (id, estadoPresencia, usuarioId) => {
  * EXCLUYE personal que tiene papeletas activas para esa fecha
  * @param {string} fecha - Fecha en formato YYYY-MM-DD
  * @param {number} usuarioSistemaId - ID del usuario del sistema que ejecuta la acción
+ * @param {boolean} crearSiNoExiste - Si es true, crea registros nuevos. Si es false, solo actualiza existentes (default: true)
  * @returns {Object} Resultado con cantidad de registros actualizados
  */
-const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
+const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId, crearSiNoExiste = true) => {
   try {
     // Normalizar fecha a YYYY-MM-DD (zona Lima)
     fecha = toLimaDateYYYYMMDD(fecha);
@@ -589,11 +622,43 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
       throw new AppError('Fecha inválida para marcar ausentes', 400);
     }
     
-    // Buscar todos los personal activos que no tienen registro de asistencia con horaIngreso para esta fecha
-    // EXCLUIR personal que tiene papeletas activas (APROBADO o EN_CURSO) para esa fecha
-    // Primero, crear registros de asistencia para personal que no tiene ninguno (solo para esa fecha)
-    // EXCLUIR personal con papeletas activas
-    const queryCrearRegistros = `
+    // PASO 1: Crear registros con estado "Permiso" para personal con papeleta activa
+    const queryCrearPermisos = `
+      INSERT INTO ControlAsistenciaPersonal (
+        personal_id,
+        fecha,
+        hora_ingreso,
+        hora_salida,
+        estado_presencia,
+        usuario_registro_id
+      )
+      SELECT 
+        p.id,
+        $1::date,
+        NULL,
+        NULL,
+        'Permiso',
+        $2
+      FROM Personal p
+      WHERE p.activo = true
+        AND p.id NOT IN (
+          SELECT DISTINCT personal_id 
+          FROM ControlAsistenciaPersonal 
+          WHERE fecha = $1::date
+        )
+        AND p.id IN (
+          SELECT DISTINCT ps.personal_solicitante_id
+          FROM PapeletasSalida ps
+          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
+            AND DATE(ps.fecha_hora_salida_programada) <= $1::date
+            AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
+            AND ps.fecha_hora_retorno_real IS NULL
+        )
+      RETURNING id
+    `;
+    
+    // PASO 2: Crear registros con estado "Ausente" para el resto sin papeleta
+    const queryCrearAusentes = `
       INSERT INTO ControlAsistenciaPersonal (
         personal_id,
         fecha,
@@ -627,42 +692,61 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
       RETURNING id
     `;
     
-    // Actualizar registros existentes que no tienen horaIngreso y no están marcados como ausente
-    // EXCLUIR personal con papeletas activas
+    // PASO 3: Actualizar registros existentes que no tienen horaIngreso
+    // NO sobrescribir Permisos existentes ni personal con papeletas activas
     const queryActualizarRegistros = `
-      UPDATE ControlAsistenciaPersonal ca
-      SET 
-        estado_presencia = 'Ausente',
-        usuario_registro_id = $2
-      WHERE ca.fecha = $1::date
-        AND (ca.hora_ingreso IS NULL OR ca.hora_ingreso = '')
-        AND ca.estado_presencia != 'Ausente'
-        AND ca.personal_id NOT IN (
-          SELECT DISTINCT ps.personal_solicitante_id
-          FROM PapeletasSalida ps
-          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
-            AND DATE(ps.fecha_hora_salida_programada) <= $1::date
-            AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
-            AND ps.fecha_hora_retorno_real IS NULL
-        )
-      RETURNING id
-    `;
+    UPDATE ControlAsistenciaPersonal ca
+    SET 
+      estado_presencia = 'Ausente',
+      usuario_registro_id = $2
+    WHERE ca.fecha = $1::date
+      AND ca.hora_ingreso IS NULL
+      AND ca.estado_presencia != 'Ausente'
+      AND ca.estado_presencia != 'Permiso'
+      AND ca.personal_id NOT IN (
+        SELECT DISTINCT ps.personal_solicitante_id
+        FROM PapeletasSalida ps
+        WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
+          AND DATE(ps.fecha_hora_salida_programada) <= $1::date
+          AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
+          AND ps.fecha_hora_retorno_real IS NULL
+      )
+    RETURNING id
+  `;
     
-    // Ejecutar ambas consultas
-    const [crearResult, actualizarResult] = await Promise.all([
-      db.query(queryCrearRegistros, [fecha, usuarioSistemaId]),
-      db.query(queryActualizarRegistros, [fecha, usuarioSistemaId])
-    ]);
+    // Ejecutar consultas según el parámetro crearSiNoExiste
+    let creadosPermiso = 0;
+    let creadosAusente = 0;
+    let actualizados = 0;
     
-    const creados = crearResult.rows.length;
-    const actualizados = actualizarResult.rows.length;
+    if (crearSiNoExiste) {
+      // Modo completo: crear registros nuevos (Permiso + Ausente) Y actualizar existentes
+      const [permisoResult, ausenteResult, actualizarResult] = await Promise.all([
+        db.query(queryCrearPermisos, [fecha, usuarioSistemaId]),
+        db.query(queryCrearAusentes, [fecha, usuarioSistemaId]),
+        db.query(queryActualizarRegistros, [fecha, usuarioSistemaId])
+      ]);
+      
+      creadosPermiso = permisoResult.rows.length;
+      creadosAusente = ausenteResult.rows.length;
+      actualizados = actualizarResult.rows.length;
+    } else {
+      // Modo solo actualización: NO crear registros nuevos, solo actualizar existentes
+      const actualizarResult = await db.query(queryActualizarRegistros, [fecha, usuarioSistemaId]);
+      actualizados = actualizarResult.rows.length;
+    }
+    
+    const creados = creadosPermiso + creadosAusente;
     const total = creados + actualizados;
+    const modoOperacion = crearSiNoExiste ? 'crear y actualizar' : 'solo actualizar';
     
-    logger.info(`Marcado de ausentes completado para fecha ${fecha}: ${creados} registros creados, ${actualizados} actualizados (total: ${total}). Personal con papeletas activas excluido.`);
+    logger.info(`Marcado de ausentes completado para fecha ${fecha} (modo: ${modoOperacion}): ${creados} registros creados (${creadosPermiso} permisos, ${creadosAusente} ausentes), ${actualizados} actualizados (total: ${total}).`);
     
     return {
       fecha,
       registrosCreados: creados,
+      registrosPermisoCreados: creadosPermiso,
+      registrosAusentesCreados: creadosAusente,
       registrosActualizados: actualizados,
       total
     };
@@ -670,6 +754,58 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId) => {
   } catch (error) {
     logger.error(`Error en repositorio marcando ausentes para fecha ${fecha}:`, error);
     throw error instanceof AppError ? error : new AppError('Error marcando ausentes', 500);
+  }
+};
+
+/**
+ * Verificar si existen registros de asistencia para una fecha específica
+ * @param {string} fecha - Fecha en formato YYYY-MM-DD
+ * @returns {Object} Información sobre registros existentes
+ */
+const verificarRegistrosDelDia = async (fecha) => {
+  try {
+    // Normalizar fecha a YYYY-MM-DD (zona Lima)
+    fecha = toLimaDateYYYYMMDD(fecha);
+    
+    if (!fecha || typeof fecha !== 'string' || fecha.trim() === '') {
+      throw new AppError('Fecha inválida para verificar registros', 400);
+    }
+    
+    // Contar total de personal activo
+    const queryPersonalActivo = `
+      SELECT COUNT(*) as total
+      FROM Personal
+      WHERE activo = true
+    `;
+    
+    // Contar registros de asistencia para la fecha
+    const queryRegistrosExistentes = `
+      SELECT COUNT(*) as total
+      FROM ControlAsistenciaPersonal
+      WHERE fecha = $1::date
+    `;
+    
+    const [personalResult, registrosResult] = await Promise.all([
+      db.query(queryPersonalActivo),
+      db.query(queryRegistrosExistentes, [fecha])
+    ]);
+    
+    const totalPersonalActivo = parseInt(personalResult.rows[0].total);
+    const totalRegistros = parseInt(registrosResult.rows[0].total);
+    const porcentaje = totalPersonalActivo > 0 ? Math.round((totalRegistros / totalPersonalActivo) * 100) : 0;
+    const necesitaCreacion = totalRegistros === 0;
+    
+    return {
+      fecha,
+      totalPersonalActivo,
+      totalRegistros,
+      porcentaje,
+      necesitaCreacion
+    };
+    
+  } catch (error) {
+    logger.error(`Error verificando registros del día para fecha ${fecha}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error verificando registros del día', 500);
   }
 };
 
@@ -1270,6 +1406,7 @@ module.exports = {
   updateSalida,
   updateEstadoPresencia,
   marcarAusentesAlFinalDelDia,
+  verificarRegistrosDelDia,
   actualizarEstadoPorPeriodo,
   getEstadisticas,
   getEstadisticasTotales,

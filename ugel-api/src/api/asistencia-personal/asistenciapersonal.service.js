@@ -12,6 +12,7 @@ const { AppError } = require('../../middleware/errorHandler');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit-table');
 const { getTheme } = require('../../config/exportStyles');
+const config = require('../../config');
 
 // Estados de presencia válidos
 const VALID_PRESENCE_STATES = ['Presente', 'Tardanza', 'Ausente', 'Permiso', 'Comisión'];
@@ -340,9 +341,14 @@ const registrarEstadoPresencia = async (personalId, estadoPresencia, usuarioId) 
  * Esta función debe ejecutarse al final del día (ej. 23:59) para marcar ausentes del día anterior
  * @param {string} fecha - Fecha en formato YYYY-MM-DD (opcional, por defecto usa el día anterior)
  * @param {number} usuarioSistemaId - ID del usuario del sistema que ejecuta la acción
+ * @param {boolean} crearSiNoExiste - Si es true, crea registros nuevos para personal sin asistencia. Si es false, solo actualiza existentes (default: true)
  * @returns {Object} Resultado con cantidad de registros actualizados
  */
-const marcarAusentesAlFinalDelDia = async (fecha = null, usuarioSistemaId = 1) => {
+const marcarAusentesAlFinalDelDia = async (
+  fecha = null,
+  usuarioSistemaId = config.systemUserId,
+  crearSiNoExiste = true
+) => {
   try {
     // Si no se proporciona fecha, usar el día anterior (en zona horaria Lima)
     let fechaProcesar = fecha;
@@ -358,11 +364,19 @@ const marcarAusentesAlFinalDelDia = async (fecha = null, usuarioSistemaId = 1) =
       fechaProcesar = limaTime.toISOString().split('T')[0];
     }
     
-    logger.info(`Iniciando marcado de ausentes para fecha: ${fechaProcesar}`);
+    const modoOperacion = crearSiNoExiste ? 'crear y actualizar' : 'solo actualizar';
+    logger.info(`Iniciando marcado de ausentes para fecha: ${fechaProcesar} (modo: ${modoOperacion})`);
     
-    const resultado = await repository.marcarAusentesAlFinalDelDia(fechaProcesar, usuarioSistemaId);
+    const resultado = await repository.marcarAusentesAlFinalDelDia(
+      fechaProcesar,
+      usuarioSistemaId,
+      crearSiNoExiste
+    );
     
-    logger.info(`Marcado de ausentes completado: ${resultado.total} registros procesados (${resultado.registrosCreados} creados, ${resultado.registrosActualizados} actualizados)`);
+    logger.info(
+      `Marcado de ausentes completado: ${resultado.total} registros procesados ` +
+      `(${resultado.registrosCreados} creados, ${resultado.registrosActualizados} actualizados)` 
+    );
     
     return resultado;
     

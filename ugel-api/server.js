@@ -9,6 +9,12 @@ const config = require('./src/config');
 const logger = require('./src/utils/logger');
 
 const PORT = config.port || 3000;
+const SYSTEM_USER_ID = config.systemUserId;
+
+// Validar que SYSTEM_USER_ID esté configurado
+if (!SYSTEM_USER_ID) {
+  logger.warn('SYSTEM_USER_ID no está configurado. Las tareas automáticas podrían fallar por FK.');
+}
 
 // Inicializar el servidor HTTP y Socket.IO
 const http = require('http');
@@ -40,8 +46,8 @@ const asistenciaPersonalService = require('./src/api/asistencia-personal/asisten
 const ejecutarCierreAutomatico = async () => {
   try {
     logger.info('Ejecutando cierre automático de visitas programado...');
-    // Usar usuario ID 1 como usuario del sistema para cierres automáticos
-    const resultado = await visitasService.cerrarVisitasAutomaticamente(1);
+    // Usa el usuario técnico del sistema
+    const resultado = await visitasService.cerrarVisitasAutomaticamente(SYSTEM_USER_ID);
     logger.info(`Cierre automático completado: ${resultado.cerradas} visitas cerradas, ${resultado.errores} errores`);
   } catch (error) {
     logger.error('Error en cierre automático programado:', error);
@@ -49,35 +55,54 @@ const ejecutarCierreAutomatico = async () => {
 };
 
 /**
- * Función para marcar ausentes al final del día
- * Esta función se ejecuta diariamente a las 23:59 para marcar ausentes del día anterior
+ * Función para marcar ausentes con opción de crear o solo actualizar
+ * @param {boolean} crearSiNoExiste - Si es true, crea registros nuevos. Si es false, solo actualiza existentes
  */
-const ejecutarMarcadoAusentes = async () => {
+const ejecutarMarcadoAusentes = async (crearSiNoExiste = true) => {
   try {
-    logger.info('Ejecutando marcado automático de ausentes...');
-    // Usar usuario ID 1 como usuario del sistema para acciones automáticas
-    const resultado = await asistenciaPersonalService.marcarAusentesAlFinalDelDia(null, 1);
-    logger.info(`Marcado de ausentes completado: ${resultado.total} registros procesados para fecha ${resultado.fecha}`);
+    const modoOperacion = crearSiNoExiste ? 'crear y actualizar' : 'solo actualizar';
+    logger.info(`Ejecutando marcado automático de ausentes (modo: ${modoOperacion})...`);
+    
+    // Obtener fecha actual en zona horaria Lima
+    const ahora = new Date();
+    const limaOffset = -5 * 60; // -5 horas en minutos
+    const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
+    const limaTime = new Date(utcTime + (limaOffset * 60000));
+    const fechaActual = limaTime.toISOString().split('T')[0];
+    
+    // Usar usuario técnico del sistema para acciones automáticas
+    const resultado = await asistenciaPersonalService.marcarAusentesAlFinalDelDia(
+      fechaActual,
+      SYSTEM_USER_ID,
+      crearSiNoExiste
+    );
+
+    logger.info(
+      `Marcado de ausentes completado: ${resultado.total} registros procesados para fecha ${resultado.fecha} ` +
+      `(${resultado.registrosCreados} creados, ${resultado.registrosActualizados} actualizados)` 
+    );
   } catch (error) {
     logger.error('Error en marcado automático de ausentes:', error);
   }
 };
 
 /**
- * Calcular el tiempo hasta la próxima ejecución a las 23:59
- * @returns {number} Tiempo en milisegundos hasta las 23:59
+ * Calcular el tiempo hasta la próxima ejecución de un horario específico
+ * @param {number} hora - Hora objetivo (0-23)
+ * @param {number} minuto - Minuto objetivo (0-59)
+ * @returns {number} Tiempo en milisegundos hasta el horario especificado
  */
-const calcularTiempoHasta2359 = () => {
+const calcularTiempoHasta = (hora, minuto) => {
   const ahora = new Date();
   const limaOffset = -5 * 60; // -5 horas en minutos
   const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
   const limaTime = new Date(utcTime + (limaOffset * 60000));
   
-  // Crear fecha objetivo para hoy a las 23:59:00
+  // Crear fecha objetivo para hoy con el horario especificado
   const objetivo = new Date(limaTime);
-  objetivo.setHours(23, 59, 0, 0);
+  objetivo.setHours(hora, minuto, 0, 0);
   
-  // Si ya pasó las 23:59 de hoy, programar para mañana
+  // Si ya pasó el horario de hoy, programar para mañana
   if (limaTime >= objetivo) {
     objetivo.setDate(objetivo.getDate() + 1);
   }
@@ -85,7 +110,8 @@ const calcularTiempoHasta2359 = () => {
   // Calcular diferencia en milisegundos
   const diferencia = objetivo.getTime() - limaTime.getTime();
   
-  logger.info(`Próxima ejecución de marcado de ausentes programada para: ${objetivo.toISOString()} (en ${Math.round(diferencia / 1000 / 60)} minutos)`);
+  const horarioFormateado = `${hora.toString().padStart(2, '0')}:${minuto.toString().padStart(2, '0')}`;
+  logger.info(`Próxima ejecución de marcado de ausentes (${horarioFormateado}) programada para: ${objetivo.toISOString()} (en ${Math.round(diferencia / 1000 / 60)} minutos)`);
   
   return diferencia;
 };
@@ -103,21 +129,101 @@ server.listen(PORT, () => {
   setInterval(ejecutarCierreAutomatico, 30 * 60 * 1000);
   logger.info('Tarea programada de cierre automático de visitas iniciada (cada 30 minutos)');
   
-  // Programar marcado de ausentes diariamente a las 23:59
-  const programarMarcadoAusentes = () => {
-    const tiempoHasta2359 = calcularTiempoHasta2359();
+  // Configuración de horarios para marcado de ausentes
+  // Formato: { hora, minuto, crearSiNoExiste }
+  const horariosActualizacion = [
+    { hora: 10, minuto: 0, crearSiNoExiste: false },  // 10:00 AM - Solo actualizar
+    { hora: 12, minuto: 0, crearSiNoExiste: false },  // 12:00 PM - Solo actualizar
+    { hora: 17, minuto: 0, crearSiNoExiste: false },  // 5:00 PM - Solo actualizar
+    { hora: 23, minuto: 59, crearSiNoExiste: true }   // 11:59 PM - Crear y actualizar
+  ];
+  
+  /**
+   * Programar una ejecución de marcado de ausentes para un horario específico
+   * @param {Object} config - Configuración del horario { hora, minuto, crearSiNoExiste }
+   */
+  const programarMarcadoParaHorario = (config) => {
+    const { hora, minuto, crearSiNoExiste } = config;
+    const horarioFormateado = `${hora.toString().padStart(2, '0')}:${minuto.toString().padStart(2, '0')}`;
     
-    setTimeout(() => {
+    const ejecutarYReprogramar = () => {
       // Ejecutar el marcado de ausentes
-      ejecutarMarcadoAusentes();
+      ejecutarMarcadoAusentes(crearSiNoExiste);
       
-      // Programar la próxima ejecución (24 horas después)
-      setInterval(ejecutarMarcadoAusentes, 24 * 60 * 60 * 1000);
-    }, tiempoHasta2359);
+      // Reprogramar para el mismo horario del día siguiente (24 horas después)
+      const tiempoHastaProximaEjecucion = calcularTiempoHasta(hora, minuto);
+      setTimeout(ejecutarYReprogramar, tiempoHastaProximaEjecucion);
+    };
+    
+    // Calcular tiempo hasta la primera ejecución
+    const tiempoHastaPrimeraEjecucion = calcularTiempoHasta(hora, minuto);
+    setTimeout(ejecutarYReprogramar, tiempoHastaPrimeraEjecucion);
+    
+    const modoOperacion = crearSiNoExiste ? 'crear y actualizar' : 'solo actualizar';
+    logger.info(`Tarea programada de marcado automático de ausentes configurada para ${horarioFormateado} (modo: ${modoOperacion})`);
   };
   
-  programarMarcadoAusentes();
-  logger.info('Tarea programada de marcado automático de ausentes iniciada (diariamente a las 23:59)');
+  /**
+   * Verificar y crear registros de asistencia del día si es necesario
+   * Solo crea registros si ya pasaron las 10:00 AM y no existen registros
+   */
+  const verificarYCrearRegistrosDiarios = async () => {
+    try {
+      // Obtener hora actual en zona horaria Lima
+      const ahora = new Date();
+      const limaOffset = -5 * 60; // -5 horas en minutos
+      const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
+      const limaTime = new Date(utcTime + (limaOffset * 60000));
+      
+      const horaActual = limaTime.getHours();
+      const minutoActual = limaTime.getMinutes();
+      const horaFormateada = `${horaActual.toString().padStart(2, '0')}:${minutoActual.toString().padStart(2, '0')}`;
+      
+      logger.info(`Verificando registros de asistencia del día... (Hora actual: ${horaFormateada})`);
+      
+      // Solo crear registros si ya pasaron las 10:00 AM
+      if (horaActual < 10) {
+        logger.info('Hora actual antes de las 10:00 AM. No se crearán registros. Esperando ejecución programada.');
+        return;
+      }
+      
+      // Verificar si existen registros para hoy
+      const fechaActual = limaTime.toISOString().split('T')[0];
+      const repository = require('./src/api/asistencia-personal/asistenciapersonal.repository');
+      const verificacion = await repository.verificarRegistrosDelDia(fechaActual);
+      
+      logger.info(`Registros encontrados: ${verificacion.totalRegistros}/${verificacion.totalPersonalActivo} (${verificacion.porcentaje}%)`);
+      
+      // Si no hay registros o hay muy pocos (menos del 10%), crear registros base
+      if (verificacion.necesitaCreacion || verificacion.porcentaje < 10) {
+        logger.info('No se encontraron suficientes registros. Creando registros base...');
+        await ejecutarMarcadoAusentes(true); // true = crear registros nuevos
+        logger.info('Registros base creados exitosamente.');
+      } else {
+        logger.info('Ya existen registros suficientes. No se requiere creación inicial.');
+      }
+      
+    } catch (error) {
+      logger.error('Error verificando y creando registros diarios:', error);
+      // No lanzar error para no bloquear el inicio del servidor
+    }
+  };
+  
+  /**
+   * Programar todos los horarios de marcado de ausentes
+   */
+  const programarMarcadosMultiples = () => {
+    horariosActualizacion.forEach(config => {
+      programarMarcadoParaHorario(config);
+    });
+  };
+  
+  // Verificar y crear registros del día si es necesario (solo después de las 10:00 AM)
+  verificarYCrearRegistrosDiarios().then(() => {
+    // Después de verificar, programar los horarios múltiples
+    programarMarcadosMultiples();
+    logger.info(`Sistema de marcado automático de ausentes iniciado con ${horariosActualizacion.length} horarios configurados`);
+  });
 });
 
 // Manejo de cierre graceful

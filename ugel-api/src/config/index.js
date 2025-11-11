@@ -55,7 +55,12 @@ const config = {
     bcryptRounds: 12,
     maxLoginAttempts: 5,
     lockoutTime: 15 * 60 * 1000 // 15 minutos en millisegundos
-  }
+  },
+
+  // Id del usuario técnico de sistema (para tareas automáticas)
+  systemUserId: process.env.SYSTEM_USER_ID
+    ? parseInt(process.env.SYSTEM_USER_ID, 10)
+    : null
 };
 
 // Validar configuraciones críticas
