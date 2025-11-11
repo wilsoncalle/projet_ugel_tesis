@@ -627,6 +627,40 @@ const restore = async (id) => {
   }
 };
 
+/**
+ * Actualizar perfil del usuario
+ * @param {number} id - ID del usuario
+ * @param {Object} profileData - Datos del perfil
+ * @returns {Object} Usuario actualizado sin contraseña
+ */
+const updateProfile = async (id, profileData) => {
+  try {
+    const { nombre_usuario, correo } = profileData;
+    
+    const query = `
+      UPDATE Usuarios
+      SET 
+        nombre_usuario = $1,
+        correo = $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3 AND deleted_at IS NULL
+      RETURNING id, nombre_usuario, correo, rol, activo, created_at, updated_at
+    `;
+    
+    const result = await db.query(query, [nombre_usuario, correo, id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+    
+    return result.rows[0];
+    
+  } catch (error) {
+    logger.error(`Error en repositorio actualizando perfil del usuario ID ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error actualizando perfil', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -641,5 +675,6 @@ module.exports = {
   countByRole,
   findDeleted,
   findByIdIncludingDeleted,
-  restore
+  restore,
+  updateProfile
 };

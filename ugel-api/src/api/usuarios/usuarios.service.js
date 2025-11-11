@@ -394,6 +394,95 @@ const restoreUsuario = async (id, userId) => {
   }
 };
 
+/**
+ * Actualizar perfil del usuario autenticado
+ * @param {number} userId - ID del usuario
+ * @param {Object} profileData - Datos del perfil a actualizar
+ * @returns {Object} Usuario actualizado
+ */
+const updateProfile = async (userId, profileData) => {
+  try {
+    const { nombre_usuario, correo } = profileData;
+    
+    // Verificar que el usuario existe
+    const usuario = await repository.findById(userId);
+    if (!usuario) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+    
+    // Verificar si el correo ya está en uso por otro usuario
+    if (correo && correo !== usuario.correo) {
+      const existingUser = await repository.findByEmail(correo);
+      if (existingUser && existingUser.id !== userId) {
+        throw new AppError('El correo electrónico ya está en uso', 400);
+      }
+    }
+    
+    // Verificar si el nombre de usuario ya está en uso por otro usuario
+    if (nombre_usuario && nombre_usuario !== usuario.nombre_usuario) {
+      const existingUser = await repository.findByUsername(nombre_usuario);
+      if (existingUser && existingUser.id !== userId) {
+        throw new AppError('El nombre de usuario ya está en uso', 400);
+      }
+    }
+    
+    // Actualizar perfil
+    const updatedUser = await repository.updateProfile(userId, {
+      nombre_usuario,
+      correo
+    });
+    
+    logger.info(`Perfil actualizado para usuario ID ${userId}`);
+    return updatedUser;
+    
+  } catch (error) {
+    logger.error(`Error actualizando perfil del usuario ID ${userId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Cambiar contraseña del usuario autenticado
+ * @param {number} userId - ID del usuario
+ * @param {Object} passwordData - Datos de contraseña
+ * @returns {void}
+ */
+const updatePassword = async (userId, passwordData) => {
+  try {
+    const { currentPassword, newPassword } = passwordData;
+    
+    // Verificar que el usuario existe
+    const usuario = await repository.findById(userId);
+    if (!usuario) {
+      throw new AppError('Usuario no encontrado', 404);
+    }
+    
+    // Verificar contraseña actual
+    const isPasswordValid = await bcrypt.compare(currentPassword, usuario.contrasena);
+    if (!isPasswordValid) {
+      throw new AppError('La contraseña actual es incorrecta', 400);
+    }
+    
+    // Verificar que la nueva contraseña sea diferente
+    const isSamePassword = await bcrypt.compare(newPassword, usuario.contrasena);
+    if (isSamePassword) {
+      throw new AppError('La nueva contraseña debe ser diferente a la actual', 400);
+    }
+    
+    // Hash de la nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    
+    // Actualizar contraseña
+    await repository.updatePassword(userId, hashedPassword);
+    
+    logger.info(`Contraseña actualizada para usuario ID ${userId}`);
+    
+  } catch (error) {
+    logger.error(`Error actualizando contraseña del usuario ID ${userId}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllUsuarios,
   getUsuarioById,
@@ -402,5 +491,7 @@ module.exports = {
   changePassword,
   deleteUsuario,
   getDeletedUsuarios,
-  restoreUsuario
+  restoreUsuario,
+  updateProfile,
+  updatePassword
 };

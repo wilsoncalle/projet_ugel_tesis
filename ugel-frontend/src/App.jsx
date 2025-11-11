@@ -27,6 +27,7 @@ import DashboardAdminPage from './pages/DashboardAdminPage';
 import DashboardRRHHPage from './pages/DashboardRRHHPage';
 import DashboardVigilantePage from './pages/DashboardVigilantePage';
 import PersonalAsistenciaPage from './pages/PersonalAsistenciaPage';
+import ProfilePage from './pages/ProfilePage';
 
 // Catalog Pages
 import AreasPage from './pages/AreasPage';
@@ -94,7 +95,8 @@ function App() {
               <Route path="papeletas" element={<ProtectedRoute allowedRoles={['vigilante']} element={<VigilantePapeletasPage />} />} />
             </Route>
             
-
+            {/* Ruta de Perfil - Accesible para todos los roles autenticados */}
+            <Route path="/perfil" element={<ProtectedRoute element={<ProfilePage />} />} />
             
             {/* Default Redirect Based on Role */}
             <Route path="/" element={<ProtectedRoute element={<DefaultRedirect />} />} />

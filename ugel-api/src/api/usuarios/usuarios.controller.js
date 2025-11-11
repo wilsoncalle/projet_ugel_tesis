@@ -171,6 +171,39 @@ const restore = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Actualizar perfil del usuario autenticado
+ * @route PUT /api/usuarios/me
+ */
+const updateProfile = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  logger.info(`Usuario ${userId} actualizando su perfil`);
+  
+  const usuario = await service.updateProfile(userId, req.body);
+  
+  res.json({
+    success: true,
+    message: 'Perfil actualizado exitosamente',
+    data: usuario
+  });
+});
+
+/**
+ * Cambiar contraseña del usuario autenticado
+ * @route PUT /api/usuarios/me/password
+ */
+const updatePassword = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  logger.info(`Usuario ${userId} cambiando su contraseña`);
+  
+  await service.updatePassword(userId, req.body);
+  
+  res.json({
+    success: true,
+    message: 'Contraseña actualizada exitosamente'
+  });
+});
+
 module.exports = {
   getAll,
   getById,
@@ -179,5 +212,7 @@ module.exports = {
   changePassword,
   softDelete,
   getDeleted,
-  restore
+  restore,
+  updateProfile,
+  updatePassword
 };

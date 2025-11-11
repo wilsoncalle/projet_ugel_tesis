@@ -39,6 +39,30 @@ router.get('/deleted',
 );
 
 /**
+ * @route   PUT /api/usuarios/me
+ * @desc    Actualizar perfil del usuario autenticado
+ * @access  Private (Usuario autenticado)
+ */
+router.put('/me', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateUpdateProfile,
+  controller.updateProfile
+);
+
+/**
+ * @route   PUT /api/usuarios/me/password
+ * @desc    Cambiar contraseña del usuario autenticado
+ * @access  Private (Usuario autenticado)
+ */
+router.put('/me/password', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateUpdatePassword,
+  controller.updatePassword
+);
+
+/**
  * @route   GET /api/usuarios/:id
  * @desc    Obtener usuario por ID
  * @access  Private (Admin o propietario)

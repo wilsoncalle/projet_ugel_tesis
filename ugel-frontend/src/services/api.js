@@ -414,6 +414,9 @@ export const usuariosService = {
   delete: (id) => api.delete(`/usuarios/${id}`),
   getDeleted: () => api.get('/usuarios/deleted'),
   restore: (id) => api.put(`/usuarios/${id}/restore`),
+  // Métodos de perfil
+  updatePerfil: (data) => api.put('/usuarios/me', data),
+  updatePassword: (data) => api.put('/usuarios/me/password', data),
 };
 
 // --- Funciones para el Dashboard del Vigilante ---

@@ -163,6 +163,19 @@ const schemas = {
         .optional(),
       activo: Joi.boolean().optional(),
     }).min(1),
+
+    updateProfile: Joi.object({
+      nombre_usuario: Joi.string().min(3).max(100).required(),
+      correo: Joi.string().email().max(150).required(),
+    }),
+
+    updatePassword: Joi.object({
+      currentPassword: Joi.string().required(),
+      newPassword: Joi.string()
+        .min(config.validation.minPasswordLength)
+        .max(255)
+        .required(),
+    }),
   },
 
   // Personal
@@ -460,6 +473,8 @@ const validationMiddleware = {
   // Usuarios
   validateCreateUser: validate(schemas.usuarios.create),
   validateUpdateUser: validate(schemas.usuarios.update),
+  validateUpdateProfile: validate(schemas.usuarios.updateProfile),
+  validateUpdatePassword: validate(schemas.usuarios.updatePassword),
 
   // Personal
   validateCreatePersonal: validate(schemas.personal.create),
