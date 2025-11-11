@@ -18,8 +18,10 @@ import {
   CheckCircleIcon,
   XCircleIcon,
 } from '@heroicons/react/24/outline';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const ProfilePage = () => {
+  useDocumentTitle('Mi Perfil - COAC-UGEL');
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
 
