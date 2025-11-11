@@ -371,7 +371,7 @@ const MainLayout = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Barra de navegación superior con efecto blur */}
       <nav className="fixed top-0 left-0 right-0 z-[30] bg-white bg-opacity-70 backdrop-blur-md shadow-sm border-b border-gray-200">
-        <div className="container-fluid px-6 py-3">
+        <div className="container-fluid px-6 py-2">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
               {/* Botón de hamburguesa para móvil - No mostrar en rutas de vigilante */}

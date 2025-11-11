@@ -389,7 +389,7 @@ const VigilantePapeletasPage = () => {
   // ---------- RENDER ----------
   return (
     <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-6 py-3">
         <div className="space-y-6 max-w-7xl mx-auto">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
