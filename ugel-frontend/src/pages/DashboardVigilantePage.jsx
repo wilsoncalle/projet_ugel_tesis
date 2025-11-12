@@ -14,6 +14,7 @@ import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp';
 import { createVisitaWithOfflineSupport, registrarSalidaWithOfflineSupport, isOfflineResponse, getResponseMessage } from '../services/offlineApiService';
 import { getPendingVisitas, getPendingSalidas, getVisitasActivasCompletas } from '../utils/offlineDB';
 import { formatHora } from '../utils/dateHelpers';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 // Función para consultar RENIEC
 const consultarRENIEC = async (numeroDocumento) => {
@@ -79,13 +80,10 @@ const itemVariants = {
     },
   },
 };
-
-
 const DashboardVigilantePage = () => {
+  useDocumentTitle('Registro de Visitantes - COAC-UGEL');
   // Hook de autenticación
   const { user, isAuthenticated } = useAuth();
-  
-  
   // Estados principales del dashboard
   const [visitantesEnEspera, setVisitantesEnEspera] = useState([]);
   const [visitantesActivos, setVisitantesActivos] = useState([]);

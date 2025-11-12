@@ -4,8 +4,10 @@ import Input from '../components/Input';
 import SelectCustom from '../components/SelectCustom';
 import { personalService, areasService, tiposContratoService, tiposDocumentoService, cargosService } from '../services/api';
 import { personalFormFields, getTableColumns, transformPersonal, transformPersonalToBackend } from '../config/formFields.jsx';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const PersonalPage = () => {
+  useDocumentTitle('Gestión de Personal - COAC-UGEL');
   const [formFields, setFormFields] = useState(personalFormFields);
   const tableColumns = getTableColumns('personal');
 

@@ -12,6 +12,7 @@ import DateRangeFilter from '../components/DateRangeFilter';
 import QuickSearchBar from '../components/QuickSearchBar';
 import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { MagnifyingGlassIcon, ClockIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, UserGroupIcon, CalendarIcon, DocumentArrowDownIcon, ChevronDownIcon, DocumentTextIcon, XMarkIcon, EyeIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import { AsistenciasTotalesCard, PuntualidadCard, AusenciasCard, AreasCard, PersonalCard, PanelSeleccionEstadisticas } from '../components/personal_estadisticas';
 
@@ -49,6 +50,7 @@ const itemVariants = {
 };
 
 const PersonalAsistenciaPage = () => {
+  useDocumentTitle('Asistencia de Personal - COAC-UGEL');
   const { user } = useAuth();
   
   // Estados principales

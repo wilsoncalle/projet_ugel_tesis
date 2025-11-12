@@ -7,6 +7,7 @@ import Notification from "../components/Notification";
 import TabView from "../components/TabView";
 import { EyeIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/outline";
 import { papeletasSalidaService } from "../services/api";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { 
   PanelSeleccionEstadisticas,
   PapeletasEstadoCard,
@@ -22,6 +23,7 @@ import {
  * - Tabla simplificada: Código, Personal, Motivo, Salida Programada, Retorno Programada, Estado, Acción
  */
 const VigilantePapeletasPage = () => {
+  useDocumentTitle('Papeletas - COAC-UGEL');
   // ---------- STATE ----------
   const [loading, setLoading] = useState(true);
   const [papeletas, setPapeletas] = useState([]);

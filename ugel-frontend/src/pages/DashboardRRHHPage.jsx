@@ -17,6 +17,7 @@ import {
   ErrorDashboard 
 } from '../components/dashboard';
 import SelectCustom from '../components/SelectCustom';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 // Componentes de estadísticas de Personal
 import {
@@ -44,6 +45,7 @@ import { exportToCSV, formatDate } from '../utils/dashboardUtils';
  * Integra estadísticas de Papeletas de Salida y Asistencias del Personal
  */
 const DashboardRRHHPage = () => {
+  useDocumentTitle('Dashboard RRHH - COAC-UGEL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [periodo, setPeriodo] = useState('mes');

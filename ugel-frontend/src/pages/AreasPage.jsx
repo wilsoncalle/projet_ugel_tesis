@@ -2,8 +2,10 @@ import CatalogoPage from '../components/CatalogoPage';
 import Input from '../components/Input';
 import { areasService } from '../services/api';
 import { areasFormFields, getTableColumns, transformAreas, transformAreasToBackend } from '../config/formFields.jsx';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const AreasPage = () => {
+  useDocumentTitle('Áreas - COAC-UGEL');
   const tableColumns = getTableColumns('areas');
 
   return (

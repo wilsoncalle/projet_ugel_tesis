@@ -2,8 +2,10 @@ import CatalogoPage from '../components/CatalogoPage';
 import Input from '../components/Input';
 import { tiposDocumentoService } from '../services/api';
 import { tiposDocumentoFormFields, getTableColumns, transformTiposDocumento, transformTiposDocumentoToBackend } from '../config/formFields.jsx';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const TiposDocumentoPage = () => {
+  useDocumentTitle('Tipos de Documento - COAC-UGEL');
   const tableColumns = getTableColumns('tiposDocumento');
 
   return (

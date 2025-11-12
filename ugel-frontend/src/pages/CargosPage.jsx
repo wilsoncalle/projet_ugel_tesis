@@ -4,8 +4,10 @@ import Input from '../components/Input';
 import SelectCustom from '../components/SelectCustom';
 import { cargosService, areasService } from '../services/api';
 import { cargosFormFields, getTableColumns, transformCargos, transformCargosToBackend } from '../config/formFields.jsx';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const CargosPage = () => {
+  useDocumentTitle('Cargos - COAC-UGEL');
   const [formFields, setFormFields] = useState(cargosFormFields);
   const tableColumns = getTableColumns('cargos');
 

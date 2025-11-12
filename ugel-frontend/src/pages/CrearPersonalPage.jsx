@@ -5,8 +5,10 @@ import Button from '../components/Button';
 import FormularioGenerico from '../components/FormularioGenerico';
 import Notification from '../components/Notification';
 import { personalService, areasService, tiposContratoService } from '../services/api';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const CrearPersonalPage = () => {
+  useDocumentTitle('Crear Personal - COAC-UGEL');
   const navigate = useNavigate();
   const { id } = useParams(); // Si estamos en modo edición, tendremos un ID
   const isEditMode = !!id;

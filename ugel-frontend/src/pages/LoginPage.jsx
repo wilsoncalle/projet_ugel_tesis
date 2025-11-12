@@ -5,8 +5,10 @@ import Input from '../components/Input';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import { LockClosedIcon, UserIcon } from '@heroicons/react/24/outline';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const LoginPage = () => {
+  useDocumentTitle('Iniciar Sesión - COAC-UGEL');
   const [credentials, setCredentials] = useState({
     nombreUsuario: '',
     contrasena: '',

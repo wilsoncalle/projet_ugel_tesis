@@ -7,8 +7,10 @@ import MotivosVisitaPage from './MotivosVisitaPage';
 import TiposDocumentoPage from './TiposDocumentoPage';
 import MotivosSalidaPage from './MotivosSalidaPage';
 import PersonalPage from './PersonalPage';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const AdminCatalogosPage = () => {
+  useDocumentTitle('Catálogos de Administración - COAC-UGEL');
   const [activeTab, setActiveTab] = useState('personal');
   
   // Función para renderizar el catálogo activo

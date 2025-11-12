@@ -2,8 +2,10 @@ import CatalogoPage from '../components/CatalogoPage';
 import Input from '../components/Input';
 import { motivosSalidaService } from '../services/api';
 import { motivosSalidaFormFields, getTableColumns, transformMotivosSalida, transformMotivosSalidaToBackend } from '../config/formFields.jsx';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const MotivosSalidaPage = () => {
+  useDocumentTitle('Motivos de Salida - COAC-UGEL');
   const tableColumns = getTableColumns('motivosSalida');
 
   return (

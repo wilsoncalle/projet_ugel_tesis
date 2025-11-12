@@ -15,6 +15,7 @@ import {
   motivosSalidaService,
   personalService,
 } from "../services/api";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 
 /**
  * Vista RRHH — Papeletas de Salida
@@ -22,6 +23,7 @@ import {
  * - Modal "Nueva Papeleta": solicitante, motivo, salida programada, retorno programado, sustento
  */
 const PapeletasPage = () => {
+  useDocumentTitle('Gestión de Papeletas - COAC-UGEL');
   // ---------- STATE ----------
   const [loading, setLoading] = useState(true);
   const [papeletas, setPapeletas] = useState([]);

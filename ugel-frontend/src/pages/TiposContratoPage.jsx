@@ -2,8 +2,10 @@ import CatalogoPage from '../components/CatalogoPage';
 import Input from '../components/Input';
 import { tiposContratoService } from '../services/api';
 import { tiposContratoFormFields, getTableColumns, transformTiposContrato, transformTiposContratoToBackend } from '../config/formFields.jsx';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const TiposContratoPage = () => {
+  useDocumentTitle('Tipos de Contrato - COAC-UGEL');
   const tableColumns = getTableColumns('tiposContrato');
 
   return (

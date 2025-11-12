@@ -4,8 +4,10 @@ import Input from '../components/Input';
 import SelectCustom from '../components/SelectCustom';
 import { usuariosService, personalService } from '../services/api';
 import { usuariosFormFields, getTableColumns, transformUsuarios, transformUsuariosToBackend } from '../config/formFields.jsx';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const UsuariosPage = () => {
+  useDocumentTitle('Gestión de Usuarios - COAC-UGEL');
   const tableColumns = getTableColumns('usuarios');
 
   // Estado para guardar la lista del personal

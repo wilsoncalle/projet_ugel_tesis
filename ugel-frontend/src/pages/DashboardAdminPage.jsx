@@ -11,6 +11,7 @@ import {
 
 // Hooks
 import useDashboardData from '../hooks/useDashboardData';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 // Componentes del dashboard
 import { 
@@ -49,6 +50,7 @@ import { exportToCSV, formatDate } from '../utils/dashboardUtils';
  * Integra estadísticas de Personal y Visitas en una vista unificada
  */
 const DashboardAdminPage = () => {
+  useDocumentTitle('Dashboard Admin - COAC-UGEL');
   const {
     loading,
     error,
