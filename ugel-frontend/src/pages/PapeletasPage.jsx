@@ -441,14 +441,81 @@ const PapeletasPage = () => {
     try {
       setFormError(null);
 
+      // Validar que las fechas estén presentes
+      if (!values.fechaHoraSalidaProgramada || !values.fechaHoraRetornoProgramada) {
+        setFormError("Las fechas de salida y retorno programadas son requeridas.");
+        return;
+      }
+
+      // Asegurar formato ISO correcto para las fechas
+      let fechaSalida = values.fechaHoraSalidaProgramada;
+      let fechaRetorno = values.fechaHoraRetornoProgramada;
+
+      // Si la fecha viene en formato 'yyyy-MM-dd HH:mm', convertir a ISO
+      if (typeof fechaSalida === 'string' && fechaSalida.includes(' ')) {
+        fechaSalida = fechaSalida.replace(' ', 'T') + ':00';
+      }
+      // Si no tiene la parte de tiempo, agregarla
+      if (typeof fechaSalida === 'string' && !fechaSalida.includes('T')) {
+        fechaSalida = fechaSalida + 'T00:00:00';
+      }
+      // Asegurar formato completo ISO (agregar segundos si faltan)
+      if (typeof fechaSalida === 'string' && fechaSalida.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+        fechaSalida = fechaSalida + ':00';
+      }
+
+      if (typeof fechaRetorno === 'string' && fechaRetorno.includes(' ')) {
+        fechaRetorno = fechaRetorno.replace(' ', 'T') + ':00';
+      }
+      if (typeof fechaRetorno === 'string' && !fechaRetorno.includes('T')) {
+        fechaRetorno = fechaRetorno + 'T00:00:00';
+      }
+      if (typeof fechaRetorno === 'string' && fechaRetorno.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+        fechaRetorno = fechaRetorno + ':00';
+      }
+
+      // Validar que la fecha de retorno sea mayor que la fecha de salida
+      const fechaSalidaISO = fechaSalida.includes('T') 
+        ? fechaSalida 
+        : fechaSalida.includes(' ') 
+          ? fechaSalida.replace(' ', 'T') + ':00'
+          : fechaSalida + 'T00:00:00';
+      
+      const fechaRetornoISO = fechaRetorno.includes('T') 
+        ? fechaRetorno 
+        : fechaRetorno.includes(' ') 
+          ? fechaRetorno.replace(' ', 'T') + ':00'
+          : fechaRetorno + 'T00:00:00';
+      
+      try {
+        const fechaSalidaDate = new Date(fechaSalidaISO);
+        const fechaRetornoDate = new Date(fechaRetornoISO);
+        
+        if (isNaN(fechaSalidaDate.getTime()) || isNaN(fechaRetornoDate.getTime())) {
+          setFormError("Las fechas proporcionadas no son válidas.");
+          return;
+        }
+        
+        if (fechaRetornoDate <= fechaSalidaDate) {
+          setFormError("La fecha y hora de retorno debe ser posterior a la fecha y hora de salida.");
+          return;
+        }
+      } catch (e) {
+        console.error("Error validando fechas:", e);
+        setFormError("Error al validar las fechas. Por favor, verifica los datos.");
+        return;
+      }
+
       // Map a backend
       const payload = {
         personalSolicitanteId: Number(values.personalSolicitanteId),
         motivoSalidaId: Number(values.motivoSalidaId),
-        fechaHoraSalidaProgramada: values.fechaHoraSalidaProgramada, // ISO local from datetime-local
-        fechaHoraRetornoProgramada: values.fechaHoraRetornoProgramada,
+        fechaHoraSalidaProgramada: fechaSalida,
+        fechaHoraRetornoProgramada: fechaRetorno,
         sustentoSolicitud: values.sustentoSolicitud || null,
       };
+
+      console.log('Payload enviado:', payload);
 
       await papeletasSalidaService.create(payload);
       setNotification({
@@ -460,10 +527,56 @@ const PapeletasPage = () => {
       await loadPapeletas();
     } catch (e) {
       console.error("Error creando papeleta:", e);
-      setFormError(
-        e?.response?.data?.message ||
-          "No se pudo registrar la papeleta. Revisa los datos.",
-      );
+      console.error("Error response:", e?.response?.data);
+      console.error("Error details:", e?.response?.data?.details);
+      
+      // Extraer mensaje de error más detallado
+      let errorMessage = "No se pudo registrar la papeleta. Revisa los datos.";
+      
+      if (e?.response?.data) {
+        const errorData = e.response.data;
+        
+        // Si hay detalles de validación de Joi (formato del errorHandler)
+        if (errorData.details && Array.isArray(errorData.details)) {
+          console.log("Detalles de validación:", errorData.details);
+          const errorMessages = errorData.details.map(detail => {
+            const fieldName = detail.field || 'campo';
+            const message = detail.message || 'Error de validación';
+            const value = detail.value !== undefined ? ` (valor: ${detail.value})` : '';
+            return `${fieldName}: ${message}${value}`;
+          });
+          errorMessage = errorData.error 
+            ? `${errorData.error}\n${errorMessages.join('\n')}`
+            : errorMessages.join('\n');
+        }
+        // Si hay un mensaje directo
+        else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+        // Si hay un error general
+        else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        // Si hay un array de errores
+        else if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMessage = errorData.errors.map(err => err.message || err).join(', ');
+        }
+        // Si hay un objeto con detalles
+        else if (typeof errorData === 'object') {
+          const errorDetails = Object.entries(errorData)
+            .filter(([key]) => key !== 'success' && key !== 'statusCode' && key !== 'timestamp' && key !== 'path' && key !== 'method')
+            .map(([key, value]) => {
+              if (typeof value === 'object') {
+                return `${key}: ${JSON.stringify(value)}`;
+              }
+              return `${key}: ${value}`;
+            })
+            .join(', ');
+          errorMessage = errorDetails || errorMessage;
+        }
+      }
+      
+      setFormError(errorMessage);
     }
   };
 
@@ -531,7 +644,7 @@ const PapeletasPage = () => {
       name: "fechaHoraSalidaProgramada",
       label: "Salida Programada",
       required: true,
-      render: ({ value, onChange, error }) => {
+      render: ({ value, onChange, error, formData }) => {
         const raw = value || "";
         const [datePartRaw, timePartRaw] = raw.split("T");
         const datePart = datePartRaw || "";
@@ -563,11 +676,62 @@ const PapeletasPage = () => {
       name: "fechaHoraRetornoProgramada",
       label: "Retorno Programado",
       required: true,
-      render: ({ value, onChange, error }) => {
+      render: ({ value, onChange, error, formData }) => {
         const raw = value || "";
         const [datePartRaw, timePartRaw] = raw.split("T");
         const datePart = datePartRaw || "";
         const timePart = (timePartRaw || "").slice(0, 5);
+        
+        // Obtener la fecha de salida para establecer restricciones
+        const fechaSalidaRaw = formData?.fechaHoraSalidaProgramada || "";
+        let minDate = null;
+        let minHour = null;
+        let minMinute = null;
+        
+        if (fechaSalidaRaw) {
+          // Parsear la fecha de salida
+          const fechaSalidaISO = fechaSalidaRaw.includes('T') 
+            ? fechaSalidaRaw 
+            : fechaSalidaRaw.includes(' ') 
+              ? fechaSalidaRaw.replace(' ', 'T') + ':00'
+              : fechaSalidaRaw + 'T00:00:00';
+          
+          try {
+            const fechaSalida = new Date(fechaSalidaISO);
+            if (!isNaN(fechaSalida.getTime())) {
+              // Establecer minDate como el día siguiente si es el mismo día
+              // o el mismo día si la hora de retorno puede ser mayor
+              const hoy = new Date();
+              hoy.setHours(0, 0, 0, 0);
+              const fechaSalidaDay = new Date(fechaSalida);
+              fechaSalidaDay.setHours(0, 0, 0, 0);
+              
+              // Si la fecha de salida es hoy o futura, usar esa fecha como mínimo
+              if (fechaSalidaDay >= hoy) {
+                minDate = fechaSalida.toISOString().slice(0, 10); // 'yyyy-MM-dd'
+                
+                // Si es el mismo día, la hora mínima debe ser mayor que la hora de salida
+                const fechaRetornoDay = datePart ? new Date(datePart + 'T00:00:00') : null;
+                if (fechaRetornoDay && fechaRetornoDay.getTime() === fechaSalidaDay.getTime()) {
+                  // Mismo día: hora mínima = hora de salida + 1 minuto
+                  minHour = fechaSalida.getHours();
+                  minMinute = fechaSalida.getMinutes() + 1;
+                  if (minMinute >= 60) {
+                    minHour += 1;
+                    minMinute = 0;
+                  }
+                } else {
+                  // Día diferente: puede empezar desde minHour (7:00)
+                  minHour = 7;
+                  minMinute = 0;
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Error parseando fecha de salida:", e);
+          }
+        }
+        
         // DatePicker ahora devuelve 'yyyy-MM-dd HH:mm', necesitamos convertir a formato ISO
         const handleDate = (d) => {
           // Si d incluye hora (formato 'yyyy-MM-dd HH:mm'), convertir a formato ISO
@@ -585,7 +749,14 @@ const PapeletasPage = () => {
         return (
           <div className="w-full space-y-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Retorno Programada</label>
-            <DatePicker value={datePickerValue} onChange={handleDate} type="retorno" />
+            <DatePicker 
+              value={datePickerValue} 
+              onChange={handleDate} 
+              type="retorno"
+              minDate={minDate}
+              minHour={minHour !== null ? minHour : undefined}
+              minMinute={minMinute !== null ? minMinute : undefined}
+            />
             {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
         );

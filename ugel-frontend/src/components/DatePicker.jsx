@@ -15,6 +15,7 @@ const DatePicker = ({
   // NUEVO: Restricción de horas
   minHour = 7,   // 07:00
   maxHour = 19,  // 19:59
+  minMinute = 0, // Minuto mínimo (para restricciones dinámicas)
   // estrategia: "hide" (oculta fuera de rango) | "disable" (las muestra deshabilitadas)
   hourRenderStrategy = "disable",
   // NUEVO: Tipo de fecha para determinar hora inicial
@@ -36,13 +37,41 @@ const DatePicker = ({
   };
 
   // Helper para verificar si una hora está permitida
-  const isHourAllowed = (hour) => hour >= minHour && hour <= maxHour;
+  const isHourAllowed = (hour) => {
+    if (hour < minHour || hour > maxHour) return false;
+    // Si hay minMinute configurado y estamos en minHour, verificar minutos
+    if (minMinute > 0 && hour === minHour) {
+      // Esto se verificará en isMinuteAllowed
+      return true;
+    }
+    return true;
+  };
+  
+  // Helper para verificar si un minuto está permitido
+  const isMinuteAllowed = (hour, minute) => {
+    if (hour < minHour || hour > maxHour) return false;
+    if (hour === minHour && minMinute > 0) {
+      return minute >= minMinute;
+    }
+    return true;
+  };
 
   // Helper para ajustar la hora al rango permitido
   const clampHour = (date) => {
     const h = date.getHours();
-    if (h < minHour) return setHours(date, minHour);
-    if (h > maxHour) return setHours(date, maxHour);
+    const m = date.getMinutes();
+    if (h < minHour) {
+      const clamped = setHours(date, minHour);
+      return setMinutes(clamped, minMinute > 0 ? minMinute : 0);
+    }
+    if (h > maxHour) {
+      const clamped = setHours(date, maxHour);
+      return setMinutes(clamped, 59);
+    }
+    // Si estamos en minHour y hay minMinute, asegurar que el minuto sea válido
+    if (h === minHour && minMinute > 0 && m < minMinute) {
+      return setMinutes(date, minMinute);
+    }
     return date;
   };
 
@@ -164,19 +193,30 @@ const DatePicker = ({
         hour = now.getHours();
         minute = now.getMinutes();
       } else {
-        // Para fecha de retorno: usar minHour (07:00)
+        // Para fecha de retorno: usar minHour y minMinute si están configurados
         hour = minHour;
-        minute = 0;
+        minute = minMinute > 0 ? minMinute : 0;
       }
     } else {
-      // Si es un día futuro: siempre comenzar en minHour (07:00)
+      // Si es un día futuro: usar minHour y minMinute si están configurados
       hour = minHour;
-      minute = 0;
+      minute = minMinute > 0 ? minMinute : 0;
     }
     
     // Asegurar que la hora esté en el rango permitido
-    if (hour < minHour) hour = minHour;
-    if (hour > maxHour) hour = maxHour;
+    if (hour < minHour) {
+      hour = minHour;
+      minute = minMinute > 0 ? minMinute : 0;
+    }
+    if (hour > maxHour) {
+      hour = maxHour;
+      minute = 59;
+    }
+    
+    // Si estamos en minHour y hay minMinute, asegurar que el minuto sea válido
+    if (hour === minHour && minMinute > 0 && minute < minMinute) {
+      minute = minMinute;
+    }
     
     let newDate = setHours(day, hour);
     newDate = setMinutes(newDate, minute);
@@ -186,13 +226,23 @@ const DatePicker = ({
   
   const handleSelectHour = (hour) => {
     if (!isHourAllowed(hour)) return; // bloquea clicks fuera del rango si strategy === "disable"
-    const newDate = setHours(selectedDate, hour);
+    let newDate = setHours(selectedDate, hour);
+    // Si seleccionamos minHour y hay minMinute, ajustar el minuto
+    if (hour === minHour && minMinute > 0) {
+      const currentMinute = newDate.getMinutes();
+      if (currentMinute < minMinute) {
+        newDate = setMinutes(newDate, minMinute);
+      }
+    }
     handleSelectionChange(newDate);
   };
 
   const handleSelectMinute = (minute) => {
     // Solo permite minutos si la hora actual está permitida
-    if (!isHourAllowed(selectedDate.getHours())) return;
+    const currentHour = selectedDate.getHours();
+    if (!isHourAllowed(currentHour)) return;
+    // Verificar si el minuto está permitido según minMinute
+    if (!isMinuteAllowed(currentHour, minute)) return;
     const newDate = setMinutes(selectedDate, minute);
     handleSelectionChange(newDate);
   };
@@ -408,12 +458,19 @@ const DatePicker = ({
              <div ref={minuteListRef} onScroll={onScrollMinutes} className="overflow-y-auto max-h-[224px] pr-1 dp-no-scrollbar">
                      {minutesLoop.map((m, idx) => {
                          const isSelected = value && m === currentMinute;
+                         const disabled = !isMinuteAllowed(currentHour, m);
                          return (
                              <button
                                key={`m-${idx}`}
                                ref={idx === BLOCK_MINUTES + currentMinute ? itemMinuteRef : null}
                                onClick={() => handleSelectMinute(m)}
-                               className={`w-8 h-8 rounded-full text-sm flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}
+                               disabled={disabled}
+                               className={[
+                                 "w-8 h-8 rounded-full text-sm flex items-center justify-center transition-colors",
+                                 isSelected ? "bg-blue-600 text-white" : "hover:bg-gray-100",
+                                 disabled ? "opacity-30 cursor-not-allowed hover:bg-transparent" : ""
+                               ].join(" ")}
+                               title={disabled ? "Minuto no permitido" : undefined}
                              >
                                {m}
                              </button>
