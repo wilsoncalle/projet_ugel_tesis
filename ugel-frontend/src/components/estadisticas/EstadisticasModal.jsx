@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, FileDown, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { DocumentArrowDownIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import EstadisticasChart from './EstadisticasChart';
@@ -173,7 +174,7 @@ const EstadisticasModal = ({
     { value: 'todo', label: 'Todo el historial' }
   ];
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full h-full max-w-7xl max-h-[95vh] flex flex-col">
         {/* Cabecera del modal */}
@@ -358,7 +359,8 @@ const EstadisticasModal = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
