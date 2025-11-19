@@ -251,12 +251,12 @@ const getStats = asyncHandler(async (req, res) => {
  * Estadísticas de estado de papeletas
  */
 const getStatsEstado = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de estadísticas de estado de papeletas");
-
-  const stats = await service.getEstadisticasEstado({
+  logger.info("Solicitud de estadísticas de estado de papeletas (Mongo)");
+  
+  // Usamos mongoService
+  const stats = await mongoService.getEstadisticasEstadoExternas({
     fechaInicio: req.query.fechaInicio,
-    fechaFin: req.query.fechaFin,
-    periodo: req.query.periodo,
+    fechaFin: req.query.fechaFin
   });
 
   res.json({
@@ -271,12 +271,11 @@ const getStatsEstado = asyncHandler(async (req, res) => {
  * Estadísticas de motivos de salida
  */
 const getStatsMotivos = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de estadísticas de motivos de papeletas");
+  logger.info("Solicitud de estadísticas de motivos de papeletas (Mongo)");
 
-  const stats = await service.getEstadisticasMotivos({
+  const stats = await mongoService.getEstadisticasMotivosExternas({
     fechaInicio: req.query.fechaInicio,
-    fechaFin: req.query.fechaFin,
-    periodo: req.query.periodo,
+    fechaFin: req.query.fechaFin
   });
 
   res.json({
@@ -291,17 +290,16 @@ const getStatsMotivos = asyncHandler(async (req, res) => {
  * Estadísticas de horas autorizadas vs usadas
  */
 const getStatsHoras = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de estadísticas de horas de papeletas");
+  logger.info("Solicitud de estadísticas de horas/empleados (Mongo)");
 
-  const stats = await service.getEstadisticasHoras({
+  const stats = await mongoService.getEstadisticasHorasExternas({
     fechaInicio: req.query.fechaInicio,
-    fechaFin: req.query.fechaFin,
-    periodo: req.query.periodo,
+    fechaFin: req.query.fechaFin
   });
 
   res.json({
     success: true,
-    message: "Estadísticas de horas obtenidas exitosamente",
+    message: "Estadísticas de empleados obtenidas exitosamente",
     data: stats,
   });
 });
@@ -311,12 +309,11 @@ const getStatsHoras = asyncHandler(async (req, res) => {
  * Estadísticas de áreas y colaboradores
  */
 const getStatsAreas = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de estadísticas de áreas de papeletas");
+  logger.info("Solicitud de estadísticas de áreas (Mongo)");
 
-  const stats = await service.getEstadisticasAreas({
+  const stats = await mongoService.getEstadisticasAreasExternas({
     fechaInicio: req.query.fechaInicio,
-    fechaFin: req.query.fechaFin,
-    periodo: req.query.periodo,
+    fechaFin: req.query.fechaFin
   });
 
   res.json({
@@ -331,15 +328,8 @@ const getStatsAreas = asyncHandler(async (req, res) => {
  * Obtiene papeletas aprobadas desde MongoDB (datos externos)
  */
 const getExternas = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de papeletas externas desde MongoDB");
-
   const data = await mongoService.getPapeletasAprobadasExternas();
-
-  res.json({
-    success: true,
-    message: "Papeletas externas obtenidas exitosamente",
-    data: data,
-  });
+  res.json({ success: true, data });
 });
 
 module.exports = {
