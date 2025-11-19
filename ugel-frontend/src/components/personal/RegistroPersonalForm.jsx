@@ -356,11 +356,13 @@ const RegistroPersonalForm = forwardRef(({
     
     switch (field) {
       case 'numeroDocumento':
-        validatedValue = value.slice(0, 20);
+        // Only allow numbers
+        const numbersOnly = value.replace(/[^0-9]/g, '');
+        validatedValue = numbersOnly.slice(0, 20);
         break;
       case 'nombres':
       case 'apellidos':
-        validatedValue = value.slice(0, 150);
+        validatedValue = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g, '').slice(0, 150);
         break;
       default:
         validatedValue = value;

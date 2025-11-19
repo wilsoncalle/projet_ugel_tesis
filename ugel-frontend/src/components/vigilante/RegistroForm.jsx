@@ -89,6 +89,7 @@ const RegistroForm = forwardRef(
     const [isModalPapeletaOpen, setIsModalPapeletaOpen] = useState(false);
     const [papeletaSeleccionada, setPapeletaSeleccionada] = useState(null);
     const [loadingPapeleta, setLoadingPapeleta] = useState(false);
+    const [papeletasExternas, setPapeletasExternas] = useState([]);
 
     const { documentoInput, busquedaInput } = refs;
 
@@ -270,10 +271,11 @@ const RegistroForm = forwardRef(
 
         if (empleadosResponse.data.success) {
           // Procesar papeletas externas para cruzar información
-          const papeletasExternas = papeletasResponse?.data?.data || [];
+          const papeletasExternasData = papeletasResponse?.data?.data || [];
+          setPapeletasExternas(papeletasExternasData);
           const papeletasActivasMap = new Map();
 
-          papeletasExternas.forEach(p => {
+          papeletasExternasData.forEach(p => {
             if (p.estado === 'EN_CURSO') {
               // Usar DNI como clave principal si existe, sino nombre completo
               if (p.solicitante_numero_documento) {
@@ -524,7 +526,31 @@ const RegistroForm = forwardRef(
           setPapeletaSeleccionada(papeletaMapeada);
           setIsModalPapeletaOpen(true);
         } else {
-          console.error('No se encontró la papeleta. Respuesta:', response.data);
+          // Intentar buscar en papeletas externas (MongoDB)
+          console.log('Buscando en papeletas externas...');
+          const papeletaExterna = papeletasExternas.find(p => p.codigo_papeleta === empleadoSeleccionadoActual.detallePapeleta);
+          
+          if (papeletaExterna) {
+            console.log('Papeleta externa encontrada:', papeletaExterna);
+            const papeletaMapeada = {
+              ...papeletaExterna,
+              id: papeletaExterna._id || papeletaExterna.id, // Asegurar ID
+              personal_solicitante_nombre: `${papeletaExterna.solicitante_nombres || ''} ${papeletaExterna.solicitante_apellidos || ''}`.trim(),
+              personal_autoriza_nombre: 'Sistema Externo',
+              motivo_nombre: papeletaExterna.motivo || '-',
+              area_destino_nombre: papeletaExterna.lugar_destino || '-',
+              fecha_solicitud: papeletaExterna.fecha_solicitud || papeletaExterna.fecha_inicio,
+              fecha_salida_programada: papeletaExterna.fecha_inicio,
+              fecha_retorno_programada: papeletaExterna.fecha_fin,
+              sustento: papeletaExterna.observacion || papeletaExterna.sustento || '-',
+              estado: papeletaExterna.estado
+            };
+            
+            setPapeletaSeleccionada(papeletaMapeada);
+            setIsModalPapeletaOpen(true);
+          } else {
+            console.error('No se encontró la papeleta ni en local ni en externos.');
+          }
         }
       } catch (error) {
         console.error('Error al cargar detalles de papeleta:', error);
@@ -768,6 +794,9 @@ const RegistroForm = forwardRef(
 
       switch (field) {
         case 'numeroDocumento':
+          // Only allow numbers
+          const numbersOnly = value.replace(/[^0-9]/g, '');
+          
           // Si es DNI, limitar a 8 dígitos
           const tipoDNI = tiposDocumento.find(
             (tipo) =>
@@ -776,16 +805,16 @@ const RegistroForm = forwardRef(
           );
           
           if (tipoDNI && formVisitante.tipoDocumentoId === tipoDNI.value) {
-            validatedValue = value.slice(0, 8);
+            validatedValue = numbersOnly.slice(0, 8);
           } else {
-            validatedValue = value.slice(0, 20);
+            validatedValue = numbersOnly.slice(0, 20);
           }
           break;
         case 'nombres':
-          validatedValue = value.slice(0, 150);
+          validatedValue = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g, '').slice(0, 150);
           break;
         case 'apellidos':
-          validatedValue = value.slice(0, 150);
+          validatedValue = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g, '').slice(0, 150);
           break;
         default:
           validatedValue = value;
@@ -1683,7 +1712,8 @@ const RegistroForm = forwardRef(
                     leftIcon={
                       <PlusIcon className="h-4 w-4" />
                     }
-                    className="flex-1 bg-gray-900 hover:bg-gray-800 text-white"
+                    // className="flex-1 bg-gray-800 hover:bg-gray-900 text-white"
+                    className="flex-1"
                     size="sm"
                   >
                     Agregar Visitante
@@ -1938,7 +1968,7 @@ const RegistroForm = forwardRef(
                     visitantesEnEspera.length > 0 && (
                       <Badge
                         variant="primary"
-                        className="ml-3 bg-white text-blue-600"
+                        className="ml-2 bg-white text-blue-600"
                       >
                         {visitantesEnEspera.length}
                       </Badge>
@@ -1989,7 +2019,7 @@ const RegistroForm = forwardRef(
                       : 'bg-yellow-100 text-yellow-800'
                   }`}
                 >
-                  {val}
+                  {val === 'EN_CURSO' ? 'En Curso' : val}
                 </span>
               ),
             },

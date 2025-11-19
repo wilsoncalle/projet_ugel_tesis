@@ -1444,10 +1444,29 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
   };
 
   const handleFormChange = (field, value) => {
+    let validatedValue = value;
+    
+    // Validate document number to only accept numbers
+    if (field === 'numeroDocumento') {
+      validatedValue = value.replace(/[^0-9]/g, '');
+      
+      // If DNI, limit to 8 digits
+      const tipoDNI = tiposDocumento.find(tipo => 
+        tipo.label?.toLowerCase().includes('dni') ||
+        tipo.label?.toLowerCase().includes('documento nacional')
+      );
+      
+      if (tipoDNI && formData.tipoDocumento === tipoDNI.value) {
+        validatedValue = validatedValue.slice(0, 8);
+      } else {
+        validatedValue = validatedValue.slice(0, 20);
+      }
+    }
+    
     setFormData(prev => {
       const newFormData = {
         ...prev,
-        [field]: value
+        [field]: validatedValue || value
       };
 
       // Limpiar búsqueda solo cuando cambie número de documento (no tipo de documento)
@@ -1547,7 +1566,13 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
                              value={formData.numeroDocumento}
                              onChange={(e) => handleFormChange('numeroDocumento', e.target.value)}
                              placeholder=""
-                             maxLength="20"
+                             maxLength={(() => {
+                               const tipoDNI = tiposDocumento.find(tipo => 
+                                 tipo.label?.toLowerCase().includes('dni') ||
+                                 tipo.label?.toLowerCase().includes('documento nacional')
+                               );
+                               return (tipoDNI && formData.tipoDocumento === tipoDNI.value) ? "8" : "20";
+                             })()}
                              className="rounded-r-none border-r-0"
                              style={{ borderTopRightRadius: '0', borderBottomRightRadius: '0' }}
                            />
@@ -1621,7 +1646,7 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
           <Button
             onClick={() => onRegistrarIngreso(formData.personalSeleccionado)}
             disabled={!formData.personalSeleccionado || loading}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+            className="flex-1"
             size="lg"
           >
             <CheckCircleIcon className="h-5 w-5 inline mr-2" />

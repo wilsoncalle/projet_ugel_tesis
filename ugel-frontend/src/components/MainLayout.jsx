@@ -281,7 +281,7 @@ const RRHHSidebar = ({ papeletasActivasCount = 0, isExpanded }) => (
           } 
           label="Gestión de Personal" 
         />
-        <NavItem 
+       {/* <NavItem 
           to="/rrhh/papeletas" 
           isExpanded={isExpanded}
           icon={
@@ -296,7 +296,7 @@ const RRHHSidebar = ({ papeletasActivasCount = 0, isExpanded }) => (
           } 
           label="Gestión de Papeletas"
           badge={papeletasActivasCount > 0 ? papeletasActivasCount : null}
-        />
+        /> */}
       </ul>
     </div>
   </>
@@ -716,7 +716,7 @@ const MainLayout = () => {
         ref={mainRef}
         className={`
           main-content-edge min-h-screen transition-all duration-200 ease-out
-          ${isVigilanteRoute ? 'pt-20 ml-0' : 'pt-16'}
+          ${isVigilanteRoute ? 'pt-16 ml-0' : 'pt-16'}
         `}
         style={{
           marginLeft: !isVigilanteRoute
