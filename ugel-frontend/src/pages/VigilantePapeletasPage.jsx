@@ -55,85 +55,35 @@ const VigilantePapeletasPage = () => {
     setLoading(true);
     try {
       const { page = pagination.page, limit = pagination.limit } = opts;
-      const q = search || "";
+      const q = search.toLowerCase() || "";
 
-      // Map tabs -> estado backend
-      const estadoByTab = {
-        aprobado: "APROBADO",
-        en_curso: "EN_CURSO",
-        finalizado: "FINALIZADO",
-      };
-
-      let allData = [];
+      // Llamar DIRECTAMENTE al nuevo endpoint de MongoDB para obtener datos externos
+      const response = await papeletasSalidaService.getExternas();
       
-      if (activeTab === "todas") {
-        // Para "todas", hacer dos llamadas simples para obtener papeletas APROBADO y EN_CURSO
-        // Usar un límite razonable (100) en lugar de 1000 para evitar errores 400
-        try {
-          const [aprobadoRes, enCursoRes] = await Promise.all([
-            papeletasSalidaService.getAll({
-              page: 1,
-              limit: 100, // Límite razonable
-              q: q || "",
-              estado: "APROBADO",
-            }),
-            papeletasSalidaService.getAll({
-              page: 1,
-              limit: 100, // Límite razonable
-              q: q || "",
-              estado: "EN_CURSO",
-            }),
-          ]);
-          
-          const aprobadoData = aprobadoRes?.data?.data || aprobadoRes?.data || [];
-          const enCursoData = enCursoRes?.data?.data || enCursoRes?.data || [];
-          
-          // Combinar y ordenar por fecha de solicitud descendente
-          allData = [...(Array.isArray(aprobadoData) ? aprobadoData : []), ...(Array.isArray(enCursoData) ? enCursoData : [])]
-            .sort((a, b) => {
-              const fechaA = new Date(a.fecha_solicitud || 0);
-              const fechaB = new Date(b.fecha_solicitud || 0);
-              return fechaB - fechaA;
-            });
-        } catch (err) {
-          console.error("Error cargando papeletas para tab 'todas':", err);
-          allData = [];
-        }
-      } else {
-        // Para tabs específicos, traer solo ese estado
-        const params = {
-          page,
-          limit,
-          q: q || "",
-          estado: estadoByTab[activeTab],
-        };
+      let allData = response.data?.data || []; 
 
-        const res = await papeletasSalidaService.getAll(params);
-        allData = res?.data?.data || res?.data || [];
+      // Filtro de búsqueda en frontend
+      if (q) {
+        allData = allData.filter(p => 
+           p.codigo_papeleta?.toLowerCase().includes(q) ||
+           p.solicitante_nombres?.toLowerCase().includes(q) ||
+           p.solicitante_apellidos?.toLowerCase().includes(q)
+        );
       }
 
-      // Filtrar solo estados permitidos para vigilante según el tab
+      // Aplicar lógica de Tabs
       let filteredData = [];
       if (activeTab === "todas") {
-        filteredData = Array.isArray(allData) 
-          ? allData.filter((p) => ["APROBADO", "EN_CURSO"].includes(p.estado))
-          : [];
-      } else if (activeTab === "finalizado") {
-        filteredData = Array.isArray(allData) 
-          ? allData.filter((p) => p.estado === "FINALIZADO")
-          : [];
+          filteredData = allData;
       } else {
-        filteredData = Array.isArray(allData) 
-          ? allData.filter((p) => p.estado === estadoByTab[activeTab])
-          : [];
+          // MongoDB devuelve estado "APROBADO" (mayúscula)
+          filteredData = allData.filter(p => p.estado === activeTab.toUpperCase());
       }
 
-      // Aplicar paginación en frontend para "todas"
+      // Paginación en Frontend (MongoDB trae todo el array)
       const startIndex = (page - 1) * limit;
       const endIndex = startIndex + limit;
-      const paginatedData = activeTab === "todas" 
-        ? filteredData.slice(startIndex, endIndex)
-        : filteredData;
+      const paginatedData = filteredData.slice(startIndex, endIndex);
 
       setPapeletas(paginatedData);
       setPagination({
@@ -143,7 +93,7 @@ const VigilantePapeletasPage = () => {
         totalPages: Math.ceil(filteredData.length / limit),
       });
     } catch (e) {
-      console.error("Error cargando papeletas:", e);
+      console.error("Error cargando papeletas externas:", e);
       setPapeletas([]);
       setPagination({
         page: 1,

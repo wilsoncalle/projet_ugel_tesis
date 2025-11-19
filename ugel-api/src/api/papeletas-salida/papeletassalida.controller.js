@@ -7,6 +7,7 @@ const service = require("./papeletassalida.service");
 const personalRepository = require("../personal/personal.repository");
 const { asyncHandler, AppError } = require("../../middleware/errorHandler");
 const logger = require("../../utils/logger");
+const mongoService = require("../external/mongoService");
 
 /**
  * GET /api/papeletas-salida
@@ -325,6 +326,22 @@ const getStatsAreas = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * GET /api/papeletas-salida/externas
+ * Obtiene papeletas aprobadas desde MongoDB (datos externos)
+ */
+const getExternas = asyncHandler(async (req, res) => {
+  logger.info("Solicitud de papeletas externas desde MongoDB");
+
+  const data = await mongoService.getPapeletasAprobadasExternas();
+
+  res.json({
+    success: true,
+    message: "Papeletas externas obtenidas exitosamente",
+    data: data,
+  });
+});
+
 module.exports = {
   // listados
   getAll,
@@ -345,4 +362,7 @@ module.exports = {
   getStatsMotivos,
   getStatsHoras,
   getStatsAreas,
+
+  // externas
+  getExternas,
 };

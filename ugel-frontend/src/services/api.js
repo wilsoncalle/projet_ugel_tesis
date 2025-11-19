@@ -170,6 +170,9 @@ export const papeletasSalidaService = {
   // Detalle
   getById: (id) => api.get(`/papeletas-salida/${id}`),
 
+  // Obtener papeletas aprobadas desde MongoDB (datos externos)
+  getExternas: () => api.get('/papeletas-salida/externas'),
+
   // Crear (SOLICITADO por defecto o APROBADO si se indica)
   create: (papeleta) => {
     // Espera campos:

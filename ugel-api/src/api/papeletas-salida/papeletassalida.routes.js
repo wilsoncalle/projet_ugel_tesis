@@ -108,6 +108,18 @@ router.get(
 );
 
 /**
+ * @route   GET /api/papeletas-salida/externas
+ * @desc    Obtener papeletas aprobadas desde MongoDB (datos externos)
+ * @access  Public (sin autenticación por ahora)
+ */
+router.get(
+  "/externas",
+  // authenticateToken,
+  // requireActiveUser,
+  controller.getExternas,
+);
+
+/**
  * @route   POST /api/papeletas-salida
  * @desc    Registrar nueva papeleta (SOLICITADO por defecto o APROBADO si se indica)
  * @access  Private
