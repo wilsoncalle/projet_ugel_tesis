@@ -1,26 +1,26 @@
-// src/api/external/mongoService.js
 const mongoose = require('mongoose');
 
-// URI Proporcionada
-const MONGO_URI = "mongodb+srv://songer_db_user:jCIFFjqauOCgusyH@proyectopermisos.xyv7m4t.mongodb.net/test?retryWrites=true&w=majority&appName=ProyectoPermisos"; // Asegúrate que la DB sea 'test' o el nombre correcto tras el .net/
+// Tu URI de conexión
+const MONGO_URI = "mongodb+srv://songer_db_user:jCIFFjqauOCgusyH@proyectopermisos.xyv7m4t.mongodb.net/test?retryWrites=true&w=majority&appName=ProyectoPermisos";
 
-// Definimos esquemas simples "al vuelo" para leer los datos sin validaciones estrictas
+// Esquema de Usuario (sin cambios)
 const usuarioSchema = new mongoose.Schema({
     nombre: String,
     apellido: String,
     codigoEmpleado: String,
     areaId: mongoose.Schema.Types.ObjectId
-}, { collection: 'usuarios' }); // Nombre exacto de la colección en Mongo
+}, { collection: 'usuarios' });
 
+// Esquema de Solicitud (Corregido a 'solicituds')
 const solicitudSchema = new mongoose.Schema({
     empleadoId: mongoose.Schema.Types.ObjectId,
     tipo: String,
     fechaInicio: Date,
     fechaFin: Date,
     motivo: String,
-    estado: String,
+    estado: String, // En Mongo siempre vendrá como 'aprobado' u 'observado', etc.
     numeroSolicitud: Number
-}, { collection: 'solicituds' }); // Nombre exacto de la colección en Mongo
+}, { collection: 'solicituds' });
 
 let isConnected = false;
 
@@ -29,9 +29,35 @@ const connectMongo = async () => {
     try {
         await mongoose.connect(MONGO_URI);
         isConnected = true;
-        console.log("Conectado a MongoDB Externo");
+        console.log("Conectado a MongoDB Externo (Solo Lectura)");
     } catch (error) {
         console.error("Error conectando a Mongo:", error);
+    }
+};
+
+/**
+ * Función auxiliar para determinar el estado basado en el tiempo.
+ * Reglas:
+ * 1. Si fecha actual < fechaInicio -> APROBADO (Aún no sale)
+ * 2. Si fechaInicio <= fecha actual <= fechaFin -> EN_CURSO (Está fuera)
+ * 3. Si fecha actual > fechaFin -> FINALIZADO (Ya debió volver)
+ */
+const calcularEstadoVirtual = (fechaInicio, fechaFin, estadoOriginal) => {
+    // Si en la base de datos original NO está aprobado (ej. denegado/pendiente), respetamos eso.
+    if (estadoOriginal !== 'aprobado') {
+        return estadoOriginal.toUpperCase();
+    }
+
+    const ahora = new Date();
+    const inicio = new Date(fechaInicio);
+    const fin = new Date(fechaFin);
+
+    if (ahora < inicio) {
+        return 'APROBADO'; // Futuro
+    } else if (ahora >= inicio && ahora <= fin) {
+        return 'EN_CURSO'; // Presente
+    } else {
+        return 'FINALIZADO'; // Pasado
     }
 };
 
@@ -42,53 +68,67 @@ const getPapeletasAprobadasExternas = async () => {
     const SolicitudModel = mongoose.models.Solicitud || mongoose.model('Solicitud', solicitudSchema);
 
     try {
-        // 1. Buscar solo aprobadas
+        // 1. Traemos SOLO las que tengan estado base 'aprobado' en Mongo
         const solicitudes = await SolicitudModel.find({ estado: 'aprobado' }).lean();
 
-        // 2. Obtener los IDs de los empleados para hacer el "Join" manual
+        // 2. Obtener IDs de usuarios
         const empleadoIds = solicitudes.map(s => s.empleadoId);
         const usuarios = await UsuarioModel.find({ _id: { $in: empleadoIds } }).lean();
 
-        // Crear mapa de usuarios para acceso rápido
+        // Mapa de usuarios
         const usuariosMap = {};
         usuarios.forEach(u => {
             usuariosMap[u._id.toString()] = u;
         });
 
-        // 3. Mapear al formato que tu Frontend (TableGenerica) espera
+        // 3. Mapear y CALCULAR EL ESTADO VIRTUAL
         const dataFormateada = solicitudes.map(sol => {
             const empleado = usuariosMap[sol.empleadoId?.toString()] || {};
             
+            // Calculamos el estado dinámico aquí
+            const estadoVirtual = calcularEstadoVirtual(sol.fechaInicio, sol.fechaFin, sol.estado);
+
             return {
                 // IDs y Códigos
                 id: sol._id.toString(),
-                // Usamos numeroSolicitud o los ultimos 6 del ID si no existe
                 codigo_papeleta: sol.numeroSolicitud ? `SOL-${sol.numeroSolicitud}` : `EXT-${sol._id.toString().slice(-6)}`,
                 
-                // Datos Empleado (Mapeo de nombres para tu frontend)
+                // Datos Empleado
                 solicitante_nombres: empleado.nombre || "Desconocido",
                 solicitante_apellidos: empleado.apellido || "",
-                solicitante_numero_documento: empleado.codigoEmpleado || "", // Usamos codigo como documento
+                solicitante_numero_documento: empleado.codigoEmpleado || "", 
                 
-                // Datos de la Papeleta
-                nombre_motivo: sol.tipo, // 'Vacaciones', 'Cita médica', etc.
-                motivo_detalle: sol.motivo, // El texto largo
+                // Datos Papeleta
+                nombre_motivo: sol.tipo,
+                motivo_detalle: sol.motivo,
                 
-                // Fechas (Tu frontend espera fecha_hora_salida_programada)
+                // Fechas Programadas
                 fecha_hora_salida_programada: sol.fechaInicio,
                 fecha_hora_retorno_programada: sol.fechaFin,
                 
-                // Fechas reales (null porque son solicitudes nuevas)
-                fecha_hora_salida_real: null,
-                fecha_hora_retorno_real: null,
+                // Fechas reales: 
+                // Como es virtual, si el estado es FINALIZADO o EN_CURSO, 
+                // podríamos simular que la "salida real" fue la "programada" para llenar el dato en la tabla.
+                fecha_hora_salida_real: (estadoVirtual === 'EN_CURSO' || estadoVirtual === 'FINALIZADO') ? sol.fechaInicio : null,
+                fecha_hora_retorno_real: (estadoVirtual === 'FINALIZADO') ? sol.fechaFin : null,
 
-                // Estado (Normalizamos a mayúsculas para tu badge)
-                estado: 'APROBADO' 
+                // ESTADO DINÁMICO (Aquí sucede la magia)
+                estado: estadoVirtual
             };
         });
 
-        // Ordenar por fecha más reciente
-        return dataFormateada.sort((a, b) => new Date(b.fecha_hora_salida_programada) - new Date(a.fecha_hora_salida_programada));
+        // Ordenar: Ponemos primero las EN_CURSO (prioridad para el vigilante), luego APROBADO, luego FINALIZADO
+        const pesoEstado = { 'EN_CURSO': 1, 'APROBADO': 2, 'FINALIZADO': 3 };
+        
+        return dataFormateada.sort((a, b) => {
+            // Primero por estado
+            const pesoA = pesoEstado[a.estado] || 99;
+            const pesoB = pesoEstado[b.estado] || 99;
+            if (pesoA !== pesoB) return pesoA - pesoB;
+
+            // Luego por fecha (las más recientes primero)
+            return new Date(b.fecha_hora_salida_programada) - new Date(a.fecha_hora_salida_programada);
+        });
 
     } catch (error) {
         console.error("Error obteniendo data de Mongo:", error);

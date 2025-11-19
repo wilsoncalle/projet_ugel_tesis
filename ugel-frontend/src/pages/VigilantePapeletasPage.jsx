@@ -27,13 +27,20 @@ const VigilantePapeletasPage = () => {
   // ---------- STATE ----------
   const [loading, setLoading] = useState(true);
   const [papeletas, setPapeletas] = useState([]);
-  const [activeTab, setActiveTab] = useState("todas"); // todas | aprobado | en_curso | finalizado | estadisticas
+  const [activeTab, setActiveTab] = useState("aprobado"); // todas | aprobado | en_curso | finalizado | estadisticas
   const [search, setSearch] = useState("");
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
     total: 0,
     totalPages: 1,
+  });
+
+  const [tabCounts, setTabCounts] = useState({
+    todas: 0,
+    aprobado: 0,
+    en_curso: 0,
+    finalizado: 0,
   });
 
   // Estado para la categoría de estadísticas
@@ -61,6 +68,15 @@ const VigilantePapeletasPage = () => {
       const response = await papeletasSalidaService.getExternas();
       
       let allData = response.data?.data || []; 
+
+      // Calcular contadores con TODOS los datos (antes de filtrar por tab)
+      const newCounts = {
+        todas: allData.filter((p) => ["APROBADO", "EN_CURSO"].includes(p.estado)).length,
+        aprobado: allData.filter((p) => p.estado === "APROBADO").length,
+        en_curso: allData.filter((p) => p.estado === "EN_CURSO").length,
+        finalizado: allData.filter((p) => p.estado === "FINALIZADO").length,
+      };
+      setTabCounts(newCounts);
 
       // Filtro de búsqueda en frontend
       if (q) {
@@ -316,25 +332,11 @@ const VigilantePapeletasPage = () => {
   ];
 
   // ---------- TABS ----------
-  // Los contadores se calculan en el servidor, por ahora usamos los datos cargados
-  // En una implementación real, podrías hacer llamadas separadas para obtener los contadores
-  const counts = useMemo(() => {
-    // Para simplificar, usamos los datos actuales
-    // En producción, podrías hacer llamadas separadas para obtener los totales reales
-    const c = {
-      todas: papeletas.filter((p) => ["APROBADO", "EN_CURSO"].includes(p.estado)).length,
-      aprobado: papeletas.filter((p) => p.estado === "APROBADO").length,
-      en_curso: papeletas.filter((p) => p.estado === "EN_CURSO").length,
-      finalizado: papeletas.filter((p) => p.estado === "FINALIZADO").length,
-    };
-    return c;
-  }, [papeletas]);
-
   const tabs = [
-    { key: "todas", label: "Todas", count: counts.todas },
-    { key: "aprobado", label: "Aprobado", count: counts.aprobado },
-    { key: "en_curso", label: "En curso", count: counts.en_curso },
-    { key: "finalizado", label: "Finalizado", count: counts.finalizado },
+    // { key: "todas", label: "Todas", count: tabCounts.todas },
+    { key: "aprobado", label: "Aprobado", count: tabCounts.aprobado },
+    { key: "en_curso", label: "En curso", count: tabCounts.en_curso },
+    { key: "finalizado", label: "Finalizado", count: tabCounts.finalizado },
     { key: "estadisticas", label: "Estadísticas", icon: null, isStatsButton: true },
   ];
 

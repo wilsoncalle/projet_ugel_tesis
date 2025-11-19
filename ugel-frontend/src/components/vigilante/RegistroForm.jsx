@@ -222,11 +222,13 @@ const RegistroForm = forwardRef(
           motivosResponse,
           empleadosResponse,
           areasResponse,
+          papeletasResponse,
         ] = await Promise.all([
           tiposDocumentoService.getAll(),
           motivosVisitaService.getAll(),
           personalService.getAll(),
           areasService.getAll(),
+          papeletasSalidaService.getExternas(),
         ]);
 
         if (tiposResponse.data.success) {
@@ -267,6 +269,22 @@ const RegistroForm = forwardRef(
         }
 
         if (empleadosResponse.data.success) {
+          // Procesar papeletas externas para cruzar información
+          const papeletasExternas = papeletasResponse?.data?.data || [];
+          const papeletasActivasMap = new Map();
+
+          papeletasExternas.forEach(p => {
+            if (p.estado === 'EN_CURSO') {
+              // Usar DNI como clave principal si existe, sino nombre completo
+              if (p.solicitante_numero_documento) {
+                papeletasActivasMap.set(p.solicitante_numero_documento, p);
+              }
+              // También mapear por nombre completo para fallback
+              const nombreCompleto = `${p.solicitante_nombres} ${p.solicitante_apellidos}`.trim().toLowerCase();
+              papeletasActivasMap.set(nombreCompleto, p);
+            }
+          });
+
           const empleadosData = empleadosResponse.data.data.map(
             (empleado) => {
               const estadoBruto = (empleado.estado_presencia || '')
@@ -275,9 +293,20 @@ const RegistroForm = forwardRef(
                 .toLowerCase();
 
               let estado = 'disponible';
+              let codigoPapeleta = empleado.codigo_papeleta_activa || null;
 
+              // Verificar si tiene papeleta externa activa (MongoDB)
+              const nombreCompletoEmpleado = `${empleado.nombres} ${empleado.apellidos}`.trim().toLowerCase();
+              const papeletaExterna = 
+                papeletasActivasMap.get(empleado.numero_documento) || 
+                papeletasActivasMap.get(nombreCompletoEmpleado);
+
+              if (papeletaExterna) {
+                estado = 'permiso';
+                codigoPapeleta = papeletaExterna.codigo_papeleta;
+              }
               // Si no hay registro de asistencia, lo consideramos ausente
-              if (!empleado.estado_presencia) {
+              else if (!empleado.estado_presencia) {
                 estado = 'ausente';
               }
               // Ausente explícito
@@ -291,7 +320,7 @@ const RegistroForm = forwardRef(
               ) {
                 estado = 'ausente';
               }
-              // Permiso / comisión o papeleta activa
+              // Permiso / comisión o papeleta activa (Legacy Postgres)
               else if (
                 estadoBruto === 'permiso' ||
                 estadoBruto === 'comisión' ||
@@ -308,7 +337,7 @@ const RegistroForm = forwardRef(
                 areaNombre: empleado.area_nombre || 'Sin área',
                 cargo: empleado.cargo_nombre || 'Sin cargo',
                 estado,
-                detallePapeleta: empleado.codigo_papeleta_activa || null,
+                detallePapeleta: codigoPapeleta,
               };
             }
           );
@@ -1010,6 +1039,20 @@ const RegistroForm = forwardRef(
         return;
       }
 
+      // Validar estado del empleado antes de agregar
+      if (empleadoSeleccionadoActual) {
+        if (empleadoSeleccionadoActual.estado === 'permiso') {
+          setMensajeVisitante('No se puede registrar visita: El empleado tiene permiso de salida.');
+          setTipoMensaje('error');
+          return;
+        }
+        if (empleadoSeleccionadoActual.estado === 'ausente') {
+          setMensajeVisitante('No se puede registrar visita: El empleado está ausente.');
+          setTipoMensaje('error');
+          return;
+        }
+      }
+
       const tieneDatosVisita =
         formVisitaActivos.motivoId &&
         formVisitaActivos.lugar;
@@ -1221,6 +1264,20 @@ const RegistroForm = forwardRef(
     const handleRegisterVisit = () => {
   if (!isVisitaFormValid || !visitantesEnEspera || visitantesEnEspera.length === 0)
     return;
+
+  // Validar estado del empleado antes de registrar
+  if (empleadoSeleccionadoActual) {
+    if (empleadoSeleccionadoActual.estado === 'permiso') {
+      setMensajeEstadoEmpleado('No se puede registrar: El empleado tiene permiso de salida.');
+      setTipoMensajeEmpleado('error');
+      return;
+    }
+    if (empleadoSeleccionadoActual.estado === 'ausente') {
+      setMensajeEstadoEmpleado('No se puede registrar: El empleado está ausente.');
+      setTipoMensajeEmpleado('error');
+      return;
+    }
+  }
 
   const visitaData = {
     empleadoId: formVisitaActivos.empleadoId,
