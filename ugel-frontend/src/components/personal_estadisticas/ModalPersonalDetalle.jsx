@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   User,
@@ -95,9 +96,9 @@ const ModalPersonalDetalle = ({ isOpen, onClose, personal, periodo }) => {
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black bg-opacity-50 p-4"
       onClick={onClose}
     >
       <div
@@ -258,6 +259,8 @@ const ModalPersonalDetalle = ({ isOpen, onClose, personal, periodo }) => {
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default ModalPersonalDetalle;

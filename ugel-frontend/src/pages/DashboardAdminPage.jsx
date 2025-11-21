@@ -280,10 +280,6 @@ const DashboardAdminPage = () => {
     ? 'Historial de asistencias'
     : 'Historial de visitas';
 
-  const historialSubtitle = vistaActiva === 'personal'
-    ? 'Resumen rápido de asistencias en contexto de personal'
-    : 'Resumen rápido de visitas en contexto de visitas';
-
   const historialData = vistaActiva === 'personal'
     ? (historialAsistenciasPreview?.items || [])
     : (historialVisitasPreview?.items || []);
@@ -528,7 +524,6 @@ const DashboardAdminPage = () => {
 
           <DashboardHistorialWidget
             title={historialTitle}
-            subtitle={historialSubtitle}
             data={historialData}
             columns={historialColumns}
             onExpand={onExpandHistorial}

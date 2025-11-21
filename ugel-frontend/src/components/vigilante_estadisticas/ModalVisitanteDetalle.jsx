@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   User,
@@ -50,14 +51,14 @@ const ModalVisitanteDetalle = ({ isOpen, onClose, visitante, periodo }) => {
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-black bg-opacity-50 p-4"
       onClick={onClose}
     >
       <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col"
-          onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* --- HEADER --- */}
         <div className=" text-gray-800 p-5 flex justify-between items-start">
@@ -235,6 +236,8 @@ const ModalVisitanteDetalle = ({ isOpen, onClose, visitante, periodo }) => {
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default ModalVisitanteDetalle;
