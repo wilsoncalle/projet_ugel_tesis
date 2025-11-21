@@ -33,9 +33,9 @@ const connectMongo = async () => {
     try {
         await mongoose.connect(MONGO_URI);
         isConnected = true;
-        console.log("✅ Conectado a MongoDB para Estadísticas");
+        console.log("Conectado a MongoDB para Estadísticas");
     } catch (error) {
-        console.error("❌ Error Mongo:", error);
+        console.error("Error Mongo:", error);
     }
 };
 

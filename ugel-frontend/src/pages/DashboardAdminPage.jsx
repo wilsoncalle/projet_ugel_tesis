@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { 
   Users, 
   UserCheck, 
@@ -21,6 +21,15 @@ import {
   ErrorDashboard 
 } from '../components/dashboard';
 import SelectCustom from '../components/SelectCustom';
+
+// Widgets y modales de historial
+import DashboardHistorialWidget from '../components/dashboard/DashboardHistorialWidget';
+import HistorialVisitasModal from '../components/dashboard/modals/HistorialVisitasModal';
+import HistorialAsistenciasModal from '../components/dashboard/modals/HistorialAsistenciasModal';
+
+// Columnas reutilizables para tablas compactas
+import getHistorialVisitasColumns from '../components/vigilante/columns/historialVisitasColumns.jsx';
+import getHistorialAsistenciasColumns from '../components/personal/columns/historialAsistenciasColumns.jsx';
 
 // Componentes de estadísticas de Personal
 import {
@@ -63,7 +72,24 @@ const DashboardAdminPage = () => {
     cambiarPeriodo,
     cambiarVista,
     refresh,
+    historialVisitasPreview,
+    historialAsistenciasPreview,
   } = useDashboardData();
+
+  // Estado para modales de historial
+  const [showVisitasModal, setShowVisitasModal] = useState(false);
+  const [showAsistenciasModal, setShowAsistenciasModal] = useState(false);
+
+  // Columnas para widgets compactos (sin columna de acciones)
+  const visitasColumnsDashboard = useMemo(
+    () => getHistorialVisitasColumns(),
+    []
+  );
+
+  const asistenciasColumnsDashboard = useMemo(
+    () => getHistorialAsistenciasColumns(),
+    []
+  );
 
   /**
    * Maneja la exportación de datos
@@ -230,6 +256,31 @@ const DashboardAdminPage = () => {
       });
   };
 
+  // Configuración del widget de historial según la vista activa
+  const historialTitle = vistaActiva === 'personal'
+    ? 'Historial de asistencias'
+    : 'Historial de visitas';
+
+  const historialSubtitle = vistaActiva === 'personal'
+    ? 'Resumen rápido de asistencias en contexto de personal'
+    : 'Resumen rápido de visitas en contexto de visitas';
+
+  const historialData = vistaActiva === 'personal'
+    ? (historialAsistenciasPreview?.items || [])
+    : (historialVisitasPreview?.items || []);
+
+  const historialColumns = vistaActiva === 'personal'
+    ? asistenciasColumnsDashboard
+    : visitasColumnsDashboard;
+
+  const onExpandHistorial = vistaActiva === 'personal'
+    ? () => setShowAsistenciasModal(true)
+    : () => setShowVisitasModal(true);
+
+  const emptyMessageHistorial = vistaActiva === 'personal'
+    ? 'No hay asistencias registradas para el período seleccionado'
+    : 'No hay visitas registradas para el período seleccionado';
+
   // Mostrar estado de carga
   if (loading) {
     return (
@@ -254,110 +305,14 @@ const DashboardAdminPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-radial from-blue-50 to-slate-50 p-0">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+      <div className="max-w-[1600px] mx-auto space-y-4">
         
         {/* Header del Dashboard con Filtros Integrados */}
-        <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 p-6 border border-slate-100 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            
-            {/* Título */}
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">
-                Dashboard Administrativo
-              </h1>
-              <p className="text-sm text-slate-500">
-                Vista unificada de estadísticas de personal y visitas
-              </p>
-            </div>
-
-            {/* Controles */}
-            <div className="flex flex-wrap items-center gap-3">
-              
-              {/* Selector de período */}
-              <div className="w-full sm:w-56">
-                <SelectCustom
-                  value={[
-                    { value: 'hoy', label: 'Hoy' },
-                    { value: 'semana', label: 'Esta Semana' },
-                    { value: 'mes', label: 'Este Mes' },
-                    { value: 'anio', label: 'Este Año' },
-                    { value: 'todo', label: 'Todo el Historial' }
-                  ].find(op => op.value === periodo)}
-                  onChange={(selectedOption) => cambiarPeriodo(selectedOption?.value || 'mes')}
-                  options={[
-                    { value: 'hoy', label: 'Hoy' },
-                    { value: 'semana', label: 'Esta Semana' },
-                    { value: 'mes', label: 'Este Mes' },
-                    { value: 'anio', label: 'Este Año' },
-                    { value: 'todo', label: 'Todo el Historial' }
-                  ]}
-                  placeholder="Seleccionar período"
-                  isClearable={false}
-                />
-              </div>
-
-              {/* Botón de refrescar */}
-           {/*   <button
-                onClick={refresh}
-                disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Actualizar datos"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Actualizar</span>
-              </button>
-
-              {/* Botón de exportar */}
-          {/*    <button
-                onClick={handleExport}
-                disabled={loading}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Exportar datos"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Exportar</span>
-              </button> */}
-            </div>
-          </div>
-        </div>
-
-        {/* KPIs Principales - Siempre visibles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KPICard
-            title="Total Asistencias"
-            value={kpis.totalAsistencias}
-            change={comparacion.asistenciasCambio}
-            icon={UserCheck}
-            colorScheme="blue"
-            subtitle="Personal registrado"
-          />
-          
-          <KPICard
-            title="Total Visitas"
-            value={kpis.totalVisitas}
-            change={comparacion.visitasCambio}
-            icon={Users}
-            colorScheme="green"
-            subtitle="Visitantes ingresados"
-          />
-          
-          <KPICard
-            title="Puntualidad"
-            value={kpis.puntualidad}
-            change={comparacion.puntualidadCambio}
-            icon={Clock}
-            colorScheme="purple"
-            subtitle="Asistencias a tiempo"
-          />
-          
-          <KPICard
-            title="Visitantes Frecuentes"
-            value={kpis.visitantesFrecuentes}
-            change={comparacion.visitantesCambio}
-            icon={TrendingUp}
-            colorScheme="orange"
-            subtitle="Visitantes recurrentes"
-          />
+        <div className="px-0 pt-2">
+          {/* Título */}
+          <h1 className="text-2xl font-bold text-slate-800">
+            Dashboard Administrativo
+          </h1>
         </div>
 
         {/* Toggle de Vista */}
@@ -366,11 +321,61 @@ const DashboardAdminPage = () => {
           onCambiarVista={cambiarVista}
         />
 
+        {/* KPIs Principales - Siempre visibles */}
+        <div className="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <KPICard
+              title="Total Asistencias"
+              value={kpis.totalAsistencias}
+              change={comparacion.asistenciasCambio}
+              icon={UserCheck}
+              colorScheme="blue"
+              subtitle="Personal registrado"
+            />
+            
+            <KPICard
+              title="Total Visitas"
+              value={kpis.totalVisitas}
+              change={comparacion.visitasCambio}
+              icon={Users}
+              colorScheme="green"
+              subtitle="Visitantes ingresados"
+            />
+            
+            <KPICard
+              title="Puntualidad"
+              value={kpis.puntualidad}
+              change={comparacion.puntualidadCambio}
+              icon={Clock}
+              colorScheme="purple"
+              subtitle="Asistencias a tiempo"
+            />
+            
+            <KPICard
+              title="Visitantes Frecuentes"
+              value={kpis.visitantesFrecuentes}
+              change={comparacion.visitantesCambio}
+              icon={TrendingUp}
+              colorScheme="orange"
+              subtitle="Visitantes recurrentes"
+            />
+          </div>
+
+          <DashboardHistorialWidget
+            title={historialTitle}
+            subtitle={historialSubtitle}
+            data={historialData}
+            columns={historialColumns}
+            onExpand={onExpandHistorial}
+            emptyMessage={emptyMessageHistorial}
+          />
+        </div>
+
         {/* Contenido según Vista Activa */}
         {vistaActiva === 'personal' ? (
           <>
             {/* Sección de Personal */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               
               {/* Título de sección */}
               <div className="flex items-center gap-3">
@@ -380,11 +385,13 @@ const DashboardAdminPage = () => {
                 </h2>
               </div>
 
-              {/* Asistencias Totales - Ocupa todo el ancho con layout interno */}
-              <AsistenciasTotalesCard />
+              {/* Asistencias Totales + Historial de visitas (preview) */}
+              <div>
+                <AsistenciasTotalesCard />
+              </div>
 
               {/* Grid de tarjetas de Personal */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 
                 {/* Puntualidad y Tardanzas */}
                 <PuntualidadCard />
@@ -408,7 +415,7 @@ const DashboardAdminPage = () => {
         ) : (
           <>
             {/* Sección de Visitas */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               
               {/* Título de sección */}
               <div className="flex items-center gap-3">
@@ -419,9 +426,9 @@ const DashboardAdminPage = () => {
               </div>
 
               {/* Grid de tarjetas de Visitas */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 
-                {/* Visitas Totales */}
+                {/* Visitas Totales + Historial de asistencias (preview) */}
                 <div className="lg:col-span-2">
                   <VisitasTotalesCard />
                 </div>
@@ -446,6 +453,16 @@ const DashboardAdminPage = () => {
             </div>
           </>
         )}
+
+        {/* Modales de historial completos */}
+        <HistorialVisitasModal
+          isOpen={showVisitasModal}
+          onClose={() => setShowVisitasModal(false)}
+        />
+        <HistorialAsistenciasModal
+          isOpen={showAsistenciasModal}
+          onClose={() => setShowAsistenciasModal(false)}
+        />
       </div>
     </div>
   );

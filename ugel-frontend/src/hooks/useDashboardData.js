@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { visitasService, asistenciaPersonalService } from '../services/api';
 
 /**
  * Combina flujos diarios de asistencias, inasistencias y permisos
@@ -77,6 +78,19 @@ const useDashboardData = () => {
     porArea: [],
   });
 
+  // Preview de historiales para el dashboard (10 registros más recientes)
+  const [historialVisitasPreview, setHistorialVisitasPreview] = useState({
+    items: [],
+    total: 0,
+    pagination: null,
+  });
+
+  const [historialAsistenciasPreview, setHistorialAsistenciasPreview] = useState({
+    items: [],
+    total: 0,
+    pagination: null,
+  });
+
   // Estados para comparación de períodos
   const [comparacion, setComparacion] = useState({
     asistenciasCambio: 0,
@@ -93,7 +107,7 @@ const useDashboardData = () => {
       const token = localStorage.getItem('token');
       
       // Fetch paralelo de todas las estadísticas de personal
-      const [totalesRes, ausenciasRes, puntualidadRes, areasRes] = await Promise.all([
+      const [totalesRes, ausenciasRes, puntualidadRes, areasRes, historialRes] = await Promise.all([
         fetch(`/api/asistencia-personal/estadisticas/totales?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
@@ -106,12 +120,17 @@ const useDashboardData = () => {
         fetch(`/api/asistencia-personal/estadisticas/areas?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
+        asistenciaPersonalService.getAll({
+          page: 1,
+          limit: 10,
+        }),
       ]);
 
       const totales = await totalesRes.json();
       const ausencias = await ausenciasRes.json();
       const puntualidad = await puntualidadRes.json();
       const areas = await areasRes.json();
+      const historial = historialRes.data;
 
       // Procesar datos - Nueva estructura con asistencias/inasistencias/permisos
       const asistenciasData = totales.data?.asistencias || {};
@@ -153,6 +172,18 @@ const useDashboardData = () => {
         })),
       });
 
+      // Preview de historial de asistencias (primeras 10 filas según backend)
+      if (historial && historial.success) {
+        const items = historial.data || [];
+        setHistorialAsistenciasPreview({
+          items,
+          total: historial.pagination?.total || items.length || 0,
+          pagination: historial.pagination || null,
+        });
+      } else {
+        setHistorialAsistenciasPreview({ items: [], total: 0, pagination: null });
+      }
+
     } catch (err) {
       console.error('Error al obtener datos de personal:', err);
       throw err;
@@ -167,7 +198,7 @@ const useDashboardData = () => {
       const token = localStorage.getItem('token');
       
       // Fetch paralelo de todas las estadísticas de visitas
-      const [totalesRes, motivoRes, areaRes, frecuentesRes] = await Promise.all([
+      const [totalesRes, motivoRes, areaRes, frecuentesRes, historialRes] = await Promise.all([
         fetch(`/api/visitas/totales?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
@@ -180,12 +211,17 @@ const useDashboardData = () => {
         fetch(`/api/visitas/visitantes-frecuentes?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
+        visitasService.getAll({
+          page: 1,
+          limit: 10,
+        }),
       ]);
 
       const totales = await totalesRes.json();
       const motivo = await motivoRes.json();
       const area = await areaRes.json();
       const frecuentes = await frecuentesRes.json();
+      const historial = historialRes.data;
 
       const flujoDiario = totales.data?.flujoDiario || [];
       
@@ -202,6 +238,18 @@ const useDashboardData = () => {
         porMotivo: motivo.data || [],
         porArea: area.data || [],
       });
+
+      // Preview de historial de visitas (primeras 10 filas según backend)
+      if (historial && historial.success) {
+        const items = historial.data || [];
+        setHistorialVisitasPreview({
+          items,
+          total: historial.pagination?.total || items.length || 0,
+          pagination: historial.pagination || null,
+        });
+      } else {
+        setHistorialVisitasPreview({ items: [], total: 0, pagination: null });
+      }
 
     } catch (err) {
       console.error('Error al obtener datos de visitas:', err);
@@ -285,6 +333,8 @@ const useDashboardData = () => {
     datosPersonal,
     datosVisitas,
     comparacion,
+    historialVisitasPreview,
+    historialAsistenciasPreview,
     
     // Funciones
     cambiarPeriodo,
