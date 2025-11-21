@@ -240,6 +240,8 @@ const getHistorialVisitasColumns = ({ handleOpenModal } = {}) => {
       minWidth: '80px',
       maxWidth: '80px',
       width: '80px',
+      className: 'text-center',
+      cellClassName: 'text-center',
       sticky: 'right',
       stickyOffset: '0px',
       render: (row) => {

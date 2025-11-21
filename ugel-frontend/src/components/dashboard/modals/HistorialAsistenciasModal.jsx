@@ -192,7 +192,7 @@ const HistorialAsistenciasModal = ({ isOpen, onClose, initialFilters = {} }) => 
                       aria-label="Cerrar"
                       title="Cerrar"
                     >
-                      <Maximize2 className="h-5 w-5" />
+                      <XMarkIcon className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -293,7 +293,14 @@ const HistorialAsistenciasModal = ({ isOpen, onClose, initialFilters = {} }) => 
                     {
                       key: 'personal_area_nombre',
                       label: 'Área',
-                      render: (value) => value || 'Sin área asignada',
+                      render: (value, dataRow) => {
+                        const area =
+                          value ||
+                          dataRow?.personal_area_nombre ||
+                          dataRow?.area_nombre ||
+                          dataRow?.area;
+                        return area || 'Sin área asignada';
+                      },
                     },
                     {
                       key: 'estado_presencia',

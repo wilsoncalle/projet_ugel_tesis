@@ -51,6 +51,9 @@ import {
   CalendarioVisitas,
 } from '../components/vigilante_estadisticas';
 
+// Otros componentes
+import ModalDetalles from '../components/ModalDetalles';
+
 // Utilidades
 import { exportToCSV, formatDate } from '../utils/dashboardUtils';
 
@@ -80,14 +83,30 @@ const DashboardAdminPage = () => {
   const [showVisitasModal, setShowVisitasModal] = useState(false);
   const [showAsistenciasModal, setShowAsistenciasModal] = useState(false);
 
-  // Columnas para widgets compactos (sin columna de acciones)
+  // Estado para detalles desde widgets de historial
+  const [selectedHistorialItem, setSelectedHistorialItem] = useState(null);
+  const [selectedHistorialTipo, setSelectedHistorialTipo] = useState(null);
+
+  // Columnas para widgets compactos (con columna de acciones "Ver")
   const visitasColumnsDashboard = useMemo(
-    () => getHistorialVisitasColumns(),
+    () =>
+      getHistorialVisitasColumns({
+        handleOpenModal: (row) => {
+          setSelectedHistorialTipo('visita');
+          setSelectedHistorialItem(row);
+        },
+      }),
     []
   );
 
   const asistenciasColumnsDashboard = useMemo(
-    () => getHistorialAsistenciasColumns(),
+    () =>
+      getHistorialAsistenciasColumns({
+        handleOpenModal: (row) => {
+          setSelectedHistorialTipo('asistencia');
+          setSelectedHistorialItem(row);
+        },
+      }),
     []
   );
 
@@ -281,6 +300,152 @@ const DashboardAdminPage = () => {
     ? 'No hay asistencias registradas para el período seleccionado'
     : 'No hay visitas registradas para el período seleccionado';
 
+  // Fields para ModalDetalles de VISITAS (mismo diseño que VisitantesTabla e HistorialVisitasModal)
+  const visitaDetalleFields = [
+    {
+      key: 'visitante_nombres',
+      label: 'Visitante',
+      render: (value, dataRow) =>
+        `${dataRow.visitante_nombres || ''} ${
+          dataRow.visitante_apellidos || ''
+        }`.trim(),
+    },
+    {
+      key: 'numero_documento',
+      label: 'Documento',
+      render: (value, dataRow) =>
+        `${dataRow.tipo_documento_codigo || 'DNI'}: ${value || ''}`,
+    },
+    {
+      key: 'personal_nombres',
+      label: 'Empleado Visitado',
+      render: (value, dataRow) =>
+        `${dataRow.personal_nombres || ''} ${
+          dataRow.personal_apellidos || ''
+        }`.trim(),
+    },
+    {
+      key: 'personal_cargo',
+      label: 'Cargo del Empleado',
+      render: (value) => value || 'Sin cargo asignado',
+    },
+    {
+      key: 'nombre_motivo',
+      label: 'Motivo de Visita',
+      render: (value) => value || 'No especificado',
+    },
+    {
+      key: 'nombre_area',
+      label: 'Área de Destino',
+      render: (value) => value || 'No especificada',
+    },
+    {
+      key: 'fecha_ingreso',
+      label: 'Fecha y Hora de Ingreso',
+      render: (value) => {
+        if (!value) return 'No especificada';
+        try {
+          const fecha = new Date(value);
+          return fecha.toLocaleString('es-PE');
+        } catch {
+          return value;
+        }
+      },
+    },
+    {
+      key: 'fecha_salida',
+      label: 'Fecha y Hora de Salida',
+      render: (value) => {
+        if (!value) return 'Visita activa';
+        try {
+          const fecha = new Date(value);
+          return fecha.toLocaleString('es-PE');
+        } catch {
+          return value;
+        }
+      },
+    },
+    {
+      key: 'usuario_ingreso',
+      label: 'Registrado por',
+      render: (value) => value || 'No especificado',
+    },
+  ];
+
+  // Fields para ModalDetalles de ASISTENCIAS (mismo diseño que PersonalAsistenciaPage e HistorialAsistenciasModal)
+  const asistenciaDetalleFields = [
+    {
+      key: 'personal_nombres',
+      label: 'Personal',
+      render: (value, dataRow) =>
+        `${dataRow.personal_nombres || ''} ${
+          dataRow.personal_apellidos || ''
+        }`.trim(),
+    },
+    {
+      key: 'personal_numero_documento',
+      label: 'Documento',
+      render: (value, dataRow) =>
+        `${dataRow.personal_tipo_documento || 'DNI'}: ${value || ''}`,
+    },
+    {
+      key: 'personal_cargo_nombre',
+      label: 'Cargo',
+      render: (value) => value || 'Sin cargo asignado',
+    },
+    {
+      key: 'personal_area_nombre',
+      label: 'Área',
+      render: (value, dataRow) => {
+        const area =
+          value ||
+          dataRow?.personal_area_nombre ||
+          dataRow?.area_nombre ||
+          dataRow?.area;
+        return area || 'Sin área asignada';
+      },
+    },
+    {
+      key: 'estado_presencia',
+      label: 'Estado de Presencia',
+      render: (value) => value || 'No especificado',
+    },
+    {
+      key: 'fecha',
+      label: 'Fecha',
+      render: (value) => {
+        if (!value) return 'No especificada';
+        try {
+          const fecha = new Date(value);
+          return fecha.toLocaleDateString('es-PE');
+        } catch {
+          return value;
+        }
+      },
+    },
+    {
+      key: 'hora_ingreso',
+      label: 'Hora de Ingreso',
+      render: (value) => {
+        if (!value) return 'No registrada';
+        return value.substring(0, 5);
+      },
+    },
+    {
+      key: 'hora_salida',
+      label: 'Hora de Salida',
+      render: (value) => {
+        if (!value) return 'Sin salida registrada';
+        return value.substring(0, 5);
+      },
+    },
+    {
+      key: 'usuario_registro',
+      label: 'Registrado por',
+      render: (value) => value || 'No especificado',
+    },
+  ];
+
   // Mostrar estado de carga
   if (loading) {
     return (
@@ -462,6 +627,31 @@ const DashboardAdminPage = () => {
         <HistorialAsistenciasModal
           isOpen={showAsistenciasModal}
           onClose={() => setShowAsistenciasModal(false)}
+        />
+
+        {/* Modal de detalles desde widgets de historial */}
+        <ModalDetalles
+          isOpen={!!selectedHistorialItem}
+          onClose={() => {
+            setSelectedHistorialItem(null);
+            setSelectedHistorialTipo(null);
+          }}
+          data={selectedHistorialItem || {}}
+          title={
+            selectedHistorialTipo === 'visita'
+              ? 'Detalles de Visita'
+              : selectedHistorialTipo === 'asistencia'
+              ? 'Detalles de Asistencia'
+              : 'Detalles'
+          }
+          size="lg"
+          fields={
+            selectedHistorialTipo === 'visita'
+              ? visitaDetalleFields
+              : selectedHistorialTipo === 'asistencia'
+              ? asistenciaDetalleFields
+              : []
+          }
         />
       </div>
     </div>
