@@ -381,20 +381,11 @@ const MainLayout = () => {
   useEffect(() => {
     const cargarPapeletasActivas = async () => {
       try {
-        const aprobadasResponse = await papeletasSalidaService.getAll({
-          estado: 'APROBADO',
-          page: 1,
-          limit: 1
-        });
+        const response = await papeletasSalidaService.getExternas();
+        const allPapeletas = response.data?.data || [];
         
-        const enCursoResponse = await papeletasSalidaService.getAll({
-          estado: 'EN_CURSO',
-          page: 1,
-          limit: 1
-        });
-
-        const totalAprobadas = aprobadasResponse.data?.pagination?.total || 0;
-        const totalEnCurso = enCursoResponse.data?.pagination?.total || 0;
+        const totalAprobadas = allPapeletas.filter(p => p.estado === 'APROBADO').length;
+        const totalEnCurso = allPapeletas.filter(p => p.estado === 'EN_CURSO').length;
         const total = totalAprobadas + totalEnCurso;
         
         setPapeletasActivasCount(total);

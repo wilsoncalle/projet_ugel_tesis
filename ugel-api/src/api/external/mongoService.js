@@ -242,11 +242,15 @@ const getEstadisticasHorasExternas = async ({ fechaInicio, fechaFin }) => {
     };
 };
 
-// Para el endpoint de visualización del vigilante (mantener)
-const getPapeletasAprobadasExternas = async () => {
+// Para el endpoint de visualización del vigilante (con filtro de fechas)
+const getPapeletasAprobadasExternas = async ({ fechaInicio, fechaFin } = {}) => {
     const data = await getBaseData();
+    
+    // 🔹 aplicar filtro por rango usando helper ya existente
+    const dataFiltrada = filtrarPorRangoFecha(data, fechaInicio, fechaFin);
+
     // Reutilizar la lógica de formateo anterior pero usando getBaseData que ya tiene estadoVirtual
-    return data.map(sol => ({
+    return dataFiltrada.map(sol => ({
         id: sol._id.toString(),
         codigo_papeleta: sol.numeroSolicitud ? `SOL-${sol.numeroSolicitud}` : `EXT-${sol._id.toString().slice(-6)}`,
         solicitante_nombres: sol.nombreEmpleado.split(' ')[0], // Hack simple nombre

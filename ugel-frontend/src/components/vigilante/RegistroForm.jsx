@@ -501,56 +501,41 @@ const RegistroForm = forwardRef(
       try {
         console.log('Buscando papeleta con código:', empleadoSeleccionadoActual.detallePapeleta);
         
-        // Buscar papeleta por código
-        const response = await papeletasSalidaService.getAll({
-          q: empleadoSeleccionadoActual.detallePapeleta,
-          limit: 1
-        });
+        // Buscar en papeletas externas (MongoDB)
+        // Si papeletasExternas está vacío, podríamos intentar recargarlo, pero asumimos que se cargó al inicio
+        let papeletaExterna = papeletasExternas.find(p => p.codigo_papeleta === empleadoSeleccionadoActual.detallePapeleta);
+        
+        // Si no se encuentra en el estado actual, intentar recargar externas por si acaso
+        if (!papeletaExterna) {
+           console.log('No encontrada en cache, recargando externas...');
+           const response = await papeletasSalidaService.getExternas();
+           if (response.data.success) {
+             const freshData = response.data.data || [];
+             setPapeletasExternas(freshData);
+             papeletaExterna = freshData.find(p => p.codigo_papeleta === empleadoSeleccionadoActual.detallePapeleta);
+           }
+        }
 
-        console.log('Respuesta completa:', response.data);
-
-        if (response.data.success && response.data.data?.length > 0) {
-          const papeleta = response.data.data[0];
-          console.log('Papeleta encontrada:', papeleta);
-          
+        if (papeletaExterna) {
+          console.log('Papeleta externa encontrada:', papeletaExterna);
           const papeletaMapeada = {
-            ...papeleta,
-            personal_solicitante_nombre: `${papeleta.solicitante_nombres || ''} ${papeleta.solicitante_apellidos || ''}`.trim(),
-            personal_autoriza_nombre: papeleta.autoriza_nombres && papeleta.autoriza_apellidos 
-              ? `${papeleta.autoriza_nombres} ${papeleta.autoriza_apellidos}`.trim()
-              : '-',
-            motivo_nombre: papeleta.nombre_motivo || '-',
-            area_destino_nombre: '-',
+            ...papeletaExterna,
+            id: papeletaExterna._id || papeletaExterna.id, // Asegurar ID
+            personal_solicitante_nombre: `${papeletaExterna.solicitante_nombres || ''} ${papeletaExterna.solicitante_apellidos || ''}`.trim(),
+            personal_autoriza_nombre: 'Sistema Externo',
+            motivo_nombre: papeletaExterna.motivo || '-',
+            area_destino_nombre: papeletaExterna.lugar_destino || '-',
+            fecha_solicitud: papeletaExterna.fecha_solicitud || papeletaExterna.fecha_inicio,
+            fecha_salida_programada: papeletaExterna.fecha_inicio,
+            fecha_retorno_programada: papeletaExterna.fecha_fin,
+            sustento: papeletaExterna.observacion || papeletaExterna.sustento || '-',
+            estado: papeletaExterna.estado
           };
           
           setPapeletaSeleccionada(papeletaMapeada);
           setIsModalPapeletaOpen(true);
         } else {
-          // Intentar buscar en papeletas externas (MongoDB)
-          console.log('Buscando en papeletas externas...');
-          const papeletaExterna = papeletasExternas.find(p => p.codigo_papeleta === empleadoSeleccionadoActual.detallePapeleta);
-          
-          if (papeletaExterna) {
-            console.log('Papeleta externa encontrada:', papeletaExterna);
-            const papeletaMapeada = {
-              ...papeletaExterna,
-              id: papeletaExterna._id || papeletaExterna.id, // Asegurar ID
-              personal_solicitante_nombre: `${papeletaExterna.solicitante_nombres || ''} ${papeletaExterna.solicitante_apellidos || ''}`.trim(),
-              personal_autoriza_nombre: 'Sistema Externo',
-              motivo_nombre: papeletaExterna.motivo || '-',
-              area_destino_nombre: papeletaExterna.lugar_destino || '-',
-              fecha_solicitud: papeletaExterna.fecha_solicitud || papeletaExterna.fecha_inicio,
-              fecha_salida_programada: papeletaExterna.fecha_inicio,
-              fecha_retorno_programada: papeletaExterna.fecha_fin,
-              sustento: papeletaExterna.observacion || papeletaExterna.sustento || '-',
-              estado: papeletaExterna.estado
-            };
-            
-            setPapeletaSeleccionada(papeletaMapeada);
-            setIsModalPapeletaOpen(true);
-          } else {
-            console.error('No se encontró la papeleta ni en local ni en externos.');
-          }
+          console.error('No se encontró la papeleta.');
         }
       } catch (error) {
         console.error('Error al cargar detalles de papeleta:', error);

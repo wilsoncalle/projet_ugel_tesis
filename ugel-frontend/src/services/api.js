@@ -128,70 +128,11 @@ export const personalService = {
 };
 
 export const papeletasSalidaService = {
-  // Listado con filtros y paginación
-  getAll: (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.q) params.append('q', filters.q);
-    if (filters.estado) params.append('estado', filters.estado); // SOLICITADO|APROBADO|RECHAZADO|EN_CURSO|FINALIZADO|CANCELADO
-    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
-    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
-    if (filters.campoFecha) params.append('campoFecha', filters.campoFecha); // solicitud|programada|salida_real|retorno_real
-    if (filters.motivoSalidaId) params.append('motivoSalidaId', filters.motivoSalidaId);
-    if (filters.solicitanteId) params.append('solicitanteId', filters.solicitanteId);
-    if (filters.autorizaId) params.append('autorizaId', filters.autorizaId);
-    if (filters.areaDestinoId) params.append('areaDestinoId', filters.areaDestinoId);
-    if (filters.orderBy) params.append('orderBy', filters.orderBy);
-    if (filters.orderDir) params.append('orderDir', filters.orderDir);
-    if (filters.page) params.append('page', filters.page);
-    if (filters.limit) params.append('limit', filters.limit);
-    return api.get(`/papeletas-salida?${params.toString()}`);
-  },
-
-  // Pendientes para garita (APROBADO/EN_CURSO sin retorno)
-  getPendientes: (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.q) params.append('q', filters.q);
-    if (filters.areaDestinoId) params.append('areaDestinoId', filters.areaDestinoId);
-    if (filters.motivoSalidaId) params.append('motivoSalidaId', filters.motivoSalidaId);
-    if (filters.page) params.append('page', filters.page);
-    if (filters.limit) params.append('limit', filters.limit);
-    return api.get(`/papeletas-salida/pendientes?${params.toString()}`);
-  },
-
-  // Estadísticas
-  getEstadisticas: ({ fechaInicio, fechaFin, campoFecha } = {}) => {
-    const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    if (campoFecha) params.append('campoFecha', campoFecha); // solicitud|programada|salida_real|retorno_real
-    return api.get(`/papeletas-salida/estadisticas?${params.toString()}`);
-  },
-
-  // Detalle
-  getById: (id) => api.get(`/papeletas-salida/${id}`),
-
   // Obtener papeletas aprobadas desde MongoDB (datos externos)
-  getExternas: () => api.get('/papeletas-salida/externas'),
+  getExternas: (params = {}) => api.get('/papeletas-salida/externas', { params }),
 
-  // Crear (SOLICITADO por defecto o APROBADO si se indica)
-  create: (papeleta) => {
-    // Espera campos:
-    // personalSolicitanteId, motivoSalidaId, sustentoSolicitud,
-    // fechaHoraSalidaProgramada, fechaHoraRetornoProgramada,
-    // crearComoAprobada?, personalAutorizaId?, observacionAutorizacion?
-    return api.post('/papeletas-salida', papeleta);
-  },
-  decidir: (id, { accion, personalAutorizaId, observacionAutorizacion } = {}) =>
-    api.put(`/papeletas-salida/${id}/decidir`, {
-      accion, // 'APROBAR' | 'RECHAZAR'
-      personalAutorizaId,
-      observacionAutorizacion,
-    }),
   registrarSalida: (id) => api.put(`/papeletas-salida/${id}/salida`),
   registrarRetorno: (id) => api.put(`/papeletas-salida/${id}/retorno`),
-  cancelar: (id, { observacionAutorizacion } = {}) =>
-    api.put(`/papeletas-salida/${id}/cancelar`, { observacionAutorizacion }),
-  delete: (id) => api.delete(`/papeletas-salida/${id}`),
 };
 
 

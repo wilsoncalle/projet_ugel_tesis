@@ -328,7 +328,11 @@ const getStatsAreas = asyncHandler(async (req, res) => {
  * Obtiene papeletas aprobadas desde MongoDB (datos externos)
  */
 const getExternas = asyncHandler(async (req, res) => {
-  const data = await mongoService.getPapeletasAprobadasExternas();
+  const { fechaInicio, fechaFin } = req.query;
+  const data = await mongoService.getPapeletasAprobadasExternas({
+    fechaInicio: fechaInicio || null,
+    fechaFin: fechaFin || null,
+  });
   res.json({ success: true, data });
 });
 

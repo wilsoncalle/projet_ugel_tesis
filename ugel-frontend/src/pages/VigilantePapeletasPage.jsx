@@ -5,6 +5,7 @@ import Button from "../components/Button";
 import ModalDetalles from "../components/ModalDetalles";
 import Notification from "../components/Notification";
 import TabView from "../components/TabView";
+import DateRangeFilter from "../components/DateRangeFilter";
 import { EyeIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/outline";
 import { papeletasSalidaService } from "../services/api";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
@@ -46,6 +47,11 @@ const VigilantePapeletasPage = () => {
   // Estado para la categoría de estadísticas
   const [categoriaEstadisticas, setCategoriaEstadisticas] = useState('estado');
 
+  // Estados para filtro de fechas
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [semanaUI, setSemanaUI] = useState(null);
+
   // Modales
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPapeleta, setSelectedPapeleta] = useState(null);
@@ -64,8 +70,13 @@ const VigilantePapeletasPage = () => {
       const { page = pagination.page, limit = pagination.limit } = opts;
       const q = search.toLowerCase() || "";
 
+      // 🔹 Construir params para backend con fechas
+      const params = {};
+      if (fechaDesde) params.fechaInicio = fechaDesde; // 'YYYY-MM-DD'
+      if (fechaHasta) params.fechaFin = fechaHasta;
+
       // Llamar DIRECTAMENTE al nuevo endpoint de MongoDB para obtener datos externos
-      const response = await papeletasSalidaService.getExternas();
+      const response = await papeletasSalidaService.getExternas(params);
       
       let allData = response.data?.data || []; 
 
@@ -146,7 +157,7 @@ const VigilantePapeletasPage = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, search]);
+  }, [activeTab, search, fechaDesde, fechaHasta]);
 
   // ---------- UI HELPERS ----------
   const estadoBadge = (estado) => {
@@ -353,6 +364,30 @@ const VigilantePapeletasPage = () => {
                 Registre las salidas y retornos del personal autorizado.
               </p>
             </div>
+          </div>
+
+          {/* Filtro por rango de fechas */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+            <DateRangeFilter
+              fechaDesde={fechaDesde}
+              fechaHasta={fechaHasta}
+              onFechaDesdeChange={(value) => {
+                setFechaDesde(value || '');
+                setPagination(prev => ({ ...prev, page: 1 }));
+              }}
+              onFechaHastaChange={(value) => {
+                setFechaHasta(value || '');
+                setPagination(prev => ({ ...prev, page: 1 }));
+              }}
+              onClear={() => {
+                setFechaDesde('');
+                setFechaHasta('');
+                setSemanaUI(null);
+                setPagination(prev => ({ ...prev, page: 1 }));
+              }}
+              semanaUIProp={semanaUI}
+              onSemanaChange={setSemanaUI}
+            />
           </div>
 
           {/* Tabs */}
