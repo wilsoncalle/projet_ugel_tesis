@@ -31,7 +31,8 @@ const LoginPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
     if (!validateForm()) return;
     try {
       const result = await login(credentials);
@@ -68,7 +69,7 @@ const LoginPage = () => {
           </div>
         )}
 
-        <div className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <Input
             label="Usuario"
             id="nombreUsuario"
@@ -92,8 +93,7 @@ const LoginPage = () => {
           />
 
           <Button
-            type="button"
-            onClick={handleSubmit}
+            type="submit"
             isLoading={loading}
             isFullWidth
             size="lg"
@@ -101,7 +101,7 @@ const LoginPage = () => {
           >
             Iniciar Sesión
           </Button>
-        </div>
+        </form>
       </div>
 
       {/* ===== FOOTER INSTITUCIONAL ===== */}

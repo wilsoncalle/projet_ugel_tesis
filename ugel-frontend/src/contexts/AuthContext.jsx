@@ -10,14 +10,26 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   // Check if user is authenticated on app load
-  const checkAuth = useCallback(() => {
+  const checkAuth = useCallback(async () => {
     try {
       const storedUser = authService.getCurrentUser();
       const token = localStorage.getItem('token');
       
       if (storedUser && token) {
-        setUser(storedUser);
-        setIsAuthenticated(true);
+        // Verify token validity with backend
+        const isValid = await authService.verifyToken();
+        
+        if (isValid) {
+          setUser(storedUser);
+          setIsAuthenticated(true);
+        } else {
+          // Token invalid or expired
+          authService.logout();
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } else {
+        setLoading(false);
       }
       
       setLoading(false);
@@ -62,7 +74,8 @@ export const AuthProvider = ({ children }) => {
       
       if (error.response) {
         // Error de respuesta del servidor
-        errorMessage = error.response.data?.message || 'Credenciales incorrectas';
+        // El backend envía el mensaje en 'error' o 'message'
+        errorMessage = error.response.data?.error || error.response.data?.message || 'Credenciales incorrectas';
       } else if (error.request) {
         // Error de red (no se recibió respuesta)
         errorMessage = 'No se pudo conectar al servidor. Verifique su conexión a internet.';

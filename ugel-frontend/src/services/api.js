@@ -23,22 +23,74 @@ api.interceptors.request.use(
   }
 );
 
+// Queue for pending requests while refreshing token
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => {
     return response;
   },
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
     
     // Handle 401 Unauthorized errors
-    if (error.response && error.response.status === 401) {
-      // Clear local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+    if (error.response && error.response.status === 401 && !originalRequest._retry && !originalRequest.url.includes('/auth/login') && !originalRequest.url.includes('/auth/refresh')) {
       
-      // No redirección automática aquí, dejaremos que los componentes manejen esto
-      // para evitar recargas de página inesperadas
+      if (isRefreshing) {
+        return new Promise(function(resolve, reject) {
+          failedQueue.push({resolve, reject});
+        }).then(token => {
+          originalRequest.headers['Authorization'] = 'Bearer ' + token;
+          return api(originalRequest);
+        }).catch(err => {
+          return Promise.reject(err);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const token = localStorage.getItem('token');
+        // Use a new axios instance to avoid interceptor loop
+        const response = await axios.post('/api/auth/refresh', {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const newToken = response.data.data.token; // Adjust based on actual response structure
+        
+        if (newToken) {
+          localStorage.setItem('token', newToken);
+          api.defaults.headers.common['Authorization'] = 'Bearer ' + newToken;
+          originalRequest.headers['Authorization'] = 'Bearer ' + newToken;
+          processQueue(null, newToken);
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        // Clear local storage and redirect to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     }
+    
     return Promise.reject(error);
   }
 );
@@ -49,11 +101,26 @@ export const authService = {
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    window.location.href = '/login';
   },
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
+  refreshToken: () => api.post('/auth/refresh'),
+  verifyToken: async () => {
+    try {
+      // Try to refresh token to verify validity
+      const response = await api.post('/auth/refresh');
+      if (response.data && response.data.data && response.data.data.token) {
+        localStorage.setItem('token', response.data.data.token);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      return false;
+    }
+  }
 };
 
 export const areasService = {

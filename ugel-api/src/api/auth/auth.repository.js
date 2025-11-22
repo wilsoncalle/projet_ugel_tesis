@@ -23,7 +23,10 @@ const findByUsername = async (nombreUsuario) => {
         u.rol,
         u.activo,
         u.fecha_creacion,
-        u.personal_id
+        u.intentos_fallidos,
+        u.bloqueado_hasta,
+        u.personal_id,
+        u.ultimo_intento_fallido
       FROM Usuarios u
       WHERE u.nombre_usuario = $1
     `;
@@ -33,7 +36,8 @@ const findByUsername = async (nombreUsuario) => {
     
   } catch (error) {
     logger.error('Error buscando usuario por nombre de usuario:', error);
-    throw new AppError('Error interno del servidor', 500);
+    // Expose the database error message for debugging
+    throw new AppError(`Error de base de datos: ${error.message}`, 500);
   }
 };
 
@@ -216,6 +220,84 @@ const countByRole = async (rol) => {
   }
 };
 
+/**
+ * Incrementar intentos fallidos
+ * @param {number} userId - ID del usuario
+ * @returns {number} Nuevos intentos fallidos
+ */
+const incrementFailedAttempts = async (userId) => {
+  try {
+    const query = `
+      UPDATE Usuarios 
+      SET intentos_fallidos = intentos_fallidos + 1, ultimo_intento_fallido = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING intentos_fallidos
+    `;
+    
+    const result = await db.query(query, [userId]);
+    
+    if (result.rows.length === 0) {
+      logger.error(`No se pudo incrementar intentos fallidos: Usuario ID ${userId} no encontrado para actualización`);
+      // Si no se encuentra el usuario para actualizar, retornamos un valor alto para forzar bloqueo o manejarlo
+      return 999; 
+    }
+    
+    return result.rows[0].intentos_fallidos;
+    
+  } catch (error) {
+    logger.error('Error incrementando intentos fallidos:', error);
+    // No lanzar error 500 para no romper el flujo de login fallido, 
+    // pero retornar un valor que indique fallo o simplemente 1
+    return 1;
+  }
+};
+
+/**
+ * Resetear intentos fallidos
+ * @param {number} userId - ID del usuario
+ * @returns {boolean} True si se actualizó correctamente
+ */
+const resetFailedAttempts = async (userId) => {
+  try {
+    const query = `
+      UPDATE Usuarios 
+      SET intentos_fallidos = 0, bloqueado_hasta = NULL
+      WHERE id = $1
+    `;
+    
+    await db.query(query, [userId]);
+    return true;
+    
+  } catch (error) {
+    logger.error('Error reseteando intentos fallidos:', error);
+    // No lanzar error crítico
+    return false;
+  }
+};
+
+/**
+ * Bloquear usuario temporalmente
+ * @param {number} userId - ID del usuario
+ * @param {Date} lockoutUntil - Fecha hasta la cual bloquear
+ * @returns {boolean} True si se actualizó correctamente
+ */
+const lockUser = async (userId, lockoutUntil) => {
+  try {
+    const query = `
+      UPDATE Usuarios 
+      SET bloqueado_hasta = $1
+      WHERE id = $2
+    `;
+    
+    await db.query(query, [lockoutUntil, userId]);
+    return true;
+    
+  } catch (error) {
+    logger.error('Error bloqueando usuario:', error);
+    throw new AppError('Error interno del servidor', 500);
+  }
+};
+
 module.exports = {
   findByUsername,
   findById,
@@ -223,5 +305,8 @@ module.exports = {
   create,
   updatePassword,
   updateLastLogin,
-  countByRole
+  countByRole,
+  incrementFailedAttempts,
+  resetFailedAttempts,
+  lockUser
 };

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS Usuarios (
     email VARCHAR(150) NOT NULL UNIQUE,
     rol VARCHAR(20) NOT NULL, -- "Vigilante", "Administrador", "RRHH"
     activo BOOLEAN NOT NULL DEFAULT TRUE,
+    intentos_fallidos INT NOT NULL DEFAULT 0,
+    bloqueado_hasta TIMESTAMP NULL,
     fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

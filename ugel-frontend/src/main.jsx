@@ -10,40 +10,22 @@ import { setupConnectivityListeners } from './utils/offlineSync';
 import './index.css';
 import { HelmetProvider } from 'react-helmet-async';
 
+import { registerSW } from 'virtual:pwa-register';
+
 // Registrar Service Worker para funcionalidad offline
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then((registration) => {
-        // Service Worker registrado silenciosamente
+const updateSW = registerSW({
+  onNeedRefresh() {
+    if (confirm('Nueva versión disponible. ¿Deseas actualizar ahora?')) {
+      updateSW(true);
+    }
+  },
+  onOfflineReady() {
+    console.log('App lista para trabajar offline');
+  },
+});
 
-        // Configurar listeners de conectividad
-        setupConnectivityListeners();
-
-        // Verificar actualizaciones del Service Worker
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          console.log('Nueva versión del Service Worker encontrada');
-
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('Nueva versión disponible. Recarga la página para actualizar.');
-
-              if (window.confirm('Nueva versión disponible. ¿Deseas actualizar ahora?')) {
-                window.location.reload();
-              }
-            }
-          });
-        });
-      })
-      .catch((error) => {
-        console.error('Error al registrar Service Worker:', error);
-      });
-  });
-} else {
-  console.warn('Service Workers no están soportados en este navegador');
-}
+// Configurar listeners de conectividad
+setupConnectivityListeners();
 
 // Solicitar permiso para notificaciones
 if ('Notification' in window && Notification.permission === 'default') {

@@ -69,6 +69,27 @@ const loginUser = async (loginData) => {
     throw new AppError('Credenciales inválidas', 401);
   }
   
+  // Verificar si el usuario está bloqueado
+  // Primero, verificar si el último intento fallido fue hace mucho tiempo y resetear si es necesario
+  if (user.intentos_fallidos > 0 && user.ultimo_intento_fallido) {
+    const lastFailedTime = new Date(user.ultimo_intento_fallido).getTime();
+    const currentTime = Date.now();
+    const timeWindow = config.security.failedAttemptsWindow || 30 * 60 * 1000; // Default 30 min
+    
+    if (currentTime - lastFailedTime > timeWindow) {
+      await repository.resetFailedAttempts(user.id);
+      user.intentos_fallidos = 0;
+      user.bloqueado_hasta = null;
+      logger.info(`Intentos fallidos reseteados por expiración de tiempo para usuario: ${user.nombre_usuario}`);
+    }
+  }
+  
+  // Verificar si el usuario está bloqueado (después del posible reset)
+  if (user.bloqueado_hasta && new Date(user.bloqueado_hasta) > new Date()) {
+    const remainingTime = Math.ceil((new Date(user.bloqueado_hasta) - new Date()) / 1000 / 60);
+    throw new AppError(`Cuenta bloqueada temporalmente. Intente nuevamente en ${remainingTime} minutos`, 403);
+  }
+
   // Verificar si el usuario está activo
   if (!user.activo) {
     throw new AppError('Usuario inactivo. Contacta al administrador', 403);
@@ -76,8 +97,24 @@ const loginUser = async (loginData) => {
   
   // Verificar contraseña
   const isPasswordValid = await bcrypt.compare(contrasena, user.hash_contrasena);
+  
   if (!isPasswordValid) {
-    throw new AppError('Credenciales inválidas', 401);
+    // Incrementar intentos fallidos
+    const failedAttempts = await repository.incrementFailedAttempts(user.id);
+    
+    // Verificar si se debe bloquear
+    if (failedAttempts >= config.security.maxLoginAttempts) {
+      const lockoutTime = new Date(Date.now() + config.security.lockoutTime);
+      await repository.lockUser(user.id, lockoutTime);
+      throw new AppError(`Cuenta bloqueada por demasiados intentos fallidos. Intente nuevamente en ${config.security.lockoutTime / 60000} minutos`, 403);
+    }
+    
+    throw new AppError(`Credenciales inválidas. Intentos restantes: ${config.security.maxLoginAttempts - failedAttempts}`, 401);
+  }
+  
+  // Resetear intentos fallidos si el login es exitoso
+  if (user.intentos_fallidos > 0 || user.bloqueado_hasta) {
+    await repository.resetFailedAttempts(user.id);
   }
   
   // Buscar personal asociado al usuario

@@ -54,7 +54,8 @@ const config = {
   security: {
     bcryptRounds: 12,
     maxLoginAttempts: 5,
-    lockoutTime: 15 * 60 * 1000 // 15 minutos en millisegundos
+    lockoutTime: 15 * 60 * 1000, // 15 minutos en millisegundos
+    failedAttemptsWindow: 30 * 60 * 1000 // 30 minutos ventana de olvido
   },
 
   // Id del usuario técnico de sistema (para tareas automáticas)

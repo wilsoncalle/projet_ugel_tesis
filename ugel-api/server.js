@@ -24,7 +24,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: config.corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
   },
@@ -32,8 +32,28 @@ const io = new Server(server, {
 
 app.set('socketio', io);
 
+// Middleware de autenticación para Socket.IO
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return next(new Error('Autenticación requerida'));
+  }
+  
+  const { verifyTokenSilent } = require('./src/middleware/authHandler');
+  const decoded = verifyTokenSilent(token);
+  
+  if (!decoded) {
+    return next(new Error('Token inválido o expirado'));
+  }
+  
+  // Guardar información del usuario en el socket
+  socket.user = decoded;
+  next();
+});
+
 io.on('connection', (socket) => {
-  logger.info(`Socket conectado: ${socket.id}`);
+  logger.info(`Socket conectado: ${socket.id} (Usuario: ${socket.user.nombreUsuario})`);
 });
 
 // Importar servicios para tareas programadas

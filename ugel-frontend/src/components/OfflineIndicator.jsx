@@ -19,7 +19,24 @@ const OfflineIndicator = () => {
   const [syncing, setSyncing] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  // Actualizar estado de conexión
+  // Cargar datos pendientes
+  const loadPendingData = async () => {
+    try {
+      const { getPendingVisitas, getPendingSalidas } = await import('../utils/offlineDB');
+      const visitas = await getPendingVisitas();
+      const salidas = await getPendingSalidas();
+      
+      setPendingCount({
+        total: visitas.length + salidas.length,
+        visitas: visitas.length,
+        salidas: salidas.length
+      });
+    } catch (error) {
+      console.error('Error loading pending data:', error);
+    }
+  };
+
+  // Actualizar estado de conexión y datos
   useEffect(() => {
     const updateOnlineStatus = () => {
       try {
@@ -29,13 +46,33 @@ const OfflineIndicator = () => {
       }
     };
 
+    const handleSyncComplete = (event) => {
+      loadPendingData();
+      setSyncing(false);
+    };
+
+    const handleConnectionChanged = (event) => {
+      setOnline(event.detail.online);
+    };
+
     // Listeners para cambios de conectividad
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
+    window.addEventListener('offline-sync-complete', handleSyncComplete);
+    window.addEventListener('connection-status-changed', handleConnectionChanged);
+    
+    // Cargar datos iniciales
+    loadPendingData();
+    
+    // Intervalo para verificar datos pendientes periódicamente
+    const intervalId = setInterval(loadPendingData, 5000);
 
     return () => {
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
+      window.removeEventListener('offline-sync-complete', handleSyncComplete);
+      window.removeEventListener('connection-status-changed', handleConnectionChanged);
+      clearInterval(intervalId);
     };
   }, []);
 
@@ -43,9 +80,9 @@ const OfflineIndicator = () => {
   const handleManualSync = async () => {
     setSyncing(true);
     try {
-      // Simular sincronización
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setPendingCount({ total: 0, visitas: 0, salidas: 0 });
+      const { syncPendingData } = await import('../utils/offlineSync');
+      await syncPendingData();
+      await loadPendingData();
     } catch (error) {
       console.error('Error en sincronización manual:', error);
     } finally {

@@ -14,7 +14,16 @@ const router = express.Router();
  * @desc    Registrar un nuevo usuario
  * @access  Public (en desarrollo) / Admin (en producción)
  */
+const { authenticateToken, requireAdmin } = require('../../middleware/authHandler');
+
+/**
+ * @route   POST /api/auth/register
+ * @desc    Registrar un nuevo usuario
+ * @access  Admin
+ */
 router.post('/register', 
+  authenticateToken,
+  requireAdmin,
   validationMiddleware.validateRegister,
   controller.register
 );

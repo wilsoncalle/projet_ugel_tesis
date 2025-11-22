@@ -13,20 +13,27 @@ const router = express.Router();
  * @desc    Verificar estado del sistema
  * @access  Public
  */
+const { authenticateToken, requireAdmin } = require('../../middleware/authHandler');
+
+/**
+ * @route   GET /api/health
+ * @desc    Verificar estado del sistema
+ * @access  Public
+ */
 router.get('/', controller.healthCheck);
 
 /**
  * @route   GET /api/health/database
  * @desc    Verificar estado de la base de datos
- * @access  Public
+ * @access  Private (Admin)
  */
-router.get('/database', controller.databaseCheck);
+router.get('/database', authenticateToken, requireAdmin, controller.databaseCheck);
 
 /**
  * @route   GET /api/health/detailed
  * @desc    Verificación detallada del sistema
- * @access  Public
+ * @access  Private (Admin)
  */
-router.get('/detailed', controller.detailedHealthCheck);
+router.get('/detailed', authenticateToken, requireAdmin, controller.detailedHealthCheck);
 
 module.exports = router;
