@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { io } from 'socket.io-client';
+// import { io } from 'socket.io-client'; // Cargado dinámicamente
 import { AnimatePresence, motion } from "framer-motion";
 import Card from '../components/Card';
 import RegistroForm from '../components/vigilante/RegistroForm';
@@ -238,7 +238,6 @@ const DashboardVigilantePage = () => {
   const documentoInputRef = useRef(null);
   const busquedaInputRef = useRef(null);
   const registroFormRef = useRef(null);
-  
   // Referencia para debounce de búsquedas
   const searchTimeout = useRef(null);
 
@@ -248,100 +247,109 @@ const DashboardVigilantePage = () => {
     let socketInstance = null;
     let isCleaningUp = false;
 
-    const initializeSocket = () => {
+    const initializeSocket = async () => {
       // Si ya hay una instancia, no crear otra
       if (socketInstance) return socketInstance;
 
-    // Conexión Socket.IO para actualizaciones en tiempo real
-    const socket = io({
-      transports: ['websocket'],
-        autoConnect: false,
-        reconnection: false,
-        timeout: 5000
-      });
-
-      socketInstance = socket;
-
-    // Intentar conectar solo si estamos online
-    if (navigator.onLine) {
-      socket.connect();
-    }
-  
-    socket.on('connect', () => {
-        console.log('[Socket.IO] Conectado');
-    });
-  
-    socket.on('nueva_visita_registrada', (visita) => {
-        if (isCleaningUp) return; // Ignorar si estamos limpiando
-
-      setVisitantesActivos(prev => {
-        if (prev.some(v => String(v.id) === String(visita.id))) return prev;
-  
-        const mapeada = {
-          ...visita,
-          empleadoVisitado: {
-            id: visita.personal_visitado_id,
-            nombres: visita.personal_nombres || '',
-            apellidos: visita.personal_apellidos || '',
-            cargo: visita.personal_cargo || ''
-          },
-          motivo: {
-            id: visita.motivo_visita_id,
-            label: visita.nombre_motivo || ''
-          },
-          lugar: visita.area_destino_id,
-          lugarNombre: visita.nombre_area || ''
-        };
-  
-        return [mapeada, ...prev];
-      });
-    });
-  
-      // Handler para salidas con protección contra duplicados
-      const handleSalidaRegistrada = ({ visitaId }) => {
-        if (isCleaningUp) return; // Ignorar si estamos limpiando
-
-        console.log(`[Socket.IO] Salida registrada para visita ID: ${visitaId}`);
+      try {
+        const { io } = await import('socket.io-client');
         
-      setVisitantesActivos(prev => {
-          const visitaExistente = prev.find(v => String(v.id) === String(visitaId));
-          
-          if (!visitaExistente) {
-            console.log(`[Socket.IO] Visita ${visitaId} no está en activos, ignorando`);
-            return prev;
-          }
-          
-          if (visitaExistente.fecha_salida || visitaExistente.hora_salida) {
-            console.log(`[Socket.IO] Visita ${visitaId} ya tiene salida, ignorando`);
-            return prev;
-          }
-          
-        const nuevaLista = prev.filter(v => String(v.id) !== String(visitaId));
-          console.log(`[Socket.IO] Visitantes activos después de remover: ${nuevaLista.length}`);
-          
-          setActivosPagination(prevPag => ({
-            ...prevPag,
-            totalItems: Math.max(0, prevPag.totalItems - 1),
-            totalPages: Math.ceil(Math.max(0, prevPag.totalItems - 1) / prevPag.itemsPerPage)
-          }));
-          
-          return nuevaLista;
+        if (isCleaningUp) return null;
+
+        // Conexión Socket.IO para actualizaciones en tiempo real
+        const socket = io({
+          transports: ['websocket'],
+          autoConnect: false,
+          reconnection: false,
+          timeout: 5000
         });
-      };
 
-      socket.on('salida_visita_registrada', handleSalidaRegistrada);
-    socket.on('disconnect', () => {
-        console.log('[Socket.IO] Desconectado');
-      });
-      socket.on('connect_error', () => {
-        // Silencioso
-      });
+        socketInstance = socket;
 
-      return socket;
+        // Intentar conectar solo si estamos online
+        if (navigator.onLine) {
+          socket.connect();
+        }
+      
+        socket.on('connect', () => {
+            console.log('[Socket.IO] Conectado');
+        });
+      
+        socket.on('nueva_visita_registrada', (visita) => {
+            if (isCleaningUp) return; // Ignorar si estamos limpiando
+
+          setVisitantesActivos(prev => {
+            if (prev.some(v => String(v.id) === String(visita.id))) return prev;
+      
+            const mapeada = {
+              ...visita,
+              empleadoVisitado: {
+                id: visita.personal_visitado_id,
+                nombres: visita.personal_nombres || '',
+                apellidos: visita.personal_apellidos || '',
+                cargo: visita.personal_cargo || ''
+              },
+              motivo: {
+                id: visita.motivo_visita_id,
+                label: visita.nombre_motivo || ''
+              },
+              lugar: visita.area_destino_id,
+              lugarNombre: visita.nombre_area || ''
+            };
+      
+            return [mapeada, ...prev];
+          });
+        });
+      
+          // Handler para salidas con protección contra duplicados
+          const handleSalidaRegistrada = ({ visitaId }) => {
+            if (isCleaningUp) return; // Ignorar si estamos limpiando
+
+            console.log(`[Socket.IO] Salida registrada para visita ID: ${visitaId}`);
+            
+          setVisitantesActivos(prev => {
+              const visitaExistente = prev.find(v => String(v.id) === String(visitaId));
+              
+              if (!visitaExistente) {
+                console.log(`[Socket.IO] Visita ${visitaId} no está en activos, ignorando`);
+                return prev;
+              }
+              
+              if (visitaExistente.fecha_salida || visitaExistente.hora_salida) {
+                console.log(`[Socket.IO] Visita ${visitaId} ya tiene salida, ignorando`);
+                return prev;
+              }
+              
+            const nuevaLista = prev.filter(v => String(v.id) !== String(visitaId));
+              console.log(`[Socket.IO] Visitantes activos después de remover: ${nuevaLista.length}`);
+              
+              setActivosPagination(prevPag => ({
+                ...prevPag,
+                totalItems: Math.max(0, prevPag.totalItems - 1),
+                totalPages: Math.ceil(Math.max(0, prevPag.totalItems - 1) / prevPag.itemsPerPage)
+              }));
+              
+              return nuevaLista;
+            });
+          };
+
+          socket.on('salida_visita_registrada', handleSalidaRegistrada);
+        socket.on('disconnect', () => {
+            console.log('[Socket.IO] Desconectado');
+          });
+          socket.on('connect_error', () => {
+            // Silencioso
+          });
+
+          return socket;
+      } catch (error) {
+        console.error('[Socket.IO] Error cargando librería:', error);
+        return null;
+      }
     };
 
     // Inicializar socket
-    const socket = initializeSocket();
+    initializeSocket();
 
     // CLEANUP CRÍTICO
     return () => {

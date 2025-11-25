@@ -3,10 +3,11 @@
  * Sistema Integral de Control de Acceso - UGEL Talara
  */
 
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+// Imports dinámicos se realizarán dentro de las funciones
+// import { jsPDF } from 'jspdf';
+// import autoTable from 'jspdf-autotable';
+// import ExcelJS from 'exceljs';
+// import { saveAs } from 'file-saver';
 
 /**
  * Captura un gráfico de Chart.js como imagen base64
@@ -153,6 +154,10 @@ export const generatePdfReport = async (config) => {
       resumen = {},
       nombreArchivo = 'reporte_estadisticas'
     } = config;
+
+    // Cargar librerías dinámicamente
+    const { jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
 
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -330,6 +335,10 @@ export const generateExcelReport = async (config) => {
       resumen = {},
       nombreArchivo = 'reporte_estadisticas'
     } = config;
+
+    // Cargar librerías dinámicamente
+    const { default: ExcelJS } = await import('exceljs');
+    const { saveAs } = await import('file-saver');
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Sistema UGEL';

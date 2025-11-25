@@ -7,6 +7,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // --- ESTO ES LO QUE DEBES AGREGAR ---
+      devOptions: {
+        enabled: false, // Desactiva el Service Worker mientras desarrollas (npm run dev)
+      },
+      // -------------------------------------
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
@@ -34,6 +39,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Ojo: Esta caché de API también te estaba dando datos viejos del backend
         runtimeCaching: [
           {
             urlPattern: /^\/api\/.*/,
@@ -42,7 +48,7 @@ export default defineConfig({
               cacheName: 'api-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
+                maxAgeSeconds: 60 * 60 * 24 * 7 
               },
               cacheableResponse: {
                 statuses: [0, 200]
@@ -56,7 +62,7 @@ export default defineConfig({
               cacheName: 'images',
               expiration: {
                 maxEntries: 60,
-                maxAgeSeconds: 30 * 24 * 60 * 60 // 30 days
+                maxAgeSeconds: 30 * 24 * 60 * 60 
               }
             }
           },
@@ -77,6 +83,17 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true
+      }
+    }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['@mantine/core', '@mantine/hooks', '@heroicons/react', 'lucide-react'],
+          charts: ['chart.js', 'react-chartjs-2', 'recharts', 'chartjs-plugin-datalabels'],
+        }
       }
     }
   }
