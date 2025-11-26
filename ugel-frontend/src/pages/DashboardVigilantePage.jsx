@@ -256,12 +256,21 @@ const DashboardVigilantePage = () => {
         
         if (isCleaningUp) return null;
 
+        const socketURL = import.meta.env.VITE_SOCKET_URL || (window.location.origin.includes(':5173') ? 'http://localhost:3000' : window.location.origin);
+
         // Conexión Socket.IO para actualizaciones en tiempo real
-        const socket = io({
+        const token = localStorage.getItem('token');
+
+        const socket = io(socketURL, {
           transports: ['websocket'],
           autoConnect: false,
-          reconnection: false,
-          timeout: 5000
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 2000,
+          timeout: 5000,
+          auth: {
+            token: token
+          }
         });
 
         socketInstance = socket;
@@ -276,11 +285,11 @@ const DashboardVigilantePage = () => {
         });
       
         socket.on('nueva_visita_registrada', (visita) => {
-            if (isCleaningUp) return; // Ignorar si estamos limpiando
+          if (isCleaningUp) return; // Ignorar si estamos limpiando
 
           setVisitantesActivos(prev => {
             if (prev.some(v => String(v.id) === String(visita.id))) return prev;
-      
+
             const mapeada = {
               ...visita,
               empleadoVisitado: {
@@ -296,9 +305,12 @@ const DashboardVigilantePage = () => {
               lugar: visita.area_destino_id,
               lugarNombre: visita.nombre_area || ''
             };
-      
+
             return [mapeada, ...prev];
           });
+
+          // Refrescar desde servidor para mantener tablas y paginación alineadas
+          cargarVisitantesActivos();
         });
       
           // Handler para salidas con protección contra duplicados
@@ -1295,6 +1307,19 @@ const DashboardVigilantePage = () => {
               lugar: parseInt(lugarId),
               lugarNombre: lugarNombre
             });
+
+            // Notificar a otras vistas (Mis Visitas) que se creó una visita
+            try {
+              const visitaParaEvento = responseVisita?.data?.data || visitaPayload;
+              window.dispatchEvent(new CustomEvent('visita-registrada', {
+                detail: {
+                  personalVisitadoId: parseInt(empleadoId),
+                  visita: visitaParaEvento
+                }
+              }));
+            } catch (evtError) {
+              console.warn('[Dashboard] No se pudo notificar la creación de visita:', evtError);
+            }
           } else {
             console.error('[Dashboard] Respuesta inválida:', responseVisita);
             throw new Error('Error al crear visita: Respuesta inválida del servidor');

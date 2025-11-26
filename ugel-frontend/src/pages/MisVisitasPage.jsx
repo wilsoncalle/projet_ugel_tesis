@@ -8,6 +8,7 @@ const MisVisitasPage = () => {
   const { user } = useAuth();
   const personalId = user?.personal_id || user?.personalId;
   const missingPersonalToast = useRef(false);
+  const isFetchingRef = useRef(false);
   const [activeTab, setActiveTab] = useState('activos');
   const [visitasActivas, setVisitasActivas] = useState([]);
   const [historialVisitas, setHistorialVisitas] = useState([]);
@@ -26,6 +27,8 @@ const MisVisitasPage = () => {
   });
 
   const fetchVisitas = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       setLoading(true);
       if (!personalId) {
@@ -73,12 +76,85 @@ const MisVisitasPage = () => {
       toast.error('Error al cargar las visitas');
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   }, [activeTab, activosPagination.page, historialPagination.page, personalId]);
 
   useEffect(() => {
     fetchVisitas();
   }, [fetchVisitas]);
+
+  useEffect(() => {
+    const handleVisitaCreada = (event) => {
+      const detail = event.detail || {};
+      const visitadoId = detail.personalVisitadoId || detail.visita?.personal_visitado_id || detail.visita?.personalVisitadoId;
+      if (!personalId || !visitadoId) return;
+      if (parseInt(visitadoId, 10) !== parseInt(personalId, 10)) return;
+      fetchVisitas();
+    };
+
+    window.addEventListener('visita-registrada', handleVisitaCreada);
+    return () => window.removeEventListener('visita-registrada', handleVisitaCreada);
+  }, [fetchVisitas, personalId]);
+
+  // Socket.IO integration for real-time updates
+  useEffect(() => {
+    if (!personalId) return;
+
+    let socket;
+    
+    const initializeSocket = async () => {
+      try {
+        const { io } = await import('socket.io-client');
+        const socketURL = import.meta.env.VITE_SOCKET_URL || (window.location.origin.includes(':5173') ? 'http://localhost:3000' : window.location.origin);
+        
+        const token = localStorage.getItem('token');
+        
+        socket = io(socketURL, {
+          transports: ['websocket'],
+          reconnection: true,
+          auth: {
+            token: token
+          }
+        });
+
+        socket.on('connect', () => {
+          console.log('[MisVisitas] Socket connected');
+        });
+
+        socket.on('nueva_visita_registrada', (visita) => {
+          const visitadoId = visita.personal_visitado_id ?? visita.personalVisitadoId;
+          // Check if the visit is for the current user
+          if (visitadoId && parseInt(visitadoId, 10) === parseInt(personalId, 10)) {
+             console.log('[MisVisitas] Nueva visita recibida por socket', visita);
+             fetchVisitas();
+             toast.success('Nueva visita registrada');
+          }
+        });
+
+        socket.on('salida_visita_registrada', ({ visitaId }) => {
+           // Check if this visit is in our active list
+           setVisitasActivas(prev => {
+             const exists = prev.some(v => v.id === parseInt(visitaId));
+             if (exists) {
+               console.log('[MisVisitas] Salida registrada recibida por socket', visitaId);
+               fetchVisitas();
+             }
+             return prev;
+           });
+        });
+
+      } catch (error) {
+        console.error('[MisVisitas] Error initializing socket:', error);
+      }
+    };
+
+    initializeSocket();
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [personalId, fetchVisitas]);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
