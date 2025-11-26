@@ -133,15 +133,13 @@ const MisVisitasPage = () => {
         });
 
         socket.on('salida_visita_registrada', ({ visitaId }) => {
-           // Check if this visit is in our active list
-           setVisitasActivas(prev => {
-             const exists = prev.some(v => v.id === parseInt(visitaId));
-             if (exists) {
-               console.log('[MisVisitas] Salida registrada recibida por socket', visitaId);
-               fetchVisitas();
-             }
-             return prev;
-           });
+           console.log('[MisVisitas] Salida registrada recibida por socket', visitaId);
+           
+           // Actualizar estado local inmediatamente para feedback visual rápido
+           setVisitasActivas(prev => prev.filter(v => v.id !== parseInt(visitaId)));
+           
+           // Recargar datos para asegurar consistencia (especialmente historial)
+           fetchVisitas();
         });
 
       } catch (error) {
