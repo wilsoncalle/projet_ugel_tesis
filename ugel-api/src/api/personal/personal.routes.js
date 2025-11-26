@@ -49,6 +49,18 @@ router.get('/documento/:tipo/:numero',
 );
 
 /**
+ * @route   POST /api/personal/sincronizar-usuarios
+ * @desc    Crear o reactivar usuarios para personal existente con datos completos
+ * @access  Private (Admin/RRHH)
+ */
+router.post('/sincronizar-usuarios',
+  authenticateToken,
+  requireActiveUser,
+  requireAdminOrRRHH,
+  controller.sincronizarUsuarios
+);
+
+/**
  * @route   GET /api/personal/:id
  * @desc    Obtener personal por ID
  * @access  Private

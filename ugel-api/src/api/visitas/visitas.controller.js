@@ -417,13 +417,25 @@ const delegate = asyncHandler(async (req, res) => {
  * @route GET /api/visitas/mis-visitas
  */
 const getMisVisitas = asyncHandler(async (req, res) => {
-  const personalId = req.user.personalId;
+  const { rol, personalId } = req.user;
   
-  if (!personalId) {
-    throw new AppError('Usuario no asociado a personal', 400);
+  if (rol !== 'Personal') {
+    throw new AppError('Solo usuarios con rol Personal pueden acceder a Mis Visitas', 403);
   }
+
+  if (!personalId) {
+    throw new AppError('El usuario no tiene un personal asociado', 400);
+  }
+
+  const { page = 1, limit = 10, q = '' } = req.query;
   
-  const result = await service.getAllVisitas({ ...req.query, personalVisitadoId: personalId });
+  const result = await service.getAllVisitas({ 
+    ...req.query, 
+    personalVisitadoId: personalId,
+    page: Number(page),
+    limit: Number(limit),
+    q: q
+  });
   
   res.json({
     success: true,

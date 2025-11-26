@@ -33,7 +33,7 @@ const authenticateToken = asyncHandler(async (req, res, next) => {
       email: decoded.email,
       rol: decoded.rol,
       activo: decoded.activo,
-      personal_id: decoded.personal_id || decoded.personalId || null
+      personalId: decoded.personalId || decoded.personal_id || null
     };
     
     logger.debug(`Usuario autenticado: ${decoded.nombreUsuario} (${decoded.rol})`);
@@ -136,7 +136,7 @@ const generateToken = (user) => {
     email: user.email,
     rol: user.rol,
     activo: user.activo,
-    personal_id: user.personal_id || user.personalId || null
+    personalId: user.personal_id || user.personalId || null
   };
   
   return jwt.sign(payload, config.jwt.secret, {

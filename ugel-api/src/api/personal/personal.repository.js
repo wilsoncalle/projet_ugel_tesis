@@ -13,7 +13,7 @@ const logger = require('../../utils/logger');
  * @returns {Object} Personal encontrado y total
  */
 const findAll = async (options = {}) => {
-  const { page = 1, limit = 20, search = '', activo, areaId, tipoContratoId } = options;
+  const { page = 1, limit = 20, search = '', activo, areaId, tipoContratoId, fecha } = options;
   const offset = (page - 1) * limit;
   
   try {
@@ -27,6 +27,19 @@ const findAll = async (options = {}) => {
         total: 0
       };
     }
+
+    const queryParams = [];
+    let paramCounter = 1;
+
+    // Determinar la fecha para el join de asistencia
+    // Si se proporciona fecha, usarla como parámetro, sino usar CURRENT_DATE (DB server time)
+    let fechaJoinClause = 'CURRENT_DATE';
+    if (fecha) {
+      fechaJoinClause = `$${paramCounter}::date`;
+      queryParams.push(fecha);
+      paramCounter++;
+    }
+
     // Construir la consulta base
     let query = `
       SELECT 
@@ -92,13 +105,11 @@ const findAll = async (options = {}) => {
       LEFT JOIN Cargos c ON p.cargo_id = c.id
       LEFT JOIN ControlAsistenciaPersonal ca 
         ON ca.personal_id = p.id 
-        AND ca.fecha = CURRENT_DATE
+        AND ca.fecha = ${fechaJoinClause}
     `;
     
     // Construir la cláusula WHERE
     const whereConditions = [];
-    const queryParams = [];
-    let paramCounter = 1;
     
     // Filtro por texto
     if (search) {
@@ -146,6 +157,9 @@ const findAll = async (options = {}) => {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM Personal p
+      LEFT JOIN ControlAsistenciaPersonal ca 
+        ON ca.personal_id = p.id 
+        AND ca.fecha = ${fechaJoinClause}
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     

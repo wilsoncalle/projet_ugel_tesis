@@ -365,9 +365,11 @@ const MainLayout = () => {
   const [papeletasActivasCount, setPapeletasActivasCount] = useState(0);
   
   const userRole = user?.rol?.toLowerCase() || '';
-  const isVigilanteRoute =
+  const isVigilanteContext =
     location.pathname.startsWith('/vigilante') ||
     (userRole.includes('vigilante') && location.pathname === '/perfil');
+
+  const isFullWidthLayout = isVigilanteContext || location.pathname === '/mis-visitas';
 
   // Determinar si el sidebar debe estar expandido (hover, pin o abierto en móvil)
   const isExpanded = pinned || isHovered || sidebarOpen;
@@ -424,7 +426,7 @@ const MainLayout = () => {
 
   // Aplicar estado pinned sin transiciones al montar / cambiar
   useLayoutEffect(() => {
-    if (isVigilanteRoute) return;
+    if (isFullWidthLayout) return;
     const sidebar = sidebarRef.current;
     const main = mainRef.current;
     if (!sidebar || !main) return;
@@ -446,11 +448,11 @@ const MainLayout = () => {
       sidebar.style.transition = '';
       main.style.transition = '';
     });
-  }, [pinned, isVigilanteRoute]);
+  }, [pinned, isFullWidthLayout]);
 
   // Restaurar y guardar scroll
   useEffect(() => {
-    if (isVigilanteRoute) return;
+    if (isFullWidthLayout) return;
     const sidebar = sidebarRef.current;
     if (!sidebar) return;
 
@@ -463,7 +465,7 @@ const MainLayout = () => {
     
     sidebar.addEventListener('scroll', handler);
     return () => sidebar.removeEventListener('scroll', handler);
-  }, [isVigilanteRoute]);
+  }, [isFullWidthLayout]);
 
   // Cerrar sidebar móvil al pasar a desktop
   useEffect(() => {
@@ -500,7 +502,7 @@ const MainLayout = () => {
         <div className="container-fluid px-6 py-2">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              {!isVigilanteRoute && (
+              {!isFullWidthLayout && (
                 <button 
                   className="md:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100 mr-3"
                   onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -518,7 +520,7 @@ const MainLayout = () => {
                   <span className="text-xs text-gray-500">{currentDate}</span>
                 </div>
                 
-                {isVigilanteRoute && (
+                {isVigilanteContext && (
                   <div className="flex items-center gap-4 ml-4 border-b border-gray-200">
                     <NavLink
                       to="/vigilante"
@@ -651,7 +653,7 @@ const MainLayout = () => {
       </nav>
       
       {/* Sidebar Edge */}
-      {!isVigilanteRoute && (
+      {!isFullWidthLayout && (
         <>
           <aside 
             ref={sidebarRef}
@@ -729,16 +731,16 @@ const MainLayout = () => {
         ref={mainRef}
         className={`
           main-content-edge min-h-screen transition-all duration-200 ease-out
-          ${isVigilanteRoute ? 'pt-16 ml-0' : 'pt-16'}
+          ${isFullWidthLayout ? 'pt-16 ml-0' : 'pt-16'}
         `}
         style={{
-          marginLeft: !isVigilanteRoute
+          marginLeft: !isFullWidthLayout
             ? (pinned ? `${SIDEBAR_WIDTH_EXPANDED}px` : `${SIDEBAR_WIDTH_COLLAPSED}px`)
             : '0'
         }}
       >
-        <div className={isVigilanteRoute ? 'bg-gray-50' : 'px-6 py-6 bg-gray-50'}>
-          {isVigilanteRoute ? (
+        <div className={isFullWidthLayout ? 'bg-gray-50' : 'px-6 py-6 bg-gray-50'}>
+          {isFullWidthLayout ? (
             <Outlet />
           ) : (
             <div className="container mx-auto">

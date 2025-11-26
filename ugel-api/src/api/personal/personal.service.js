@@ -8,10 +8,325 @@ const areasRepository = require('../areas/areas.repository');
 const tiposContratoRepository = require('../tipos-contrato/tiposcontrato.repository');
 const cargosRepository = require('../cargos/cargos.repository');
 const usuariosService = require('../usuarios/usuarios.service');
+const db = require('../../config/database');
 const { AppError } = require('../../middleware/errorHandler');
 const config = require('../../config');
 const logger = require('../../utils/logger');
 const { toLimaDateYYYYMMDD } = require('../../utils/fechas');
+
+// Crea o reactiva usuario automáticamente cuando el personal tiene datos mínimos
+const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
+  try {
+    logger.info(`[ensureUsuarioParaPersonal] Iniciando verificación para personal ID ${personal.id} (${origen})`);
+    
+    // Log de datos recibidos
+    logger.debug(`[ensureUsuarioParaPersonal] Datos del personal:`, {
+      id: personal.id,
+      nombres: personal.nombres,
+      apellidos: personal.apellidos,
+      numero_documento: personal.numero_documento,
+      email: personal.email,
+      fecha_nacimiento: personal.fecha_nacimiento
+    });
+
+    const fechaNacStr = toLimaDateYYYYMMDD(personal.fecha_nacimiento);
+    logger.debug(`[ensureUsuarioParaPersonal] Fecha normalizada: ${fechaNacStr}`);
+    
+    const tieneDatosMinimos =
+      fechaNacStr &&
+      personal.numero_documento &&
+      personal.email;
+
+    if (!tieneDatosMinimos) {
+      logger.warn(
+        `[ensureUsuarioParaPersonal] No se creó usuario automático para personal ID ${personal.id} por datos incompletos:`,
+        {
+          tiene_fecha: !!fechaNacStr,
+          tiene_documento: !!personal.numero_documento,
+          tiene_email: !!personal.email
+        }
+      );
+      return { created: false, reason: 'datos_incompletos' };
+    }
+
+    logger.info(`[ensureUsuarioParaPersonal] Personal ID ${personal.id} tiene datos completos, verificando usuario existente...`);
+
+    const existingUser = await usuariosService.getUsuarioByPersonalId(personal.id);
+    
+    if (existingUser) {
+      logger.info(`[ensureUsuarioParaPersonal] Usuario existente encontrado:`, {
+        usuario_id: existingUser.id,
+        activo: existingUser.activo,
+        nombre_usuario: existingUser.nombre_usuario
+      });
+    } else {
+      logger.info(`[ensureUsuarioParaPersonal] No se encontró usuario existente para personal ID ${personal.id}`);
+    }
+
+    const [year, month, day] = fechaNacStr.split('-');
+    const password = `${day}${month}${year}`; // DDMMYYYY
+    
+    logger.debug(`[ensureUsuarioParaPersonal] Contraseña generada (formato DDMMYYYY): ${password}`);
+
+    if (existingUser && existingUser.activo === false) {
+      logger.info(`[ensureUsuarioParaPersonal] Reactivando usuario inactivo ID ${existingUser.id}...`);
+      
+      await usuariosService.updateUsuario(
+        existingUser.id,
+        {
+          nombreUsuario: personal.numero_documento,
+          email: personal.email,
+          contrasena: password,
+          rol: existingUser.rol || 'Personal',
+          activo: true,
+          personalId: personal.id,
+        },
+        userId
+      );
+
+      logger.info(
+        `[ensureUsuarioParaPersonal] Usuario reactivado automáticamente (${origen}) para personal ID: ${personal.id}`
+      );
+      return { created: false, reactivated: true, userId: existingUser.id };
+    }
+
+    if (existingUser && existingUser.activo === true) {
+      logger.info(
+        `[ensureUsuarioParaPersonal] Personal ID ${personal.id} ya tiene usuario asociado activo (ID ${existingUser.id}), no se crea otro`
+      );
+      return { created: false, reason: 'ya_existe_activo', userId: existingUser.id };
+    }
+
+    // No existe usuario - crear uno nuevo
+    logger.info(`[ensureUsuarioParaPersonal] Creando nuevo usuario para personal ID ${personal.id}...`);
+    
+    const nuevoUsuario = await usuariosService.createUsuario(
+      {
+        nombreUsuario: personal.numero_documento,
+        email: personal.email,
+        contrasena: password,
+        rol: 'Personal',
+        personalId: personal.id,
+      },
+      userId
+    );
+
+    logger.info(
+      `[ensureUsuarioParaPersonal] Usuario creado automáticamente (${origen}) para personal ID: ${personal.id}, Usuario ID: ${nuevoUsuario.id}`
+    );
+    
+    return { created: true, userId: nuevoUsuario.id };
+
+  } catch (error) {
+    logger.error(
+      `[ensureUsuarioParaPersonal] Error creando/reactivando usuario automático para personal ID ${personal.id} (${origen}):`,
+      {
+        error: error.message,
+        stack: error.stack
+      }
+    );
+    // No lanzar el error para que no afecte la actualización del personal
+    return { created: false, error: error.message };
+  }
+};
+
+/**
+ * Sincronizar usuarios para todo el personal que cumpla requisitos
+ * Incluye limpieza de vínculos incorrectos
+ * @param {number} userId - ID del usuario que ejecuta la sincronización
+ * @returns {Object} Resultado de la sincronización
+ */
+const sincronizarUsuariosPersonal = async (userId) => {
+  try {
+    // PASO 1: Limpiar vínculos incorrectos primero
+    logger.info('Limpiando vinculos incorrectos de usuarios...');
+    
+    // Obtener usuarios que NO son Personal pero tienen personal_id
+    const usuariosIncorrectos = await db.query(`
+      SELECT id, nombre_usuario, rol, personal_id 
+      FROM Usuarios 
+      WHERE rol != 'Personal' AND personal_id IS NOT NULL
+    `);
+    
+    let vinculosCorregidos = 0;
+    for (const u of usuariosIncorrectos.rows) {
+      await db.query('UPDATE Usuarios SET personal_id = NULL WHERE id = $1', [u.id]);
+      vinculosCorregidos++;
+      logger.info(`Vinculo incorrecto eliminado: Usuario ${u.nombre_usuario} (${u.rol}) ya no apunta a personal_id ${u.personal_id}`);
+    }
+    
+    // PASO 2: Obtener todo el personal activo
+    const result = await repository.findAll({ 
+      page: 1, 
+      limit: 10000,
+      activo: true 
+    });
+    
+    const personal = result.personal || [];
+    let creados = 0;
+    let reactivados = 0;
+    let omitidos = 0;
+    let yaExistentes = 0;
+    let errores = 0;
+    const erroresDetalle = [];
+
+    logger.info(`Iniciando sincronizacion de usuarios para ${personal.length} registros de personal`);
+
+    for (const p of personal) {
+      try {
+        const fechaNacStr = toLimaDateYYYYMMDD(p.fecha_nacimiento);
+        const tieneDatosMinimos =
+          fechaNacStr &&
+          p.numero_documento &&
+          p.email;
+
+        if (!tieneDatosMinimos) {
+          omitidos++;
+          logger.debug(`Personal ID ${p.id} omitido: falta email (${p.email}), fecha_nacimiento (${fechaNacStr}) o numero_documento (${p.numero_documento})`);
+          continue;
+        }
+
+        // Buscar usuario vinculado a este personal
+        const existingUser = await usuariosService.getUsuarioByPersonalId(p.id);
+        const [year, month, day] = fechaNacStr.split('-');
+        const password = `${day}${month}${year}`; // DDMMYYYY
+
+        if (existingUser && existingUser.activo === false) {
+          // Reactivar usuario inactivo
+          await usuariosService.updateUsuario(
+            existingUser.id,
+            {
+              nombreUsuario: p.numero_documento,
+              email: p.email,
+              contrasena: password,
+              rol: 'Personal', // Asegurar que sea rol Personal
+              activo: true,
+              personalId: p.id,
+            },
+            userId
+          );
+          reactivados++;
+          logger.info(`Usuario reactivado para personal ID ${p.id}: ${p.nombres} ${p.apellidos} (DNI: ${p.numero_documento})`);
+          
+        } else if (existingUser && existingUser.activo === true) {
+          // Ya tiene usuario activo - verificar consistencia
+          yaExistentes++;
+          
+          // Validar que el usuario tenga los datos correctos
+          if (existingUser.nombre_usuario !== p.numero_documento || 
+              existingUser.email !== p.email ||
+              existingUser.rol !== 'Personal') {
+            logger.warn(`Personal ID ${p.id} tiene usuario activo pero con datos inconsistentes. Actualizando...`);
+            
+            await usuariosService.updateUsuario(
+              existingUser.id,
+              {
+                nombreUsuario: p.numero_documento,
+                email: p.email,
+                contrasena: password,
+                rol: 'Personal',
+                activo: true,
+                personalId: p.id,
+              },
+              userId
+            );
+            logger.info(`Usuario actualizado para consistencia: ${p.nombres} ${p.apellidos}`);
+          } else {
+            logger.debug(`Personal ID ${p.id} ya tiene usuario activo correcto (ID ${existingUser.id})`);
+          }
+          
+        } else if (!existingUser) {
+          // NO tiene usuario - verificar que no haya un usuario con ese DNI sin vínculo
+          const usuarioExistentePorDNI = await db.query(`
+            SELECT id, rol, personal_id 
+            FROM Usuarios 
+            WHERE nombre_usuario = $1
+          `, [p.numero_documento]);
+          
+          if (usuarioExistentePorDNI.rows.length > 0) {
+            const uExistente = usuarioExistentePorDNI.rows[0];
+            
+            if (uExistente.personal_id === null) {
+              // Existe un usuario con ese DNI pero sin personal_id - vincularlo
+              await usuariosService.updateUsuario(
+                uExistente.id,
+                {
+                  nombreUsuario: p.numero_documento,
+                  email: p.email,
+                  contrasena: password,
+                  rol: 'Personal',
+                  activo: true,
+                  personalId: p.id,
+                },
+                userId
+              );
+              reactivados++;
+              logger.info(`Usuario existente vinculado a personal ID ${p.id}: ${p.nombres} ${p.apellidos}`);
+            } else {
+              errores++;
+              erroresDetalle.push({
+                personalId: p.id,
+                nombres: `${p.nombres} ${p.apellidos}`,
+                error: `Ya existe usuario con DNI ${p.numero_documento} vinculado a otro personal (ID ${uExistente.personal_id})`
+              });
+              logger.error(`Conflicto: Usuario con DNI ${p.numero_documento} ya existe vinculado a personal ${uExistente.personal_id}`);
+            }
+          } else {
+            // No existe usuario - crear nuevo
+            await usuariosService.createUsuario(
+              {
+                nombreUsuario: p.numero_documento,
+                email: p.email,
+                contrasena: password,
+                rol: 'Personal',
+                personalId: p.id,
+              },
+              userId
+            );
+            creados++;
+            logger.info(`Usuario creado para personal ID ${p.id}: ${p.nombres} ${p.apellidos} (DNI: ${p.numero_documento}, Email: ${p.email})`);
+          }
+        }
+      } catch (error) {
+        errores++;
+        erroresDetalle.push({
+          personalId: p.id,
+          nombres: `${p.nombres} ${p.apellidos}`,
+          error: error.message
+        });
+        logger.error(`Error procesando personal ID ${p.id} (${p.nombres} ${p.apellidos}):`, error.message);
+      }
+    }
+
+    const resultado = {
+      total: personal.length,
+      creados,
+      reactivados,
+      yaExistentes,
+      omitidos,
+      errores,
+      vinculosCorregidos,
+      erroresDetalle: errores > 0 ? erroresDetalle : undefined
+    };
+
+    logger.info('========================================');
+    logger.info('Sincronizacion completada:');
+    logger.info(`  Total personal: ${resultado.total}`);
+    logger.info(`  Usuarios creados: ${resultado.creados}`);
+    logger.info(`  Usuarios reactivados: ${resultado.reactivados}`);
+    logger.info(`  Ya existentes: ${resultado.yaExistentes}`);
+    logger.info(`  Omitidos (datos incompletos): ${resultado.omitidos}`);
+    logger.info(`  Vinculos incorrectos corregidos: ${resultado.vinculosCorregidos}`);
+    logger.info(`  Errores: ${resultado.errores}`);
+    logger.info('========================================');
+
+    return resultado;
+
+  } catch (error) {
+    logger.error('Error en sincronizacion de usuarios:', error);
+    throw error;
+  }
+};
 
 
 
@@ -108,12 +423,14 @@ const createPersonal = async (personalData, userId) => {
       nombres, 
       apellidos,
       fechaNacimiento,
+      fecha_nacimiento: fechaNacimientoSnake,
       email,
       cargoId,
       areaDestinoId, 
       tipoContratoId 
     } = personalData;
-    const fechaNacimientoLima = toLimaDateYYYYMMDD(fechaNacimiento);
+    const fechaNacimientoInput = fechaNacimiento !== undefined ? fechaNacimiento : fechaNacimientoSnake;
+    const fechaNacimientoLima = toLimaDateYYYYMMDD(fechaNacimientoInput);
     
     // Verificar que el tipo de documento sea válido
     if (!config.validation.validDocumentTypes.includes(tipoDocumento)) {
@@ -170,34 +487,7 @@ const createPersonal = async (personalData, userId) => {
     logger.info(`Personal creado: ${nombres} ${apellidos} por usuario ID: ${userId}`);
 
     // Crear usuario automático
-    try {
-    const fechaNacStr = toLimaDateYYYYMMDD(fechaNacimiento); // "YYYY-MM-DD"
-
-    if (!fechaNacStr) {
-      throw new AppError('Fecha de nacimiento inválida', 400);
-    }
-    const [year, month, day] = fechaNacStr.split('-');
-    const password = `${day}${month}${year}`; // DDMMYYYY
-
-    await usuariosService.createUsuario(
-      {
-        nombreUsuario: numeroDocumento,
-        email: email,
-        contrasena: password,
-        rol: 'Personal',
-        personalId: newPersonal.id,
-      },
-      userId
-    );
-
-    logger.info(`Usuario creado automáticamente para personal ID: ${newPersonal.id}`);
-  } catch (userError) {
-    logger.error(
-      `Error creando usuario automático para personal ID ${newPersonal.id}:`,
-      userError
-    );
-    // No lanzas error para no romper la creación de personal
-  }
+    await ensureUsuarioParaPersonal(newPersonal, userId, 'creación');
     
     return newPersonal;
     
@@ -214,6 +504,13 @@ const createPersonal = async (personalData, userId) => {
  * @param {number} userId - ID del usuario que actualiza
  * @returns {Object} Personal actualizado
  */
+/**
+ * Actualizar personal existente
+ * @param {number} id - ID del personal
+ * @param {Object} personalData - Datos a actualizar
+ * @param {number} userId - ID del usuario que actualiza
+ * @returns {Object} Personal actualizado
+ */
 const updatePersonal = async (id, personalData, userId) => {
   try {
     // Verificar si el personal existe
@@ -221,12 +518,14 @@ const updatePersonal = async (id, personalData, userId) => {
     if (!existingPersonal) {
       throw new AppError('Personal no encontrado', 404);
     }
+    
     const { 
       tipoDocumento, 
       numeroDocumento, 
       nombres, 
       apellidos,
       fechaNacimiento,
+      fecha_nacimiento: fechaNacimientoSnake,
       email,
       cargoId,
       areaDestinoId, 
@@ -234,7 +533,10 @@ const updatePersonal = async (id, personalData, userId) => {
       activo
     } = personalData;
     
+    const fechaNacimientoInput = fechaNacimiento !== undefined ? fechaNacimiento : fechaNacimientoSnake;
+    
     const updateData = {};
+    
     // Preparar datos a actualizar
     if (tipoDocumento !== undefined) {
       // Verificar que el tipo de documento sea válido
@@ -266,9 +568,9 @@ const updatePersonal = async (id, personalData, userId) => {
       updateData.apellidos = apellidos;
     }
 
-    if (fechaNacimiento !== undefined) {
+    if (fechaNacimientoInput !== undefined) {
       // Normalizamos a YYYY-MM-DD en zona horaria Lima
-      const fechaNacStr = toLimaDateYYYYMMDD(fechaNacimiento);
+      const fechaNacStr = toLimaDateYYYYMMDD(fechaNacimientoInput);
       if (!fechaNacStr) {
         throw new AppError('Fecha de nacimiento inválida', 400);
       }
@@ -327,61 +629,44 @@ const updatePersonal = async (id, personalData, userId) => {
       return existingPersonal;
     }
     
+    logger.info(`[updatePersonal] Actualizando personal ID ${id} con datos:`, updateData);
+    
     // Actualizar personal
     const updatedPersonal = await repository.update(id, updateData);
 
-    logger.info(`Personal ID ${id} actualizado por usuario ID: ${userId}`);
+    logger.info(`[updatePersonal] Personal ID ${id} actualizado por usuario ID: ${userId}`);
 
-    // 🔹 NUEVO: si ahora tiene datos completos y aún no tiene usuario, crearlo automáticamente
-    try {
-      const existingUser = await usuariosService.getUsuarioByPersonalId(updatedPersonal.id);
+    // IMPORTANTE: Verificar si se actualizaron campos críticos para usuario
+    const camposCriticosActualizados = 
+      updateData.email !== undefined || 
+      updateData.fecha_nacimiento !== undefined || 
+      updateData.numero_documento !== undefined;
 
-      // Solo intentamos crear si NO tiene usuario aún
-      if (!existingUser) {
-        // Usamos la fecha del personal actualizado o la que vino en el body
-        const fechaNacimientoRaw = updatedPersonal.fecha_nacimiento || fechaNacimiento;
-        const fechaNacStr = toLimaDateYYYYMMDD(fechaNacimientoRaw);
-
-        const tieneDatosMinimos =
-          fechaNacStr &&
-          updatedPersonal.numero_documento &&
-          updatedPersonal.email;
-
-        if (tieneDatosMinimos) {
-          const [year, month, day] = fechaNacStr.split('-');
-          const password = `${day}${month}${year}`; // DDMMYYYY
-
-          await usuariosService.createUsuario(
-            {
-              nombreUsuario: updatedPersonal.numero_documento,
-              email: updatedPersonal.email,
-              contrasena: password,
-              rol: 'Personal',
-              personalId: updatedPersonal.id,
-            },
-            userId
-          );
-
-          logger.info(
-            `Usuario creado automáticamente (por actualización) para personal ID: ${updatedPersonal.id}`
-          );
-        } else {
-          logger.warn(
-            `No se pudo crear usuario automático para personal ID ${updatedPersonal.id} por datos incompletos (email/fecha_nacimiento/numero_documento)`
-          );
-        }
+    if (camposCriticosActualizados) {
+      logger.info(`[updatePersonal] Se actualizaron campos críticos (email/fecha_nacimiento/numero_documento), verificando creación de usuario...`);
+      
+      // Si ahora tiene datos completos, crear o reactivar usuario automáticamente
+      const resultado = await ensureUsuarioParaPersonal(updatedPersonal, userId, 'actualización');
+      
+      if (resultado.created) {
+        logger.info(`[updatePersonal] Usuario creado exitosamente para personal ID ${id}`);
+      } else if (resultado.reactivated) {
+        logger.info(`[updatePersonal] Usuario reactivado para personal ID ${id}`);
+      } else if (resultado.reason === 'ya_existe_activo') {
+        logger.info(`[updatePersonal] Personal ID ${id} ya tiene usuario activo`);
+      } else if (resultado.reason === 'datos_incompletos') {
+        logger.warn(`[updatePersonal] Personal ID ${id} aún no tiene datos completos para crear usuario`);
+      } else if (resultado.error) {
+        logger.error(`[updatePersonal] Error al intentar crear usuario para personal ID ${id}: ${resultado.error}`);
       }
-    } catch (userError) {
-      logger.error(
-        `Error creando usuario automático en updatePersonal ID ${id}:`,
-        userError
-      );
-      // No lanzamos error: la actualización de personal ya se hizo
+    } else {
+      logger.debug(`[updatePersonal] No se actualizaron campos críticos, omitiendo verificación de usuario`);
     }
 
     return updatedPersonal;
+    
   } catch (error) {
-    logger.error(`Error actualizando personal ID ${id}:`, error);
+    logger.error(`[updatePersonal] Error actualizando personal ID ${id}:`, error);
     throw error;
   }
 };
@@ -491,5 +776,6 @@ module.exports = {
   updatePersonal,
   deletePersonal,
   getDeletedPersonal,
-  restorePersonal
+  restorePersonal,
+  sincronizarUsuariosPersonal
 };

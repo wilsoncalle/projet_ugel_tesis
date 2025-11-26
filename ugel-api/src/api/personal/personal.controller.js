@@ -152,6 +152,22 @@ const restore = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Sincronizar usuarios para personal existente
+ * @route POST /api/personal/sincronizar-usuarios
+ */
+const sincronizarUsuarios = asyncHandler(async (req, res) => {
+  logger.info('Iniciando sincronización de usuarios para personal');
+
+  const resultado = await service.sincronizarUsuariosPersonal(req.user.id);
+
+  res.json({
+    success: true,
+    message: 'Sincronización completada exitosamente',
+    data: resultado
+  });
+});
+
 module.exports = {
   getAll,
   getById,
@@ -160,5 +176,6 @@ module.exports = {
   update,
   softDelete,
   getDeleted,
-  restore
+  restore,
+  sincronizarUsuarios
 };
