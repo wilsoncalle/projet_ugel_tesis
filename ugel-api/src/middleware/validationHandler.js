@@ -214,6 +214,14 @@ const schemas = {
         .messages({
           "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
         }),
+      fechaNacimiento: Joi.date().iso().required().messages({
+        "date.base": "La fecha de nacimiento debe ser una fecha válida",
+        "any.required": "La fecha de nacimiento es requerida"
+      }),
+      email: Joi.string().email().max(150).required().messages({
+        "string.email": "Debe ser un email válido",
+        "any.required": "El email es requerido"
+      }),
       cargo: Joi.string().min(2).max(100).default("Sin asignar").optional(),
       areaDestinoId: Joi.number().integer().positive().required(),
       tipoContratoId: Joi.number().integer().positive().required(),
@@ -249,6 +257,8 @@ const schemas = {
         .messages({
           "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
         }),
+      fechaNacimiento: Joi.date().iso().optional(),
+      email: Joi.string().email().max(150).optional(),
       cargo: Joi.string().min(2).max(100).optional(),
       areaDestinoId: Joi.number().integer().positive().optional(),
       tipoContratoId: Joi.number().integer().positive().optional(),

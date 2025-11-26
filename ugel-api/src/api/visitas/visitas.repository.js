@@ -1178,6 +1178,74 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
     throw new AppError('Error en cierre automático de visitas', 500);
   }
 };
+/**
+ * Actualizar estado de la visita (Aceptar/Rechazar)
+ * @param {number} id - ID de la visita
+ * @param {string} estado - Nuevo estado (ACEPTADO, RECHAZADO)
+ * @param {string} motivoRechazo - Motivo del rechazo (opcional)
+ * @returns {Object} Visita actualizada
+ */
+const updateEstado = async (id, estado, motivoRechazo = null) => {
+  try {
+    let query = `
+      UPDATE RegistrosVisitas
+      SET 
+        estado_visita = $1,
+        fecha_aceptacion = CASE WHEN $1 = 'ACEPTADO' THEN CURRENT_TIMESTAMP ELSE fecha_aceptacion END,
+        fecha_rechazo = CASE WHEN $1 = 'RECHAZADO' THEN CURRENT_TIMESTAMP ELSE fecha_rechazo END,
+        motivo_rechazo = $2
+      WHERE id = $3
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [estado, motivoRechazo, id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Visita no encontrada', 404);
+    }
+    
+    return await findById(id);
+  } catch (error) {
+    logger.error(`Error actualizando estado de visita ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error actualizando estado', 500);
+  }
+};
+
+/**
+ * Delegar visita a otro personal
+ * @param {number} id - ID de la visita
+ * @param {number} nuevoPersonalId - ID del nuevo personal
+ * @param {number} nuevoAreaId - ID del área del nuevo personal
+ * @param {number} delegadoPorId - ID del personal que delega
+ * @returns {Object} Visita actualizada
+ */
+const delegar = async (id, nuevoPersonalId, nuevoAreaId, delegadoPorId) => {
+  try {
+    const query = `
+      UPDATE RegistrosVisitas
+      SET
+        personal_visitado_id = $1,
+        area_destino_id = $2,
+        delegado_por_id = $3,
+        fecha_delegacion = CURRENT_TIMESTAMP,
+        estado_visita = 'DELEGADO'
+      WHERE id = $4
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [nuevoPersonalId, nuevoAreaId, delegadoPorId, id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Visita no encontrada', 404);
+    }
+    
+    return await findById(id);
+  } catch (error) {
+    logger.error(`Error delegando visita ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error delegando visita', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findActivas,
@@ -1194,5 +1262,7 @@ module.exports = {
   getFlujoDiario,
   getVisitasPorPersonal,
   getVisitantesFrecuentes,
-  getVisitanteDetalle
+  getVisitanteDetalle,
+  updateEstado,
+  delegar
 };

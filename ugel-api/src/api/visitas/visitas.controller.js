@@ -347,6 +347,92 @@ const cerrarVisitasAutomaticamente = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * Aceptar visita
+ * @route POST /api/visitas/:id/aceptar
+ */
+const accept = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const personalId = req.user.personalId;
+  
+  if (!personalId) {
+    throw new AppError('Usuario no asociado a personal', 400);
+  }
+  
+  const visita = await service.acceptVisita(id, personalId);
+  
+  res.json({
+    success: true,
+    message: 'Visita aceptada exitosamente',
+    data: visita
+  });
+});
+
+/**
+ * Rechazar visita
+ * @route POST /api/visitas/:id/rechazar
+ */
+const reject = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { motivo } = req.body;
+  const personalId = req.user.personalId;
+  
+  if (!personalId) {
+    throw new AppError('Usuario no asociado a personal', 400);
+  }
+  
+  const visita = await service.rejectVisita(id, personalId, motivo);
+  
+  res.json({
+    success: true,
+    message: 'Visita rechazada exitosamente',
+    data: visita
+  });
+});
+
+/**
+ * Delegar visita
+ * @route POST /api/visitas/:id/delegar
+ */
+const delegate = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { nuevoPersonalId } = req.body;
+  const personalId = req.user.personalId;
+  
+  if (!personalId) {
+    throw new AppError('Usuario no asociado a personal', 400);
+  }
+  
+  const visita = await service.delegateVisita(id, personalId, nuevoPersonalId);
+  
+  res.json({
+    success: true,
+    message: 'Visita delegada exitosamente',
+    data: visita
+  });
+});
+
+/**
+ * Obtener mis visitas (Personal)
+ * @route GET /api/visitas/mis-visitas
+ */
+const getMisVisitas = asyncHandler(async (req, res) => {
+  const personalId = req.user.personalId;
+  
+  if (!personalId) {
+    throw new AppError('Usuario no asociado a personal', 400);
+  }
+  
+  const result = await service.getAllVisitas({ ...req.query, personalVisitadoId: personalId });
+  
+  res.json({
+    success: true,
+    message: 'Mis visitas obtenidas exitosamente',
+    data: result.visitas,
+    pagination: result.pagination
+  });
+});
+
 module.exports = {
   getAll,
   getActivas,
@@ -361,5 +447,9 @@ module.exports = {
   getVisitasTotales,
   getVisitasPorPersonal,
   getVisitantesFrecuentes,
-  getVisitanteDetalle
+  getVisitanteDetalle,
+  accept,
+  reject,
+  delegate,
+  getMisVisitas
 };

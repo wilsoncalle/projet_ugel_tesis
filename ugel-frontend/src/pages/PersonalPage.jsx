@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import CatalogoPage from '../components/CatalogoPage';
 import Input from '../components/Input';
 import SelectCustom from '../components/SelectCustom';
+import BirthdatePicker from '../components/BirthdatePicker';
 import { personalService, areasService, tiposContratoService, tiposDocumentoService, cargosService } from '../services/api';
 import { personalFormFields, getTableColumns, transformPersonal, transformPersonalToBackend } from '../config/formFields.jsx';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -84,16 +85,18 @@ const PersonalPage = () => {
       formLayout="grid"
       formFields={formFields.map(field => {
         // Campos de texto
-        if (['numeroDocumento', 'nombres', 'apellidos'].includes(field.name)) {
+        if (['numeroDocumento', 'nombres', 'apellidos', 'email'].includes(field.name)) {
           const labels = {
             numeroDocumento: 'Número de Documento',
             nombres: 'Nombres',
-            apellidos: 'Apellidos'
+            apellidos: 'Apellidos',
+            email: 'Correo Electrónico'
           };
           const maxLengths = {
             numeroDocumento: 20,
             nombres: 150,
-            apellidos: 150
+            apellidos: 150,
+            email: 150
           };
           return {
             ...field,
@@ -104,8 +107,26 @@ const PersonalPage = () => {
                 onChange={(e) => onChange(e.target.value)}
                 maxLength={maxLengths[field.name]}
                 className=" md:w-full"
+                type={field.name === 'email' ? 'email' : 'text'}
               />
             )
+          };
+        }
+
+        // Date picker custom
+        if (field.name === 'fechaNacimiento') {
+          return {
+            ...field,
+            render: ({ value, onChange, error }) => (
+              <BirthdatePicker
+                label={field.label}
+                name={field.name}
+                value={value}
+                onChange={onChange}
+                error={error}
+                className="md:w-full"
+              />
+            ),
           };
         }
 

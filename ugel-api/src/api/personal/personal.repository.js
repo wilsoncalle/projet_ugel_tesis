@@ -35,6 +35,8 @@ const findAll = async (options = {}) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.fecha_nacimiento,
+        p.email,
         p.cargo_id,
         c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
@@ -189,6 +191,8 @@ const findById = async (id) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.fecha_nacimiento,
+        p.email,
         p.cargo_id,
         c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
@@ -227,6 +231,8 @@ const findByDocumento = async (tipoDocumento, numeroDocumento) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.fecha_nacimiento,
+        p.email,
         p.cargo_id,
         c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
@@ -261,7 +267,9 @@ const create = async (personalData) => {
       tipo_documento, 
       numero_documento, 
       nombres, 
-      apellidos, 
+      apellidos,
+      fecha_nacimiento,
+      email,
       cargo_id,
       area_destino_id, 
       tipo_contrato_id,
@@ -273,13 +281,15 @@ const create = async (personalData) => {
         tipo_documento, 
         numero_documento, 
         nombres, 
-        apellidos, 
+        apellidos,
+        fecha_nacimiento,
+        email,
         cargo_id,
         area_destino_id, 
         tipo_contrato_id,
         activo
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING id
     `;
     
@@ -287,7 +297,9 @@ const create = async (personalData) => {
       tipo_documento, 
       numero_documento, 
       nombres, 
-      apellidos, 
+      apellidos,
+      fecha_nacimiento,
+      email,
       cargo_id,
       area_destino_id, 
       tipo_contrato_id,
@@ -354,6 +366,16 @@ const update = async (id, personalData) => {
     if (personalData.apellidos !== undefined) {
       updateFields.push(`apellidos = $${paramCounter++}`);
       queryParams.push(personalData.apellidos);
+    }
+
+    if (personalData.fecha_nacimiento !== undefined) {
+      updateFields.push(`fecha_nacimiento = $${paramCounter++}`);
+      queryParams.push(personalData.fecha_nacimiento);
+    }
+
+    if (personalData.email !== undefined) {
+      updateFields.push(`email = $${paramCounter++}`);
+      queryParams.push(personalData.email);
     }
     
     if (personalData.cargo_id !== undefined) {
@@ -461,10 +483,13 @@ const findByArea = async (areaId) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.fecha_nacimiento,
+        p.email,
         p.cargo_id,
         c.nombre_cargo as cargo_nombre,
         p.activo
       FROM Personal p
+      LEFT JOIN Cargos c ON p.cargo_id = c.id
       WHERE p.area_destino_id = $1 AND p.activo = true
       ORDER BY p.apellidos ASC, p.nombres ASC
     `;
@@ -517,6 +542,8 @@ const findDeleted = async (options = {}) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.fecha_nacimiento,
+        p.email,
         p.cargo_id,
         c.nombre_cargo as cargo_nombre,
         p.area_destino_id,
@@ -594,6 +621,8 @@ const findByIdIncludingDeleted = async (id) => {
         p.numero_documento,
         p.nombres,
         p.apellidos,
+        p.fecha_nacimiento,
+        p.email,
         p.cargo_id,
         c.nombre_cargo as cargo_nombre,
         p.area_destino_id,

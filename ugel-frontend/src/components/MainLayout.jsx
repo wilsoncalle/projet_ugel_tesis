@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Users, ClipboardCheck, FileText, Pin } from 'lucide-react';
 import { papeletasSalidaService } from '../services/api';
+import { Toaster } from 'react-hot-toast';
 
 // Anchos del sidebar (colapsado / expandido) en px
 const SIDEBAR_WIDTH_COLLAPSED = 56;   // barra estrecha (iconos)
@@ -297,6 +298,27 @@ const RRHHSidebar = ({ papeletasActivasCount = 0, isExpanded }) => (
           label="Gestión de Papeletas"
           badge={papeletasActivasCount > 0 ? papeletasActivasCount : null}
         /> */}
+      </ul>
+    </div>
+  </>
+);
+
+// Sidebar para Personal
+const PersonalSidebar = ({ isExpanded }) => (
+  <>
+    <div className="mb-4">
+      <SectionHeader title="Mi Gestión" isExpanded={isExpanded} />
+      <ul className="space-y-0.5">
+        <NavItem 
+          to="/mis-visitas" 
+          isExpanded={isExpanded}
+          icon={
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          } 
+          label="Mis Visitas" 
+        />
       </ul>
     </div>
   </>
@@ -777,6 +799,7 @@ const MainLayout = () => {
           }
         }
       `}</style>
+      <Toaster position="top-right" />
     </div>
   );
 };

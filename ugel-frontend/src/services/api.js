@@ -259,6 +259,17 @@ export const visitasService = {
   getVisitasPorPersonal: (periodo = 'mes') => api.get(`/visitas/por-personal?periodo=${periodo}`),
   getVisitantesFrecuentes: (periodo = 'mes') => api.get(`/visitas/visitantes-frecuentes?periodo=${periodo}`),
   getVisitanteDetalle: (visitanteId, periodo = 'mes') => api.get(`/visitas/visitante/${visitanteId}/detalle?periodo=${periodo}`),
+  getMisVisitas: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    if (filters.q) params.append('q', filters.q);
+    return api.get(`/visitas/mis-visitas?${params.toString()}`);
+  },
+  buscarGlobal: (documento) => api.get(`/visitas/buscar?documento=${documento}`),
+  accept: (id) => api.post(`/visitas/${id}/aceptar`),
+  reject: (id, motivo) => api.post(`/visitas/${id}/rechazar`, { motivo }),
+  delegate: (id, nuevoPersonalId) => api.post(`/visitas/${id}/delegar`, { nuevoPersonalId }),
 };
 
 export const tiposDocumentoService = {

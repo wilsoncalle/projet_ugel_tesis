@@ -1040,6 +1040,78 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
   }
 };
 
+/**
+ * Aceptar visita
+ * @param {number} id - ID de la visita
+ * @param {number} personalId - ID del personal que acepta
+ * @returns {Object} Visita actualizada
+ */
+const acceptVisita = async (id, personalId) => {
+  try {
+    const visita = await repository.findById(id);
+    if (!visita) throw new AppError('Visita no encontrada', 404);
+
+    // Verificar que sea el personal visitado
+    if (visita.personal_visitado_id !== personalId) {
+      throw new AppError('No tiene permiso para aceptar esta visita', 403);
+    }
+    
+    return await repository.updateEstado(id, 'ACEPTADO');
+  } catch (error) {
+    logger.error(`Error aceptando visita ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Rechazar visita
+ * @param {number} id - ID de la visita
+ * @param {number} personalId - ID del personal que rechaza
+ * @param {string} motivo - Motivo del rechazo
+ * @returns {Object} Visita actualizada
+ */
+const rejectVisita = async (id, personalId, motivo) => {
+  try {
+    const visita = await repository.findById(id);
+    if (!visita) throw new AppError('Visita no encontrada', 404);
+    
+    if (visita.personal_visitado_id !== personalId) {
+      throw new AppError('No tiene permiso para rechazar esta visita', 403);
+    }
+    
+    return await repository.updateEstado(id, 'RECHAZADO', motivo);
+  } catch (error) {
+    logger.error(`Error rechazando visita ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Delegar visita
+ * @param {number} id - ID de la visita
+ * @param {number} personalId - ID del personal que delega
+ * @param {number} nuevoPersonalId - ID del nuevo personal
+ * @returns {Object} Visita actualizada
+ */
+const delegateVisita = async (id, personalId, nuevoPersonalId) => {
+  try {
+    const visita = await repository.findById(id);
+    if (!visita) throw new AppError('Visita no encontrada', 404);
+    
+    if (visita.personal_visitado_id !== personalId) {
+      throw new AppError('No tiene permiso para delegar esta visita', 403);
+    }
+    
+    const nuevoPersonal = await personalRepository.findById(nuevoPersonalId);
+    if (!nuevoPersonal) throw new AppError('Nuevo personal no encontrado', 404);
+    
+    return await repository.delegar(id, nuevoPersonalId, nuevoPersonal.area_destino_id, personalId);
+  } catch (error) {
+    logger.error(`Error delegando visita ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllVisitas,
   getVisitasActivas,
@@ -1053,8 +1125,11 @@ module.exports = {
   exportarAPDF,
   getVisitasPorArea,
   getVisitasPorMotivo,
-  getVisitasTotales,
+  getVisitasTotales, // Kept from original, assuming it's a service function
   getVisitasPorPersonal,
   getVisitantesFrecuentes,
-  getVisitanteDetalle
+  getVisitanteDetalle,
+  acceptVisita,
+  rejectVisita,
+  delegateVisita
 };

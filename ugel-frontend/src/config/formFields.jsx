@@ -118,6 +118,20 @@ export const personalFormFields = [
     placeholder: 'Ingrese apellidos'
   },
   {
+    name: 'fechaNacimiento',
+    label: 'Fecha de Nacimiento',
+    type: 'date',
+    required: true,
+    placeholder: 'Seleccione fecha de nacimiento'
+  },
+  {
+    name: 'email',
+    label: 'Correo Electrónico',
+    type: 'email',
+    required: true,
+    placeholder: 'Ingrese correo electrónico'
+  },
+  {
     name: 'cargoId',
     label: 'Cargo',
     type: 'select',
@@ -332,6 +346,23 @@ export const transformCargosToBackend = (data) => {
 };
 
 // Transformación de datos para el módulo de Personal
+
+// Helper para formatear fechas al formato YYYY-MM-DD (requerido por input type="date")
+const formatDateForInput = (value) => {
+  if (!value) return '';
+
+  // Soporta string ISO, string YYYY-MM-DD, Date, etc.
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`; // 2004-09-26
+};
+
 export const transformPersonal = (data) => {
   console.log('transformPersonal - Datos de entrada:', data);
   if (Array.isArray(data)) {
@@ -341,6 +372,8 @@ export const transformPersonal = (data) => {
       numeroDocumento: item.numero_documento,
       nombres: item.nombres,
       apellidos: item.apellidos,
+      fechaNacimiento: formatDateForInput(item.fecha_nacimiento),
+      email: item.email,
       cargoId: item.cargo_id ? item.cargo_id.toString() : '',
       cargo_nombre: item.cargo_nombre || 'Sin asignar',
       areaDestinoId: item.area_destino_id ? item.area_destino_id.toString() : '',
@@ -359,6 +392,8 @@ export const transformPersonal = (data) => {
       numeroDocumento: data.numero_documento,
       nombres: data.nombres,
       apellidos: data.apellidos,
+      fechaNacimiento: formatDateForInput(data.fecha_nacimiento),
+      email: data.email,
       cargoId: data.cargo_id ? data.cargo_id.toString() : '',
       cargo_nombre: data.cargo_nombre || 'Sin asignar',
       areaDestinoId: data.area_destino_id ? data.area_destino_id.toString() : '',
@@ -374,21 +409,21 @@ export const transformPersonal = (data) => {
   return data;
 };
 
+
 // Función para transformar datos del frontend al backend
-export const transformPersonalToBackend = (data) => {
-  console.log('transformPersonalToBackend - Datos de entrada:', data);
-  const transformed = {
-    tipoDocumento: data.tipoDocumento,
-    numeroDocumento: data.numeroDocumento,
-    nombres: data.nombres,
-    apellidos: data.apellidos,
-    cargoId: parseInt(data.cargoId),
-    areaDestinoId: parseInt(data.areaDestinoId),
-    tipoContratoId: parseInt(data.tipoContratoId),
-    activo: data.activo
+export const transformPersonalToBackend = (formData) => {
+  return {
+    tipoDocumento: formData.tipoDocumento,
+    numeroDocumento: formData.numeroDocumento,
+    nombres: formData.nombres,
+    apellidos: formData.apellidos,
+    fechaNacimiento: formData.fechaNacimiento || null, // ya viene "YYYY-MM-DD"
+    email: formData.email,
+    cargoId: formData.cargoId,
+    areaDestinoId: formData.areaDestinoId,
+    tipoContratoId: formData.tipoContratoId,
+    activo: formData.activo,
   };
-  console.log('transformPersonalToBackend - Datos transformados:', transformed);
-  return transformed;
 };
 
 // Usuarios - campos y transformaciones
@@ -763,6 +798,68 @@ export const getTableColumns = (moduleName) => {
         minWidth: '150px',
         maxWidth: '150px',
         width: '150px'
+      },
+      {
+        key: 'fechaNacimiento',
+        title: 'F. Nacimiento',
+        minWidth: '120px',
+        maxWidth: '130px',
+        width: '120px',
+        render: (value, row) => {
+          // En algunos componentes de tabla, `value` puede venir como:
+          // - el valor de la celda (string)
+          // - o la fila completa (objeto)
+          let raw = value;
+
+          // Si value es un objeto, intentamos sacar la fecha de ahí o de row
+          if (raw && typeof raw === 'object') {
+            if ('fechaNacimiento' in raw) {
+              raw = raw.fechaNacimiento;
+            } else if ('fecha_nacimiento' in raw) {
+              raw = raw.fecha_nacimiento;
+            } else if (row && typeof row === 'object') {
+              raw = row.fechaNacimiento || row.fecha_nacimiento || '';
+            } else {
+              raw = '';
+            }
+          } else if (!raw && row && typeof row === 'object') {
+            // Si value viene vacío pero la fila sí tiene el campo
+            raw = row.fechaNacimiento || row.fecha_nacimiento || '';
+          }
+
+          if (!raw) return '';
+
+          // A estas alturas raw debería ser algo tipo 'YYYY-MM-DD' o 'YYYY-MM-DDTHH:mm:ss'
+          if (typeof raw === 'string') {
+            const [datePart] = raw.split('T');   // '2004-09-26'
+            const parts = datePart.split('-');   // ['2004','09','26']
+            if (parts.length === 3) {
+              const [year, month, day] = parts;
+              return `${day}/${month}/${year}`; // 26/09/2004
+            }
+            // Si no es formateable, devolvemos el pedazo de fecha
+            return datePart;
+          }
+
+          // Fallback por si raw no es string (Date u otra cosa parseable)
+          const date = raw instanceof Date ? raw : new Date(raw);
+          if (Number.isNaN(date.getTime())) {
+            // Mejor mostrar vacío que [object Object]
+            return '';
+          }
+
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          return `${day}/${month}/${year}`;
+        }
+      },
+      {
+        key: 'email',
+        title: 'Correo',
+        minWidth: '220px',
+        maxWidth: '260px',
+        width: '220px'
       },
       { 
         key: 'cargo_nombre', 

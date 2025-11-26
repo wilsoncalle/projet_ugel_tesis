@@ -11,6 +11,7 @@ const DefaultRedirect = () => {
   if (role.includes('admin')) return <Navigate to="/admin" replace />;
   if (role.includes('rrhh')) return <Navigate to="/rrhh" replace />;
   if (role.includes('vigilante')) return <Navigate to="/vigilante" replace />;
+  if (role.includes('personal')) return <Navigate to="/mis-visitas" replace />;
   
   // Fallback to login if role is unknown
   return <Navigate to="/login" replace />;
@@ -28,6 +29,7 @@ import DashboardRRHHPage from './pages/DashboardRRHHPage';
 import DashboardVigilantePage from './pages/DashboardVigilantePage';
 import PersonalAsistenciaPage from './pages/PersonalAsistenciaPage';
 import ProfilePage from './pages/ProfilePage';
+import MisVisitasPage from './pages/MisVisitasPage';
 
 // Catalog Pages
 import AreasPage from './pages/AreasPage';
@@ -97,6 +99,7 @@ function App() {
             
             {/* Ruta de Perfil - Accesible para todos los roles autenticados */}
             <Route path="/perfil" element={<ProtectedRoute element={<ProfilePage />} />} />
+            <Route path="/mis-visitas" element={<ProtectedRoute element={<MisVisitasPage />} />} />
             
             {/* Default Redirect Based on Role */}
             <Route path="/" element={<ProtectedRoute element={<DefaultRedirect />} />} />

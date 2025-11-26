@@ -935,10 +935,7 @@ const DashboardVigilantePage = () => {
         // Campos para compatibilidad con la tabla
         personal_visitado_id: visita.personalVisitadoId,
         motivo_visita_id: visita.motivoVisitaId,
-        area_destino_id: visita.areaDestinoId,
-        personal_cargo: 'Sin cargo',
-        nombre_motivo: 'Pendiente',
-        nombre_area: 'Pendiente'
+        area_destino_id: visita.areaDestinoId
       }));
       
       setVisitasPendientes(visitasTransformadas);

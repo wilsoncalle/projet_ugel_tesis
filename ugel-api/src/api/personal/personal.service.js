@@ -7,9 +7,13 @@ const repository = require('./personal.repository');
 const areasRepository = require('../areas/areas.repository');
 const tiposContratoRepository = require('../tipos-contrato/tiposcontrato.repository');
 const cargosRepository = require('../cargos/cargos.repository');
+const usuariosService = require('../usuarios/usuarios.service');
 const { AppError } = require('../../middleware/errorHandler');
 const config = require('../../config');
 const logger = require('../../utils/logger');
+const { toLimaDateYYYYMMDD } = require('../../utils/fechas');
+
+
 
 /**
  * Obtener todo el personal con paginación y filtros
@@ -102,11 +106,14 @@ const createPersonal = async (personalData, userId) => {
       tipoDocumento, 
       numeroDocumento, 
       nombres, 
-      apellidos, 
+      apellidos,
+      fechaNacimiento,
+      email,
       cargoId,
       areaDestinoId, 
       tipoContratoId 
     } = personalData;
+    const fechaNacimientoLima = toLimaDateYYYYMMDD(fechaNacimiento);
     
     // Verificar que el tipo de documento sea válido
     if (!config.validation.validDocumentTypes.includes(tipoDocumento)) {
@@ -152,6 +159,8 @@ const createPersonal = async (personalData, userId) => {
       numero_documento: numeroDocumento,
       nombres,
       apellidos,
+      fecha_nacimiento: fechaNacimientoLima,
+      email,
       cargo_id: cargoId,
       area_destino_id: areaDestinoId,
       tipo_contrato_id: tipoContratoId,
@@ -159,6 +168,36 @@ const createPersonal = async (personalData, userId) => {
     });
     
     logger.info(`Personal creado: ${nombres} ${apellidos} por usuario ID: ${userId}`);
+
+    // Crear usuario automático
+    try {
+    const fechaNacStr = toLimaDateYYYYMMDD(fechaNacimiento); // "YYYY-MM-DD"
+
+    if (!fechaNacStr) {
+      throw new AppError('Fecha de nacimiento inválida', 400);
+    }
+    const [year, month, day] = fechaNacStr.split('-');
+    const password = `${day}${month}${year}`; // DDMMYYYY
+
+    await usuariosService.createUsuario(
+      {
+        nombreUsuario: numeroDocumento,
+        email: email,
+        contrasena: password,
+        rol: 'Personal',
+        personalId: newPersonal.id,
+      },
+      userId
+    );
+
+    logger.info(`Usuario creado automáticamente para personal ID: ${newPersonal.id}`);
+  } catch (userError) {
+    logger.error(
+      `Error creando usuario automático para personal ID ${newPersonal.id}:`,
+      userError
+    );
+    // No lanzas error para no romper la creación de personal
+  }
     
     return newPersonal;
     
@@ -182,12 +221,13 @@ const updatePersonal = async (id, personalData, userId) => {
     if (!existingPersonal) {
       throw new AppError('Personal no encontrado', 404);
     }
-    
     const { 
       tipoDocumento, 
       numeroDocumento, 
       nombres, 
-      apellidos, 
+      apellidos,
+      fechaNacimiento,
+      email,
       cargoId,
       areaDestinoId, 
       tipoContratoId,
@@ -195,14 +235,12 @@ const updatePersonal = async (id, personalData, userId) => {
     } = personalData;
     
     const updateData = {};
-    
     // Preparar datos a actualizar
     if (tipoDocumento !== undefined) {
       // Verificar que el tipo de documento sea válido
       if (!config.validation.validDocumentTypes.includes(tipoDocumento)) {
         throw new AppError(`Tipo de documento inválido. Tipos válidos: ${config.validation.validDocumentTypes.join(', ')}`, 400);
-      }
-      
+      }  
       updateData.tipo_documento = tipoDocumento;
     }
     
@@ -213,12 +251,10 @@ const updatePersonal = async (id, personalData, userId) => {
           tipoDocumento || existingPersonal.tipo_documento, 
           numeroDocumento
         );
-        
         if (duplicatePersonal && duplicatePersonal.id !== parseInt(id)) {
           throw new AppError('Ya existe otro personal con este documento', 409);
         }
       }
-      
       updateData.numero_documento = numeroDocumento;
     }
     
@@ -228,6 +264,19 @@ const updatePersonal = async (id, personalData, userId) => {
     
     if (apellidos !== undefined) {
       updateData.apellidos = apellidos;
+    }
+
+    if (fechaNacimiento !== undefined) {
+      // Normalizamos a YYYY-MM-DD en zona horaria Lima
+      const fechaNacStr = toLimaDateYYYYMMDD(fechaNacimiento);
+      if (!fechaNacStr) {
+        throw new AppError('Fecha de nacimiento inválida', 400);
+      }
+      updateData.fecha_nacimiento = fechaNacStr;
+    }
+
+    if (email !== undefined) {
+      updateData.email = email;
     }
     
     if (cargoId !== undefined) {
@@ -280,11 +329,57 @@ const updatePersonal = async (id, personalData, userId) => {
     
     // Actualizar personal
     const updatedPersonal = await repository.update(id, updateData);
-    
+
     logger.info(`Personal ID ${id} actualizado por usuario ID: ${userId}`);
-    
+
+    // 🔹 NUEVO: si ahora tiene datos completos y aún no tiene usuario, crearlo automáticamente
+    try {
+      const existingUser = await usuariosService.getUsuarioByPersonalId(updatedPersonal.id);
+
+      // Solo intentamos crear si NO tiene usuario aún
+      if (!existingUser) {
+        // Usamos la fecha del personal actualizado o la que vino en el body
+        const fechaNacimientoRaw = updatedPersonal.fecha_nacimiento || fechaNacimiento;
+        const fechaNacStr = toLimaDateYYYYMMDD(fechaNacimientoRaw);
+
+        const tieneDatosMinimos =
+          fechaNacStr &&
+          updatedPersonal.numero_documento &&
+          updatedPersonal.email;
+
+        if (tieneDatosMinimos) {
+          const [year, month, day] = fechaNacStr.split('-');
+          const password = `${day}${month}${year}`; // DDMMYYYY
+
+          await usuariosService.createUsuario(
+            {
+              nombreUsuario: updatedPersonal.numero_documento,
+              email: updatedPersonal.email,
+              contrasena: password,
+              rol: 'Personal',
+              personalId: updatedPersonal.id,
+            },
+            userId
+          );
+
+          logger.info(
+            `Usuario creado automáticamente (por actualización) para personal ID: ${updatedPersonal.id}`
+          );
+        } else {
+          logger.warn(
+            `No se pudo crear usuario automático para personal ID ${updatedPersonal.id} por datos incompletos (email/fecha_nacimiento/numero_documento)`
+          );
+        }
+      }
+    } catch (userError) {
+      logger.error(
+        `Error creando usuario automático en updatePersonal ID ${id}:`,
+        userError
+      );
+      // No lanzamos error: la actualización de personal ya se hizo
+    }
+
     return updatedPersonal;
-    
   } catch (error) {
     logger.error(`Error actualizando personal ID ${id}:`, error);
     throw error;

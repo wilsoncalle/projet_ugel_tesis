@@ -15,7 +15,7 @@ const router = express.Router();
  * @desc    Obtener todas las visitas con paginación y filtros
  * @access  Private
  */
-router.get('/', 
+router.get('/',
   authenticateToken,
   requireActiveUser,
   validationMiddleware.validatePagination,
@@ -50,7 +50,7 @@ router.get('/export/pdf',
  * @desc    Obtener visitas activas (sin salida)
  * @access  Private
  */
-router.get('/activas', 
+router.get('/activas',
   authenticateToken,
   requireActiveUser,
   validationMiddleware.validatePagination,
@@ -62,13 +62,18 @@ router.get('/activas',
  * @desc    Obtener estadísticas de visitas por área
  * @access  Private
  */
-router.get('/por-area', 
+router.get('/por-area',
   authenticateToken,
   requireActiveUser,
   controller.getVisitasPorArea
 );
 
-router.get('/por-motivo', 
+/**
+ * @route   GET /api/visitas/por-motivo
+ * @desc    Obtener estadísticas de visitas por motivo
+ * @access  Private
+ */
+router.get('/por-motivo',
   authenticateToken,
   requireActiveUser,
   controller.getVisitasPorMotivo
@@ -79,7 +84,7 @@ router.get('/por-motivo',
  * @desc    Obtener estadísticas de visitas por personal visitado
  * @access  Private
  */
-router.get('/por-personal', 
+router.get('/por-personal',
   authenticateToken,
   requireActiveUser,
   controller.getVisitasPorPersonal
@@ -90,7 +95,7 @@ router.get('/por-personal',
  * @desc    Obtener visitantes frecuentes
  * @access  Private
  */
-router.get('/visitantes-frecuentes', 
+router.get('/visitantes-frecuentes',
   authenticateToken,
   requireActiveUser,
   controller.getVisitantesFrecuentes
@@ -101,7 +106,7 @@ router.get('/visitantes-frecuentes',
  * @desc    Obtener detalle de visitas de un visitante específico
  * @access  Private
  */
-router.get('/visitante/:visitanteId/detalle', 
+router.get('/visitante/:visitanteId/detalle',
   authenticateToken,
   requireActiveUser,
   controller.getVisitanteDetalle
@@ -112,10 +117,22 @@ router.get('/visitante/:visitanteId/detalle',
  * @desc    Obtener estadísticas de visitas totales
  * @access  Private
  */
-router.get('/totales', 
+router.get('/totales',
   authenticateToken,
   requireActiveUser,
   controller.getVisitasTotales
+);
+
+/**
+ * @route   GET /api/visitas/mis-visitas
+ * @desc    Obtener mis visitas (Personal)
+ * @access  Private
+ */
+router.get('/mis-visitas',
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validatePagination,
+  controller.getMisVisitas
 );
 
 /**
@@ -123,7 +140,7 @@ router.get('/totales',
  * @desc    Obtener visita por ID
  * @access  Private
  */
-router.get('/:id', 
+router.get('/:id',
   authenticateToken,
   requireActiveUser,
   validationMiddleware.validateId,
@@ -135,7 +152,7 @@ router.get('/:id',
  * @desc    Registrar nueva visita
  * @access  Private
  */
-router.post('/', 
+router.post('/',
   authenticateToken,
   requireActiveUser,
   validationMiddleware.validateCreateVisita,
@@ -147,7 +164,7 @@ router.post('/',
  * @desc    Registrar salida de visita
  * @access  Private
  */
-router.put('/:id/salida', 
+router.put('/:id/salida',
   authenticateToken,
   requireActiveUser,
   validationMiddleware.validateId,
@@ -159,10 +176,46 @@ router.put('/:id/salida',
  * @desc    Cerrar automáticamente visitas pendientes según las reglas del sistema
  * @access  Private
  */
-router.post('/cerrar-automatico', 
+router.post('/cerrar-automatico',
   authenticateToken,
   requireActiveUser,
   controller.cerrarVisitasAutomaticamente
+);
+
+/**
+ * @route   POST /api/visitas/:id/aceptar
+ * @desc    Aceptar visita
+ * @access  Private
+ */
+router.post('/:id/aceptar',
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateId,
+  controller.accept
+);
+
+/**
+ * @route   POST /api/visitas/:id/rechazar
+ * @desc    Rechazar visita
+ * @access  Private
+ */
+router.post('/:id/rechazar',
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateId,
+  controller.reject
+);
+
+/**
+ * @route   POST /api/visitas/:id/delegar
+ * @desc    Delegar visita
+ * @access  Private
+ */
+router.post('/:id/delegar',
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateId,
+  controller.delegate
 );
 
 module.exports = router;

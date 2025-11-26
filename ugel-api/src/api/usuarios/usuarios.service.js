@@ -68,6 +68,26 @@ const getUsuarioById = async (id) => {
     throw error;
   }
 };
+/**
+ * Obtener usuario por personalId
+ * @param {number} personalId - ID del personal
+ * @returns {Object|null} Usuario encontrado sin contraseña
+ */
+const getUsuarioByPersonalId = async (personalId) => {
+  try {
+    if (!personalId) return null;
+
+    const usuario = await repository.findByPersonalId(personalId);
+    if (!usuario) return null;
+
+    const { hash_contrasena, ...usuarioSinContrasena } = usuario;
+    return usuarioSinContrasena;
+  } catch (error) {
+    logger.error(`Error obteniendo usuario por personalId ${personalId}:`, error);
+    throw error;
+  }
+};
+
 
 /**
  * Crear nuevo usuario
@@ -500,5 +520,6 @@ module.exports = {
   getDeletedUsuarios,
   restoreUsuario,
   updateProfile,
-  updatePassword
+  updatePassword,
+  getUsuarioByPersonalId
 };

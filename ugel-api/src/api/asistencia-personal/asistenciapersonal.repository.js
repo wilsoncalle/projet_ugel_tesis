@@ -454,7 +454,8 @@ const create = async (asistenciaData) => {
       hora_ingreso,
       hora_salida,
       estado_presencia,
-      usuario_registro_id
+      usuario_registro_id,
+      minutos_tardanza
     } = asistenciaData;
     
     const query = `
@@ -464,9 +465,10 @@ const create = async (asistenciaData) => {
         hora_ingreso,
         hora_salida,
         estado_presencia,
-        usuario_registro_id
+        usuario_registro_id,
+        minutos_tardanza
       )
-      VALUES ($1, $2, $3, $4, $5, $6)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING id
     `;
     
@@ -476,7 +478,8 @@ const create = async (asistenciaData) => {
       hora_ingreso,
       hora_salida,
       estado_presencia,
-      usuario_registro_id
+      usuario_registro_id,
+      minutos_tardanza || 0
     ]);
     
     if (result.rows.length === 0) {
@@ -515,19 +518,20 @@ const create = async (asistenciaData) => {
  * @param {number} usuarioId - ID del usuario que actualiza
  * @returns {Object} Registro de asistencia actualizado
  */
-const updateIngreso = async (id, horaIngreso, estadoPresencia, usuarioId) => {
+const updateIngreso = async (id, horaIngreso, estadoPresencia, usuarioId, minutosTardanza = 0) => {
   try {
     const query = `
       UPDATE ControlAsistenciaPersonal 
       SET 
         hora_ingreso = $1,
         estado_presencia = $2,
-        usuario_registro_id = $3
-      WHERE id = $4
+        usuario_registro_id = $3,
+        minutos_tardanza = $4
+      WHERE id = $5
       RETURNING id
     `;
     
-    const result = await db.query(query, [horaIngreso, estadoPresencia, usuarioId, id]);
+    const result = await db.query(query, [horaIngreso, estadoPresencia, usuarioId, minutosTardanza, id]);
     
     if (result.rows.length === 0) {
       throw new AppError('Registro de asistencia no encontrado', 404);
@@ -1458,6 +1462,80 @@ const getPersonalDetalle = async (personalId, fechaInicio, fechaFin) => {
   }
 };
 
+/**
+ * Obtener configuración de asistencia
+ * @param {number} personalId - ID del personal (opcional)
+ * @returns {Object} Configuración
+ */
+const getConfiguracion = async (personalId = null) => {
+  try {
+    let query;
+    let params = [];
+
+    if (personalId) {
+      // Buscar configuración específica o global (específica tiene prioridad)
+      query = `
+        SELECT minutos_tolerancia_por_dia, dias_tolerancia_por_mes
+        FROM config_asistencia_personal
+        WHERE personal_id = $1 OR personal_id IS NULL
+        ORDER BY personal_id NULLS LAST
+        LIMIT 1
+      `;
+      params = [personalId];
+    } else {
+      // Solo global
+      query = `
+        SELECT minutos_tolerancia_por_dia, dias_tolerancia_por_mes
+        FROM config_asistencia_personal
+        WHERE personal_id IS NULL
+        LIMIT 1
+      `;
+    }
+
+    const result = await db.query(query, params);
+    
+    if (result.rows.length > 0) {
+        return {
+            minutos_tolerancia_dia: result.rows[0].minutos_tolerancia_por_dia,
+            dias_tolerancia_mes: result.rows[0].dias_tolerancia_por_mes
+        };
+    }
+    
+    return { dias_tolerancia_mes: 10, minutos_tolerancia_dia: 10 };
+  } catch (error) {
+    logger.error('Error obteniendo configuración de asistencia:', error);
+    return { dias_tolerancia_mes: 10, minutos_tolerancia_dia: 10 };
+  }
+};
+
+/**
+ * Contar días de tolerancia usados en el mes
+ * @param {number} personalId
+ * @param {number} mes
+ * @param {number} anio
+ * @returns {number} Días usados
+ */
+const countDiasToleranciaUsados = async (personalId, mes, anio) => {
+  try {
+    const query = `
+      SELECT COUNT(*) as total
+      FROM ControlAsistenciaPersonal
+      WHERE personal_id = $1
+        AND EXTRACT(MONTH FROM fecha) = $2
+        AND EXTRACT(YEAR FROM fecha) = $3
+        AND minutos_tardanza > 0
+        AND estado_presencia = 'Presente'
+    `;
+    
+    const result = await db.query(query, [personalId, mes, anio]);
+    return parseInt(result.rows[0].total);
+    
+  } catch (error) {
+    logger.error('Error contando días de tolerancia:', error);
+    return 0;
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -1475,5 +1553,7 @@ module.exports = {
   getEstadisticasAusencias,
   getEstadisticasAreas,
   getEstadisticasPersonal,
-  getPersonalDetalle
+  getPersonalDetalle,
+  getConfiguracion,
+  countDiasToleranciaUsados
 };

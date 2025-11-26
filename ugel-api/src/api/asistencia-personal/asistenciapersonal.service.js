@@ -184,53 +184,106 @@ const registrarIngreso = async (personalId, usuarioId) => {
     // Obtener fecha y hora actual en zona horaria de Lima (UTC-5)
     const { fecha: fechaActual, hora: horaActual } = nowLima();
     
-    // Verificar si el personal tiene una papeleta activa para esta fecha
-    // Si tiene papeleta activa, debe marcarse como 'En Permiso' (no tardanza ni ausente)
+    // Obtener configuración y uso de tolerancia
+    const configAsistencia = await repository.getConfiguracion(personalId);
+    const fechaObj = new Date(fechaActual);
+    const diasUsados = await repository.countDiasToleranciaUsados(
+        personalId, 
+        fechaObj.getMonth() + 1, 
+        fechaObj.getFullYear()
+    );
+
     const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaActual);
-    
-    // Determinar estado según la hora de ingreso
-    // Si tiene papeleta activa, siempre es 'En Permiso' (no se marca tardanza)
-    let estadoPresencia;
-    if (papeletaActiva) {
-      estadoPresencia = 'Permiso';
-      logger.info(`Personal ID ${personalId} tiene papeleta activa (${papeletaActiva.codigo_papeleta}) - Estado: Permiso`);
-    } else {
-      estadoPresencia = determinarEstadoPresencia(horaActual);
-      logger.info(`Registrando ingreso - Hora Lima: ${horaActual}, Estado: ${estadoPresencia}`);
-    }
-    
-    // Verificar si ya existe un registro para este personal en la fecha actual
     const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);
     
-    if (registroExistente) {
-      // Si ya existe un registro con hora de ingreso, no permitir registrar nuevamente
-      // (esto previene duplicados, pero el registro de ingreso NUNCA debe estar bloqueado por el estado)
-      if (registroExistente.hora_ingreso) {
-        throw new AppError('El personal ya tiene un ingreso registrado para hoy', 400);
-      }
-      
-      // Si existe un registro pero sin hora de ingreso (ej. se marcó como ausente manualmente),
-      // actualizarlo con la hora de ingreso y recalcular el estado
-      const asistencia = await repository.updateIngreso(registroExistente.id, horaActual, estadoPresencia, usuarioId);
-      
-      logger.info(`Ingreso actualizado para personal ID ${personalId} a las ${horaActual} - Estado: ${estadoPresencia}`);
-      
-      return asistencia;
+    let minutosTardanzaCalculados = 0;
+    let esRetornoPapeleta = false;
+
+    // Calcular minutos de tardanza
+    if (registroExistente && registroExistente.hora_ingreso && papeletaActiva && papeletaActiva.estado === 'EN_CURSO') {
+        // Retorno de papeleta
+        esRetornoPapeleta = true;
+        const retornoProg = new Date(papeletaActiva.fecha_hora_retorno_programada);
+        
+        const [hAct, mAct] = horaActual.split(':').map(Number);
+        const minAct = hAct * 60 + mAct;
+        
+        // Ajuste básico para obtener minutos del día de la fecha programada
+        // Asumimos que la fecha programada es correcta en la DB
+        const minProg = retornoProg.getHours() * 60 + retornoProg.getMinutes();
+        
+        const diff = minAct - minProg;
+        if (diff > 0) {
+            minutosTardanzaCalculados = diff;
+        }
+        
+        // Actualizar papeleta marcando retorno real
+        await papeletasRepository.registrarRetorno(papeletaActiva.id, usuarioId);
+        
+    } else if (!registroExistente || !registroExistente.hora_ingreso) {
+        // Primer ingreso del día
+        const [hAct, mAct] = horaActual.split(':').map(Number);
+        const minAct = hAct * 60 + mAct;
+        
+        const minInicio = 8 * 60; // 8:00 AM Inicio de jornada
+        const diff = minAct - minInicio;
+        
+        if (diff > 0) {
+            minutosTardanzaCalculados = diff;
+        }
     } else {
-      // Si no existe un registro, crear uno nuevo
-      // IMPORTANTE: El registro siempre se crea, sin importar la hora del día
-      const asistencia = await repository.create({
-        personal_id: personalId,
-        fecha: fechaActual,
-        hora_ingreso: horaActual,
-        hora_salida: null,
-        estado_presencia: estadoPresencia,
-        usuario_registro_id: usuarioId
-      });
-      
-      logger.info(`Ingreso registrado para personal ID ${personalId} a las ${horaActual} - Estado: ${estadoPresencia}`);
-      
-      return asistencia;
+        // Ya tiene ingreso y no es retorno de papeleta
+        throw new AppError('El personal ya tiene un ingreso registrado para hoy', 400);
+    }
+    
+    // Determinar nuevo estado
+    let nuevoEstado = 'Presente';
+    let totalMinutosTardanza = minutosTardanzaCalculados;
+    
+    if (registroExistente) {
+        totalMinutosTardanza += (registroExistente.minutos_tardanza || 0);
+    }
+
+    if (minutosTardanzaCalculados > 0) {
+        // Verificar tolerancia (10 días de 10 min)
+        if (minutosTardanzaCalculados <= configAsistencia.minutos_tolerancia_dia && diasUsados < configAsistencia.dias_tolerancia_mes) {
+            nuevoEstado = 'Presente';
+        } else {
+            nuevoEstado = 'Tardanza';
+        }
+    }
+    
+    // Si ya estaba en Tardanza, se mantiene
+    if (registroExistente && registroExistente.estado_presencia === 'Tardanza') {
+        nuevoEstado = 'Tardanza';
+    }
+    
+    // Si tiene papeleta activa (no retorno), el estado inicial podría ser Permiso?
+    // Si llega tarde al inicio pero tiene papeleta de 8 a 10...
+    // La lógica actual prioriza la llegada.
+    
+    if (registroExistente) {
+        const asistencia = await repository.updateIngreso(
+            registroExistente.id, 
+            registroExistente.hora_ingreso || horaActual, 
+            nuevoEstado, 
+            usuarioId,
+            totalMinutosTardanza
+        );
+        logger.info(`Ingreso actualizado (Retorno/Corrección) para personal ID ${personalId} - Estado: ${nuevoEstado}, Tardanza: ${totalMinutosTardanza} min`);
+        return asistencia;
+    } else {
+        const asistencia = await repository.create({
+            personal_id: personalId,
+            fecha: fechaActual,
+            hora_ingreso: horaActual,
+            hora_salida: null,
+            estado_presencia: nuevoEstado,
+            usuario_registro_id: usuarioId,
+            minutos_tardanza: totalMinutosTardanza
+        });
+        logger.info(`Ingreso registrado para personal ID ${personalId} - Estado: ${nuevoEstado}, Tardanza: ${totalMinutosTardanza} min`);
+        return asistencia;
     }
     
   } catch (error) {
