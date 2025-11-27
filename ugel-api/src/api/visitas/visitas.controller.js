@@ -465,6 +465,27 @@ const getMisVisitas = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * Finalizar atención de visita
+ * @route POST /api/visitas/:id/finalizar-atencion
+ */
+const finalizarAtencion = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const personalId = req.user.personalId;
+  
+  if (!personalId) {
+    throw new AppError('Usuario no asociado a personal', 400);
+  }
+  
+  const visita = await service.finalizarAtencion(id, personalId);
+  
+  res.json({
+    success: true,
+    message: 'Atención finalizada exitosamente',
+    data: visita
+  });
+});
+
 module.exports = {
   getAll,
   getActivas,
@@ -483,5 +504,6 @@ module.exports = {
   accept,
   reject,
   delegate,
-  getMisVisitas
+  getMisVisitas,
+  finalizarAtencion
 };

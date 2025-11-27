@@ -271,6 +271,7 @@ export const visitasService = {
   accept: (id) => api.post(`/visitas/${id}/aceptar`),
   reject: (id, motivo) => api.post(`/visitas/${id}/rechazar`, { motivo }),
   delegate: (id, nuevoPersonalId) => api.post(`/visitas/${id}/delegar`, { nuevoPersonalId }),
+  finalizarAtencion: (id) => api.post(`/visitas/${id}/finalizar-atencion`),
 };
 
 export const tiposDocumentoService = {

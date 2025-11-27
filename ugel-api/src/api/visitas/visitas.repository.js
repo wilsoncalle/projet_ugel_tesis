@@ -53,7 +53,8 @@ const findAll = async (options = {}, usePagination = true) => {
         u1.nombre_usuario as usuario_ingreso,
         rv.estado_visita,
         rv.usuario_salida_id,
-        u2.nombre_usuario as usuario_salida
+        u2.nombre_usuario as usuario_salida,
+        rv.fecha_fin_atencion
       FROM RegistrosVisitas rv
       JOIN Visitantes v ON rv.visitante_id = v.id
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
@@ -307,7 +308,8 @@ const findById = async (id) => {
         u1.nombre_usuario as usuario_ingreso,
         rv.estado_visita,
         rv.usuario_salida_id,
-        u2.nombre_usuario as usuario_salida
+        u2.nombre_usuario as usuario_salida,
+        rv.fecha_fin_atencion
       FROM RegistrosVisitas rv
       JOIN Visitantes v ON rv.visitante_id = v.id
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
@@ -1209,6 +1211,35 @@ const delegar = async (id, nuevoPersonalId, nuevoAreaId, delegadoPorId) => {
 };
 
 /**
+ * Finalizar atención de una visita
+ * @param {number} id - ID de la visita
+ * @returns {Object} Visita actualizada
+ */
+const updateFinAtencion = async (id) => {
+  try {
+    const query = `
+      UPDATE RegistrosVisitas
+      SET
+        fecha_fin_atencion = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING id
+    `;
+    
+    const result = await db.query(query, [id]);
+    
+    if (result.rows.length === 0) {
+      throw new AppError('Visita no encontrada', 404);
+    }
+    
+    return await findById(id);
+  } catch (error) {
+    logger.error(`Error finalizando atención de visita ${id}:`, error);
+    throw error instanceof AppError ? error : new AppError('Error finalizando atención', 500);
+  }
+};
+
+
+/**
  * Buscar visitas por personal visitado con filtros y paginación
  * @param {number} personalId - ID del personal visitado
  * @param {Object} options - Opciones de búsqueda
@@ -1249,7 +1280,8 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
         rv.fecha_aceptacion,
         rv.fecha_rechazo,
         rv.usuario_ingreso_id,
-        u1.nombre_usuario as usuario_ingreso
+        u1.nombre_usuario as usuario_ingreso,
+        rv.fecha_fin_atencion
       FROM RegistrosVisitas rv
       JOIN Visitantes v ON rv.visitante_id = v.id
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
@@ -1337,7 +1369,6 @@ module.exports = {
   findAll,
   findActivas,
   findById,
-  findByPersonalVisitado,
   create,
   registrarSalida,
   registrarSalidaConFechaHora,
@@ -1346,11 +1377,13 @@ module.exports = {
   getVisitasPorArea,
   getVisitasPorMotivo,
   getTotalVisitas,
-  cerrarVisitasAutomaticamente,
   getFlujoDiario,
   getVisitasPorPersonal,
   getVisitantesFrecuentes,
   getVisitanteDetalle,
+  cerrarVisitasAutomaticamente,
   updateEstado,
-  delegar
+  delegar,
+  updateFinAtencion,
+  findByPersonalVisitado
 };

@@ -14,6 +14,7 @@ import {
   XCircleIcon, 
   UserGroupIcon, 
   EyeIcon,
+  ArrowRightOnRectangleIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { formatHora } from '../../utils/dateHelpers';
@@ -124,6 +125,17 @@ const MisVisitasTabla = ({
     }
   };
 
+  const handleFinalizarAtencion = async (visita) => {
+    try {
+      await visitasService.finalizarAtencion(visita.id);
+      toast.success('Atención finalizada correctamente');
+      onRefresh();
+    } catch (error) {
+      toast.error('Error al finalizar la atención');
+      console.error(error);
+    }
+  };
+
   const handleViewDetails = (visita) => {
     setSelectedVisita(visita);
     setDetailsModalOpen(true);
@@ -209,15 +221,21 @@ const MisVisitasTabla = ({
             const ingreso = new Date(row.fecha_ingreso);
             const diffMinutes = differenceInMinutes(currentTime, ingreso);
             
+            // Clase base para los contenedores (Flexbox centrado estricto)
+            const containerBase = "flex items-center gap-1.5"; 
+
             if (row.estado_visita === 'PENDIENTE') {
               const isOverLimit = diffMinutes > 5;
               return (
-                <div className={`flex items-center space-x-1 ${isOverLimit ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-                  <ClockIcon className="h-4 w-4" />
-                  <span>{diffMinutes} min</span>
+                <div className={`${containerBase} ${isOverLimit ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                  {/* shrink-0 evita que el icono se deforme */}
+                  <ClockIcon className="h-4 w-4 shrink-0" />
+                  {/* leading-none elimina el espacio vertical extra del texto */}
+                  <span className="leading-none">{diffMinutes} min</span>
+                  
                   {isOverLimit && (
                     <ExclamationTriangleIcon
-                      className="h-4 w-4"
+                      className="h-4 w-4 shrink-0"
                       title="Excedió tiempo de espera (5 min)"
                     />
                   )}
@@ -226,13 +244,21 @@ const MisVisitasTabla = ({
             } else if (row.estado_visita === 'ACEPTADO') {
               const isOverLimit = diffMinutes > 30;
               return (
-                <div className={`flex items-center space-x-1 ${isOverLimit ? 'text-orange-600 font-bold' : 'text-green-600'}`}>
-                  <ClockIcon className="h-4 w-4" />
-                  <span>{diffMinutes} min</span>
+                <div className={`${containerBase} ${isOverLimit ? 'bg-orange-100 text-orange-700 px-2 py-1 rounded-md w-fit' : 'text-green-600'}`}>
+                  <ClockIcon className="h-4 w-4 shrink-0" />
+                  
+                  {/* Ajuste fino: leading-none alinea el texto con el icono */}
+                  <span className={`leading-none ${isOverLimit ? 'font-bold' : ''}`}>
+                    {diffMinutes} min
+                  </span>
+
                   {isOverLimit && (
-                    <span className="text-xs bg-orange-100 px-1 rounded">
-                      Excedido
-                    </span>
+                    // Flexbox aquí también para asegurar que el texto pequeño quede centrado respecto a su propio borde
+                    <div className="flex items-center border-l border-orange-300 pl-1.5 h-full">
+                       <span className="text-xs font-bold leading-none">
+                        Excedido
+                      </span>
+                    </div>
                   )}
                 </div>
               );
@@ -246,33 +272,55 @@ const MisVisitasTabla = ({
           minWidth: '140px',
           sticky: 'right',
           render: (row) => {
-            if (row.estado_visita !== 'PENDIENTE') return null;
-            
-            return (
-              <div className="flex justify-left space-x-2">
-                <button
-                  onClick={() => handleAccept(row)}
-                  className="p-1.5 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
-                  title="Aceptar"
-                >
-                  <CheckCircleIcon className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => handleRejectClick(row)}
-                  className="p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
-                  title="Rechazar"
-                >
-                  <XCircleIcon className="h-5 w-5" />
-                </button>
-                <button
-                  onClick={() => handleDelegateClick(row)}
-                  className="p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
-                  title="Delegar"
-                >
-                  <UserGroupIcon className="h-5 w-5" />
-                </button>
-              </div>
-            );
+            if (row.estado_visita === 'PENDIENTE') {
+              return (
+                <div className="flex justify-left space-x-2">
+                  <button
+                    onClick={() => handleAccept(row)}
+                    className="p-1.5 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+                    title="Aceptar"
+                  >
+                    <CheckCircleIcon className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => handleRejectClick(row)}
+                    className="p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                    title="Rechazar"
+                  >
+                    <XCircleIcon className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => handleDelegateClick(row)}
+                    className="p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+                    title="Delegar"
+                  >
+                    <UserGroupIcon className="h-5 w-5" />
+                  </button>
+                </div>
+              );
+            } else if (row.estado_visita === 'ACEPTADO') {
+              return (
+                <div className="flex justify-left space-x-2">
+                  <button
+                    onClick={() => handleViewDetails(row)}
+                    className="p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+                    title="Ver Detalles"
+                  >
+                    <EyeIcon className="h-5 w-5" />
+                  </button>
+                  {!row.fecha_fin_atencion && (
+                    <button
+                      onClick={() => handleFinalizarAtencion(row)}
+                      className="p-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+                      title="Finalizar Atención"
+                    >
+                      <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+              );
+            }
+            return null;
           }
         }
       );
@@ -516,11 +564,7 @@ const MisVisitasTabla = ({
               <div className="font-semibold">Estado:</div>
               <div>{selectedVisita.estado_visita}</div>
             </div>
-            <div className="flex justify-end mt-4">
-              <Button variant="primary" onClick={() => setDetailsModalOpen(false)}>
-                Cerrar
-              </Button>
-            </div>
+
           </div>
         )}
       </ModalGenerico>

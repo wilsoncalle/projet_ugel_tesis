@@ -218,4 +218,16 @@ router.post('/:id/delegar',
   controller.delegate
 );
 
+/**
+ * @route   POST /api/visitas/:id/finalizar-atencion
+ * @desc    Finalizar atención de visita
+ * @access  Private
+ */
+router.post('/:id/finalizar-atencion',
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateId,
+  controller.finalizarAtencion
+);
+
 module.exports = router;

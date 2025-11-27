@@ -1127,6 +1127,35 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
   }
 };
 
+/**
+ * Finalizar atención de una visita
+ * @param {number} id - ID de la visita
+ * @param {number} personalId - ID del personal que finaliza la atención
+ * @returns {Object} Visita actualizada
+ */
+const finalizarAtencion = async (id, personalId) => {
+  try {
+    // Verificar si la visita existe
+    const visita = await repository.findById(id);
+    if (!visita) {
+      throw new AppError('Visita no encontrada', 404);
+    }
+    
+    // Verificar que la visita corresponda al personal
+    if (visita.personal_visitado_id !== personalId) {
+      throw new AppError('No tiene permiso para finalizar esta visita', 403);
+    }
+    
+    // Finalizar atención
+    const updatedVisita = await repository.updateFinAtencion(id);
+    
+    return updatedVisita;
+  } catch (error) {
+    logger.error(`Error finalizando atención de visita ${id}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllVisitas,
   getVisitasActivas,
@@ -1147,5 +1176,6 @@ module.exports = {
   acceptVisita,
   rejectVisita,
   delegateVisita,
-  findByPersonalVisitado
+  findByPersonalVisitado,
+  finalizarAtencion
 };
