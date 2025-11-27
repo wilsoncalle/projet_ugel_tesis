@@ -10,6 +10,7 @@ import TabView from '../components/TabView';
 import TableGenerica from '../components/TableGenerica';
 import ModalDetalles from '../components/ModalDetalles';
 import ModalGenerico from '../components/ModalGenerico';
+import AsistenciaPersonalCalendario from '../components/AsistenciaPersonalCalendario';
 import DateRangeFilter from '../components/DateRangeFilter';
 import QuickSearchBar from '../components/QuickSearchBar';
 import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService } from '../services/api';
@@ -1150,10 +1151,9 @@ const PersonalAsistenciaPage = () => {
         isOpen={isCalendarModalOpen}
         onClose={() => setIsCalendarModalOpen(false)}
         title="Calendario Mensual de Asistencia"
+        size="full"
       >
-        <div className="p-4 text-center text-gray-500">
-          Próximamente: Calendario Mensual
-        </div>
+        <AsistenciaPersonalCalendario />
       </ModalGenerico>
 
       {/* Modal de detalles */}
