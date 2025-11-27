@@ -6,6 +6,7 @@
 const repository = require('./asistenciapersonal.repository');
 const personalRepository = require('../personal/personal.repository');
 const papeletasRepository = require('../papeletas-salida/papeletassalida.repository');
+const asistenciaConfigService = require('../asistencia-config/asistencia-config.service');
 const { nowLima, toLimaDateYYYYMMDD } = require('../../utils/fechas');
 const logger = require('../../utils/logger');
 const { AppError } = require('../../middleware/errorHandler');
@@ -184,13 +185,19 @@ const registrarIngreso = async (personalId, usuarioId) => {
     // Obtener fecha y hora actual en zona horaria de Lima (UTC-5)
     const { fecha: fechaActual, hora: horaActual } = nowLima();
     
-    // Obtener configuración y uso de tolerancia
-    const configAsistencia = await repository.getConfiguracion(personalId);
+    // Obtener configuración efectiva de tolerancia (por personal o global)
+    const configAsistencia = await asistenciaConfigService.getConfigForPersonal(personalId);
+
+    // Valores por defecto si aún no hay config en la tabla
+    const minutosToleranciaDia = configAsistencia?.minutos_tolerancia_por_dia ?? 10;
+    const diasToleranciaMes = configAsistencia?.dias_tolerancia_por_mes ?? 10;
+
+    // Días de tolerancia ya usados en el mes actual
     const fechaObj = new Date(fechaActual);
     const diasUsados = await repository.countDiasToleranciaUsados(
-        personalId, 
-        fechaObj.getMonth() + 1, 
-        fechaObj.getFullYear()
+      personalId,
+      fechaObj.getMonth() + 1,
+      fechaObj.getFullYear()
     );
 
     const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaActual);
@@ -245,14 +252,18 @@ const registrarIngreso = async (personalId, usuarioId) => {
     }
 
     if (minutosTardanzaCalculados > 0) {
-        // Verificar tolerancia (10 días de 10 min)
-        if (minutosTardanzaCalculados <= configAsistencia.minutos_tolerancia_dia && diasUsados < configAsistencia.dias_tolerancia_mes) {
-            nuevoEstado = 'Presente';
-        } else {
-            nuevoEstado = 'Tardanza';
-        }
+    // Verificar tolerancia configurada
+    if (
+      minutosTardanzaCalculados <= minutosToleranciaDia &&
+      diasUsados < diasToleranciaMes
+      ) {
+        // Está dentro del rango de “tolerancia” → se registra Presente pero contando el día usado
+        nuevoEstado = 'Presente';
+      } else {
+        nuevoEstado = 'Tardanza';
+      }
     }
-    
+
     // Si ya estaba en Tardanza, se mantiene
     if (registroExistente && registroExistente.estado_presencia === 'Tardanza') {
         nuevoEstado = 'Tardanza';

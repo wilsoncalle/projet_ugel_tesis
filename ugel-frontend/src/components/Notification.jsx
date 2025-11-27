@@ -26,7 +26,7 @@ const Notification = ({
     if (onClose) onClose();
   };
 
-  if (!isVisible) return null;
+  if (!isVisible || !message) return null;
 
   const baseClasses = 'fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden';
   

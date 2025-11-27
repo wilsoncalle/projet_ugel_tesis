@@ -583,7 +583,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="flex justify-center space-x-1">
+            <div className="flex justify-left space-x-1">
               {/* Botón Ver Detalles - siempre visible */}
               <button
                 onClick={() => handleOpenModal(row)}
@@ -640,7 +640,7 @@ const VisitantesTabla = ({
           }
           
           return (
-            <div className="flex justify-center">
+            <div className="flex justify-left">
               <button
                 onClick={() => handleOpenModal(row)}
                 className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"

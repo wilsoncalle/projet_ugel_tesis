@@ -274,10 +274,10 @@ const MisVisitasTabla = ({
         minWidth: '60px',
         sticky: 'right',
         render: (row) => (
-          <div className="flex justify-center">
+          <div className="flex justify-left">
             <button
               onClick={() => handleViewDetails(row)}
-              className="p-1.5 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors"
+              className="p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
               title="Ver Detalles"
             >
               <EyeIcon className="h-5 w-5" />

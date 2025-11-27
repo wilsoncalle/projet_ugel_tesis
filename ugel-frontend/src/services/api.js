@@ -627,5 +627,21 @@ export const getCargos = (filtros = {}) => {
   return api.get(`/cargos?${params.toString()}`);
 };
 
+export const asistenciaConfigService = {
+  getGlobal: () => api.get('/asistencia-config/global'),
+  saveGlobal: (data) => api.post('/asistencia-config/global', data),
+  getByPersonal: (personalId) => api.get(`/asistencia-config/personal/${personalId}`),
+  saveForPersonal: (personalId, data) => api.post(`/asistencia-config/personal/${personalId}`, data),
+  getAll: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.page) params.append('page', filters.page);
+    if (filters.limit) params.append('limit', filters.limit);
+    return api.get(`/asistencia-config?${params.toString()}`);
+  },
+  disable: (id) => api.delete(`/asistencia-config/${id}`),
+};
+
+
+
 // Export the axios instance for direct use
 export default api;

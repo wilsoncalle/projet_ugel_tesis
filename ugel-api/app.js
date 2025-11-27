@@ -25,6 +25,7 @@ const papeletasSalidaRoutes = require('./src/api/papeletas-salida/papeletassalid
 const asistenciaPersonalRoutes = require('./src/api/asistencia-personal/asistenciapersonal.routes');
 const cargosRoutes = require('./src/api/cargos/cargos.routes');
 const healthRoutes = require('./src/api/health/health.routes');
+const asistenciaConfigRoutes = require('./src/api/asistencia-config/asistencia-config.routes');
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use('/api/papeletas-salida', papeletasSalidaRoutes);
 app.use('/api/asistencia-personal', asistenciaPersonalRoutes);
 app.use('/api/cargos', cargosRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/asistencia-config', asistenciaConfigRoutes);
 
 // Ruta raíz
 app.get('/', (req, res) => {
