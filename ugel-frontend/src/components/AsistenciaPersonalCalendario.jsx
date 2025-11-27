@@ -164,6 +164,19 @@ const AsistenciaPersonalCalendario = () => {
     return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [asistencias]);
 
+  // Calculate global stats for the current month
+  const globalStats = useMemo(() => {
+    const stats = { P: 0, T: 0, F: 0, J: 0 };
+    personalRows.forEach(person => {
+      Object.values(person.attendance).forEach(code => {
+        if (stats[code] !== undefined) {
+          stats[code]++;
+        }
+      });
+    });
+    return stats;
+  }, [personalRows]);
+
   // Handle cell click
   const handleCellClick = (e, personalId, date) => {
     if (mode !== 'edit') return;
@@ -307,10 +320,10 @@ const AsistenciaPersonalCalendario = () => {
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-white shadow-sm">
             <tr>
-              <th rowSpan={3} className="bg-[#03366c] text-white font-bold p-2 border border-slate-200 w-12 text-center align-middle">
+              <th rowSpan={3} className="bg-[#03366c] text-white font-bold p-2 border border-slate-200 w-10 text-center align-middle">
                 N°
               </th>
-              <th rowSpan={3} className="bg-[#054f9f] text-white font-bold p-3 border border-slate-200 text-left align-middle min-w-[250px]">
+              <th rowSpan={3} className="bg-[#054f9f] text-white font-bold p-3 border border-slate-200 text-left align-middle min-w-[180px]">
                 Apellidos y Nombres
               </th>
               {weeks.map((week, idx) => (
@@ -318,7 +331,7 @@ const AsistenciaPersonalCalendario = () => {
                   Semana {idx + 1}
                 </th>
               ))}
-              <th rowSpan={3} className="bg-[#054f9f] text-white font-bold p-2 border border-slate-200 text-center align-middle w-24">
+              <th rowSpan={3} className="bg-[#054f9f] text-white font-bold p-1 border border-slate-200 text-center align-middle w-[100px] text-xs">
                 Totales
               </th>
             </tr>
@@ -361,8 +374,8 @@ const AsistenciaPersonalCalendario = () => {
                       {idx + 1}
                     </td>
                     <td className="border border-slate-200 p-2 text-xs">
-                      <div className="font-medium text-gray-900">{person.nombre}</div>
-                      <div className="text-[10px] text-gray-500">{person.cargo}</div>
+                      <div className="font-medium text-[14px] text-gray-900">{person.nombre}</div>
+                      <div className="text-[12px] text-gray-500">{person.cargo}</div>
                     </td>
                     {schoolDays.map((day) => {
                       // Check modified first, then original
@@ -396,8 +409,25 @@ const AsistenciaPersonalCalendario = () => {
                         </td>
                       );
                     })}
-                    <td className="border border-slate-200 p-1 text-[10px] text-center font-medium bg-sky-50 text-sky-900">
-                      {`P:${stats.P} T:${stats.T} F:${stats.F} J:${stats.J}`}
+                    <td className="border border-slate-200 p-0 align-middle h-full">
+                      <div className="grid grid-cols-4 w-full h-full min-h-[32px]">
+                        <div className="flex items-center justify-center border-r border-slate-200" title="Presentes">
+                          <span className="text-green-600 text-[12px]">P</span>
+                          <span className="text-green-600 text-[12px] ml-[1px]">{stats.P}</span>
+                        </div>
+                        <div className="flex items-center justify-center border-r border-slate-200" title="Tardanzas">
+                          <span className="text-amber-500 text-[12px]">T</span>
+                          <span className="text-amber-500 text-[12px] ml-[1px]">{stats.T}</span>
+                        </div>
+                        <div className="flex items-center justify-center border-r border-slate-200" title="Faltas">
+                          <span className="text-red-600 text-[12px]">F</span>
+                          <span className="text-red-600 text-[12px] ml-[1px]">{stats.F}</span>
+                        </div>
+                        <div className="flex items-center justify-center" title="Justificados">
+                          <span className="text-cyan-600 text-[12px]">J</span>
+                          <span className="text-cyan-600 text-[12px] ml-[1px]">{stats.J}</span>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -425,22 +455,34 @@ const AsistenciaPersonalCalendario = () => {
       )}
 
       {/* Legend */}
-      <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-600">
-        <div className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded bg-[#28a745] flex items-center justify-center text-white font-bold text-[10px]">P</span>
-          <span>Presente</span>
+      <div className="mt-4 flex flex-wrap gap-3 justify-center">
+        <div 
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm cursor-help hover:bg-gray-50 transition-colors"
+          title={`Total Presentes en ${MESES[month-1]} ${year}: ${globalStats.P}`}
+        >
+          <span className="w-5 h-5 rounded-full bg-[#28a745] flex items-center justify-center text-white font-bold text-[10px]">P</span>
+          <span className="text-xs font-medium text-gray-700">Presente</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded bg-[#ffc107] flex items-center justify-center text-white font-bold text-[10px]">T</span>
-          <span>Tardanza</span>
+        <div 
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm cursor-help hover:bg-gray-50 transition-colors"
+          title={`Total Tardanzas en ${MESES[month-1]} ${year}: ${globalStats.T}`}
+        >
+          <span className="w-5 h-5 rounded-full bg-[#ffc107] flex items-center justify-center text-white font-bold text-[10px]">T</span>
+          <span className="text-xs font-medium text-gray-700">Tardanza</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded bg-[#dc3545] flex items-center justify-center text-white font-bold text-[10px]">F</span>
-          <span>Falta</span>
+        <div 
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm cursor-help hover:bg-gray-50 transition-colors"
+          title={`Total Faltas en ${MESES[month-1]} ${year}: ${globalStats.F}`}
+        >
+          <span className="w-5 h-5 rounded-full bg-[#dc3545] flex items-center justify-center text-white font-bold text-[10px]">F</span>
+          <span className="text-xs font-medium text-gray-700">Falta</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-4 h-4 rounded bg-[#17a2b8] flex items-center justify-center text-white font-bold text-[10px]">J</span>
-          <span>Justificado</span>
+        <div 
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm cursor-help hover:bg-gray-50 transition-colors"
+          title={`Total Justificados en ${MESES[month-1]} ${year}: ${globalStats.J}`}
+        >
+          <span className="w-5 h-5 rounded-full bg-[#17a2b8] flex items-center justify-center text-white font-bold text-[10px]">J</span>
+          <span className="text-xs font-medium text-gray-700">Justificado</span>
         </div>
       </div>
     </div>
