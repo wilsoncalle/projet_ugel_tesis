@@ -240,7 +240,7 @@ const MisVisitasTabla = ({
             if (row.estado_visita !== 'PENDIENTE') return null;
             
             return (
-              <div className="flex justify-center space-x-2">
+              <div className="flex justify-left space-x-2">
                 <button
                   onClick={() => handleAccept(row)}
                   className="p-1.5 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"

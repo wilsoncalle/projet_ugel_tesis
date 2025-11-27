@@ -186,7 +186,7 @@ const registrarIngreso = async (personalId, usuarioId) => {
     const { fecha: fechaActual, hora: horaActual } = nowLima();
     
     // Obtener configuración efectiva de tolerancia (por personal o global)
-    const configAsistencia = await asistenciaConfigService.getConfigForPersonal(personalId);
+    const configAsistencia = await asistenciaConfigService.getConfigEfectiva(personalId);
 
     // Valores por defecto si aún no hay config en la tabla
     const minutosToleranciaDia = configAsistencia?.minutos_tolerancia_por_dia ?? 10;
