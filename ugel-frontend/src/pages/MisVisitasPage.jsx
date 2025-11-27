@@ -64,12 +64,35 @@ const MisVisitasPage = () => {
       setVisitasActivas(activas);
       setHistorialVisitas(historial);
 
-      // Actualizar totales (esto es aproximado si filtras en cliente, idealmente la API debería dar totales por estado)
-      if (activeTab === 'activos') {
-        setActivosPagination(prev => ({ ...prev, total: activas.length }));
-      } else {
-        setHistorialPagination(prev => ({ ...prev, total: historial.length }));
-      }
+      // Intentar obtener el total real de la API (usa la paginación del backend)
+      const apiPagination = response.data.pagination || {};
+
+      const totalFromApi =
+        (apiPagination.total ??
+        apiPagination.totalItems ??
+        response.data.total ??
+        response.data.count ??
+        response.data.meta?.total ??
+        response.data.totalDocs ??
+        response.data.data?.total ??
+        (response.headers && parseInt(response.headers['x-total-count'], 10))) ||
+        0;
+
+      // Actualizar totales
+      // Actualizar totales SIEMPRE para ambos tabs
+      setActivosPagination(prev => ({
+        ...prev,
+        // page la controlas tú con onActivosPageChange
+        limit: apiPagination.limit ?? prev.limit,
+        total: totalFromApi || activas.length
+      }));
+
+      setHistorialPagination(prev => ({
+        ...prev,
+        // page la controlas tú con onHistorialPageChange
+        limit: apiPagination.limit ?? prev.limit,
+        total: totalFromApi || historial.length
+      }));
 
     } catch (error) {
       console.error('Error fetching visits:', error);
@@ -165,7 +188,7 @@ const MisVisitasPage = () => {
   };
 
   return (
-    <div className="p-6 h-[calc(100vh-4rem)]">
+    <div className="p-6 h-[800px]">
       <MisVisitasTabla
         visitasActivas={visitasActivas}
         historialVisitas={historialVisitas}

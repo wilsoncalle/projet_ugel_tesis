@@ -1053,9 +1053,8 @@ const toPgDateString = (value) => {
 };
 /**
  * Cerrar automáticamente visitas según las reglas:
- * - Si se registró después de las 5:00 p.m., cerrar a las 6:00 p.m.
- * - Si se registró antes o a las 5:00 p.m., cerrar a las 5:00 p.m.
- * - Solo cerrar visitas del día actual o anteriores que no tienen salida
+ * - Solo cerrar visitas de días anteriores que no tienen salida
+ * - Las visitas del día actual NO se tocan para no interrumpir visitas en curso
  * @param {number} usuarioSistemaId - ID del usuario del sistema que ejecuta el cierre automático
  * @returns {Object} Resultado del cierre automático
  */
@@ -1063,7 +1062,7 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
   try {
     logger.info('Iniciando cierre automático de visitas...');
 
-    // Obtener todas las visitas activas (sin salida) del día actual y anteriores
+    // Obtener todas las visitas activas (sin salida) de días anteriores
     const query = `
       SELECT 
         id,
@@ -1073,7 +1072,7 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
         EXTRACT(MINUTE FROM fecha_ingreso) as minuto_ingreso
       FROM RegistrosVisitas
       WHERE fecha_salida IS NULL
-        AND DATE(fecha_ingreso) <= CURRENT_DATE
+        AND DATE(fecha_ingreso) < CURRENT_DATE
       ORDER BY fecha_ingreso ASC
     `;
 
@@ -1085,13 +1084,8 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
     let cerradas = 0;
     let errores = 0;
 
-    const ahora = new Date();
-    const horaActual = ahora.getHours();
-    const minutoActual = ahora.getMinutes();
-
     for (const visita of visitasActivas) {
       try {
-        const horaIngreso = visita.hora_ingreso;
         const fechaIngresoFechaRaw = visita.fecha_ingreso_fecha; // viene de DATE(fecha_ingreso)
 
         // Normalizamos la fecha de ingreso a 'YYYY-MM-DD'
@@ -1102,47 +1096,10 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
           continue;
         }
 
-        // Comparar solo fechas (día) para saber si es día anterior
-        const fechaIngresoDateObj = new Date(fechaIngresoDateStr); // 00:00 de ese día
-        const fechaActual = new Date();
-        fechaActual.setHours(0, 0, 0, 0);
-        fechaIngresoDateObj.setHours(0, 0, 0, 0);
-
-        const esDiaAnterior = fechaIngresoDateObj < fechaActual;
-
-        // Determinar hora de salida según las reglas
-        let horaSalida = 17; // 5:00 p.m. por defecto
-        let minutoSalida = 0;
-
-        // Si se registró después de las 5:00 p.m., cerrar a las 6:00 p.m.
-        if (horaIngreso >= 17) {
-          horaSalida = 18; // 6:00 p.m.
-        }
-
-        const horaCierre = horaIngreso >= 17 ? 18 : 17;
-
-        // Si es día actual, solo cerrar si ya pasó la hora límite
-        if (!esDiaAnterior) {
-          const yaPasoHoraCierre =
-            horaActual > horaCierre ||
-            (horaActual === horaCierre && minutoActual >= minutoSalida);
-
-          if (!yaPasoHoraCierre) {
-            // Aún no es hora de cerrar esta visita
-            continue;
-          }
-        }
-
-        // Construir fecha y hora de salida:
-        // - Para días anteriores, usar la fecha de ingreso
-        // - Para el día actual, usar la fecha actual
-        const fechaActualStr = toPgDateString(new Date());
-        const fechaSalidaStr = esDiaAnterior ? fechaIngresoDateStr : fechaActualStr;
-
-        const horaSalidaStr = `${String(horaSalida).padStart(2, '0')}:${String(minutoSalida).padStart(2, '0')}:00`;
-
-        // IMPORTANTE: aquí ya es 'YYYY-MM-DD HH:MM:SS' (sin GMT, sin texto raro)
-        const fechaHoraSalida = `${fechaSalidaStr} ${horaSalidaStr}`;
+        // Siempre es día anterior (la query excluye el día actual).
+        // Cerramos al final del día de ingreso para marcar salida forzada sin alterar el día.
+        const horaSalidaStr = '23:59:59';
+        const fechaHoraSalida = `${fechaIngresoDateStr} ${horaSalidaStr}`;
 
         logger.info(`Cerrando visita ID ${visita.id} con fechaHoraSalida = ${fechaHoraSalida}`);
 

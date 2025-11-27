@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState } from 'react';
 import Card from '../Card';
 import Button from '../Button';
 import TabView from '../TabView';
@@ -29,7 +29,8 @@ const MisVisitasTabla = ({
   activosPagination,
   onActivosPageChange,
   historialPagination,
-  onHistorialPageChange
+  onHistorialPageChange,
+  className = ""
 }) => {
   // Estados para modales
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -42,7 +43,7 @@ const MisVisitasTabla = ({
   const [personalList, setPersonalList] = useState([]);
   const [loadingPersonal, setLoadingPersonal] = useState(false);
 
-  // Manejadores de acciones
+  // Acciones
   const handleAccept = async (visita) => {
     try {
       await visitasService.accept(visita.id);
@@ -118,8 +119,8 @@ const MisVisitasTabla = ({
     setDetailsModalOpen(true);
   };
 
-  // Configuración de columnas
-  const getColumns = useMemo(() => {
+  // Columnas de la tabla (misma estructura para ambas pestañas)
+  const getColumns = () => {
     const baseColumns = [
       {
         key: 'visitante',
@@ -189,75 +190,84 @@ const MisVisitasTabla = ({
     ];
 
     if (activeTab === 'activos') {
-      baseColumns.push({
-        key: 'tiempo',
-        label: 'Tiempo',
-        minWidth: '100px',
-        render: (row) => {
-          const now = new Date();
-          const ingreso = new Date(row.fecha_ingreso);
-          const diffMinutes = differenceInMinutes(now, ingreso);
-          
-          if (row.estado_visita === 'PENDIENTE') {
-            const isOverLimit = diffMinutes > 5;
+      baseColumns.push(
+        {
+          key: 'tiempo',
+          label: 'Tiempo',
+          minWidth: '100px',
+          render: (row) => {
+            const now = new Date();
+            const ingreso = new Date(row.fecha_ingreso);
+            const diffMinutes = differenceInMinutes(now, ingreso);
+            
+            if (row.estado_visita === 'PENDIENTE') {
+              const isOverLimit = diffMinutes > 5;
+              return (
+                <div className={`flex items-center space-x-1 ${isOverLimit ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+                  <ClockIcon className="h-4 w-4" />
+                  <span>{diffMinutes} min</span>
+                  {isOverLimit && (
+                    <ExclamationTriangleIcon
+                      className="h-4 w-4"
+                      title="Excedió tiempo de espera (5 min)"
+                    />
+                  )}
+                </div>
+              );
+            } else if (row.estado_visita === 'ACEPTADO') {
+              const isOverLimit = diffMinutes > 30;
+              return (
+                <div className={`flex items-center space-x-1 ${isOverLimit ? 'text-orange-600 font-bold' : 'text-green-600'}`}>
+                  <ClockIcon className="h-4 w-4" />
+                  <span>{diffMinutes} min</span>
+                  {isOverLimit && (
+                    <span className="text-xs bg-orange-100 px-1 rounded">
+                      Excedido
+                    </span>
+                  )}
+                </div>
+              );
+            }
+            return <span className="text-gray-400">-</span>;
+          }
+        },
+        {
+          key: 'actions',
+          label: 'Acciones',
+          minWidth: '140px',
+          sticky: 'right',
+          render: (row) => {
+            if (row.estado_visita !== 'PENDIENTE') return null;
+            
             return (
-              <div className={`flex items-center space-x-1 ${isOverLimit ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-                <ClockIcon className="h-4 w-4" />
-                <span>{diffMinutes} min</span>
-                {isOverLimit && <ExclamationTriangleIcon className="h-4 w-4" title="Excedió tiempo de espera (5 min)" />}
+              <div className="flex justify-center space-x-2">
+                <button
+                  onClick={() => handleAccept(row)}
+                  className="p-1.5 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+                  title="Aceptar"
+                >
+                  <CheckCircleIcon className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => handleRejectClick(row)}
+                  className="p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+                  title="Rechazar"
+                >
+                  <XCircleIcon className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => handleDelegateClick(row)}
+                  className="p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
+                  title="Delegar"
+                >
+                  <UserGroupIcon className="h-5 w-5" />
+                </button>
               </div>
             );
-          } else if (row.estado_visita === 'ACEPTADO') {
-             const isOverLimit = diffMinutes > 30;
-             return (
-              <div className={`flex items-center space-x-1 ${isOverLimit ? 'text-orange-600 font-bold' : 'text-green-600'}`}>
-                <ClockIcon className="h-4 w-4" />
-                <span>{diffMinutes} min</span>
-                {isOverLimit && <span className="text-xs bg-orange-100 px-1 rounded">Excedido</span>}
-              </div>
-             );
           }
-          return <span className="text-gray-400">-</span>;
         }
-      });
-
-      baseColumns.push({
-        key: 'actions',
-        label: 'Acciones',
-        minWidth: '140px',
-        sticky: 'right',
-        render: (row) => {
-          if (row.estado_visita !== 'PENDIENTE') return null;
-          
-          return (
-            <div className="flex justify-center space-x-2">
-              <button
-                onClick={() => handleAccept(row)}
-                className="p-1.5 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
-                title="Aceptar"
-              >
-                <CheckCircleIcon className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => handleRejectClick(row)}
-                className="p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
-                title="Rechazar"
-              >
-                <XCircleIcon className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => handleDelegateClick(row)}
-                className="p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 transition-colors"
-                title="Delegar"
-              >
-                <UserGroupIcon className="h-5 w-5" />
-              </button>
-            </div>
-          );
-        }
-      });
+      );
     } else {
-      // Historial actions (solo ver)
       baseColumns.push({
         key: 'actions',
         label: 'Ver',
@@ -278,23 +288,89 @@ const MisVisitasTabla = ({
     }
 
     return baseColumns;
-  }, [activeTab]);
-
-  const getTabData = () => {
-    return activeTab === 'activos' ? visitasActivas : historialVisitas;
   };
 
-  const getPaginationProps = () => {
+  // Datos según pestaña (igual idea que en VisitantesTabla)
+  const getTabData = () => {
     if (activeTab === 'activos') {
+      return visitasActivas || [];
+    }
+    return historialVisitas || [];
+  };
+
+  // Paginación dinámica (igual idea que en VisitantesTabla)
+  const getPaginationProps = () => {
+    const data = getTabData();
+    const totalItemsLocal = data.length;
+
+    if (activeTab === 'activos') {
+      const itemsPerPage =
+        activosPagination?.itemsPerPage ||
+        activosPagination?.limit ||
+        10;
+
+      const currentPage =
+        activosPagination?.currentPage ||
+        activosPagination?.page ||
+        1;
+
+      const totalItems =
+        activosPagination?.totalItems ??
+        activosPagination?.total ??
+        totalItemsLocal;
+
+      const totalPages =
+        activosPagination?.totalPages ??
+        activosPagination?.pages ??
+        Math.ceil((totalItems || 0) / itemsPerPage);
+
+      // 🔥 Regla dinámica: si no hay datos o el total cabe en una página, no muestres paginación
+      if (!totalItems || totalItems <= itemsPerPage) {
+        return { pagination: false };
+      }
+
       return {
         pagination: true,
-        ...activosPagination,
+        itemsPerPage,
+        currentPage,
+        totalItems,
+        totalPages,
         onPageChange: onActivosPageChange
       };
     }
+
+    // HISTORIAL
+    const itemsPerPage =
+      historialPagination?.itemsPerPage ||
+      historialPagination?.limit ||
+      10;
+
+    const currentPage =
+      historialPagination?.currentPage ||
+      historialPagination?.page ||
+      1;
+
+    const totalItems =
+      historialPagination?.totalItems ??
+      historialPagination?.total ??
+      totalItemsLocal;
+
+    const totalPages =
+      historialPagination?.totalPages ??
+      historialPagination?.pages ??
+      Math.ceil((totalItems || 0) / itemsPerPage);
+
+    // 🔥 Mismo criterio dinámico para Historial
+    if (!totalItems || totalItems <= itemsPerPage) {
+      return { pagination: false };
+    }
+
     return {
       pagination: true,
-      ...historialPagination,
+      itemsPerPage,
+      currentPage,
+      totalItems,
+      totalPages,
       onPageChange: onHistorialPageChange
     };
   };
@@ -314,8 +390,8 @@ const MisVisitasTabla = ({
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      <Card className="shadow-lg border border-gray-200 bg-card flex-1 flex flex-col rounded-2xl">
+    <div className={`flex flex-col h-full ${className}`}>
+      <Card className="shadow-lg border border-gray-200 bg-card flex-1 flex flex-col rounded-2xl h-full">
         <div className="p-0 flex flex-col h-full">
           <div className="px-0">
             <div className="flex items-center justify-between mb-3">
@@ -330,15 +406,22 @@ const MisVisitasTabla = ({
             />
           </div>
 
-          <div className="flex-1 min-h-0 relative">
-            <div className="absolute inset-0">
-              <TableGenerica
-                columns={getColumns}
-                data={getTabData()}
-                {...getPaginationProps()}
-                emptyMessage={activeTab === 'activos' ? "No hay visitas activas" : "No hay historial de visitas"}
-              />
-            </div>
+          <div
+            className="flex-1 min-h-0 flex flex-col"
+            style={{ maxWidth: '100%' }}
+          >
+            <TableGenerica
+              columns={getColumns()}
+              data={getTabData()}
+              {...getPaginationProps()}
+              className="flex-1 flex flex-col min-h-0"
+              maxBodyHeight="100%"
+              emptyMessage={
+                activeTab === 'activos'
+                  ? 'No hay visitas activas'
+                  : 'No hay historial de visitas'
+              }
+            />
           </div>
         </div>
       </Card>

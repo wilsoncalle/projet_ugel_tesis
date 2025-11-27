@@ -109,32 +109,63 @@ const VisitantesTabla = ({
   
   const getPaginationProps = useCallback(() => {
     const data = getTabData();
-    const totalItems = data.length;
-    
-    switch (activeTab) {
-      case 'activos':
-        const activosProps = {
-          pagination: true,
-          itemsPerPage: activosPagination?.itemsPerPage || 10,
-          currentPage: activosPagination?.currentPage || 1,
-          totalItems: totalItems, // Usar el total real de datos
-          onPageChange: onActivosPageChange
-        };
-        return activosProps;
-      case 'historial':
-        const historialProps = {
-          pagination: true,
-          itemsPerPage: historialPagination?.itemsPerPage || 15,
-          currentPage: historialPagination?.currentPage || 1,
-          totalItems: historialPagination?.totalItems || data.length, // Usar total del backend o datos locales
-          totalPages: historialPagination?.totalPages || Math.ceil(data.length / (historialPagination?.itemsPerPage || 15)), // Calcular si no hay totalPages
-          onPageChange: onHistorialPageChange
-        };
-        return historialProps;
-      default:
+    const totalItemsLocal = data.length;
+
+    if (activeTab === 'activos') {
+      const itemsPerPage = activosPagination?.itemsPerPage || 10;
+      const currentPage = activosPagination?.currentPage || 1;
+      const totalItems = totalItemsLocal;
+
+      // 🔥 Regla dinámica: si no hay visitantes o son ≤ 10, no mostramos paginación
+      if (!totalItems || totalItems <= itemsPerPage) {
         return { pagination: false };
+      }
+
+      return {
+        pagination: true,
+        itemsPerPage,
+        currentPage,
+        totalItems,
+        onPageChange: onActivosPageChange
+      };
     }
-  }, [activeTab, activosPagination, historialPagination, onActivosPageChange, onHistorialPageChange, getTabData]);
+
+    if (activeTab === 'historial') {
+      const itemsPerPage = historialPagination?.itemsPerPage || 15;
+
+      const totalItems =
+        historialPagination?.totalItems ??
+        historialPagination?.total ??
+        totalItemsLocal;
+
+      const totalPages =
+        historialPagination?.totalPages ??
+        Math.ceil((totalItems || 0) / itemsPerPage);
+
+      // 🔥 También dinámico en Historial de visitantes
+      if (!totalItems || totalItems <= itemsPerPage) {
+        return { pagination: false };
+      }
+
+      return {
+        pagination: true,
+        itemsPerPage,
+        currentPage: historialPagination?.currentPage || 1,
+        totalItems,
+        totalPages,
+        onPageChange: onHistorialPageChange
+      };
+    }
+
+    return { pagination: false };
+  }, [
+    activeTab,
+    activosPagination,
+    historialPagination,
+    onActivosPageChange,
+    onHistorialPageChange,
+    getTabData
+  ]);
 
   const getColumns = useMemo(() => {
     // Función para obtener anchos según el tab activo
