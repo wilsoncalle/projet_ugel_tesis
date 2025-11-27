@@ -56,9 +56,12 @@ const AsistenciaPersonalCalendario = () => {
       const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon...
       
       if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        // Use local YYYY-MM-DD format to match backend and avoid timezone shifts
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        
         days.push({
           day: d,
-          date: date.toISOString().split('T')[0],
+          date: dateStr,
           dayOfWeek,
           initial: ['D', 'L', 'M', 'M', 'J', 'V', 'S'][dayOfWeek]
         });
@@ -152,6 +155,7 @@ const AsistenciaPersonalCalendario = () => {
         });
       }
       
+      // Ensure we match the local date format used in columns
       const dateStr = record.fecha.split('T')[0];
       const code = ESTADOS[record.estado_presencia]?.code || '?';
       map.get(record.personal_id).attendance[dateStr] = code;

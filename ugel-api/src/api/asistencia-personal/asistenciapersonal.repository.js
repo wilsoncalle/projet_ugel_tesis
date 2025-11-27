@@ -50,23 +50,31 @@ const findAll = async (options = {}) => {
     
     if (incluirAusentes) {
       // Construir la consulta con LEFT JOIN para incluir personal sin registro
+      // Ahora soportando RANGOS de fechas usando generate_series y CROSS JOIN
       const queryParams = [];
       let paramCounter = 1;
       
-      // Usar fecha específica si existe, sino usar fechaInicio (para historial de un día específico)
-      // Si fechaInicio y fechaFin son iguales, es un solo día, usar esa fecha
-      let fechaJoin = fechaOriginal;
-      if (!fechaJoin && fechaInicio) {
-        fechaJoin = fechaInicio;
-      }
+      // Determinar rango de fechas
+      let startDate = fecha || fechaInicio;
+      let endDate = fechaFin || (fecha ? fecha : fechaInicio);
       
-      // Validar que fechaJoin no sea null o undefined
-      if (!fechaJoin || typeof fechaJoin !== 'string' || fechaJoin.trim() === '') {
+      if (!startDate) {
         throw new AppError('Fecha inválida para consulta de asistencia', 400);
       }
       
-      // Construir la consulta base con LEFT JOIN incluyendo papeletas activas
+      // Agregar parámetros para generate_series ($1 y $2)
+      queryParams.push(startDate);
+      queryParams.push(endDate);
+      paramCounter = 3;
+      
+      // Construir la consulta base
+      // 1. Generar serie de fechas
+      // 2. CROSS JOIN con Personal (todos los empleados x todos los días)
+      // 3. LEFT JOIN con Asistencias y Papeletas
       let query = `
+        WITH DateSeries AS (
+            SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS fecha_serie
+        )
         SELECT 
           COALESCE(ca.id, NULL) as id,
           p.id as personal_id,
@@ -76,36 +84,30 @@ const findAll = async (options = {}) => {
           p.apellidos as personal_apellidos,
           c.nombre_cargo as personal_cargo_nombre,
           a.nombre_area as area_nombre,
-          COALESCE(ca.fecha, $${paramCounter}::date) as fecha,
+          ds.fecha_serie as fecha,
           ca.hora_ingreso,
           ca.hora_salida,
           CASE
             WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
-            WHEN pa.personal_solicitante_id IS NOT NULL THEN 'Permiso'
+            WHEN ps.id IS NOT NULL THEN 'Permiso'
             ELSE 'Ausente'
           END as estado_presencia,
           ca.usuario_registro_id,
           u.nombre_usuario as usuario_registro,
           ca.fecha_registro
-        FROM Personal p
+        FROM DateSeries ds
+        CROSS JOIN Personal p
         LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
         LEFT JOIN Cargos c ON p.cargo_id = c.id
         LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
-          AND ca.fecha = $${paramCounter}::date
-        LEFT JOIN (
-          SELECT DISTINCT ps.personal_solicitante_id, $${paramCounter}::date as fecha_papeleta
-          FROM PapeletasSalida ps
-          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
-            AND DATE(ps.fecha_hora_salida_programada) <= $${paramCounter}::date
-            AND DATE(ps.fecha_hora_retorno_programada) >= $${paramCounter}::date
-            AND ps.fecha_hora_retorno_real IS NULL
-        ) pa ON pa.personal_solicitante_id = p.id
+          AND ca.fecha = ds.fecha_serie
+        LEFT JOIN PapeletasSalida ps ON ps.personal_solicitante_id = p.id
+          AND ps.estado IN ('APROBADO', 'EN_CURSO')
+          AND DATE(ps.fecha_hora_salida_programada) <= ds.fecha_serie
+          AND DATE(ps.fecha_hora_retorno_programada) >= ds.fecha_serie
+          AND ps.fecha_hora_retorno_real IS NULL
         LEFT JOIN Usuarios u ON ca.usuario_registro_id = u.id
       `;
-      
-      // Agregar parámetro de fecha para el join
-      queryParams.push(fechaJoin);
-      paramCounter++;
       
       // Construir condiciones WHERE
       const whereConditions = ['p.activo = true'];
@@ -119,13 +121,6 @@ const findAll = async (options = {}) => {
         )`);
         queryParams.push(`%${search}%`);
         paramCounter++;
-      }
-      
-      // Filtro por rango de fechas (si hay rango, filtrar en la fecha del registro)
-      if (fechaInicio && !fecha) {
-        // Para rangos, necesitamos una consulta diferente o usar UNION
-        // Por ahora, si hay rango, solo mostramos registros del primer día con ausentes
-        // TODO: Mejorar para rangos de fechas
       }
       
       // Filtro por personal
@@ -147,7 +142,7 @@ const findAll = async (options = {}) => {
         whereConditions.push(`
           CASE
             WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
-            WHEN pa.personal_solicitante_id IS NOT NULL THEN 'Permiso'
+            WHEN ps.id IS NOT NULL THEN 'Permiso'
             ELSE 'Ausente'
           END = $${paramCounter}
         `);
@@ -158,64 +153,30 @@ const findAll = async (options = {}) => {
       // Agregar condiciones WHERE
       query += ` WHERE ${whereConditions.join(' AND ')}`;
       
-      // Construir countQuery de forma más simple con los mismos parámetros
-      const countWhereConditions = ['p.activo = true'];
-      const countParamsSimplified = [fechaJoin];
-      let countParamCounter = 2;
-      
-      if (search) {
-        countWhereConditions.push(`(
-          p.nombres ILIKE $${countParamCounter} OR 
-          p.apellidos ILIKE $${countParamCounter} OR 
-          p.numero_documento ILIKE $${countParamCounter}
-        )`);
-        countParamsSimplified.push(`%${search}%`);
-        countParamCounter++;
-      }
-      
-      if (personalId) {
-        countWhereConditions.push(`p.id = $${countParamCounter}`);
-        countParamsSimplified.push(personalId);
-        countParamCounter++;
-      }
-      
-      if (areaId) {
-        countWhereConditions.push(`p.area_destino_id = $${countParamCounter}`);
-        countParamsSimplified.push(areaId);
-        countParamCounter++;
-      }
-      
-      if (estadoPresencia) {
-        countWhereConditions.push(`
-          CASE
-            WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
-            WHEN pa.personal_solicitante_id IS NOT NULL THEN 'Permiso'
-            ELSE 'Ausente'
-          END = $${countParamCounter}
-        `);
-        countParamsSimplified.push(estadoPresencia);
-        countParamCounter++;
-      }
-      
-      const countQueryFinal = `
+      // Construir countQuery (total de registros generados)
+      const countQuery = `
+        WITH DateSeries AS (
+            SELECT generate_series($1::date, $2::date, '1 day'::interval)::date AS fecha_serie
+        )
         SELECT COUNT(*) as total
-        FROM Personal p
+        FROM DateSeries ds
+        CROSS JOIN Personal p
         LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
-          AND ca.fecha = $1::date
-        LEFT JOIN (
-          SELECT DISTINCT ps.personal_solicitante_id, $1::date as fecha_papeleta
-          FROM PapeletasSalida ps
-          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
-            AND DATE(ps.fecha_hora_salida_programada) <= $1::date
-            AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
-            AND ps.fecha_hora_retorno_real IS NULL
-        ) pa ON pa.personal_solicitante_id = p.id
-        WHERE ${countWhereConditions.join(' AND ')}
+          AND ca.fecha = ds.fecha_serie
+        LEFT JOIN PapeletasSalida ps ON ps.personal_solicitante_id = p.id
+          AND ps.estado IN ('APROBADO', 'EN_CURSO')
+          AND DATE(ps.fecha_hora_salida_programada) <= ds.fecha_serie
+          AND DATE(ps.fecha_hora_retorno_programada) >= ds.fecha_serie
+          AND ps.fecha_hora_retorno_real IS NULL
+        WHERE ${whereConditions.join(' AND ')}
       `;
+      
+      // Clonar parámetros para el count (sin limit/offset)
+      const countParams = [...queryParams];
       
       // Agregar ordenamiento y paginación
       query += `
-        ORDER BY COALESCE(ca.fecha, $1::date) DESC, p.apellidos ASC, p.nombres ASC
+        ORDER BY ds.fecha_serie DESC, p.apellidos ASC, p.nombres ASC
         LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
       `;
       
@@ -225,7 +186,7 @@ const findAll = async (options = {}) => {
       // Ejecutar consultas en paralelo
       const [asistenciasResult, countResult] = await Promise.all([
         db.query(query, queryParams),
-        db.query(countQueryFinal, countParamsSimplified)
+        db.query(countQuery, countParams)
       ]);
       
       return {
