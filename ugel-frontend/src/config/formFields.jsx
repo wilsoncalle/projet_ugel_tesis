@@ -411,19 +411,22 @@ export const transformPersonal = (data) => {
 
 
 // Función para transformar datos del frontend al backend
-export const transformPersonalToBackend = (formData) => {
-  return {
-    tipoDocumento: formData.tipoDocumento,
-    numeroDocumento: formData.numeroDocumento,
-    nombres: formData.nombres,
-    apellidos: formData.apellidos,
-    fechaNacimiento: formData.fechaNacimiento || null, // ya viene "YYYY-MM-DD"
-    email: formData.email,
-    cargoId: formData.cargoId,
-    areaDestinoId: formData.areaDestinoId,
-    tipoContratoId: formData.tipoContratoId,
-    activo: formData.activo,
+export const transformPersonalToBackend = (data) => {
+  console.log('transformPersonalToBackend - Datos de entrada:', data);
+  const transformed = {
+    tipoDocumento: data.tipoDocumento,
+    numeroDocumento: data.numeroDocumento,
+    nombres: data.nombres,
+    apellidos: data.apellidos,
+    fechaNacimiento: data.fechaNacimiento || null,
+    email: data.email || null,
+    cargoId: parseInt(data.cargoId),
+    areaDestinoId: parseInt(data.areaDestinoId),
+    tipoContratoId: parseInt(data.tipoContratoId),
+    activo: data.activo
   };
+  console.log('transformPersonalToBackend - Datos transformados:', transformed);
+  return transformed;
 };
 
 // Usuarios - campos y transformaciones

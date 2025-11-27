@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from "framer-motion";
+
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -8,6 +9,7 @@ import Badge from '../components/Badge';
 import TabView from '../components/TabView';
 import TableGenerica from '../components/TableGenerica';
 import ModalDetalles from '../components/ModalDetalles';
+import ModalGenerico from '../components/ModalGenerico';
 import DateRangeFilter from '../components/DateRangeFilter';
 import QuickSearchBar from '../components/QuickSearchBar';
 import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService } from '../services/api';
@@ -67,6 +69,7 @@ const PersonalAsistenciaPage = () => {
   // Estados para el modal de detalles
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   
   // Estados del formulario de registro
   const [personalSeleccionado, setPersonalSeleccionado] = useState(null);
@@ -1043,7 +1046,11 @@ const PersonalAsistenciaPage = () => {
                       <>
                         {/* Indicadores arriba de la tabla, dentro del contenedor blanco */}
                         <div className="px-0 pt-0 pb-2">
-                          <IndicadoresAsistencia estadisticas={estadisticas} />
+                          <IndicadoresAsistencia 
+                            estadisticas={estadisticas} 
+                            showCalendarButton={activeTab === 'historial'}
+                            onCalendarClick={() => setIsCalendarModalOpen(true)}
+                          />
                         </div>
 
                         <div className="flex-1">
@@ -1138,6 +1145,17 @@ const PersonalAsistenciaPage = () => {
         </div>
       </div>
       
+      {/* Modal de Calendario Mensual */}
+      <ModalGenerico
+        isOpen={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        title="Calendario Mensual de Asistencia"
+      >
+        <div className="p-4 text-center text-gray-500">
+          Próximamente: Calendario Mensual
+        </div>
+      </ModalGenerico>
+
       {/* Modal de detalles */}
       <ModalDetalles
         isOpen={isModalOpen}
@@ -1950,7 +1968,7 @@ const EstadoBadge = ({ estado }) => {
 };
 
 // Componente de indicadores de asistencia
-const IndicadoresAsistencia = ({ estadisticas }) => {
+const IndicadoresAsistencia = ({ estadisticas, showCalendarButton, onCalendarClick }) => {
     const items = [
       { key: 'presentes', label: 'Presentes', value: estadisticas.presentes, icon: CheckCircleIcon, chip: 'bg-white text-green-600 border-green-300' },
       { key: 'tardes',    label: 'Tardanzas', value: estadisticas.tardes,    icon: ClockIcon,       chip: 'bg-white text-amber-600 border-amber-300' },
@@ -1959,8 +1977,8 @@ const IndicadoresAsistencia = ({ estadisticas }) => {
     ];
 
   return (
-    <div className="w-full">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+    <div className="w-full flex gap-4">
+      <div className={`grid grid-cols-2 sm:grid-cols-4 gap-2 ${showCalendarButton ? 'flex-1' : 'w-full'}`}>
         {items.map(({ key, label, value, icon: Icon, chip }) => (
           <div key={key} className={`flex items-center justify-between rounded-xl border px-3 py-2 ${chip}`}>
             <div className="flex items-center gap-2">
@@ -1971,6 +1989,18 @@ const IndicadoresAsistencia = ({ estadisticas }) => {
           </div>
         ))}
       </div>
+      
+      {showCalendarButton && (
+      <div className="flex-none">
+        <Button 
+          onClick={onCalendarClick}
+          className="!bg-white !text-blue-600 !border !border-blue-600 hover:!bg-blue-600/10 h-full transition-colors"
+          leftIcon={<CalendarIcon className="h-4 w-4" />}
+        >
+          Calendario Mensual
+        </Button>
+      </div>
+    )}
     </div>
   );
 };
