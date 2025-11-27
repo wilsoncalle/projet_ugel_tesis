@@ -523,7 +523,7 @@ const RegistroForm = forwardRef(
             id: papeletaExterna._id || papeletaExterna.id, // Asegurar ID
             personal_solicitante_nombre: `${papeletaExterna.solicitante_nombres || ''} ${papeletaExterna.solicitante_apellidos || ''}`.trim(),
             personal_autoriza_nombre: 'Sistema Externo',
-            motivo_nombre: papeletaExterna.motivo || '-',
+            motivo_nombre: papeletaExterna.nombre_motivo || papeletaExterna.motivo || '-',
             area_destino_nombre: papeletaExterna.lugar_destino || '-',
             fecha_solicitud: papeletaExterna.fecha_solicitud || papeletaExterna.fecha_inicio,
             fecha_salida_programada: papeletaExterna.fecha_inicio,
@@ -1982,9 +1982,61 @@ const RegistroForm = forwardRef(
           size="lg"
           fields={[
             {
-              label: 'Código',
+              label: 'Código de Papeleta',
               key: 'codigo_papeleta',
             },
+            {
+              label: 'Solicitante',
+              key: 'personal_solicitante_nombre',
+            },
+            {
+              label: 'Motivo de Salida',
+              key: 'motivo_nombre',
+            },
+            {
+              label: 'Salida Programada',
+              key: 'fecha_hora_salida_programada',
+              render: (val) =>
+                val ? new Date(val).toLocaleString('es-PE') : '-',
+            },
+            {
+              label: 'Retorno Programado',
+              key: 'fecha_hora_retorno_programada',
+              render: (val) =>
+                val ? new Date(val).toLocaleString('es-PE') : '-',
+            },
+            {
+              label: 'Tiempo Restante',
+              key: 'tiempo_restante',
+              render: (val, data) => {
+                const retornoStr = data?.fecha_hora_retorno_programada;
+                if (!retornoStr) return '-';
+                
+                const retorno = new Date(retornoStr);
+                const now = new Date();
+                
+                if (now > retorno) return 'Vencido';
+                
+                const diff = retorno - now;
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                
+                if (days > 0) return `${days} días, ${hours} horas`;
+                return `${hours} horas`;
+              }
+            },
+            // {
+            //   label: 'Salida Real',
+            //   key: 'fecha_hora_salida_real',
+            //   render: (val) =>
+            //     val ? new Date(val).toLocaleString('es-PE') : 'Pendiente',
+            // },
+            // {
+            //   label: 'Retorno Real',
+            //   key: 'fecha_hora_retorno_real',
+            //   render: (val) =>
+            //     val ? new Date(val).toLocaleString('es-PE') : 'Pendiente',
+            // },
             {
               label: 'Estado',
               key: 'estado',
@@ -2007,52 +2059,6 @@ const RegistroForm = forwardRef(
                   {val === 'EN_CURSO' ? 'En Curso' : val}
                 </span>
               ),
-            },
-            {
-              label: 'Solicitante',
-              key: 'personal_solicitante_nombre',
-            },
-            {
-              label: 'Motivo',
-              key: 'motivo_nombre',
-            },
-            {
-              label: 'Sustento',
-              key: 'sustento_solicitud',
-            },
-            {
-              label: 'Fecha de Solicitud',
-              key: 'fecha_solicitud',
-              render: (val) =>
-                val ? new Date(val).toLocaleString('es-PE') : '-',
-            },
-            {
-              label: 'Salida Programada',
-              key: 'fecha_hora_salida_programada',
-              render: (val) =>
-                val ? new Date(val).toLocaleString('es-PE') : '-',
-            },
-            {
-              label: 'Retorno Programado',
-              key: 'fecha_hora_retorno_programada',
-              render: (val) =>
-                val ? new Date(val).toLocaleString('es-PE') : '-',
-            },
-            {
-              label: 'Salida Real',
-              key: 'fecha_hora_salida_real',
-              render: (val) =>
-                val ? new Date(val).toLocaleString('es-PE') : 'Pendiente',
-            },
-            {
-              label: 'Retorno Real',
-              key: 'fecha_hora_retorno_real',
-              render: (val) =>
-                val ? new Date(val).toLocaleString('es-PE') : 'Pendiente',
-            },
-            {
-              label: 'Autorizado por',
-              key: 'personal_autoriza_nombre',
             },
           ]}
         />

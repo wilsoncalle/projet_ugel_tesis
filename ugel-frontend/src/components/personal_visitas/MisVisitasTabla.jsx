@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Card from '../Card';
 import Button from '../Button';
 import TabView from '../TabView';
@@ -42,6 +42,16 @@ const MisVisitasTabla = ({
   const [delegateTo, setDelegateTo] = useState(null);
   const [personalList, setPersonalList] = useState([]);
   const [loadingPersonal, setLoadingPersonal] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update time every minute to refresh the "Tiempo" column
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
 
   // Acciones
   const handleAccept = async (visita) => {
@@ -196,9 +206,8 @@ const MisVisitasTabla = ({
           label: 'Tiempo',
           minWidth: '100px',
           render: (row) => {
-            const now = new Date();
             const ingreso = new Date(row.fecha_ingreso);
-            const diffMinutes = differenceInMinutes(now, ingreso);
+            const diffMinutes = differenceInMinutes(currentTime, ingreso);
             
             if (row.estado_visita === 'PENDIENTE') {
               const isOverLimit = diffMinutes > 5;

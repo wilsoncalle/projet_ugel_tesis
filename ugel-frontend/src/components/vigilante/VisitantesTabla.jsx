@@ -491,6 +491,51 @@ const VisitantesTabla = ({
             </div>
           );
         }
+      },
+      {
+        key: 'estado',
+        label: 'Estado',
+        minWidth: getColumnWidths('100px', '100px'),
+        maxWidth: getColumnWidths('120px', '120px'),
+        width: getColumnWidths('120px', '120px'),
+        render: (row) => {
+          if (!row) return <div className="text-sm text-gray-900">-</div>;
+          
+          const estado = row.estado_visita || 'PENDIENTE';
+          
+          let badgeColor = 'bg-gray-100 text-gray-800';
+          let label = 'Pendiente';
+          
+          switch (estado) {
+            case 'ACEPTADO':
+              badgeColor = 'bg-green-100 text-green-800';
+              label = 'Aceptado';
+              break;
+            case 'RECHAZADO':
+              badgeColor = 'bg-red-100 text-red-800';
+              label = 'Rechazado';
+              break;
+            case 'DELEGADO':
+              badgeColor = 'bg-blue-100 text-blue-800';
+              label = 'Delegado';
+              break;
+            case 'FINALIZADO':
+              badgeColor = 'bg-gray-100 text-gray-800';
+              label = 'Finalizado';
+              break;
+            case 'PENDIENTE':
+            default:
+              badgeColor = 'bg-yellow-100 text-yellow-800';
+              label = 'Pendiente';
+              break;
+          }
+          
+          return (
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}`}>
+              {label}
+            </span>
+          );
+        }
       }
     ];
 
@@ -887,7 +932,6 @@ const VisitantesTabla = ({
                   data={getTabData()}
                   isRowInWaiting={(row) => 
                     (visitantesEnEspera || []).some(v => v.id === row.id)
-                    // Las visitas pendientes NO se muestran como "en espera", sino como visitas normales
                   }
                   {...getPaginationProps()}
                   emptyMessage={
@@ -895,6 +939,7 @@ const VisitantesTabla = ({
                       ? 'No hay visitantes activos en este momento'
                       : 'No se encontraron registros para los filtros aplicados'
                   }
+                  cellPadding="px-2"
                 />
               )}
             </div>

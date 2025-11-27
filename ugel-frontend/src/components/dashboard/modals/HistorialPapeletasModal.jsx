@@ -408,15 +408,35 @@ const HistorialPapeletasModal = ({ isOpen, onClose, initialFilters = {} }) => {
                       render: (value, data) => fmtDateTime(value || data?.fecha_hora_retorno_programada)
                     },
                     {
-                      key: 'fecha_hora_salida_real',
-                      label: 'Salida Real',
-                      render: (value, data) => fmtDateTime(value || data?.fecha_hora_salida_real)
+                      key: 'tiempo_restante',
+                      label: 'Tiempo Restante',
+                      render: (value, data) => {
+                        const retornoStr = data?.fecha_hora_retorno_programada;
+                        if (!retornoStr) return '-';
+                        
+                        const retorno = new Date(retornoStr);
+                        const now = new Date();
+                        
+                        if (now > retorno) return 'Vencido';
+                        
+                        const diff = retorno - now;
+                        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        
+                        if (days > 0) return `${days} días, ${hours} horas`;
+                        return `${hours} horas`;
+                      }
                     },
-                    {
-                      key: 'fecha_hora_retorno_real',
-                      label: 'Retorno Real',
-                      render: (value, data) => fmtDateTime(value || data?.fecha_hora_retorno_real)
-                    },
+                    // {
+                    //   key: 'fecha_hora_salida_real',
+                    //   label: 'Salida Real',
+                    //   render: (value, data) => fmtDateTime(value || data?.fecha_hora_salida_real)
+                    // },
+                    // {
+                    //   key: 'fecha_hora_retorno_real',
+                    //   label: 'Retorno Real',
+                    //   render: (value, data) => fmtDateTime(value || data?.fecha_hora_retorno_real)
+                    // },
                     {
                       key: 'estado',
                       label: 'Estado',

@@ -470,7 +470,7 @@ const VigilantePapeletasPage = () => {
           },
           {
             key: 'fecha_hora_salida_programada',
-            label: 'Fecha y Hora de Salida Programada',
+            label: 'Salida Programada',
             render: (value, data) => {
               const fechaValue = value || data?.fecha_hora_salida_programada;
               if (!fechaValue) return '—';
@@ -484,7 +484,7 @@ const VigilantePapeletasPage = () => {
           },
           {
             key: 'fecha_hora_retorno_programada',
-            label: 'Fecha y Hora de Retorno Programada',
+            label: 'Retorno Programado',
             render: (value, data) => {
               const fechaValue = value || data?.fecha_hora_retorno_programada;
               if (!fechaValue) return '—';
@@ -497,46 +497,76 @@ const VigilantePapeletasPage = () => {
             }
           },
           {
-            key: 'fecha_hora_salida_real',
-            label: 'Fecha y Hora de Salida Real',
+            key: 'tiempo_restante',
+            label: 'Tiempo Restante',
             render: (value, data) => {
-              const fechaValue = value || data?.fecha_hora_salida_real;
-              if (!fechaValue) return 'No registrada';
-              try {
-                const fecha = new Date(fechaValue);
-                return fecha.toLocaleString('es-PE');
-              } catch {
-                return fechaValue;
-              }
+              const retornoStr = data?.fecha_hora_retorno_programada;
+              if (!retornoStr) return '-';
+              
+              const retorno = new Date(retornoStr);
+              const now = new Date();
+              
+              if (now > retorno) return 'Vencido';
+              
+              const diff = retorno - now;
+              const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+              const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+              
+              if (days > 0) return `${days} días, ${hours} horas`;
+              return `${hours} horas`;
             }
           },
+          // {
+          //   key: 'fecha_hora_salida_real',
+          //   label: 'Fecha y Hora de Salida Real',
+          //   render: (value, data) => {
+          //     const fechaValue = value || data?.fecha_hora_salida_real;
+          //     if (!fechaValue) return 'No registrada';
+          //     try {
+          //       const fecha = new Date(fechaValue);
+          //       return fecha.toLocaleString('es-PE');
+          //     } catch {
+          //       return fechaValue;
+          //     }
+          //   }
+          // },
+          // {
+          //   key: 'fecha_hora_retorno_real',
+          //   label: 'Fecha y Hora de Retorno Real',
+          //   render: (value, data) => {
+          //     const fechaValue = value || data?.fecha_hora_retorno_real;
+          //     if (!fechaValue) return 'No registrada';
+          //     try {
+          //       const fecha = new Date(fechaValue);
+          //       return fecha.toLocaleString('es-PE');
+          //     } catch {
+          //       return fechaValue;
+          //     }
+          //   }
+          // },
           {
-            key: 'fecha_hora_retorno_real',
-            label: 'Fecha y Hora de Retorno Real',
-            render: (value, data) => {
-              const fechaValue = value || data?.fecha_hora_retorno_real;
-              if (!fechaValue) return 'No registrada';
-              try {
-                const fecha = new Date(fechaValue);
-                return fecha.toLocaleString('es-PE');
-              } catch {
-                return fechaValue;
-              }
-            }
-          },
-          {
-            key: 'estado',
-            label: 'Estado',
-            render: (value, data) => {
-              const estadoValue = value || data?.estado;
-              const estadoMap = {
-                APROBADO: 'Aprobado',
-                EN_CURSO: 'En curso',
-                FINALIZADO: 'Finalizado'
-              };
-              return estadoMap[estadoValue] || estadoValue || '—';
-            }
-          },
+              label: 'Estado',
+              key: 'estado',
+              render: (val) => (
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${
+                    val === 'APROBADO'
+                      ? 'bg-green-100 text-green-800'
+                      : val === 'EN_CURSO'
+                      ? 'bg-blue-100 text-blue-800'
+                      : val === 'FINALIZADO'
+                      ? 'bg-gray-100 text-gray-800'
+                      : val === 'RECHAZADO'
+                      ? 'bg-red-100 text-red-800'
+                      : val === 'CANCELADO'
+                      ? 'bg-orange-100 text-orange-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}
+                >
+                  {val === 'EN_CURSO' ? 'En Curso' : val}
+                </span>
+              ),
+            },
         ]}
       />
 

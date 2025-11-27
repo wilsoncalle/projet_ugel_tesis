@@ -21,6 +21,7 @@ const TableGenerica = ({
   totalItems: externalTotalItems,
   onPageChange: externalOnPageChange,
   isRowInWaiting = null, // Nueva prop para determinar si una fila está en espera
+  cellPadding = 'px-3', // Prop para personalizar el padding de las celdas
   ...props
 }) => {
   const [internalCurrentPage, setInternalCurrentPage] = useState(1);
@@ -131,7 +132,7 @@ const TableGenerica = ({
                   <th
                     key={column.key || index}
                     scope="col"
-                    className={`px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                    className={`${cellPadding} py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                       column.className || ''
                     } ${column.sticky ? 'sticky bg-white z-10' : ''}`}
                     style={{
@@ -163,7 +164,7 @@ const TableGenerica = ({
                 <tr>
                   <td
                     colSpan={columns.length}
-                    className="px-3 py-2 whitespace-nowrap text-center text-sm text-gray-500"
+                    className={`${cellPadding} py-2 whitespace-nowrap text-center text-sm text-gray-500`}
                   >
                     <div className="flex justify-center items-center">
                       <svg
@@ -194,7 +195,7 @@ const TableGenerica = ({
                 <tr>
                   <td
                     colSpan={columns.length}
-                    className="px-3 py-2 whitespace-nowrap text-center text-sm text-gray-500"
+                    className={`${cellPadding} py-2 whitespace-nowrap text-center text-sm text-gray-500`}
                   >
                     {searchTerm ? 'No se encontraron resultados para tu búsqueda' : emptyMessage}
                   </td>
@@ -214,7 +215,7 @@ const TableGenerica = ({
                     {columns.map((column, colIndex) => (
                       <td
                         key={`${rowIndex}-${column.key || colIndex}`}
-                        className={`px-3 py-2 text-sm ${
+                        className={`${cellPadding} py-2 text-sm ${
                           column.cellClassName || ''
                         } ${column.sticky ? 'sticky bg-white z-10' : ''}`}
                         style={{

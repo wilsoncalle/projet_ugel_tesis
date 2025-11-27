@@ -313,6 +313,30 @@ const DashboardVigilantePage = () => {
           cargarVisitantesActivos();
         });
       
+          // Handler para actualizaciones de estado
+          socket.on('estado_visita_actualizado', (data) => {
+            if (isCleaningUp) return;
+
+            console.log(`[Socket.IO] Estado actualizado para visita ID: ${data.id}, Nuevo estado: ${data.estado}`);
+
+            setVisitantesActivos(prev => {
+              return prev.map(v => {
+                if (String(v.id) === String(data.id)) {
+                  return {
+                    ...v,
+                    estado_visita: data.estado,
+                    fecha_aceptacion: data.fecha_aceptacion || v.fecha_aceptacion,
+                    fecha_rechazo: data.fecha_rechazo || v.fecha_rechazo,
+                    motivo_rechazo: data.motivo_rechazo || v.motivo_rechazo,
+                    delegado_por_id: data.delegado_por_id || v.delegado_por_id,
+                    fecha_delegacion: data.fecha_delegacion || v.fecha_delegacion
+                  };
+                }
+                return v;
+              });
+            });
+          });
+
           // Handler para salidas con protección contra duplicados
           const handleSalidaRegistrada = ({ visitaId }) => {
             if (isCleaningUp) return; // Ignorar si estamos limpiando

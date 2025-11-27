@@ -51,6 +51,7 @@ const findAll = async (options = {}, usePagination = true) => {
         rv.fecha_salida,
         rv.usuario_ingreso_id,
         u1.nombre_usuario as usuario_ingreso,
+        rv.estado_visita,
         rv.usuario_salida_id,
         u2.nombre_usuario as usuario_salida
       FROM RegistrosVisitas rv
@@ -202,7 +203,8 @@ const findActivas = async (options = {}) => {
         rv.fecha_ingreso,
         rv.fecha_salida,
         rv.usuario_ingreso_id,
-        u1.nombre_usuario as usuario_ingreso
+        u1.nombre_usuario as usuario_ingreso,
+        rv.estado_visita
       FROM RegistrosVisitas rv
       JOIN Visitantes v ON rv.visitante_id = v.id
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
@@ -303,6 +305,7 @@ const findById = async (id) => {
         rv.fecha_salida,
         rv.usuario_ingreso_id,
         u1.nombre_usuario as usuario_ingreso,
+        rv.estado_visita,
         rv.usuario_salida_id,
         u2.nombre_usuario as usuario_salida
       FROM RegistrosVisitas rv
@@ -1143,19 +1146,21 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
  * @returns {Object} Visita actualizada
  */
 const updateEstado = async (id, estado, motivoRechazo = null) => {
+  // Ensure undefined becomes null for database query
+  const motivoFinal = motivoRechazo === undefined ? null : motivoRechazo;
   try {
     let query = `
       UPDATE RegistrosVisitas
       SET 
         estado_visita = $1,
-        fecha_aceptacion = CASE WHEN $1 = 'ACEPTADO' THEN CURRENT_TIMESTAMP ELSE fecha_aceptacion END,
-        fecha_rechazo = CASE WHEN $1 = 'RECHAZADO' THEN CURRENT_TIMESTAMP ELSE fecha_rechazo END,
+        fecha_aceptacion = CASE WHEN $1::varchar = 'ACEPTADO' THEN CURRENT_TIMESTAMP ELSE fecha_aceptacion END,
+        fecha_rechazo = CASE WHEN $1::varchar = 'RECHAZADO' THEN CURRENT_TIMESTAMP ELSE fecha_rechazo END,
         motivo_rechazo = $2
       WHERE id = $3
       RETURNING id
     `;
     
-    const result = await db.query(query, [estado, motivoRechazo, id]);
+    const result = await db.query(query, [estado, motivoFinal, id]);
     
     if (result.rows.length === 0) {
       throw new AppError('Visita no encontrada', 404);
