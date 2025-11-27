@@ -282,9 +282,12 @@ const PersonalAsistenciaPage = () => {
       if (response.data.success) {
         setPersonalSeleccionado(null);
         await cargarAsistenciasHoy();
+      } else {
+        // No mostrar error global si ya existe registro, ya que el formulario muestra la advertencia
+        // setError(response.data.message);
       }
     } catch (error) {
-      setError(error.response?.data?.message || 'Error al registrar ingreso');
+      setError(error.response?.data?.error || error.response?.data?.message || 'Error al registrar ingreso');
     } finally {
       setLoading(false);
     }

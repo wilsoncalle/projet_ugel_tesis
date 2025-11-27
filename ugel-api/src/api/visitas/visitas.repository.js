@@ -1220,7 +1220,8 @@ const updateFinAtencion = async (id) => {
     const query = `
       UPDATE RegistrosVisitas
       SET
-        fecha_fin_atencion = CURRENT_TIMESTAMP
+        fecha_fin_atencion = CURRENT_TIMESTAMP,
+        estado_visita = 'FINALIZADO'
       WHERE id = $1
       RETURNING id
     `;
@@ -1296,50 +1297,75 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
     const queryParams = [personalId];
     let paramCounter = 2;
     
-    // Filtro por estados si se proporciona
+    // Filtro por estados con lógica personalizada para manejar fecha_fin_atencion
     if (estados && estados.length > 0) {
-      const placeholders = estados.map((_, i) => `$${paramCounter + i}`).join(', ');
-      query += ` AND rv.estado_visita IN (${placeholders})`;
-      queryParams.push(...estados);
-      paramCounter += estados.length;
+      const stateConditions = [];
+      
+      estados.forEach(estado => {
+        if (estado === 'ACEPTADO') {
+          // ACEPTADO real: estado es ACEPTADO y NO tiene fecha de fin de atención
+          stateConditions.push(`(rv.estado_visita = 'ACEPTADO' AND rv.fecha_fin_atencion IS NULL)`);
+        } else if (estado === 'FINALIZADO') {
+          // FINALIZADO real: estado es FINALIZADO O (estado es ACEPTADO pero YA tiene fecha de fin de atención)
+          stateConditions.push(`(rv.estado_visita = 'FINALIZADO' OR (rv.estado_visita = 'ACEPTADO' AND rv.fecha_fin_atencion IS NOT NULL))`);
+        } else {
+          // Para otros estados (PENDIENTE, RECHAZADO, DELEGADO, etc.), comportamiento normal
+          // Usamos paramCounter para inyección segura
+          stateConditions.push(`rv.estado_visita = $${paramCounter}`);
+          queryParams.push(estado);
+          paramCounter++;
+        }
+      });
+
+      if (stateConditions.length > 0) {
+        query += ` AND (${stateConditions.join(' OR ')})`;
+      }
     }
     
     // Filtro adicional: visitas sin salida (para activos)
     // Si estamos buscando activos (PENDIENTE, ACEPTADO, DELEGADO), asegurarnos de que no tengan salida
-    // Opcional: si tu lógica de negocio dice que 'ACEPTADO' siempre es sin salida, esto es redundante pero seguro.
-    // El usuario pidió: "Filtro adicional: visitas sin salida (para activos)"
     const tieneEstadoActivo = estados.some(e => ['PENDIENTE', 'ACEPTADO', 'DELEGADO'].includes(e));
     if (tieneEstadoActivo) {
-      // Nota: A veces una visita puede estar ACEPTADA pero ya tener fecha_salida si se finalizó.
-      // Pero si el estado es FINALIZADO, ya no es activo.
-      // Si el estado es PENDIENTE/ACEPTADO, se asume que está en curso o por iniciar.
-      // Sin embargo, el usuario especificó: "query += AND rv.fecha_salida IS NULL"
-      // Vamos a respetar la lógica solicitada, aunque cuidado con los estados.
-      const soloActivos = estados.every(e => ['PENDIENTE', 'ACEPTADO', 'DELEGADO'].includes(e));
-      if (soloActivos) {
-         // Si solo pedimos activos, forzamos que no tengan salida.
-         // Esto evita mostrar visitas viejas que quedaron en estado 'ACEPTADO' por error pero tienen salida (caso borde).
-         // O simplemente para asegurar que son las "de hoy" o "en curso".
-         // El usuario puso: AND DATE(rv.fecha_ingreso) = CURRENT_DATE para activos
+       const soloActivos = estados.every(e => ['PENDIENTE', 'ACEPTADO', 'DELEGADO'].includes(e));
+       if (soloActivos) {
          query += ` AND rv.fecha_salida IS NULL`;
-         // query += ` AND DATE(rv.fecha_ingreso) = CURRENT_DATE`; // El usuario lo incluyó en su snippet
-      }
+       }
     }
     
     // Consulta para contar el total
-    const countQuery = `
+    let countQuery = `
       SELECT COUNT(*) as total
       FROM RegistrosVisitas rv
       WHERE rv.personal_visitado_id = $1
-      ${estados && estados.length > 0 
-        ? `AND rv.estado_visita IN (${estados.map((_, i) => `$${2 + i}`).join(', ')})` 
-        : ''}
-      ${tieneEstadoActivo && estados.every(e => ['PENDIENTE', 'ACEPTADO', 'DELEGADO'].includes(e)) ? 'AND rv.fecha_salida IS NULL' : ''}
     `;
     
-    const countParams = estados && estados.length > 0 
-      ? [personalId, ...estados] 
-      : [personalId];
+    // Replicar lógica de filtros para el count
+    const countParams = [personalId];
+    let countParamCounter = 2;
+    
+    if (estados && estados.length > 0) {
+      const countStateConditions = [];
+      
+      estados.forEach(estado => {
+        if (estado === 'ACEPTADO') {
+          countStateConditions.push(`(rv.estado_visita = 'ACEPTADO' AND rv.fecha_fin_atencion IS NULL)`);
+        } else if (estado === 'FINALIZADO') {
+          countStateConditions.push(`(rv.estado_visita = 'FINALIZADO' OR (rv.estado_visita = 'ACEPTADO' AND rv.fecha_fin_atencion IS NOT NULL))`);
+        } else {
+          countStateConditions.push(`rv.estado_visita = $${countParamCounter}`);
+          countParams.push(estado);
+          countParamCounter++;
+        }
+      });
+
+      if (countStateConditions.length > 0) {
+        countQuery += ` AND (${countStateConditions.join(' OR ')})`;
+      }
+    }
+    
+    if (tieneEstadoActivo && estados.every(e => ['PENDIENTE', 'ACEPTADO', 'DELEGADO'].includes(e))) {
+      countQuery += ` AND rv.fecha_salida IS NULL`;
+    }
     
     // Agregar ordenamiento
     query += ` ORDER BY rv.fecha_ingreso DESC`;

@@ -130,6 +130,13 @@ const registrarIngreso = asyncHandler(async (req, res) => {
   
   const asistencia = await service.registrarIngreso(personalId, req.user.id);
   
+  if (asistencia.alreadyRegistered) {
+    return res.status(200).json({
+      success: false,
+      message: asistencia.message
+    });
+  }
+
   logger.info(`Ingreso registrado exitosamente para personal ID: ${personalId}`);
   
   res.status(201).json({

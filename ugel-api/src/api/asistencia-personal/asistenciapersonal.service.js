@@ -207,28 +207,38 @@ const registrarIngreso = async (personalId, usuarioId) => {
     let esRetornoPapeleta = false;
 
     // Calcular minutos de tardanza
-    if (registroExistente && registroExistente.hora_ingreso && papeletaActiva && papeletaActiva.estado === 'EN_CURSO') {
-        // Retorno de papeleta
-        esRetornoPapeleta = true;
-        const retornoProg = new Date(papeletaActiva.fecha_hora_retorno_programada);
-        
-        const [hAct, mAct] = horaActual.split(':').map(Number);
-        const minAct = hAct * 60 + mAct;
-        
-        // Ajuste básico para obtener minutos del día de la fecha programada
-        // Asumimos que la fecha programada es correcta en la DB
-        const minProg = retornoProg.getHours() * 60 + retornoProg.getMinutes();
-        
-        const diff = minAct - minProg;
-        if (diff > 0) {
-            minutosTardanzaCalculados = diff;
+    // Calcular minutos de tardanza
+    if (registroExistente && registroExistente.hora_ingreso) {
+        // Ya tiene ingreso registrado
+        if (papeletaActiva && papeletaActiva.estado === 'EN_CURSO') {
+            // Es retorno de papeleta
+            esRetornoPapeleta = true;
+            const retornoProg = new Date(papeletaActiva.fecha_hora_retorno_programada);
+            
+            const [hAct, mAct] = horaActual.split(':').map(Number);
+            const minAct = hAct * 60 + mAct;
+            
+            // Ajuste básico para obtener minutos del día de la fecha programada
+            const minProg = retornoProg.getHours() * 60 + retornoProg.getMinutes();
+            
+            const diff = minAct - minProg;
+            if (diff > 0) {
+                minutosTardanzaCalculados = diff;
+            }
+            
+            // Actualizar papeleta marcando retorno real
+            await papeletasRepository.registrarRetorno(papeletaActiva.id, usuarioId);
+        } else {
+            // Ya tiene asistencia y no es papeleta -> Bloquear
+            const nombreCompleto = `${personal.nombres} ${personal.apellidos}`;
+            const estado = registroExistente.estado_presencia;
+            return {
+                alreadyRegistered: true,
+                message: `${nombreCompleto} ya tiene asistencia registrada hoy - Estado: ${estado}`
+            };
         }
-        
-        // Actualizar papeleta marcando retorno real
-        await papeletasRepository.registrarRetorno(papeletaActiva.id, usuarioId);
-        
-    } else if (!registroExistente || !registroExistente.hora_ingreso) {
-        // Primer ingreso del día
+    } else {
+        // No tiene ingreso (Nuevo o Ausente) -> Permitir ingreso
         const [hAct, mAct] = horaActual.split(':').map(Number);
         const minAct = hAct * 60 + mAct;
         
@@ -238,9 +248,6 @@ const registrarIngreso = async (personalId, usuarioId) => {
         if (diff > 0) {
             minutosTardanzaCalculados = diff;
         }
-    } else {
-        // Ya tiene ingreso y no es retorno de papeleta
-        throw new AppError('El personal ya tiene un ingreso registrado para hoy', 400);
     }
     
     // Determinar nuevo estado
