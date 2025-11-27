@@ -876,7 +876,6 @@ const VisitantesTabla = ({
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center text-gray-500">
-                      <div className="text-4xl mb-4">📊</div>
                       <p>Seleccione una categoría de estadísticas</p>
                     </div>
                   </div>

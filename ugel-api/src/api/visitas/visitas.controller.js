@@ -417,32 +417,52 @@ const delegate = asyncHandler(async (req, res) => {
  * @route GET /api/visitas/mis-visitas
  */
 const getMisVisitas = asyncHandler(async (req, res) => {
-  const { rol, personalId } = req.user;
-  
-  if (rol !== 'Personal') {
-    throw new AppError('Solo usuarios con rol Personal pueden acceder a Mis Visitas', 403);
+  try {
+    // Obtener personal_id del usuario autenticado
+    const personalId = req.user?.personal_id || req.user?.personalId;
+    
+    if (!personalId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Usuario no asociado a un personal'
+      });
+    }
+    
+    const { 
+      page = 1, 
+      limit = 10,
+      estados = '' // Parámetro opcional: 'PENDIENTE,ACEPTADO' o 'FINALIZADO,RECHAZADO'
+    } = req.query;
+    
+    // Convertir estados de string a array
+    const estadosArray = estados ? estados.split(',').map(e => e.trim()) : [];
+    
+    // Usar el nuevo método del repositorio
+    const { visitas, total } = await service.findByPersonalVisitado(
+      personalId,
+      {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        estados: estadosArray
+      }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Mis visitas obtenidas exitosamente',
+      data: visitas,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Error en controlador getMisVisitas:', error);
+    throw error;
   }
-
-  if (!personalId) {
-    throw new AppError('El usuario no tiene un personal asociado', 400);
-  }
-
-  const { page = 1, limit = 10, q = '' } = req.query;
-  
-  const result = await service.getAllVisitas({ 
-    ...req.query, 
-    personalVisitadoId: personalId,
-    page: Number(page),
-    limit: Number(limit),
-    q: q
-  });
-  
-  res.json({
-    success: true,
-    message: 'Mis visitas obtenidas exitosamente',
-    data: result.visitas,
-    pagination: result.pagination
-  });
 });
 
 module.exports = {

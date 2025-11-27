@@ -1112,6 +1112,21 @@ const delegateVisita = async (id, personalId, nuevoPersonalId) => {
   }
 };
 
+/**
+ * Buscar visitas por personal visitado con filtros y paginación
+ * @param {number} personalId - ID del personal visitado
+ * @param {Object} options - Opciones de búsqueda
+ * @returns {Object} Visitas encontradas y total
+ */
+const findByPersonalVisitado = async (personalId, options = {}) => {
+  try {
+    return await repository.findByPersonalVisitado(personalId, options);
+  } catch (error) {
+    logger.error(`Error obteniendo visitas para personal ${personalId}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   getAllVisitas,
   getVisitasActivas,
@@ -1131,5 +1146,6 @@ module.exports = {
   getVisitanteDetalle,
   acceptVisita,
   rejectVisita,
-  delegateVisita
+  delegateVisita,
+  findByPersonalVisitado
 };

@@ -41,58 +41,39 @@ const MisVisitasPage = () => {
         return;
       }
       
-      // Fetch activas (PENDIENTE, ACEPTADO, EN_CURSO)
-      // Asumimos que el backend filtra por estado si no se pasa nada, o filtramos en cliente
-      // Para "Mis Visitas", generalmente queremos ver las pendientes de acción primero
+      // Definir estados y paginación según el tab activo
+      const estados = activeTab === 'activos' 
+        ? 'PENDIENTE,ACEPTADO,DELEGADO' 
+        : 'FINALIZADO,RECHAZADO,NO_PRESENTADO';
+      
+      const page = activeTab === 'activos' ? activosPagination.page : historialPagination.page;
+      const limit = activeTab === 'activos' ? activosPagination.limit : historialPagination.limit;
+
       const response = await visitasService.getMisVisitas({
-        page: activeTab === 'activos' ? activosPagination.page : historialPagination.page,
-        limit: activeTab === 'activos' ? activosPagination.limit : historialPagination.limit,
-        // Aquí podrías agregar filtros de estado si tu API lo soporta
+        page,
+        limit,
+        estados
       });
       
-      const allVisitas = response.data.data || [];
-      const visitasParaMi = allVisitas.filter((v) => {
-        const visitadoId = v.personal_visitado_id ?? v.personalVisitadoId ?? v.personal_id ?? v.personalId ?? v.personal?.id;
-        return visitadoId && parseInt(visitadoId, 10) === parseInt(personalId, 10);
-      });
-      const dataFiltrada = visitasParaMi.length > 0 ? visitasParaMi : allVisitas;
+      const { data, pagination } = response.data;
+      const apiPagination = pagination || {};
+      const totalFromApi = apiPagination.total ?? 0;
 
-      // Separar por fecha_salida (si no tenemos estados consistentes)
-      const activas = dataFiltrada.filter(v => !v.fecha_salida);
-      const historial = dataFiltrada.filter(v => v.fecha_salida);
-
-      setVisitasActivas(activas);
-      setHistorialVisitas(historial);
-
-      // Intentar obtener el total real de la API (usa la paginación del backend)
-      const apiPagination = response.data.pagination || {};
-
-      const totalFromApi =
-        (apiPagination.total ??
-        apiPagination.totalItems ??
-        response.data.total ??
-        response.data.count ??
-        response.data.meta?.total ??
-        response.data.totalDocs ??
-        response.data.data?.total ??
-        (response.headers && parseInt(response.headers['x-total-count'], 10))) ||
-        0;
-
-      // Actualizar totales
-      // Actualizar totales SIEMPRE para ambos tabs
-      setActivosPagination(prev => ({
-        ...prev,
-        // page la controlas tú con onActivosPageChange
-        limit: apiPagination.limit ?? prev.limit,
-        total: totalFromApi || activas.length
-      }));
-
-      setHistorialPagination(prev => ({
-        ...prev,
-        // page la controlas tú con onHistorialPageChange
-        limit: apiPagination.limit ?? prev.limit,
-        total: totalFromApi || historial.length
-      }));
+      if (activeTab === 'activos') {
+        setVisitasActivas(data || []);
+        setActivosPagination(prev => ({
+          ...prev,
+          limit: apiPagination.limit ?? prev.limit,
+          total: totalFromApi
+        }));
+      } else {
+        setHistorialVisitas(data || []);
+        setHistorialPagination(prev => ({
+          ...prev,
+          limit: apiPagination.limit ?? prev.limit,
+          total: totalFromApi
+        }));
+      }
 
     } catch (error) {
       console.error('Error fetching visits:', error);
@@ -101,7 +82,7 @@ const MisVisitasPage = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [activeTab, activosPagination.page, historialPagination.page, personalId]);
+  }, [activeTab, activosPagination.page, activosPagination.limit, historialPagination.page, historialPagination.limit, personalId]);
 
   useEffect(() => {
     fetchVisitas();
@@ -188,7 +169,7 @@ const MisVisitasPage = () => {
   };
 
   return (
-    <div className="p-6 h-[800px]">
+    <div className="flex-1" style={{ maxWidth: '100%' }}>
       <MisVisitasTabla
         visitasActivas={visitasActivas}
         historialVisitas={historialVisitas}

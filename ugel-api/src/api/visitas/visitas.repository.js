@@ -1203,10 +1203,136 @@ const delegar = async (id, nuevoPersonalId, nuevoAreaId, delegadoPorId) => {
   }
 };
 
+/**
+ * Buscar visitas por personal visitado con filtros y paginación
+ * @param {number} personalId - ID del personal visitado
+ * @param {Object} options - Opciones de búsqueda
+ * @returns {Object} Visitas encontradas y total
+ */
+const findByPersonalVisitado = async (personalId, options = {}) => {
+  const { 
+    page = 1, 
+    limit = 10, 
+    estados = [] // Array de estados: ['PENDIENTE', 'ACEPTADO'] o ['FINALIZADO', 'RECHAZADO']
+  } = options;
+  
+  const offset = (page - 1) * limit;
+  
+  try {
+    // Construir la consulta base
+    let query = `
+      SELECT 
+        rv.id,
+        rv.visitante_id,
+        v.tipo_documento_id,
+        td.codigo as tipo_documento_codigo,
+        v.numero_documento,
+        v.nombres as visitante_nombres,
+        v.apellidos as visitante_apellidos,
+        rv.area_destino_id,
+        a.nombre_area,
+        rv.personal_visitado_id,
+        p.nombres as personal_nombres,
+        p.apellidos as personal_apellidos,
+        c.nombre_cargo as personal_cargo,
+        rv.motivo_visita_id,
+        mv.nombre_motivo,
+        rv.fecha_ingreso,
+        rv.fecha_salida,
+        rv.estado_visita,
+        rv.motivo_rechazo,
+        rv.fecha_aceptacion,
+        rv.fecha_rechazo,
+        rv.usuario_ingreso_id,
+        u1.nombre_usuario as usuario_ingreso
+      FROM RegistrosVisitas rv
+      JOIN Visitantes v ON rv.visitante_id = v.id
+      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+      JOIN AreasDestino a ON rv.area_destino_id = a.id
+      JOIN Personal p ON rv.personal_visitado_id = p.id
+      JOIN Cargos c ON p.cargo_id = c.id
+      JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
+      JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
+      WHERE rv.personal_visitado_id = $1
+    `;
+    
+    const queryParams = [personalId];
+    let paramCounter = 2;
+    
+    // Filtro por estados si se proporciona
+    if (estados && estados.length > 0) {
+      const placeholders = estados.map((_, i) => `$${paramCounter + i}`).join(', ');
+      query += ` AND rv.estado_visita IN (${placeholders})`;
+      queryParams.push(...estados);
+      paramCounter += estados.length;
+    }
+    
+    // Filtro adicional: visitas sin salida (para activos)
+    // Si estamos buscando activos (PENDIENTE, ACEPTADO, DELEGADO), asegurarnos de que no tengan salida
+    // Opcional: si tu lógica de negocio dice que 'ACEPTADO' siempre es sin salida, esto es redundante pero seguro.
+    // El usuario pidió: "Filtro adicional: visitas sin salida (para activos)"
+    const tieneEstadoActivo = estados.some(e => ['PENDIENTE', 'ACEPTADO', 'DELEGADO'].includes(e));
+    if (tieneEstadoActivo) {
+      // Nota: A veces una visita puede estar ACEPTADA pero ya tener fecha_salida si se finalizó.
+      // Pero si el estado es FINALIZADO, ya no es activo.
+      // Si el estado es PENDIENTE/ACEPTADO, se asume que está en curso o por iniciar.
+      // Sin embargo, el usuario especificó: "query += AND rv.fecha_salida IS NULL"
+      // Vamos a respetar la lógica solicitada, aunque cuidado con los estados.
+      const soloActivos = estados.every(e => ['PENDIENTE', 'ACEPTADO', 'DELEGADO'].includes(e));
+      if (soloActivos) {
+         // Si solo pedimos activos, forzamos que no tengan salida.
+         // Esto evita mostrar visitas viejas que quedaron en estado 'ACEPTADO' por error pero tienen salida (caso borde).
+         // O simplemente para asegurar que son las "de hoy" o "en curso".
+         // El usuario puso: AND DATE(rv.fecha_ingreso) = CURRENT_DATE para activos
+         query += ` AND rv.fecha_salida IS NULL`;
+         // query += ` AND DATE(rv.fecha_ingreso) = CURRENT_DATE`; // El usuario lo incluyó en su snippet
+      }
+    }
+    
+    // Consulta para contar el total
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM RegistrosVisitas rv
+      WHERE rv.personal_visitado_id = $1
+      ${estados && estados.length > 0 
+        ? `AND rv.estado_visita IN (${estados.map((_, i) => `$${2 + i}`).join(', ')})` 
+        : ''}
+      ${tieneEstadoActivo && estados.every(e => ['PENDIENTE', 'ACEPTADO', 'DELEGADO'].includes(e)) ? 'AND rv.fecha_salida IS NULL' : ''}
+    `;
+    
+    const countParams = estados && estados.length > 0 
+      ? [personalId, ...estados] 
+      : [personalId];
+    
+    // Agregar ordenamiento
+    query += ` ORDER BY rv.fecha_ingreso DESC`;
+    
+    // Agregar paginación
+    query += ` LIMIT $${paramCounter} OFFSET $${paramCounter + 1}`;
+    queryParams.push(limit, offset);
+    
+    // Ejecutar consultas en paralelo
+    const [visitasResult, countResult] = await Promise.all([
+      db.query(query, queryParams),
+      db.query(countQuery, countParams)
+    ]);
+    
+    return {
+      visitas: visitasResult.rows,
+      total: parseInt(countResult.rows[0].total)
+    };
+    
+  } catch (error) {
+    logger.error(`Error en repositorio buscando visitas para personal ${personalId}:`, error);
+    throw new AppError('Error obteniendo visitas del personal', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findActivas,
   findById,
+  findByPersonalVisitado,
   create,
   registrarSalida,
   registrarSalidaConFechaHora,

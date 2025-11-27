@@ -380,12 +380,13 @@ const MisVisitasTabla = ({
       key: 'activos',
       label: 'Visitantes Actuales',
       icon: <UsersIcon className="h-4 w-4" />,
-      count: visitasActivas?.length || 0
+      count: activosPagination?.totalItems || 0
     },
     {
       key: 'historial',
       label: 'Historial de Visitas',
-      icon: <ClockIcon className="h-4 w-4" />
+      icon: <ClockIcon className="h-4 w-4" />,
+      count: historialPagination?.totalItems || 0
     }
   ];
 

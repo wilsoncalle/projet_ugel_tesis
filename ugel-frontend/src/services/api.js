@@ -264,6 +264,7 @@ export const visitasService = {
     if (filters.page) params.append('page', filters.page);
     if (filters.limit) params.append('limit', filters.limit);
     if (filters.q) params.append('q', filters.q);
+    if (filters.estados) params.append('estados', filters.estados);
     return api.get(`/visitas/mis-visitas?${params.toString()}`);
   },
   buscarGlobal: (documento) => api.get(`/visitas/buscar?documento=${documento}`),
