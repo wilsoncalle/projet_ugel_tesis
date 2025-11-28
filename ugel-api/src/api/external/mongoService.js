@@ -246,7 +246,7 @@ const getEstadisticasHorasExternas = async ({ fechaInicio, fechaFin }) => {
 const getPapeletasAprobadasExternas = async ({ fechaInicio, fechaFin } = {}) => {
     const data = await getBaseData();
     
-    // 🔹 aplicar filtro por rango usando helper ya existente
+    //aplicar filtro por rango usando helper ya existente
     const dataFiltrada = filtrarPorRangoFecha(data, fechaInicio, fechaFin);
 
     // Reutilizar la lógica de formateo anterior pero usando getBaseData que ya tiene estadoVirtual

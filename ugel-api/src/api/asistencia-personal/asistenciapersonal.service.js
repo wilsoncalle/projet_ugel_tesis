@@ -18,6 +18,13 @@ const config = require('../../config');
 // Estados de presencia válidos
 const VALID_PRESENCE_STATES = ['Presente', 'Tardanza', 'Ausente', 'Permiso', 'Comisión'];
 
+// Convierte HH:MM:SS a minutos absolutos
+const timeToMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
+  const [h = 0, m = 0, s = 0] = timeStr.split(':').map(Number);
+  return (h * 60) + m + Math.floor(s / 60);
+};
+
 /**
  * Obtener registros de asistencia con paginación y filtros
  * @param {Object} options - Opciones de filtrado y paginación
@@ -74,8 +81,8 @@ const getAsistenciasHoy = async (options = {}) => {
   const { page = 1, limit = 20, q = '' } = options;
   
   try {
-    // Obtener fecha actual en formato YYYY-MM-DD
-    const hoy = new Date().toISOString().split('T')[0];
+    // Obtener fecha actual en formato YYYY-MM-DD (Lima)
+    const { fecha: hoy } = nowLima();
     
     // Obtener asistencias del día con paginación
     const result = await repository.findAll({
@@ -516,14 +523,10 @@ const marcarAusentesAlFinalDelDia = async (
     let fechaProcesar = fecha;
     
     if (!fechaProcesar) {
-      const ahora = new Date();
-      const limaOffset = -5 * 60; // -5 horas en minutos
-      const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
-      const limaTime = new Date(utcTime + (limaOffset * 60000));
-      
-      // Obtener el día anterior
-      limaTime.setDate(limaTime.getDate() - 1);
-      fechaProcesar = limaTime.toISOString().split('T')[0];
+      const { fechaHora } = nowLima();
+      const limaAyer = new Date(fechaHora);
+      limaAyer.setDate(limaAyer.getDate() - 1);
+      fechaProcesar = limaAyer.toISOString().split('T')[0];
     }
     
     const modoOperacion = crearSiNoExiste ? 'crear y actualizar' : 'solo actualizar';
@@ -546,6 +549,88 @@ const marcarAusentesAlFinalDelDia = async (
     logger.error('Error marcando ausentes al final del día:', error);
     throw error;
   }
+};
+
+/**
+ * Marcado reactivo de ausentes según hora_entrada + tolerancia.
+ * Se ejecuta de manera periódica (ej. cada pocos minutos) y evita usar fecha UTC.
+ */
+const marcarAusentesProgresivo = async (usuarioSistemaId = config.systemUserId) => {
+  const { fecha: hoy, hora, fechaHora } = nowLima();
+  const minutosAhora = timeToMinutes(hora);
+  const mes = fechaHora.getMonth() + 1;
+  const anio = fechaHora.getFullYear();
+
+  // Traer personal activo en un batch razonable (evita cargas masivas)
+  const { personal = [] } = await personalRepository.findAll({
+    page: 1,
+    limit: 5000,
+    activo: true,
+    fecha: hoy
+  });
+
+  let procesados = 0;
+  let ausentes = 0;
+  let permisos = 0;
+
+  for (const p of personal) {
+    const personalId = p.id;
+
+    // Config efectiva (personal o global)
+    const configAsistencia = await asistenciaConfigService.getConfigEfectiva(personalId);
+    const minutosEntrada = timeToMinutes(configAsistencia?.hora_entrada || '09:00:00');
+    const minutosTolerancia = Number(configAsistencia?.minutos_tolerancia_por_dia ?? configAsistencia?.minutos_tolerancia_dia ?? 0);
+    const diasToleranciaMes = Number(configAsistencia?.dias_tolerancia_por_mes ?? configAsistencia?.dias_tolerancia_mes ?? 0);
+
+    // Antes de la hora de entrada: no hacer nada
+    if (minutosAhora < minutosEntrada) continue;
+
+    const registroHoy = await repository.findByPersonalAndFecha(personalId, hoy);
+
+    // Si ya tiene un estado distinto a Ausente, no tocar
+    if (registroHoy && registroHoy.estado_presencia && registroHoy.estado_presencia !== 'Ausente') {
+      procesados++;
+      continue;
+    }
+
+    // TODO: Integrar detección real de papeleta desde Mongo (por DNI/personalId)
+    // Por ahora, asumimos que no hay papeleta activa.
+
+    // Ventana de tolerancia por minutos: esperar antes de marcar ausencia
+    const minutosLimite = minutosEntrada + minutosTolerancia;
+    if (minutosAhora < minutosLimite) {
+      continue;
+    }
+
+    // Evaluar saldo de días de tolerancia usados en el mes
+    const diasUsados = await repository.countDiasToleranciaUsados(personalId, mes, anio);
+    const sinSaldoTolerancia = diasUsados >= diasToleranciaMes;
+
+    // Marcar ausencia si no hay registro o está en Ausente
+    if (!registroHoy) {
+      await repository.create({
+        personal_id: personalId,
+        fecha: hoy,
+        hora_ingreso: null,
+        hora_salida: null,
+        estado_presencia: 'Ausente',
+        usuario_registro_id: usuarioSistemaId
+      });
+      ausentes++;
+    } else if (registroHoy.estado_presencia !== 'Ausente') {
+      await repository.updateEstadoPresencia(registroHoy.id, 'Ausente', usuarioSistemaId);
+      ausentes++;
+    }
+
+    // Nota: sinSaldoTolerancia queda disponible para evoluciones (alertas, etc.)
+    if (sinSaldoTolerancia) {
+      // No se registra nada extra; el estado ya quedó en Ausente.
+    }
+
+    procesados++;
+  }
+
+  return { fecha: hoy, procesados, ausentes, permisos };
 };
 
 /**
@@ -1004,5 +1089,6 @@ module.exports = {
   exportarAExcel,
   exportarAPDF,
   getMiResumen,
-  getMiAsistencia
+  getMiAsistencia,
+  marcarAusentesProgresivo
 };

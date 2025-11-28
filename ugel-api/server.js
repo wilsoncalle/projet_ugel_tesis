@@ -7,6 +7,7 @@ require('dotenv').config();
 const app = require('./app');
 const config = require('./src/config');
 const logger = require('./src/utils/logger');
+const { nowLima } = require('./src/utils/fechas');
 
 const PORT = config.port || 3000;
 const SYSTEM_USER_ID = config.systemUserId;
@@ -84,11 +85,7 @@ const ejecutarMarcadoAusentes = async (crearSiNoExiste = true) => {
     logger.info(`Ejecutando marcado automático de ausentes (modo: ${modoOperacion})...`);
     
     // Obtener fecha actual en zona horaria Lima
-    const ahora = new Date();
-    const limaOffset = -5 * 60; // -5 horas en minutos
-    const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
-    const limaTime = new Date(utcTime + (limaOffset * 60000));
-    const fechaActual = limaTime.toISOString().split('T')[0];
+    const { fecha: fechaActual } = nowLima();
     
     // Usar usuario técnico del sistema para acciones automáticas
     const resultado = await asistenciaPersonalService.marcarAusentesAlFinalDelDia(
@@ -113,10 +110,7 @@ const ejecutarMarcadoAusentes = async (crearSiNoExiste = true) => {
  * @returns {number} Tiempo en milisegundos hasta el horario especificado
  */
 const calcularTiempoHasta = (hora, minuto) => {
-  const ahora = new Date();
-  const limaOffset = -5 * 60; // -5 horas en minutos
-  const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
-  const limaTime = new Date(utcTime + (limaOffset * 60000));
+  const { fechaHora: limaTime } = nowLima();
   
   // Crear fecha objetivo para hoy con el horario especificado
   const objetivo = new Date(limaTime);
@@ -190,11 +184,7 @@ server.listen(PORT, () => {
   const verificarYCrearRegistrosDiarios = async () => {
     try {
       // Obtener hora actual en zona horaria Lima
-      const ahora = new Date();
-      const limaOffset = -5 * 60; // -5 horas en minutos
-      const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
-      const limaTime = new Date(utcTime + (limaOffset * 60000));
-      
+      const { fechaHora: limaTime, fecha: fechaActual } = nowLima();
       const horaActual = limaTime.getHours();
       const minutoActual = limaTime.getMinutes();
       const horaFormateada = `${horaActual.toString().padStart(2, '0')}:${minutoActual.toString().padStart(2, '0')}`;
@@ -208,7 +198,6 @@ server.listen(PORT, () => {
       }
       
       // Verificar si existen registros para hoy
-      const fechaActual = limaTime.toISOString().split('T')[0];
       const repository = require('./src/api/asistencia-personal/asistenciapersonal.repository');
       const verificacion = await repository.verificarRegistrosDelDia(fechaActual);
       
@@ -244,6 +233,20 @@ server.listen(PORT, () => {
     programarMarcadosMultiples();
     logger.info(`Sistema de marcado automático de ausentes iniciado con ${horariosActualizacion.length} horarios configurados`);
   });
+
+  // Marcado reactivo cada 5 minutos basado en hora_entrada + tolerancia
+  const REACTIVE_INTERVAL_MS = 5 * 60 * 1000;
+  setInterval(async () => {
+    try {
+      const resumen = await asistenciaPersonalService.marcarAusentesProgresivo(SYSTEM_USER_ID);
+      logger.info(
+        `Marcado reactivo de ausentes: fecha ${resumen.fecha}, procesados ${resumen.procesados}, ausentes ${resumen.ausentes}`
+      );
+    } catch (err) {
+      logger.error('Error en marcado reactivo de ausentes:', err);
+    }
+  }, REACTIVE_INTERVAL_MS);
+  logger.info(`Marcado reactivo de ausentes iniciado (cada ${REACTIVE_INTERVAL_MS / 60000} minutos)`);
 });
 
 // Manejo de cierre graceful

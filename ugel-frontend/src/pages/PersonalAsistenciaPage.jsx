@@ -55,6 +55,16 @@ const itemVariants = {
 const PersonalAsistenciaPage = () => {
   useDocumentTitle('Asistencia de Personal - COAC-UGEL');
   const { user } = useAuth();
+
+  // Normaliza registros "Ausente" sin hora_ingreso/salida (creados antes de hora_entrada) para mostrarlos vacíos
+  const limpiarAusentesTempranos = (asistencias = []) =>
+    asistencias.map((a) => {
+      const sinIngreso = !a.hora_ingreso && !a.hora_salida;
+      if (sinIngreso && a.estado_presencia === 'Ausente') {
+        return { ...a, estado_presencia: '' };
+      }
+      return a;
+    });
   
   // Estados principales
   const [asistenciasHoy, setAsistenciasHoy] = useState([]);
@@ -253,12 +263,13 @@ const PersonalAsistenciaPage = () => {
       });
       
       if (response.data.success) {
-        setAsistenciasHoy(response.data.data || []);
+        const dataHoy = response.data.data || [];
+        setAsistenciasHoy(limpiarAusentesTempranos(dataHoy));
         
         setHoyPagination(prev => ({
           ...prev,
-          totalItems: response.data.data?.length || 0,
-          totalPages: Math.ceil((response.data.data?.length || 0) / prev.itemsPerPage)
+          totalItems: dataHoy.length || 0,
+          totalPages: Math.ceil((dataHoy.length || 0) / prev.itemsPerPage)
         }));
       }
     } catch (error) {
@@ -1951,6 +1962,8 @@ const FormularioBusquedaHistorial = ({ filtros, onBuscar, personalOptions, loadi
 
 // Badge para estados de presencia
 const EstadoBadge = ({ estado }) => {
+  if (!estado) return <span className="text-gray-900 text-sm">-</span>;
+
   const configs = {
     'Presente': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircleIcon },
     'Tarde': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: ClockIcon },
@@ -1959,13 +1972,13 @@ const EstadoBadge = ({ estado }) => {
     'Permiso': { bg: 'bg-blue-100', text: 'text-blue-800', icon: ExclamationTriangleIcon }
   };
   
-  const config = configs[estado] || configs['Ausente'];
+  const config = configs[estado] || { bg: 'bg-gray-100', text: 'text-gray-800', icon: XCircleIcon };
   const Icon = config.icon;
   
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
       <Icon className="h-3 w-3 mr-1" />
-      {estado || 'Ausente'}
+      {estado}
     </span>
   );
 };

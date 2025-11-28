@@ -6,7 +6,7 @@
 const db = require('../../config/database');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
-const { toLimaDateYYYYMMDD } = require('../../utils/fechas');
+const { toLimaDateYYYYMMDD, nowLima } = require('../../utils/fechas');
 
 /**
  * Buscar todos los registros de asistencia con filtros y paginación
@@ -65,7 +65,12 @@ const findAll = async (options = {}) => {
       // Agregar parámetros para generate_series ($1 y $2)
       queryParams.push(startDate);
       queryParams.push(endDate);
-      paramCounter = 3;
+      
+      // Agregar fecha actual de Lima para comparación ($3)
+      const { fecha: hoyLima } = nowLima();
+      queryParams.push(hoyLima);
+      
+      paramCounter = 4;
       
       // Construir la consulta base
       // 1. Generar serie de fechas
@@ -90,7 +95,8 @@ const findAll = async (options = {}) => {
           CASE
             WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
             WHEN ps.id IS NOT NULL THEN 'Permiso'
-            ELSE 'Ausente'
+            WHEN ds.fecha_serie < $3::date THEN 'Ausente'
+            ELSE NULL
           END as estado_presencia,
           ca.usuario_registro_id,
           u.nombre_usuario as usuario_registro,
@@ -143,7 +149,8 @@ const findAll = async (options = {}) => {
           CASE
             WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
             WHEN ps.id IS NOT NULL THEN 'Permiso'
-            ELSE 'Ausente'
+            WHEN ds.fecha_serie < $3::date THEN 'Ausente'
+            ELSE NULL
           END = $${paramCounter}
         `);
         queryParams.push(estadoPresencia);
@@ -168,7 +175,7 @@ const findAll = async (options = {}) => {
           AND DATE(ps.fecha_hora_salida_programada) <= ds.fecha_serie
           AND DATE(ps.fecha_hora_retorno_programada) >= ds.fecha_serie
           AND ps.fecha_hora_retorno_real IS NULL
-        WHERE ${whereConditions.join(' AND ')}
+        WHERE ($3::text IS NOT NULL OR true) AND ${whereConditions.join(' AND ')}
       `;
       
       // Clonar parámetros para el count (sin limit/offset)
