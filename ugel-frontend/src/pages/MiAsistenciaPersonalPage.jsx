@@ -20,68 +20,58 @@ import {
 const EstadoBadge = ({ estado }) => {
   const configs = {
     Presente: {
-      code: 'P',
-      bg: 'bg-green-500',
-      text: 'text-white',
-      title: 'Presente',
+      bg: 'bg-green-100',
+      text: 'text-green-800',
+      label: 'Presente',
     },
     Tardanza: {
-      code: 'T',
-      bg: 'bg-amber-400',
-      text: 'text-white',
-      title: 'Tardanza',
+      bg: 'bg-amber-100',
+      text: 'text-amber-800',
+      label: 'Tardanza',
     },
     Tarde: {
-      code: 'T',
-      bg: 'bg-amber-400',
-      text: 'text-white',
-      title: 'Tardanza',
+      bg: 'bg-amber-100',
+      text: 'text-amber-800',
+      label: 'Tardanza',
     },
     Ausente: {
-      code: 'F',
-      bg: 'bg-red-500',
-      text: 'text-white',
-      title: 'Falta',
+      bg: 'bg-red-100',
+      text: 'text-red-800',
+      label: 'Falta',
     },
     Permiso: {
-      code: 'J',
-      bg: 'bg-cyan-500',
-      text: 'text-white',
-      title: 'Justificado',
+      bg: 'bg-cyan-100',
+      text: 'text-cyan-800',
+      label: 'Justificado',
     },
     'En Permiso': {
-      code: 'J',
-      bg: 'bg-cyan-500',
-      text: 'text-white',
-      title: 'Justificado',
+      bg: 'bg-cyan-100',
+      text: 'text-cyan-800',
+      label: 'Justificado',
     },
     Justificada: {
-      code: 'J',
-      bg: 'bg-cyan-500',
-      text: 'text-white',
-      title: 'Justificado',
+      bg: 'bg-cyan-100',
+      text: 'text-cyan-800',
+      label: 'Justificado',
     },
     Comisión: {
-      code: 'C',
-      bg: 'bg-purple-500',
-      text: 'text-white',
-      title: 'Comisión',
+      bg: 'bg-purple-100',
+      text: 'text-purple-800',
+      label: 'Comisión',
     },
   };
 
   const config = configs[estado] || {
-    code: '?',
-    bg: 'bg-gray-400',
-    text: 'text-white',
-    title: estado || 'Desconocido',
+    bg: 'bg-gray-100',
+    text: 'text-gray-800',
+    label: estado || 'Desconocido',
   };
 
   return (
     <span
-      title={config.title}
-      className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${config.bg} ${config.text}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
     >
-      {config.code}
+      {config.label}
     </span>
   );
 };
@@ -303,7 +293,7 @@ const MiAsistenciaPersonalPage = () => {
             'Sábado',
           ];
           return (
-            <div className="text-xs text-gray-700">
+            <div className="text-sm text-gray-700">
               {dias[fecha.getDay()] || '-'}
             </div>
           );
@@ -529,7 +519,7 @@ const MiAsistenciaPersonalPage = () => {
 
             {/* Tabla de asistencias */}
             <Card className="p-0 border border-gray-200 bg-white rounded-2xl">
-              <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+              <div className="px-1 pt-0 pb-2 flex items-center justify-between">
                 <h2 className="text-base font-semibold text-gray-800">
                   Registros de asistencia
                 </h2>

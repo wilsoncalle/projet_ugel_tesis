@@ -177,7 +177,13 @@ const getMiAsistencia = async (personalId, options = {}) => {
     const firstDay = `${year}-${monthStr}-01`;
     const lastDayDate = new Date(year, month, 0); // día 0 del mes siguiente = último día
     const lastDayStr = String(lastDayDate.getDate()).padStart(2, '0');
-    const lastDay = `${year}-${monthStr}-${lastDayStr}`;
+    let lastDay = `${year}-${monthStr}-${lastDayStr}`;
+
+    // Validar que no se muestren días futuros
+    const { fecha: hoyLima } = nowLima();
+    if (lastDay > hoyLima) {
+      lastDay = hoyLima;
+    }
 
     // Usamos findAll con fechaInicio/fechaFin y personalId
     const result = await repository.findAll({
@@ -188,7 +194,15 @@ const getMiAsistencia = async (personalId, options = {}) => {
       personalId,
     });
 
-    return result;
+    return {
+      asistencias: result.asistencias,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: result.total,
+        totalPages: Math.ceil(result.total / limit)
+      }
+    };
   } catch (error) {
     logger.error('Error obteniendo asistencias mensuales del personal:', error);
     throw error;

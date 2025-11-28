@@ -169,28 +169,32 @@ const MisVisitasPage = () => {
   };
 
   return (
-    <div className="flex-1" style={{ maxWidth: '100%' }}>
-      <MisVisitasTabla
-        visitasActivas={visitasActivas}
-        historialVisitas={historialVisitas}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        onRefresh={fetchVisitas}
-        activosPagination={{
-          currentPage: activosPagination.page,
-          totalPages: Math.ceil(activosPagination.total / activosPagination.limit),
-          totalItems: activosPagination.total,
-          itemsPerPage: activosPagination.limit
-        }}
-        onActivosPageChange={(page) => setActivosPagination(prev => ({ ...prev, page }))}
-        historialPagination={{
-          currentPage: historialPagination.page,
-          totalPages: Math.ceil(historialPagination.total / historialPagination.limit),
-          totalItems: historialPagination.total,
-          itemsPerPage: historialPagination.limit
-        }}
-        onHistorialPageChange={(page) => setHistorialPagination(prev => ({ ...prev, page }))}
-      />
+    <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+      <div className="flex-1 p-4">
+        <div className="max-w-8xl mx-auto h-full">
+          <MisVisitasTabla
+            visitasActivas={visitasActivas}
+            historialVisitas={historialVisitas}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            onRefresh={fetchVisitas}
+            activosPagination={{
+              currentPage: activosPagination.page,
+              totalPages: Math.ceil(activosPagination.total / activosPagination.limit),
+              totalItems: activosPagination.total,
+              itemsPerPage: activosPagination.limit
+            }}
+            onActivosPageChange={(page) => setActivosPagination(prev => ({ ...prev, page }))}
+            historialPagination={{
+              currentPage: historialPagination.page,
+              totalPages: Math.ceil(historialPagination.total / historialPagination.limit),
+              totalItems: historialPagination.total,
+              itemsPerPage: historialPagination.limit
+            }}
+            onHistorialPageChange={(page) => setHistorialPagination(prev => ({ ...prev, page }))}
+          />
+        </div>
+      </div>
     </div>
   );
 };
