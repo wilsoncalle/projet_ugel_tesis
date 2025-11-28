@@ -309,7 +309,10 @@ const findById = async (id) => {
         rv.estado_visita,
         rv.usuario_salida_id,
         u2.nombre_usuario as usuario_salida,
-        rv.fecha_fin_atencion
+        rv.fecha_fin_atencion,
+        rv.delegado_por_id,
+        pd.nombres as delegado_por_nombres,
+        pd.apellidos as delegado_por_apellidos
       FROM RegistrosVisitas rv
       JOIN Visitantes v ON rv.visitante_id = v.id
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
@@ -319,6 +322,7 @@ const findById = async (id) => {
       JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
       JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
       LEFT JOIN Usuarios u2 ON rv.usuario_salida_id = u2.id
+      LEFT JOIN Personal pd ON rv.delegado_por_id = pd.id
       WHERE rv.id = $1
     `;
     
@@ -1282,7 +1286,10 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
         rv.fecha_rechazo,
         rv.usuario_ingreso_id,
         u1.nombre_usuario as usuario_ingreso,
-        rv.fecha_fin_atencion
+        rv.fecha_fin_atencion,
+        rv.delegado_por_id,
+        pd.nombres as delegado_por_nombres,
+        pd.apellidos as delegado_por_apellidos
       FROM RegistrosVisitas rv
       JOIN Visitantes v ON rv.visitante_id = v.id
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
@@ -1291,6 +1298,7 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
       JOIN Cargos c ON p.cargo_id = c.id
       JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
       JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
+      LEFT JOIN Personal pd ON rv.delegado_por_id = pd.id
       WHERE rv.personal_visitado_id = $1
     `;
     

@@ -397,8 +397,54 @@ const MisVisitasTabla = ({
             FINALIZADO: 'bg-gray-100 text-gray-800',
             NO_PRESENTADO: 'bg-gray-100 text-gray-800'
           };
+          
+          const isDelegado = row.estado_visita === 'DELEGADO';
+          
           return (
-            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${colors[row.estado_visita] || 'bg-gray-100'}`}>
+           <span
+              className={`
+                inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-sm border border-transparent
+                ${colors[row.estado_visita] || 'bg-gray-100 text-gray-700'}
+                ${isDelegado ? 'cursor-pointer hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 select-none ring-1 ring-inset ring-black/5' : ''}
+              `}
+              onClick={(e) => {
+                if (!isDelegado) return;
+                
+                // Evita que el click se propague si la fila tiene acciones
+                e.stopPropagation();
+
+                if (row.delegado_por_nombres) {
+                  // Toast limpio, estilo sistema (blanco con sombra y borde sutil)
+                  toast.success(
+                    <div className="flex flex-col">
+                      <span className="font-bold text-gray-800 text-sm">Visita Delegada</span>
+                      <span className="text-gray-600 text-xs mt-0.5">
+                        Por: {row.delegado_por_nombres} {row.delegado_por_apellidos}
+                      </span>
+                    </div>,
+                    {
+                      duration: 4000,
+                      position: 'top-center',
+                      iconTheme: {
+                        primary: '#3b82f6',
+                        secondary: '#fff',
+                      },
+                      style: {
+                        background: '#ffffff',
+                        color: '#1f2937',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        border: '1px solid #f3f4f6',
+                      },
+                    }
+                  );
+                } else {
+                  toast.error('Información del delegante no disponible');
+                }
+              }}
+              title={isDelegado ? 'Ver detalles de la delegación' : ''}
+            >
               {row.estado_visita}
             </span>
           );
@@ -419,7 +465,7 @@ const MisVisitasTabla = ({
             // Clase base para los contenedores (Flexbox centrado estricto)
             const containerBase = "flex items-center gap-1.5"; 
 
-            if (row.estado_visita === 'PENDIENTE') {
+            if (row.estado_visita === 'PENDIENTE' || row.estado_visita === 'DELEGADO') {
               const isOverLimit = diffMinutes > 5;
               return (
                 <div className={`${containerBase} ${isOverLimit ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
@@ -467,7 +513,7 @@ const MisVisitasTabla = ({
           minWidth: '140px',
           sticky: 'right',
           render: (row) => {
-            if (row.estado_visita === 'PENDIENTE') {
+            if (row.estado_visita === 'PENDIENTE' || row.estado_visita === 'DELEGADO') {
               return (
                 <div className="flex justify-left space-x-2">
                   <button

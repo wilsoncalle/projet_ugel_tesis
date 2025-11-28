@@ -445,6 +445,8 @@ const delegate = asyncHandler(async (req, res) => {
         estado: 'DELEGADO',
         fecha_delegacion: visita.fecha_delegacion,
         delegado_por_id: personalId,
+        delegado_por_nombres: visita.delegado_por_nombres,
+        delegado_por_apellidos: visita.delegado_por_apellidos,
         // Datos del nuevo personal para actualizar la UI
         nuevo_personal_id: visita.personal_visitado_id,
         nuevo_personal_nombres: visita.personal_nombres,
