@@ -16,6 +16,7 @@ import {
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import JustificationModal from '../components/JustificationModal';
+import Notification from '../components/Notification';
 
 // Badge simple para el estado de presencia
 const EstadoBadge = ({ estado }) => {
@@ -118,6 +119,7 @@ const MiAsistenciaPersonalPage = () => {
   const [loadingTabla, setLoadingTabla] = useState(false);
   const [loadingResumen, setLoadingResumen] = useState(false);
   const [error, setError] = useState('');
+  const [notification, setNotification] = useState(null);
 
   const [pagination, setPagination] = useState({
     page: 1,
@@ -286,15 +288,22 @@ const MiAsistenciaPersonalPage = () => {
         fetchAsistencias();
         fetchResumen();
         closeJustificationModal();
-        alert('Justificación enviada correctamente. Pendiente de aprobación.');
+        setNotification({
+          message: 'Justificación enviada correctamente. Pendiente de aprobación.',
+          type: 'success',
+        });
       } else {
-        alert('Error al enviar la justificación.');
+        setNotification({
+          message: 'Error al enviar la justificación.',
+          type: 'error',
+        });
       }
     } catch (err) {
       console.error('Error al justificar:', err);
-      alert(
-        err.response?.data?.message || 'Error al enviar la justificación.'
-      );
+      setNotification({
+        message: err.response?.data?.message || 'Error al enviar la justificación.',
+        type: 'error',
+      });
     } finally {
       setJustifying(false);
     }
@@ -419,18 +428,35 @@ const MiAsistenciaPersonalPage = () => {
         width: '120px',
         minWidth: '120px',
         render: (row) => {
-          // Aquí decides cuándo se puede justificar
-          // Verifica si el estado está en la lista de permitidos
+          // Verificar si ya tiene justificación
+          const justificacionEstado = row?.justificacion_estado;
+          
+          if (justificacionEstado) {
+            // Mapear colores según estado
+            const badgeColors = {
+              PENDIENTE: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+              APROBADO: 'bg-green-100 text-green-800 border-green-200',
+              RECHAZADO: 'bg-red-100 text-red-800 border-red-200',
+            };
+            const colorClass = badgeColors[justificacionEstado] || 'bg-gray-100 text-gray-800 border-gray-200';
+            
+            return (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${colorClass}`}>
+                {justificacionEstado}
+              </span>
+            );
+          }
+
+          // Si no tiene justificación, verificar si puede justificar
           const canJustify = ['Tardanza', 'Ausente', 'Falta'].includes(row?.estado_presencia);
+          
           return canJustify ? (
             <Button
-              variant="default" // O elimina esta prop si interfiere con los colores personalizados
+              variant="default"
               size="xs"
               onClick={() => openJustificationModal(row)}
-              // Quitamos bg-blue y ponemos colores oscuros. Forzamos flex-row.
               className="bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-200 rounded-full px-2 py-1 transition-all shadow-sm"
             >
-              {/* Este span interno asegura que nada se rompa */}
               <span className="flex flex-row items-center gap-2">
                 <DocumentTextIcon className="h-4 w-4 text-blue-800" />
                 <span className="text-xs font-medium">Justificar</span>
@@ -473,6 +499,13 @@ const MiAsistenciaPersonalPage = () => {
 
   return (
     <div className="h-[calc(100vh-64px)] bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
+        />
+      )}
       <div className="flex-1 p-4">
         <div className="max-w-6xl mx-auto">
           {/* Encabezado y filtros */}

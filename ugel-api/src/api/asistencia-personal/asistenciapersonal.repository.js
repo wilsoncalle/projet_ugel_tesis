@@ -101,7 +101,8 @@ const findAll = async (options = {}) => {
           ca.usuario_registro_id,
           u.nombre_usuario as usuario_registro,
           ca.minutos_tardanza,
-          ca.fecha_registro
+          ca.fecha_registro,
+          (SELECT estado FROM justificaciones WHERE control_asistencia_id = ca.id ORDER BY fecha_solicitud DESC LIMIT 1) as justificacion_estado
         FROM DateSeries ds
         CROSS JOIN Personal p
         LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
