@@ -22,42 +22,42 @@ const EstadoBadge = ({ estado }) => {
     Presente: {
       bg: 'bg-green-100',
       text: 'text-green-800',
-      label: 'Presente',
+      label: 'PRESENTE',
     },
     Tardanza: {
       bg: 'bg-amber-100',
       text: 'text-amber-800',
-      label: 'Tardanza',
+      label: 'TARDANZA',
     },
     Tarde: {
       bg: 'bg-amber-100',
       text: 'text-amber-800',
-      label: 'Tardanza',
+      label: 'TARDANZA',
     },
     Ausente: {
       bg: 'bg-red-100',
       text: 'text-red-800',
-      label: 'Falta',
+      label: 'AUSENTE',
     },
     Permiso: {
       bg: 'bg-cyan-100',
       text: 'text-cyan-800',
-      label: 'Justificado',
+      label: 'PERMISO',
     },
     'En Permiso': {
       bg: 'bg-cyan-100',
       text: 'text-cyan-800',
-      label: 'Justificado',
+      label: 'EN PERMISO',
     },
     Justificada: {
       bg: 'bg-cyan-100',
       text: 'text-cyan-800',
-      label: 'Justificado',
+      label: 'JUSTIFICADA',
     },
     Comisión: {
       bg: 'bg-purple-100',
       text: 'text-purple-800',
-      label: 'Comisión',
+      label: 'COMISIÓN',
     },
   };
 

@@ -127,10 +127,15 @@ const getMiResumen = async (personalId, { anio, mes }) => {
       configAsistencia?.dias_tolerancia_mes ??
       10;
 
+    const horaEntradaRef = configAsistencia?.hora_entrada || '09:00:00';
+    const fechaInicioConfig = configAsistencia?.aplica_desde || null;
+
     const diasToleranciaUsados = await repository.countDiasToleranciaUsados(
       personalId,
       month,
-      year
+      year,
+      horaEntradaRef,
+      fechaInicioConfig
     );
 
     const diasToleranciaRestantes = Math.max(
@@ -280,7 +285,7 @@ const determinarEstadoPresencia = (horaIngreso) => {
  */
 const registrarIngreso = async (personalId, usuarioId) => {
   try {
-    // Verificar que el personal exista y esté activo
+    // 1. Verificar personal
     const personal = await personalRepository.findById(personalId);
     if (!personal) {
       throw new AppError('Personal no encontrado', 404);
@@ -289,55 +294,79 @@ const registrarIngreso = async (personalId, usuarioId) => {
       throw new AppError('Personal inactivo', 400);
     }
     
-    // Obtener fecha y hora actual en zona horaria de Lima (UTC-5)
+    // 2. Obtener fecha/hora actual (Lima)
     const { fecha: fechaActual, hora: horaActual } = nowLima();
     
-    // Obtener configuración efectiva de tolerancia (por personal o global)
+    // 3. Obtener Configuración Efectiva
     const configAsistencia = await asistenciaConfigService.getConfigEfectiva(personalId);
-
-    // Valores por defecto si aún no hay config en la tabla
-    const minutosToleranciaDia = configAsistencia?.minutos_tolerancia_por_dia ?? 10;
-    const diasToleranciaMes = configAsistencia?.dias_tolerancia_por_mes ?? 10;
-
-    // Hora de entrada configurada (ej. '09:00:00')
+    
+    // Valores de configuración
+    const minutosToleranciaDia = Number(configAsistencia?.minutos_tolerancia_por_dia ?? configAsistencia?.minutos_tolerancia_dia ?? 10);
+    const diasToleranciaMes = Number(configAsistencia?.dias_tolerancia_por_mes ?? configAsistencia?.dias_tolerancia_mes ?? 10);
     const horaEntradaConfig = configAsistencia?.hora_entrada || '09:00:00';
+    
+    // NUEVO: Obtenemos la fecha de inicio de la configuración
+    const fechaInicioConfig = configAsistencia?.aplica_desde || null;
 
-    // Días de tolerancia ya usados en el mes actual
+    // 4. Calcular diferencia de minutos
+    const minutosLlegada = timeToMinutes(horaActual);
+    const minutosEntrada = timeToMinutes(horaEntradaConfig);
+    const diferenciaMinutos = minutosLlegada - minutosEntrada;
+
+    // 5. Verificar Saldo de Tolerancia
+    // PASAMOS fechaInicioConfig para que el conteo respete el "aplica_desde"
     const fechaObj = new Date(fechaActual);
     const diasUsados = await repository.countDiasToleranciaUsados(
       personalId,
       fechaObj.getMonth() + 1,
-      fechaObj.getFullYear()
+      fechaObj.getFullYear(),
+      horaEntradaConfig,
+      fechaInicioConfig
     );
+    
+    const tieneSaldoTolerancia = diasUsados < diasToleranciaMes;
 
     const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaActual);
     const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);
     
     let minutosTardanzaCalculados = 0;
-    let esRetornoPapeleta = false;
 
-    // Calcular minutos de tardanza
-    // Calcular minutos de tardanza
+    // 6. Validaciones de registro existente
     if (registroExistente && registroExistente.hora_ingreso) {
         // Ya tiene ingreso registrado
         if (papeletaActiva && papeletaActiva.estado === 'EN_CURSO') {
             // Es retorno de papeleta
-            esRetornoPapeleta = true;
             const retornoProg = new Date(papeletaActiva.fecha_hora_retorno_programada);
-            
-            const [hAct, mAct] = horaActual.split(':').map(Number);
-            const minAct = hAct * 60 + mAct;
             
             // Ajuste básico para obtener minutos del día de la fecha programada
             const minProg = retornoProg.getHours() * 60 + retornoProg.getMinutes();
             
-            const diff = minAct - minProg;
+            const diff = minutosLlegada - minProg;
             if (diff > 0) {
                 minutosTardanzaCalculados = diff;
             }
             
             // Actualizar papeleta marcando retorno real
             await papeletasRepository.registrarRetorno(papeletaActiva.id, usuarioId);
+            
+            // Para retorno de papeleta, actualizamos el registro existente pero mantenemos el estado original si era Presente/Tardanza
+            // O recalculamos? Por ahora solo actualizamos la hora de retorno si es necesario, pero aquí estamos en registrarIngreso.
+            // Si es retorno de papeleta, actualizamos el registro de asistencia?
+            // El código original actualizaba el ingreso. Asumimos que se mantiene esa lógica.
+            
+            const nuevoEstado = minutosTardanzaCalculados > 0 ? 'Tardanza' : 'Presente';
+            const totalMinutosTardanza = (registroExistente.minutos_tardanza || 0) + minutosTardanzaCalculados;
+            
+            const asistencia = await repository.updateIngreso(
+                registroExistente.id, 
+                registroExistente.hora_ingreso, // No cambiamos la hora de ingreso original
+                nuevoEstado, // Podría cambiar si llegó tarde del permiso
+                usuarioId,
+                totalMinutosTardanza
+            );
+            logger.info(`Retorno de papeleta registrado para personal ID ${personalId}`);
+            return asistencia;
+
         } else {
             // Ya tiene asistencia y no es papeleta -> Bloquear
             const nombreCompleto = `${personal.nombres} ${personal.apellidos}`;
@@ -347,60 +376,50 @@ const registrarIngreso = async (personalId, usuarioId) => {
                 message: `${nombreCompleto} ya tiene asistencia registrada hoy - Estado: ${estado}`
             };
         }
-    } else {
-        // No tiene ingreso (Nuevo o Ausente) -> Permitir ingreso
-        const [hAct, mAct] = horaActual.split(':').map(Number);
-        const [hConf, mConf] = horaEntradaConfig.split(':').map(Number); // ej. '09:00:00' → 9,0
-
-        const minAct = hAct * 60 + mAct;
-        const minInicio = hConf * 60 + mConf; // hora configurada
-        
-        const diff = minAct - minInicio;
-        
-        if (diff > 0) {
-            minutosTardanzaCalculados = diff;
-        }
     }
-    
-    // Determinar nuevo estado
+
+    // 7. DETERMINAR ESTADO Y MINUTOS (Para nuevo ingreso)
     let nuevoEstado = 'Presente';
-    let totalMinutosTardanza = minutosTardanzaCalculados;
-    
-    if (registroExistente) {
-        totalMinutosTardanza += (registroExistente.minutos_tardanza || 0);
-    }
+    let minutosAImputar = 0;
 
-    if (minutosTardanzaCalculados > 0) {
-    // Verificar tolerancia configurada
-    if (
-      minutosTardanzaCalculados <= minutosToleranciaDia &&
-      diasUsados < diasToleranciaMes
-      ) {
-        // Está dentro del rango de “tolerancia” → se registra Presente pero contando el día usado
-        nuevoEstado = 'Presente';
+    if (diferenciaMinutos > 0) {
+      if (tieneSaldoTolerancia) {
+        // Aún tiene saldo: Aplicamos beneficios
+        if (diferenciaMinutos <= minutosToleranciaDia) {
+          // Dentro del rango (Ej. 9:05 vs 9:10): Gratis
+          nuevoEstado = 'Presente';
+          minutosAImputar = 0;
+        } else {
+          // Fuera del rango (Ej. 9:12 vs 9:10): Paga diferencia
+          nuevoEstado = 'Tardanza';
+          minutosAImputar = diferenciaMinutos - minutosToleranciaDia;
+        }
       } else {
+        // Saldo agotado: Paga todo
         nuevoEstado = 'Tardanza';
+        minutosAImputar = diferenciaMinutos;
       }
+    } else {
+      // Llegada temprano/puntual
+      nuevoEstado = 'Presente';
+      minutosAImputar = 0;
     }
-
-    // Si ya estaba en Tardanza, se mantiene
+    
+    // Si ya estaba en Tardanza (por alguna razón previa), se mantiene
     if (registroExistente && registroExistente.estado_presencia === 'Tardanza') {
         nuevoEstado = 'Tardanza';
     }
-    
-    // Si tiene papeleta activa (no retorno), el estado inicial podría ser Permiso?
-    // Si llega tarde al inicio pero tiene papeleta de 8 a 10...
-    // La lógica actual prioriza la llegada.
-    
+
+    // 8. Guardar
     if (registroExistente) {
         const asistencia = await repository.updateIngreso(
             registroExistente.id, 
-            registroExistente.hora_ingreso || horaActual, 
+            horaActual, 
             nuevoEstado, 
             usuarioId,
-            totalMinutosTardanza
+            minutosAImputar
         );
-        logger.info(`Ingreso actualizado (Retorno/Corrección) para personal ID ${personalId} - Estado: ${nuevoEstado}, Tardanza: ${totalMinutosTardanza} min`);
+        logger.info(`Ingreso actualizado para personal ID ${personalId} - Estado: ${nuevoEstado}, Tardanza: ${minutosAImputar} min`);
         return asistencia;
     } else {
         const asistencia = await repository.create({
@@ -410,9 +429,9 @@ const registrarIngreso = async (personalId, usuarioId) => {
             hora_salida: null,
             estado_presencia: nuevoEstado,
             usuario_registro_id: usuarioId,
-            minutos_tardanza: totalMinutosTardanza
+            minutos_tardanza: minutosAImputar
         });
-        logger.info(`Ingreso registrado para personal ID ${personalId} - Estado: ${nuevoEstado}, Tardanza: ${totalMinutosTardanza} min`);
+        logger.info(`Ingreso registrado para personal ID ${personalId} - Estado: ${nuevoEstado}, Tardanza: ${minutosAImputar} min`);
         return asistencia;
     }
     

@@ -100,6 +100,7 @@ const findAll = async (options = {}) => {
           END as estado_presencia,
           ca.usuario_registro_id,
           u.nombre_usuario as usuario_registro,
+          ca.minutos_tardanza,
           ca.fecha_registro
         FROM DateSeries ds
         CROSS JOIN Personal p
@@ -218,6 +219,7 @@ const findAll = async (options = {}) => {
           ca.estado_presencia,
           ca.usuario_registro_id,
           u.nombre_usuario as usuario_registro,
+          ca.minutos_tardanza,
           ca.fecha_registro
         FROM ControlAsistenciaPersonal ca
         JOIN Personal p ON ca.personal_id = p.id
@@ -1484,7 +1486,7 @@ const getConfiguracion = async (personalId = null) => {
  * @param {number} anio
  * @returns {number} Días usados
  */
-const countDiasToleranciaUsados = async (personalId, mes, anio) => {
+const countDiasToleranciaUsados = async (personalId, mes, anio, horaEntradaRef = '09:00:00', fechaInicioConfig = null) => {
   try {
     const query = `
       SELECT COUNT(*) as total
@@ -1492,11 +1494,12 @@ const countDiasToleranciaUsados = async (personalId, mes, anio) => {
       WHERE personal_id = $1
         AND EXTRACT(MONTH FROM fecha) = $2
         AND EXTRACT(YEAR FROM fecha) = $3
-        AND minutos_tardanza > 0
-        AND estado_presencia = 'Presente'
+        AND hora_ingreso::time > $4::time
+        AND estado_presencia IN ('Presente', 'Tardanza')
+        AND ($5::date IS NULL OR fecha >= $5::date)
     `;
     
-    const result = await db.query(query, [personalId, mes, anio]);
+    const result = await db.query(query, [personalId, mes, anio, horaEntradaRef, fechaInicioConfig]);
     return parseInt(result.rows[0].total);
     
   } catch (error) {
