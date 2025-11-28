@@ -235,6 +235,19 @@ export const asistenciaPersonalService = {
     api.get('/asistencia-personal/mi/asistencia', {
       params: { anio, mes, page, limit },
     }),
+
+  justificar: (id, data) => {
+    const formData = new FormData();
+    formData.append('motivo', data.motivo);
+    if (data.archivo) {
+      formData.append('archivo', data.archivo);
+    }
+    return api.post(`/asistencia-personal/${id}/justificar`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 export const visitasService = {

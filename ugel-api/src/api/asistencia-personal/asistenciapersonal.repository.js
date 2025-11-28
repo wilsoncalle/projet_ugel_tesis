@@ -1544,6 +1544,53 @@ const getResumenMensualPersonal = async (personalId, anio, mes) => {
   }
 };
 
+/**
+ * Crear justificación de asistencia
+ * @param {Object} data - Datos de la justificación
+ * @returns {Object} Justificación creada
+ */
+const createJustificacion = async (data) => {
+  try {
+    const {
+      control_asistencia_id,
+      motivo,
+      evidencia_url,
+      estado,
+      usuario_solicitante_id
+    } = data;
+
+    const query = `
+      INSERT INTO justificaciones (
+        control_asistencia_id,
+        motivo,
+        evidencia_url,
+        estado,
+        usuario_solicitante_id
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+    `;
+
+    const result = await db.query(query, [
+      control_asistencia_id,
+      motivo,
+      evidencia_url,
+      estado || 'PENDIENTE',
+      usuario_solicitante_id
+    ]);
+
+    return result.rows[0];
+  } catch (error) {
+    logger.error('Error creando justificación:', error);
+    // Si la tabla no existe, loguear y lanzar error específico
+    if (error.code === '42P01') { // undefined_table
+      logger.warn('La tabla justificaciones no existe. Se debe ejecutar la migración.');
+      throw new AppError('Error de configuración: Tabla de justificaciones no encontrada', 500);
+    }
+    throw new AppError('Error al crear la justificación', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -1564,5 +1611,6 @@ module.exports = {
   getPersonalDetalle,
   getConfiguracion,
   countDiasToleranciaUsados,
-  getResumenMensualPersonal
+  getResumenMensualPersonal,
+  createJustificacion
 };

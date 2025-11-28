@@ -412,6 +412,30 @@ const exportarAPDF = asyncHandler(async (req, res) => {
   res.send(buffer);
 });
 
+/**
+ * Justificar inasistencia o tardanza
+ * @route POST /api/asistencia-personal/:id/justificar
+ */
+const justificar = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { motivo } = req.body;
+  const archivo = req.file;
+
+  logger.info(`Justificando asistencia ID: ${id}, Motivo: ${motivo}`);
+
+  if (!motivo) {
+    throw new AppError('El motivo es requerido', 400);
+  }
+
+  const result = await service.justificarAsistencia(id, motivo, archivo, req.user.id);
+
+  res.json({
+    success: true,
+    message: 'Justificación registrada exitosamente',
+    data: result
+  });
+});
+
 module.exports = {
   getAll,
   getHoy,
@@ -428,5 +452,6 @@ module.exports = {
   exportarAExcel,
   exportarAPDF,
   getMiResumen,
-  getMiAsistencia
+  getMiAsistencia,
+  justificar
 };

@@ -13,10 +13,11 @@ import {
   XCircleIcon,
   ExclamationTriangleIcon,
   InformationCircleIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
+import JustificationModal from '../components/JustificationModal';
 
 // Badge simple para el estado de presencia
-// Badge con código de una letra (P, T, F, J)
 const EstadoBadge = ({ estado }) => {
   const configs = {
     Presente: {
@@ -83,10 +84,12 @@ const MetricCard = ({ label, value, icon: Icon, colorClasses = '' }) => {
       className={`flex items-center justify-between rounded-xl border px-3 py-2 bg-white ${colorClasses}`}
     >
       <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4" />}
-        <span className="text-xs font-medium text-gray-700">{label}</span>
+        {Icon && <Icon className="h-4 w-4 text-gray-400" />}
+        <span className="text-xs font-medium text-gray-500">{label}</span>
       </div>
-      <span className="text-sm font-semibold tabular-nums">{value}</span>
+      <span className="text-sm font-semibold text-gray-900 tabular-nums">
+        {value}
+      </span>
     </div>
   );
 };
@@ -123,7 +126,13 @@ const MiAsistenciaPersonalPage = () => {
     totalPages: 1,
   });
 
-  // Opciones de año (puedes ajustar el rango)
+  // Estado para el modal de justificación
+  const [justificationModalOpen, setJustificationModalOpen] = useState(false);
+  const [selectedRecordForJustification, setSelectedRecordForJustification] =
+    useState(null);
+  const [justifying, setJustifying] = useState(false);
+
+  // Opciones de año
   const yearOptions = useMemo(() => {
     const currentYear = hoy.getFullYear();
     const years = [];
@@ -151,7 +160,6 @@ const MiAsistenciaPersonalPage = () => {
     []
   );
 
-  // Si el usuario no es "Personal" puedes mostrar un mensaje sencillo
   const noEsPersonal = user && user.rol && user.rol !== 'Personal';
 
   const fetchResumen = useCallback(async () => {
@@ -211,7 +219,9 @@ const MiAsistenciaPersonalPage = () => {
           page: pag.page ?? prev.page,
           limit: pag.limit ?? prev.limit,
           total: pag.total ?? prev.total ?? 0,
-          totalPages: (pag.totalPages ?? Math.ceil((pag.total ?? 0) / prev.limit)) || 1,
+          totalPages:
+            (pag.totalPages ??
+              Math.ceil((pag.total ?? 0) / prev.limit)) || 1,
         }));
       } else {
         setError('No se pudo cargar la asistencia.');
@@ -227,12 +237,10 @@ const MiAsistenciaPersonalPage = () => {
     }
   }, [anio, mes, pagination.page, pagination.limit]);
 
-  // Cuando cambian año o mes, reiniciamos la página a 1
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 1 }));
   }, [anio, mes]);
 
-  // Cargar datos al cambiar filtros o página
   useEffect(() => {
     if (noEsPersonal) return;
     fetchResumen();
@@ -253,6 +261,45 @@ const MiAsistenciaPersonalPage = () => {
     setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
+  const openJustificationModal = (record) => {
+    setSelectedRecordForJustification(record);
+    setJustificationModalOpen(true);
+  };
+
+  const closeJustificationModal = () => {
+    setJustificationModalOpen(false);
+    setSelectedRecordForJustification(null);
+  };
+
+  const handleSubmitJustification = async (data) => {
+    if (!selectedRecordForJustification) return;
+
+    try {
+      setJustifying(true);
+      const response = await asistenciaPersonalService.justificar(
+        selectedRecordForJustification.id,
+        data
+      );
+
+      if (response.data?.success) {
+        // Actualizar la lista y el resumen
+        fetchAsistencias();
+        fetchResumen();
+        closeJustificationModal();
+        alert('Justificación enviada correctamente. Pendiente de aprobación.');
+      } else {
+        alert('Error al enviar la justificación.');
+      }
+    } catch (err) {
+      console.error('Error al justificar:', err);
+      alert(
+        err.response?.data?.message || 'Error al enviar la justificación.'
+      );
+    } finally {
+      setJustifying(false);
+    }
+  };
+
   // Columnas de la tabla
   const columns = useMemo(
     () => [
@@ -266,7 +313,7 @@ const MiAsistenciaPersonalPage = () => {
           try {
             const fecha = new Date(row.fecha);
             return (
-              <div className="text-sm text-gray-900">
+              <div className="text-sm text-gray-900 tabular-nums">
                 {fecha.toLocaleDateString('es-PE')}
               </div>
             );
@@ -293,7 +340,7 @@ const MiAsistenciaPersonalPage = () => {
             'Sábado',
           ];
           return (
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-gray-900">
               {dias[fecha.getDay()] || '-'}
             </div>
           );
@@ -309,7 +356,11 @@ const MiAsistenciaPersonalPage = () => {
           if (h !== '-' && typeof h === 'string' && h.includes(':')) {
             h = h.substring(0, 5);
           }
-          return <div className="text-sm text-gray-900">{h}</div>;
+          return (
+            <div className="text-sm text-gray-900 tabular-nums">
+              {h}
+            </div>
+          );
         },
       },
       {
@@ -322,7 +373,11 @@ const MiAsistenciaPersonalPage = () => {
           if (h !== '-' && typeof h === 'string' && h.includes(':')) {
             h = h.substring(0, 5);
           }
-          return <div className="text-sm text-gray-900">{h}</div>;
+          return (
+            <div className="text-sm text-gray-900 tabular-nums">
+              {h}
+            </div>
+          );
         },
       },
       {
@@ -344,12 +399,12 @@ const MiAsistenciaPersonalPage = () => {
             row?.minutos_tarde ??
             0;
           if (!minutos) {
-            return <span className="text-sm text-gray-400">-</span>;
+            return <span className="text-sm text-gray-900">-</span>;
           }
           const esMayor30 = minutos > 30;
           return (
             <span
-              className={`text-sm font-semibold ${
+              className={`text-sm font-semibold tabular-nums ${
                 esMayor30 ? 'text-red-600' : 'text-amber-600'
               }`}
             >
@@ -358,8 +413,36 @@ const MiAsistenciaPersonalPage = () => {
           );
         },
       },
+      {
+        key: 'acciones',
+        label: 'Acciones',
+        width: '120px',
+        minWidth: '120px',
+        render: (row) => {
+          // Aquí decides cuándo se puede justificar
+          // Verifica si el estado está en la lista de permitidos
+          const canJustify = ['Tardanza', 'Ausente', 'Falta'].includes(row?.estado_presencia);
+          return canJustify ? (
+            <Button
+              variant="default" // O elimina esta prop si interfiere con los colores personalizados
+              size="xs"
+              onClick={() => openJustificationModal(row)}
+              // Quitamos bg-blue y ponemos colores oscuros. Forzamos flex-row.
+              className="bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-200 rounded-full px-2 py-1 transition-all shadow-sm"
+            >
+              {/* Este span interno asegura que nada se rompa */}
+              <span className="flex flex-row items-center gap-2">
+                <DocumentTextIcon className="h-4 w-4 text-blue-800" />
+                <span className="text-xs font-medium">Justificar</span>
+              </span>
+            </Button>
+          ) : (
+            <span className="mx-auto block w-4 h-1 bg-gray-200 rounded-full"></span>
+          );
+        },
+      },
     ],
-    []
+    [openJustificationModal]
   );
 
   if (noEsPersonal) {
@@ -393,12 +476,12 @@ const MiAsistenciaPersonalPage = () => {
       <div className="flex-1 p-4">
         <div className="max-w-6xl mx-auto">
           {/* Encabezado y filtros */}
-          <div className="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
                 Mi Asistencia
               </h1>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-500 mt-1">
                 Consulta tus registros de asistencia por año y mes.
               </p>
             </div>
@@ -436,17 +519,19 @@ const MiAsistenciaPersonalPage = () => {
 
           <div className="space-y-4">
             {/* Métricas */}
-            <Card className="p-4 border border-gray-200 bg-white rounded-2xl">
-              <div className="flex flex-col gap-3">
+            <Card className="p-0 border border-gray-200 bg-white rounded-2xl shadow-sm">
+              <div className="flex flex-col gap-4">
                 {/* Tolerancia */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <CalendarIcon className="h-5 w-5 text-blue-600" />
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-b border-gray-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <CalendarIcon className="h-5 w-5 text-blue-600" />
+                    </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">
-                        Tolerancia de llegadas tarde
+                      <p className="text-sm font-medium text-gray-900">
+                        Tolerancia de tardanzas
                       </p>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs text-gray-500 tabular-nums">
                         {loadingResumen ? 'Calculando...' : mensajeTolerancia}
                       </p>
                     </div>
@@ -454,62 +539,81 @@ const MiAsistenciaPersonalPage = () => {
 
                   <div className="flex gap-2">
                     <MetricCard
-                      label="Días totales"
-                      value={resumen.diasToleranciaTotal}
+                      label={'Días totales:\u00A0'}
+                      value={
+                        <span className="text-xs font-semibold text-gray-800">
+                          {resumen.diasToleranciaTotal}
+                        </span>
+                      }
                       icon={CalendarIcon}
                     />
+
                     <MetricCard
-                      label="Días usados"
-                      value={resumen.diasToleranciaUsados}
+                      label={'Días usados:\u00A0'}
+                      value={
+                        <span className="text-xs font-semibold text-gray-800">
+                          {resumen.diasToleranciaUsados}
+                        </span>
+                      }
                       icon={ClockIcon}
                     />
+
                     <MetricCard
-                      label="Días restantes"
-                      value={resumen.diasToleranciaRestantes}
+                      label={'Días restantes:\u00A0'}
+                      value={
+                        <span className="text-xs font-semibold text-red-600">
+                          {resumen.diasToleranciaRestantes}
+                        </span>
+                      }
                       icon={CheckCircleIcon}
                     />
                   </div>
                 </div>
 
                 {/* Conteo de estados */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2">
-                  <MetricCard
-                    label="Presentes"
-                    value={resumen.presentes}
-                    icon={CheckCircleIcon}
-                    colorClasses="border-green-200"
-                  />
-                  <MetricCard
-                    label="Tardanzas"
-                    value={resumen.tardanzas}
-                    icon={ClockIcon}
-                    colorClasses="border-amber-200"
-                  />
-                  <MetricCard
-                    label="Ausentes"
-                    value={resumen.ausentes}
-                    icon={XCircleIcon}
-                    colorClasses="border-red-200"
-                  />
-                  <MetricCard
-                    label="Permisos"
-                    value={resumen.permisos}
-                    icon={ExclamationTriangleIcon}
-                    colorClasses="border-blue-200"
-                  />
-                  <MetricCard
-                    label="Justificadas"
-                    value={resumen.justificadas}
-                    icon={InformationCircleIcon}
-                    colorClasses="border-purple-200"
-                  />
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">
+                    Resumen del mes
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <MetricCard
+                      label="Presentes"
+                      value={resumen.presentes}
+                      icon={CheckCircleIcon}
+                      colorClasses="border-green-100 bg-green-50/30"
+                    />
+                    <MetricCard
+                      label="Tardanzas"
+                      value={resumen.tardanzas}
+                      icon={ClockIcon}
+                      colorClasses="border-amber-100 bg-amber-50/30"
+                    />
+                    <MetricCard
+                      label="Ausentes"
+                      value={resumen.ausentes}
+                      icon={XCircleIcon}
+                      colorClasses="border-red-100 bg-red-50/30"
+                    />
+                    <MetricCard
+                      label="Permisos"
+                      value={resumen.permisos}
+                      icon={ExclamationTriangleIcon}
+                      colorClasses="border-blue-100 bg-blue-50/30"
+                    />
+                    <MetricCard
+                      label="Justificadas"
+                      value={resumen.justificadas}
+                      icon={InformationCircleIcon}
+                      colorClasses="border-purple-100 bg-purple-50/30"
+                    />
+                  </div>
                 </div>
 
                 {/* Minutos de tardanza totales */}
-                <div className="mt-2">
-                  <p className="text-xs text-gray-600">
-                    Minutos de tardanza acumulados en el período:{' '}
-                    <span className="font-semibold text-amber-700">
+                <div className="pt-2">
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    Minutos de tardanza acumulados:{' '}
+                    <span className="font-semibold text-gray-900 tabular-nums">
                       {resumen.minutosTardanza} min
                     </span>
                   </p>
@@ -518,9 +622,9 @@ const MiAsistenciaPersonalPage = () => {
             </Card>
 
             {/* Tabla de asistencias */}
-            <Card className="p-0 border border-gray-200 bg-white rounded-2xl">
-              <div className="px-1 pt-0 pb-2 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-gray-800">
+            <Card className="p-0 border border-gray-200 bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="px-1 pt-0 pb-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-gray-900">
                   Registros de asistencia
                 </h2>
                 <Button
@@ -531,7 +635,7 @@ const MiAsistenciaPersonalPage = () => {
                     fetchAsistencias();
                   }}
                   disabled={loadingTabla || loadingResumen}
-                  className="text-xs"
+                  className="text-xs font-medium text-gray-500 hover:text-gray-900"
                 >
                   Actualizar
                 </Button>
@@ -555,6 +659,15 @@ const MiAsistenciaPersonalPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Justificación */}
+      <JustificationModal
+        isOpen={justificationModalOpen}
+        onClose={closeJustificationModal}
+        onSubmit={handleSubmitJustification}
+        attendanceRecord={selectedRecordForJustification}
+        isLoading={justifying}
+      />
     </div>
   );
 };

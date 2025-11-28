@@ -804,7 +804,7 @@ const exportarAExcel = async (filtros = {}, themeName = 'corporate') => {
       fechaFin: filtros.fechaFin,
       personalId: filtros.personalId ? parseInt(filtros.personalId) : undefined,
       estadoPresencia: filtros.estadoPresencia
-    }, false);
+    });
     
     const asistencias = result.asistencias;
     
@@ -1123,5 +1123,47 @@ module.exports = {
   exportarAPDF,
   getMiResumen,
   getMiAsistencia,
-  marcarAusentesProgresivo
+  marcarAusentesProgresivo,
+  justificarAsistencia
+};
+
+/**
+ * Justificar inasistencia o tardanza
+ * @param {number} asistenciaId - ID de la asistencia
+ * @param {string} motivo - Motivo de la justificación
+ * @param {Object} archivo - Archivo adjunto (opcional)
+ * @param {number} usuarioId - ID del usuario que registra
+ */
+async function justificarAsistencia(asistenciaId, motivo, archivo, usuarioId) {
+  try {
+    const asistencia = await repository.findById(asistenciaId);
+    if (!asistencia) {
+      throw new AppError('Registro de asistencia no encontrado', 404);
+    }
+
+    let evidenciaUrl = null;
+    if (archivo) {
+      // En un entorno real, aquí subiríamos el archivo a S3/Cloudinary/Local
+      // Por ahora, simulamos la ruta
+      evidenciaUrl = `/uploads/justificaciones/${archivo.filename}`;
+    }
+
+    // Crear la justificación
+    await repository.createJustificacion({
+      control_asistencia_id: asistenciaId,
+      motivo,
+      evidencia_url: evidenciaUrl,
+      estado: 'PENDIENTE',
+      usuario_solicitante_id: usuarioId
+    });
+
+    // Opcional: Actualizar estado de la asistencia a algo que indique "En proceso"
+    // Por ahora no cambiamos el estado de presencia hasta que RRHH apruebe.
+    // Pero podríamos tener un estado 'Pendiente Justificación' si el sistema lo soporta.
+    
+    return { message: 'Justificación enviada correctamente' };
+  } catch (error) {
+    logger.error('Error justificando asistencia:', error);
+    throw error;
+  }
 };
