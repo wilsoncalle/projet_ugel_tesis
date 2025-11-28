@@ -197,9 +197,6 @@ export const personalService = {
 export const papeletasSalidaService = {
   // Obtener papeletas aprobadas desde MongoDB (datos externos)
   getExternas: (params = {}) => api.get('/papeletas-salida/externas', { params }),
-
-  registrarSalida: (id) => api.put(`/papeletas-salida/${id}/salida`),
-  registrarRetorno: (id) => api.put(`/papeletas-salida/${id}/retorno`),
 };
 
 

@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Card from "../components/Card";
 import TableGenerica from "../components/TableGenerica";
-import Button from "../components/Button";
 import ModalDetalles from "../components/ModalDetalles";
-import Notification from "../components/Notification";
 import TabView from "../components/TabView";
 import DateRangeFilter from "../components/DateRangeFilter";
-import { EyeIcon, ArrowRightOnRectangleIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/outline";
+import { EyeIcon } from "@heroicons/react/24/outline";
 import { papeletasSalidaService } from "../services/api";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { 
@@ -19,9 +17,8 @@ import {
 
 /**
  * Vista Vigilante — Papeletas de Salida
- * - Solo muestra papeletas en estado APROBADO y EN_CURSO
- * - Permite registrar salida (APROBADO -> EN_CURSO) y retorno (EN_CURSO -> FINALIZADO)
- * - Tabla simplificada: Código, Personal, Motivo, Salida Programada, Retorno Programada, Estado, Acción
+ * - Solo consulta papeletas externas (Mongo) en estado APROBADO/EN_CURSO/FINALIZADO
+ * - Tabla de solo lectura: Código, Personal, Motivo, Salida Programada, Retorno Programada, Estado
  */
 const VigilantePapeletasPage = () => {
   useDocumentTitle('Papeletas - COAC-UGEL');
@@ -55,7 +52,6 @@ const VigilantePapeletasPage = () => {
   // Modales
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedPapeleta, setSelectedPapeleta] = useState(null);
-  const [notification, setNotification] = useState(null);
 
   // Bloqueo de cargas simultáneas
   const isLoadingRef = useRef(false);
@@ -222,60 +218,6 @@ const VigilantePapeletasPage = () => {
     setIsDetailModalOpen(true);
   }, []);
 
-  const onRegistrarSalida = async (id) => {
-    try {
-      await papeletasSalidaService.registrarSalida(id);
-      setNotification({
-        message: "Salida registrada exitosamente",
-        type: "success",
-        duration: 2500,
-      });
-      await loadPapeletas();
-      if (isDetailModalOpen) {
-        handleCloseDetailModal();
-      }
-    } catch (e) {
-      console.error("Error al registrar salida:", e);
-      const errorMessage = 
-        e?.response?.data?.message || 
-        e?.response?.data?.error || 
-        e.message ||
-        "No se pudo registrar la salida. Inténtalo nuevamente.";
-      setNotification({
-        message: errorMessage,
-        type: "error",
-        duration: 4000,
-      });
-    }
-  };
-
-  const onRegistrarRetorno = async (id) => {
-    try {
-      await papeletasSalidaService.registrarRetorno(id);
-      setNotification({
-        message: "Retorno registrado exitosamente",
-        type: "success",
-        duration: 2500,
-      });
-      await loadPapeletas();
-      if (isDetailModalOpen) {
-        handleCloseDetailModal();
-      }
-    } catch (e) {
-      console.error("Error al registrar retorno:", e);
-      const errorMessage = 
-        e?.response?.data?.message || 
-        e?.response?.data?.error || 
-        e.message ||
-        "No se pudo registrar el retorno. Inténtalo nuevamente.";
-      setNotification({
-        message: errorMessage,
-        type: "error",
-        duration: 4000,
-      });
-    }
-  };
-
   // ---------- TABLE COLUMNS ----------
   const columns = [
     { key: "codigo", title: "Código", className: "whitespace-nowrap" },
@@ -296,49 +238,18 @@ const VigilantePapeletasPage = () => {
       title: "Estado",
       render: (row) => estadoBadge(row.estado),
     },
-      {
+    {
       key: "acciones",
       title: "Acción",
-      render: (row) => {
-        const est = String(row?.estado || "").trim().toUpperCase();
-        const esAprobado = est === "APROBADO";
-        const esEnCurso = est === "EN_CURSO";
-        
-        return (
-          <div className="flex justify-left space-x-1">
-            {/* Botón Ver - siempre visible */}
-            <button
-              onClick={() => onVerDetalle(row.raw)}
-              className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-              title="Ver Detalles"
-            >
-              <EyeIcon className="h-4 w-4" />
-            </button>
-            
-            {/* Botón Registrar Salida - solo si estado es APROBADO */}
-            {esAprobado && (
-              <button
-                onClick={() => onRegistrarSalida(row.raw?.id || row.id)}
-                className="p-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors"
-                title="Registrar Salida"
-              >
-                <ArrowRightOnRectangleIcon className="h-4 w-4" />
-              </button>
-            )}
-            
-            {/* Botón Registrar Retorno - solo si estado es EN_CURSO */}
-            {esEnCurso && (
-              <button
-                onClick={() => onRegistrarRetorno(row.raw?.id || row.id)}
-                className="p-2 bg-orange-600 text-white rounded-full hover:bg-orange-700 transition-colors"
-                title="Registrar Retorno"
-              >
-                <ArrowLeftOnRectangleIcon className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        );
-      },
+      render: (row) => (
+        <button
+          onClick={() => onVerDetalle(row.raw)}
+          className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+          title="Ver Detalles"
+        >
+          <EyeIcon className="h-4 w-4" />
+        </button>
+      ),
     },
   ];
 
@@ -570,15 +481,6 @@ const VigilantePapeletasPage = () => {
         ]}
       />
 
-      {/* Notifications */}
-      {notification && (
-        <Notification
-          message={notification.message}
-          type={notification.type}
-          duration={notification.duration}
-          onClose={() => setNotification(null)}
-        />
-      )}
     </div>
   );
 };
