@@ -103,6 +103,92 @@ const getAsistenciasHoy = async (options = {}) => {
 };
 
 /**
+ * Obtener resumen mensual de asistencia del personal logueado
+ * @param {number} personalId
+ * @param {Object} options { anio, mes }
+ */
+const getMiResumen = async (personalId, { anio, mes }) => {
+  try {
+    const year = parseInt(anio, 10) || new Date().getFullYear();
+    const month = parseInt(mes, 10) || new Date().getMonth() + 1;
+
+    // Configuración efectiva (global o por personal)
+    const configAsistencia = await asistenciaConfigService.getConfigEfectiva(personalId);
+
+    const diasToleranciaTotal =
+      configAsistencia?.dias_tolerancia_por_mes ??
+      configAsistencia?.dias_tolerancia_mes ??
+      10;
+
+    const diasToleranciaUsados = await repository.countDiasToleranciaUsados(
+      personalId,
+      month,
+      year
+    );
+
+    const diasToleranciaRestantes = Math.max(
+      diasToleranciaTotal - diasToleranciaUsados,
+      0
+    );
+
+    const resumenDB = await repository.getResumenMensualPersonal(
+      personalId,
+      year,
+      month
+    );
+
+    return {
+      diasToleranciaTotal,
+      diasToleranciaUsados,
+      diasToleranciaRestantes,
+      presentes: parseInt(resumenDB.presentes || 0, 10),
+      tardanzas: parseInt(resumenDB.tardanzas || 0, 10),
+      ausentes: parseInt(resumenDB.ausentes || 0, 10),
+      permisos: parseInt(resumenDB.permisos || 0, 10),
+      justificadas: parseInt(resumenDB.justificadas || 0, 10),
+      minutosTardanza: parseInt(resumenDB.minutos_tardanza_total || 0, 10),
+    };
+  } catch (error) {
+    logger.error('Error obteniendo resumen mensual de asistencia personal:', error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener asistencias mensuales de un personal (Mi Asistencia) con paginación
+ * @param {number} personalId
+ * @param {Object} options { anio, mes, page, limit }
+ */
+const getMiAsistencia = async (personalId, options = {}) => {
+  try {
+    const year = parseInt(options.anio, 10) || new Date().getFullYear();
+    const month = parseInt(options.mes, 10) || new Date().getMonth() + 1;
+    const page = parseInt(options.page, 10) || 1;
+    const limit = parseInt(options.limit, 10) || 15;
+
+    const monthStr = String(month).padStart(2, '0');
+    const firstDay = `${year}-${monthStr}-01`;
+    const lastDayDate = new Date(year, month, 0); // día 0 del mes siguiente = último día
+    const lastDayStr = String(lastDayDate.getDate()).padStart(2, '0');
+    const lastDay = `${year}-${monthStr}-${lastDayStr}`;
+
+    // Usamos findAll con fechaInicio/fechaFin y personalId
+    const result = await repository.findAll({
+      page,
+      limit,
+      fechaInicio: firstDay,
+      fechaFin: lastDay,
+      personalId,
+    });
+
+    return result;
+  } catch (error) {
+    logger.error('Error obteniendo asistencias mensuales del personal:', error);
+    throw error;
+  }
+};
+
+/**
  * Obtener registro de asistencia por ID
  * @param {number} id - ID del registro de asistencia
  * @returns {Object} Registro de asistencia encontrado
@@ -916,5 +1002,7 @@ module.exports = {
   getEstadisticasPersonal,
   getPersonalDetalle,
   exportarAExcel,
-  exportarAPDF
+  exportarAPDF,
+  getMiResumen,
+  getMiAsistencia
 };

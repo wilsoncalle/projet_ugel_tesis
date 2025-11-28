@@ -226,7 +226,18 @@ export const asistenciaPersonalService = {
   getById: (id) => api.get(`/asistencia-personal/${id}`),
   registrarIngreso: (personalId) => api.post('/asistencia-personal/ingreso', { personalId }),
   registrarSalida: (personalId) => api.put('/asistencia-personal/salida', { personalId }),
-  registrarEstado: (personalId, estadoPresencia) => api.post('/asistencia-personal/estado', { personalId, estadoPresencia })
+  registrarEstado: (personalId, estadoPresencia) => api.post('/asistencia-personal/estado', { personalId, estadoPresencia }),
+  
+  // Métodos para "Mi Asistencia"
+  getMiResumen: ({ anio, mes }) =>
+    api.get('/asistencia-personal/mi/resumen', {
+      params: { anio, mes },
+    }),
+
+  getMiAsistencia: ({ anio, mes, page, limit }) =>
+    api.get('/asistencia-personal/mi/asistencia', {
+      params: { anio, mes, page, limit },
+    }),
 };
 
 export const visitasService = {

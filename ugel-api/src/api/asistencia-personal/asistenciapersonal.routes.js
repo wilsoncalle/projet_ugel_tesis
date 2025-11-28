@@ -36,15 +36,28 @@ router.get('/hoy',
 );
 
 /**
- * @route   GET /api/asistencia-personal/:id
- * @desc    Obtener registro de asistencia por ID
+ * @route   GET /api/asistencia-personal/mi/resumen
+ * @desc    Obtener resumen mensual de asistencia del usuario logueado
  * @access  Private
  */
-router.get('/:id', 
+router.get(
+  '/mi/resumen',
   authenticateToken,
   requireActiveUser,
-  validationMiddleware.validateId,
-  controller.getById
+  controller.getMiResumen
+);
+
+/**
+ * @route   GET /api/asistencia-personal/mi/asistencia
+ * @desc    Obtener historial de asistencia mensual del usuario logueado
+ * @access  Private
+ */
+router.get(
+  '/mi/asistencia',
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validatePagination,
+  controller.getMiAsistencia
 );
 
 /**
@@ -175,6 +188,18 @@ router.get('/export/pdf',
   authenticateToken,
   requireActiveUser,
   controller.exportarAPDF
+);
+
+/**
+ * @route   GET /api/asistencia-personal/:id
+ * @desc    Obtener registro de asistencia por ID
+ * @access  Private
+ */
+router.get('/:id', 
+  authenticateToken,
+  requireActiveUser,
+  validationMiddleware.validateId,
+  controller.getById
 );
 
 module.exports = router;

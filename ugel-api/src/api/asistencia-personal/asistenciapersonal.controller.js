@@ -99,6 +99,73 @@ const getHoy = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Obtener resumen mensual de asistencia del usuario logueado
+ * @route GET /api/asistencia-personal/mi/resumen
+ */
+const getMiResumen = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de resumen de asistencia personal (Mi Resumen)');
+
+  const personalId = req.user.personal_id || req.user.personalId;
+
+  if (!personalId) {
+    throw new AppError(
+      'El usuario autenticado no está asociado a un registro de personal.',
+      400
+    );
+  }
+
+  const { anio, mes } = req.query;
+  const year = parseInt(anio, 10) || new Date().getFullYear();
+  const month = parseInt(mes, 10) || new Date().getMonth() + 1;
+
+  const data = await service.getMiResumen(personalId, { anio: year, mes: month });
+
+  res.json({
+    success: true,
+    message: 'Resumen de asistencia personal obtenido exitosamente',
+    data,
+  });
+});
+
+/**
+ * Obtener asistencias mensuales del usuario logueado (con paginación)
+ * @route GET /api/asistencia-personal/mi/asistencia
+ */
+const getMiAsistencia = asyncHandler(async (req, res) => {
+  logger.info('Solicitud de historial de asistencia personal (Mi Asistencia)');
+
+  const personalId = req.user.personal_id || req.user.personalId;
+
+  if (!personalId) {
+    throw new AppError(
+      'El usuario autenticado no está asociado a un registro de personal.',
+      400
+    );
+  }
+
+  const { anio, mes, page, limit } = req.query;
+
+  const year = parseInt(anio, 10) || new Date().getFullYear();
+  const month = parseInt(mes, 10) || new Date().getMonth() + 1;
+  const pageNum = parseInt(page, 10) || 1;
+  const limitNum = parseInt(limit, 10) || 15;
+
+  const result = await service.getMiAsistencia(personalId, {
+    anio: year,
+    mes: month,
+    page: pageNum,
+    limit: limitNum,
+  });
+
+  res.json({
+    success: true,
+    message: 'Registros de asistencia personal obtenidos exitosamente',
+    data: result.asistencias,
+    pagination: result.pagination,
+  });
+});
+
+/**
  * Obtener registro de asistencia por ID
  * @route GET /api/asistencia-personal/:id
  */
@@ -359,5 +426,7 @@ module.exports = {
   getEstadisticasPersonal,
   getPersonalDetalle,
   exportarAExcel,
-  exportarAPDF
+  exportarAPDF,
+  getMiResumen,
+  getMiAsistencia
 };

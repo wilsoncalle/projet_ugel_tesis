@@ -24,6 +24,7 @@ const SelectCustom = ({
   noOptionsMessage = 'No se encontraron resultados',
   menuWidth = 'auto',
   isSearchable = true,
+  hideLabel,
   ...props
 }) => {
   const [isOpen, setIsOpen] = useState(false);

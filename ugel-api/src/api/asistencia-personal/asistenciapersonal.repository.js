@@ -1498,6 +1498,42 @@ const countDiasToleranciaUsados = async (personalId, mes, anio) => {
   }
 };
 
+/**
+ * Obtener resumen mensual de asistencia de un personal
+ * @param {number} personalId
+ * @param {number} anio
+ * @param {number} mes
+ * @returns {Object}
+ */
+const getResumenMensualPersonal = async (personalId, anio, mes) => {
+  try {
+    const query = `
+      SELECT
+        COALESCE(SUM(CASE WHEN estado_presencia = 'Presente' THEN 1 END), 0) AS presentes,
+        COALESCE(SUM(CASE WHEN estado_presencia = 'Tardanza' THEN 1 END), 0) AS tardanzas,
+        COALESCE(SUM(CASE WHEN estado_presencia = 'Ausente' THEN 1 END), 0) AS ausentes,
+        COALESCE(SUM(
+          CASE WHEN estado_presencia IN ('Permiso', 'En Permiso', 'Comisión') THEN 1 END
+        ), 0) AS permisos,
+        COALESCE(SUM(CASE WHEN estado_presencia = 'Justificada' THEN 1 END), 0) AS justificadas,
+        COALESCE(SUM(minutos_tardanza), 0) AS minutos_tardanza_total
+      FROM ControlAsistenciaPersonal
+      WHERE personal_id = $1
+        AND EXTRACT(YEAR FROM fecha) = $2
+        AND EXTRACT(MONTH FROM fecha) = $3
+    `;
+
+    const result = await db.query(query, [personalId, anio, mes]);
+    return result.rows[0] || {};
+  } catch (error) {
+    logger.error(
+      `Error en repositorio obteniendo resumen mensual para personal ID ${personalId}:`,
+      error
+    );
+    throw new AppError('Error obteniendo resumen mensual de asistencia', 500);
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -1517,5 +1553,6 @@ module.exports = {
   getEstadisticasPersonal,
   getPersonalDetalle,
   getConfiguracion,
-  countDiasToleranciaUsados
+  countDiasToleranciaUsados,
+  getResumenMensualPersonal
 };
