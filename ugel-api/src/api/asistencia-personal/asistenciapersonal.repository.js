@@ -1436,7 +1436,7 @@ const getConfiguracion = async (personalId = null) => {
     if (personalId) {
       // Buscar configuración específica o global (específica tiene prioridad)
       query = `
-        SELECT minutos_tolerancia_por_dia, dias_tolerancia_por_mes
+        SELECT minutos_tolerancia_por_dia, dias_tolerancia_por_mes, hora_entrada
         FROM config_asistencia_personal
         WHERE personal_id = $1 OR personal_id IS NULL
         ORDER BY personal_id NULLS LAST
@@ -1446,7 +1446,7 @@ const getConfiguracion = async (personalId = null) => {
     } else {
       // Solo global
       query = `
-        SELECT minutos_tolerancia_por_dia, dias_tolerancia_por_mes
+        SELECT minutos_tolerancia_por_dia, dias_tolerancia_por_mes, hora_entrada
         FROM config_asistencia_personal
         WHERE personal_id IS NULL
         LIMIT 1
@@ -1458,14 +1458,15 @@ const getConfiguracion = async (personalId = null) => {
     if (result.rows.length > 0) {
         return {
             minutos_tolerancia_dia: result.rows[0].minutos_tolerancia_por_dia,
-            dias_tolerancia_mes: result.rows[0].dias_tolerancia_por_mes
+            dias_tolerancia_mes: result.rows[0].dias_tolerancia_por_mes,
+            hora_entrada: result.rows[0].hora_entrada
         };
     }
     
-    return { dias_tolerancia_mes: 10, minutos_tolerancia_dia: 10 };
+    return { dias_tolerancia_mes: 10, minutos_tolerancia_dia: 10, hora_entrada: '09:00:00' };
   } catch (error) {
     logger.error('Error obteniendo configuración de asistencia:', error);
-    return { dias_tolerancia_mes: 10, minutos_tolerancia_dia: 10 };
+    return { dias_tolerancia_mes: 10, minutos_tolerancia_dia: 10, hora_entrada: '09:00:00' };
   }
 };
 

@@ -380,7 +380,12 @@ const MainLayout = () => {
     location.pathname.startsWith('/vigilante') ||
     (userRole.includes('vigilante') && location.pathname === '/perfil');
 
-  const isFullWidthLayout = isVigilanteContext || location.pathname === '/mis-visitas';
+  const isPersonalContext =
+    location.pathname === '/mis-visitas' ||
+    location.pathname === '/mi-asistencia' ||
+    (userRole.includes('personal') && location.pathname === '/perfil');
+
+  const isFullWidthLayout = isVigilanteContext || isPersonalContext;
 
   // Determinar si el sidebar debe estar expandido (hover, pin o abierto en móvil)
   const isExpanded = pinned || isHovered || sidebarOpen;
@@ -586,6 +591,40 @@ const MainLayout = () => {
                           {papeletasActivasCount}
                         </span>
                       )}
+                    </NavLink>
+                  </div>
+                )}
+
+                {isPersonalContext && (
+                  <div className="flex items-center gap-4 ml-4 border-b border-gray-200">
+                    <NavLink
+                      to="/mis-visitas"
+                      end
+                      className={({ isActive }) => `
+                        flex items-center gap-2 py-3 px-2 font-medium text-sm transition-colors
+                        border-b-2
+                        ${isActive
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-800'
+                        }
+                      `}
+                    >
+                      <Users className="h-4 w-4" />
+                      <span>Mis Visitas</span>
+                    </NavLink>
+                    <NavLink
+                      to="/mi-asistencia"
+                      className={({ isActive }) => `
+                        flex items-center gap-2 py-3 px-2 font-medium text-sm transition-colors
+                        border-b-2
+                        ${isActive
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-800'
+                        }
+                      `}
+                    >
+                      <ClipboardCheck className="h-4 w-4" />
+                      <span>Mi Asistencia</span>
                     </NavLink>
                   </div>
                 )}

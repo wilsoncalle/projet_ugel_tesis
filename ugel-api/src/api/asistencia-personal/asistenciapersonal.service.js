@@ -192,6 +192,9 @@ const registrarIngreso = async (personalId, usuarioId) => {
     const minutosToleranciaDia = configAsistencia?.minutos_tolerancia_por_dia ?? 10;
     const diasToleranciaMes = configAsistencia?.dias_tolerancia_por_mes ?? 10;
 
+    // Hora de entrada configurada (ej. '09:00:00')
+    const horaEntradaConfig = configAsistencia?.hora_entrada || '09:00:00';
+
     // Días de tolerancia ya usados en el mes actual
     const fechaObj = new Date(fechaActual);
     const diasUsados = await repository.countDiasToleranciaUsados(
@@ -240,9 +243,11 @@ const registrarIngreso = async (personalId, usuarioId) => {
     } else {
         // No tiene ingreso (Nuevo o Ausente) -> Permitir ingreso
         const [hAct, mAct] = horaActual.split(':').map(Number);
+        const [hConf, mConf] = horaEntradaConfig.split(':').map(Number); // ej. '09:00:00' → 9,0
+
         const minAct = hAct * 60 + mAct;
+        const minInicio = hConf * 60 + mConf; // hora configurada
         
-        const minInicio = 8 * 60; // 8:00 AM Inicio de jornada
         const diff = minAct - minInicio;
         
         if (diff > 0) {

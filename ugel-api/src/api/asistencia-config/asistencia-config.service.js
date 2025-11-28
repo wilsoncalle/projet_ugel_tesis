@@ -17,7 +17,7 @@ const getConfigEfectiva = async (personalId) => {
   };
 };
 
-const setConfigGlobal = async ({ minutos, dias, aplicaDesde }) => {
+const setConfigGlobal = async ({ minutos, dias, aplicaDesde, horaEntrada }) => {
   // podrías desactivar anteriores globales si quieres mantener histórico
   const existing = await repository.getConfigGlobalActiva();
   if (existing) {
@@ -26,6 +26,7 @@ const setConfigGlobal = async ({ minutos, dias, aplicaDesde }) => {
       minutos,
       dias,
       aplicaDesde,
+      horaEntrada,
       activo: true
     });
   } else {
@@ -35,18 +36,20 @@ const setConfigGlobal = async ({ minutos, dias, aplicaDesde }) => {
       minutos,
       dias,
       aplicaDesde,
+      horaEntrada,
       activo: true
     });
   }
 };
 
-const setConfigPersonal = async ({ personalId, minutos, dias, aplicaDesde }) => {
+const setConfigPersonal = async ({ personalId, minutos, dias, aplicaDesde, horaEntrada }) => {
   const existing = await repository.getConfigPersonalActiva(personalId);
   if (existing) {
     return await repository.updateConfig(existing.id, {
       minutos,
       dias,
       aplicaDesde,
+      horaEntrada,
       activo: true
     });
   } else {
@@ -55,6 +58,7 @@ const setConfigPersonal = async ({ personalId, minutos, dias, aplicaDesde }) => 
       minutos,
       dias,
       aplicaDesde,
+      horaEntrada,
       activo: true
     });
   }

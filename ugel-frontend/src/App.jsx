@@ -29,11 +29,11 @@ import DashboardRRHHPage from './pages/DashboardRRHHPage';
 import DashboardVigilantePage from './pages/DashboardVigilantePage';
 import PersonalAsistenciaPage from './pages/PersonalAsistenciaPage';
 import ProfilePage from './pages/ProfilePage';
-import MisVisitasPage from './pages/MisVisitasPage';
 
-// Catalog Pages
 import AreasPage from './pages/AreasPage';
 import TiposDocumentoPage from './pages/TiposDocumentoPage';
+import MisVisitasPage from './pages/MisVisitasPage';
+import MiAsistenciaPersonalPage from './pages/MiAsistenciaPersonalPage';
 import MotivosVisitaPage from './pages/MotivosVisitaPage';
 import TiposContratoPage from './pages/TiposContratoPage';
 import MotivosSalidaPage from './pages/MotivosSalidaPage';
@@ -102,6 +102,7 @@ function App() {
             {/* Ruta de Perfil - Accesible para todos los roles autenticados */}
             <Route path="/perfil" element={<ProtectedRoute element={<ProfilePage />} />} />
             <Route path="/mis-visitas" element={<ProtectedRoute element={<MisVisitasPage />} />} />
+            <Route path="/mi-asistencia" element={<ProtectedRoute element={<MiAsistenciaPersonalPage />} />} />
             
             {/* Default Redirect Based on Role */}
             <Route path="/" element={<ProtectedRoute element={<DefaultRedirect />} />} />

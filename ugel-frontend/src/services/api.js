@@ -630,9 +630,9 @@ export const getCargos = (filtros = {}) => {
 
 export const asistenciaConfigService = {
   getGlobal: () => api.get('/asistencia-config/global'),
-  saveGlobal: (data) => api.post('/asistencia-config/global', data),
+  saveGlobal: (data) => api.put('/asistencia-config/global', data),
   getByPersonal: (personalId) => api.get(`/asistencia-config/personal/${personalId}`),
-  saveForPersonal: (personalId, data) => api.post(`/asistencia-config/personal/${personalId}`, data),
+  saveForPersonal: (personalId, data) => api.put(`/asistencia-config/personal/${personalId}`, data),
   getAll: (filters = {}) => {
     const params = new URLSearchParams();
     if (filters.page) params.append('page', filters.page);

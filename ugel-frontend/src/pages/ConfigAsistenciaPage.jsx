@@ -14,6 +14,7 @@ const ConfigAsistenciaPage = () => {
     minutos_tolerancia_por_dia: 10,
     dias_tolerancia_por_mes: 10,
     aplica_desde: '',
+    hora_entrada: '09:00',
   });
 
   const [loading, setLoading] = useState(false);
@@ -29,6 +30,7 @@ const ConfigAsistenciaPage = () => {
             minutos_tolerancia_por_dia: data.minutos_tolerancia_por_dia,
             dias_tolerancia_por_mes: data.dias_tolerancia_por_mes,
             aplica_desde: data.aplica_desde?.slice?.(0, 10) || '',
+            hora_entrada: data.hora_entrada?.slice?.(0, 5) || '09:00',
           });
         }
       } catch (err) {
@@ -75,10 +77,10 @@ const ConfigAsistenciaPage = () => {
         </div>
       </div>
 
-      <Notification {...notification} onClose={() => setNotification(null)} />
+      {notification && <Notification {...notification} onClose={() => setNotification(null)} />}
 
       <Card>
-        <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-3">
+        <form onSubmit={handleSubmit} className="grid gap-6 md:grid-cols-4">
           <Input
             label="Minutos de tolerancia por día"
             type="number"
@@ -96,6 +98,13 @@ const ConfigAsistenciaPage = () => {
             placeholder="Ej. 3"
           />
           
+          <Input
+            label="Hora de entrada"
+            type="time"
+            value={form.hora_entrada}
+            onChange={(e) => handleChange('hora_entrada', e.target.value)}
+          />
+
           <DateConfig
             label="Aplicar desde"
             value={form.aplica_desde}
@@ -106,7 +115,7 @@ const ConfigAsistenciaPage = () => {
             disablePast={true}
           />
 
-          <div className="md:col-span-3 flex justify-end pt-0">
+          <div className="md:col-span-4 flex justify-end pt-0">
             <Button type="submit" disabled={loading}>
               {loading ? 'Guardando…' : 'Guardar Configuración'}
             </Button>
