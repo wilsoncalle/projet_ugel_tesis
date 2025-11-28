@@ -322,7 +322,7 @@ const DashboardVigilantePage = () => {
             setVisitantesActivos(prev => {
               return prev.map(v => {
                 if (String(v.id) === String(data.id)) {
-                  return {
+                  const updatedVisita = {
                     ...v,
                     estado_visita: data.estado,
                     fecha_aceptacion: data.fecha_aceptacion || v.fecha_aceptacion,
@@ -331,6 +331,34 @@ const DashboardVigilantePage = () => {
                     delegado_por_id: data.delegado_por_id || v.delegado_por_id,
                     fecha_delegacion: data.fecha_delegacion || v.fecha_delegacion
                   };
+
+                  // Si es delegación, actualizar datos del personal visitado
+                  if (data.estado === 'DELEGADO' && data.nuevo_personal_id) {
+                    updatedVisita.personal_visitado_id = data.nuevo_personal_id;
+                    updatedVisita.personal_nombres = data.nuevo_personal_nombres;
+                    updatedVisita.personal_apellidos = data.nuevo_personal_apellidos;
+                    updatedVisita.personal_cargo = data.nuevo_personal_cargo;
+                    
+                    // Actualizar objeto anidado si existe (usado en algunas vistas)
+                    if (updatedVisita.empleadoVisitado) {
+                       updatedVisita.empleadoVisitado = {
+                         ...updatedVisita.empleadoVisitado,
+                         id: data.nuevo_personal_id,
+                         nombres: data.nuevo_personal_nombres,
+                         apellidos: data.nuevo_personal_apellidos,
+                         cargo: data.nuevo_personal_cargo
+                       };
+                    }
+
+                    // Actualizar área si cambió
+                    if (data.nuevo_area_id) {
+                        updatedVisita.area_destino_id = data.nuevo_area_id;
+                        updatedVisita.nombre_area = data.nuevo_area_nombre;
+                        updatedVisita.lugarNombre = data.nuevo_area_nombre;
+                    }
+                  }
+
+                  return updatedVisita;
                 }
                 return v;
               });

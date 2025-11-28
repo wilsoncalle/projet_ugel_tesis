@@ -4,6 +4,7 @@ import Button from '../Button';
 import TabView from '../TabView';
 import TableGenerica from '../TableGenerica';
 import ModalGenerico from '../ModalGenerico';
+import ModalDetalles from '../ModalDetalles';
 import Input from '../Input';
 import SelectCustom from '../SelectCustom';
 import { toast } from 'react-hot-toast';
@@ -18,7 +19,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { formatHora } from '../../utils/dateHelpers';
-import { visitasService, personalService } from '../../services/api';
+import { visitasService, personalService, areasService, papeletasSalidaService } from '../../services/api';
 import { differenceInMinutes } from 'date-fns';
 
 const MisVisitasTabla = ({
@@ -40,9 +41,25 @@ const MisVisitasTabla = ({
   
   const [selectedVisita, setSelectedVisita] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+  
+  // Estados para delegación
   const [delegateTo, setDelegateTo] = useState(null);
-  const [personalList, setPersonalList] = useState([]);
+  const [selectedArea, setSelectedArea] = useState(null);
+  const [personalList, setPersonalList] = useState([]); // Lista filtrada
+  const [fullPersonalList, setFullPersonalList] = useState([]); // Lista completa
+  const [areasList, setAreasList] = useState([]);
   const [loadingPersonal, setLoadingPersonal] = useState(false);
+  
+  // Estados para validación de personal (Ausente/Permiso)
+  const [mensajeEstadoEmpleado, setMensajeEstadoEmpleado] = useState(null);
+  const [tipoMensajeEmpleado, setTipoMensajeEmpleado] = useState(null);
+  
+  // Estados para Modal de Detalles de Papeleta
+  const [isModalPapeletaOpen, setIsModalPapeletaOpen] = useState(false);
+  const [papeletaSeleccionada, setPapeletaSeleccionada] = useState(null);
+  const [loadingPapeleta, setLoadingPapeleta] = useState(false);
+  const [papeletasExternas, setPapeletasExternas] = useState([]);
+
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Update time every minute to refresh the "Tiempo" column
@@ -91,22 +108,189 @@ const MisVisitasTabla = ({
   const handleDelegateClick = async (visita) => {
     setSelectedVisita(visita);
     setDelegateTo(null);
+    setSelectedArea(null);
+    setMensajeEstadoEmpleado(null);
+    setTipoMensajeEmpleado(null);
     setDelegateModalOpen(true);
     
-    if (personalList.length === 0) {
-      setLoadingPersonal(true);
-      try {
-        const response = await personalService.getActivos();
-        setPersonalList(response.data.data.map(p => ({
-          value: p.id,
-          label: `${p.nombres} ${p.apellidos}`
+    // Cargar datos si no están cargados o recargar para tener estados actualizados
+    setLoadingPersonal(true);
+    try {
+      const [personalRes, areasRes, papeletasRes] = await Promise.all([
+        personalService.getAll(),
+        areasService.getAll(),
+        papeletasSalidaService.getExternas()
+      ]);
+
+      // Procesar áreas
+      if (areasRes.data.success) {
+        setAreasList(areasRes.data.data.map(a => ({
+          value: a.id.toString(),
+          label: a.nombre_area || a.nombre
         })));
-      } catch (error) {
-        toast.error('Error al cargar lista de personal');
-      } finally {
-        setLoadingPersonal(false);
+      }
+
+      // Guardar papeletas externas para uso posterior
+      const papeletasExternasData = papeletasRes?.data?.data || [];
+      setPapeletasExternas(papeletasExternasData);
+
+      // Procesar personal con estados (lógica copiada de RegistroForm)
+      if (personalRes.data.success) {
+        const papeletasActivasMap = new Map();
+
+        papeletasExternasData.forEach(p => {
+          if (p.estado === 'EN_CURSO') {
+            if (p.solicitante_numero_documento) {
+              papeletasActivasMap.set(p.solicitante_numero_documento, p);
+            }
+            const nombreCompleto = `${p.solicitante_nombres} ${p.solicitante_apellidos}`.trim().toLowerCase();
+            papeletasActivasMap.set(nombreCompleto, p);
+          }
+        });
+
+        const empleadosProcesados = personalRes.data.data.map(empleado => {
+          const estadoBruto = (empleado.estado_presencia || '').toString().trim().toLowerCase();
+          let estado = 'disponible';
+          let codigoPapeleta = empleado.codigo_papeleta_activa || null;
+
+          const nombreCompletoEmpleado = `${empleado.nombres} ${empleado.apellidos}`.trim().toLowerCase();
+          const papeletaExterna = 
+            papeletasActivasMap.get(empleado.numero_documento) || 
+            papeletasActivasMap.get(nombreCompletoEmpleado);
+
+          if (papeletaExterna) {
+            estado = 'permiso';
+            codigoPapeleta = papeletaExterna.codigo_papeleta;
+          } else if (!empleado.estado_presencia) {
+            estado = 'ausente';
+          } else if (['ausente', 'falta', 'faltó', 'falto', 'sin marca', 'sin_marca'].includes(estadoBruto)) {
+            estado = 'ausente';
+          } else if (['permiso', 'comisión', 'comision'].includes(estadoBruto) || empleado.tiene_papeleta_activa) {
+            estado = 'permiso';
+          }
+
+          return {
+            value: empleado.id.toString(),
+            label: `${empleado.nombres} ${empleado.apellidos}`,
+            areaId: empleado.area_destino_id?.toString(),
+            areaNombre: empleado.area_nombre || 'Sin área',
+            cargo: empleado.cargo_nombre || 'Sin cargo',
+            estado,
+            detallePapeleta: codigoPapeleta,
+          };
+        });
+
+        setFullPersonalList(empleadosProcesados);
+        setPersonalList(empleadosProcesados); // Inicialmente mostrar todos
+      }
+    } catch (error) {
+      console.error('Error cargando datos para delegación:', error);
+      toast.error('Error al cargar lista de personal');
+    } finally {
+      setLoadingPersonal(false);
+    }
+  };
+
+  const handleAreaChange = (option) => {
+    setSelectedArea(option);
+    
+    if (!option) {
+      // Si se limpia el área, mostrar todos los empleados
+      setPersonalList(fullPersonalList);
+    } else {
+      // Filtrar empleados por área seleccionada
+      const filtrados = fullPersonalList.filter(p => p.areaId === option.value);
+      setPersonalList(filtrados);
+      
+      // Si el empleado seleccionado no pertenece a la nueva área, limpiarlo
+      if (delegateTo && delegateTo.areaId !== option.value) {
+        setDelegateTo(null);
+        setMensajeEstadoEmpleado(null);
+        setTipoMensajeEmpleado(null);
       }
     }
+  };
+
+  const handlePersonalChange = (option) => {
+    setDelegateTo(option);
+    setMensajeEstadoEmpleado(null);
+    setTipoMensajeEmpleado(null);
+    
+    if (option) {
+      // Validar estado del empleado
+      if (option.estado === 'permiso') {
+        setMensajeEstadoEmpleado('No se puede delegar: El empleado tiene permiso de salida.');
+        setTipoMensajeEmpleado('warning'); // Usamos warning para mostrar el botón de ver detalles
+      } else if (option.estado === 'ausente') {
+        setMensajeEstadoEmpleado('No se puede delegar: El empleado está ausente.');
+        setTipoMensajeEmpleado('error');
+      }
+
+      if (option.areaId) {
+        // Auto-seleccionar el área del empleado
+        const areaDelEmpleado = areasList.find(a => a.value === option.areaId);
+        if (areaDelEmpleado) {
+          setSelectedArea(areaDelEmpleado);
+        }
+      }
+    }
+  };
+
+  const handleVerDetallesPapeleta = async () => {
+    if (!delegateTo?.detallePapeleta) {
+      console.log('No hay código de papeleta');
+      return;
+    }
+
+    setLoadingPapeleta(true);
+    try {
+      console.log('Buscando papeleta con código:', delegateTo.detallePapeleta);
+      
+      let papeletaExterna = papeletasExternas.find(p => p.codigo_papeleta === delegateTo.detallePapeleta);
+      
+      if (!papeletaExterna) {
+         console.log('No encontrada en cache, recargando externas...');
+         const response = await papeletasSalidaService.getExternas();
+         if (response.data.success) {
+           const freshData = response.data.data || [];
+           setPapeletasExternas(freshData);
+           papeletaExterna = freshData.find(p => p.codigo_papeleta === delegateTo.detallePapeleta);
+         }
+      }
+
+      if (papeletaExterna) {
+        const papeletaMapeada = {
+          ...papeletaExterna,
+          id: papeletaExterna._id || papeletaExterna.id,
+          personal_solicitante_nombre: `${papeletaExterna.solicitante_nombres || ''} ${papeletaExterna.solicitante_apellidos || ''}`.trim(),
+          personal_autoriza_nombre: 'Sistema Externo',
+          motivo_nombre: papeletaExterna.nombre_motivo || papeletaExterna.motivo || '-',
+          area_destino_nombre: papeletaExterna.lugar_destino || '-',
+          fecha_solicitud: papeletaExterna.fecha_solicitud || papeletaExterna.fecha_inicio,
+          fecha_salida_programada: papeletaExterna.fecha_inicio,
+          fecha_retorno_programada: papeletaExterna.fecha_fin,
+          sustento: papeletaExterna.observacion || papeletaExterna.sustento || '-',
+          estado: papeletaExterna.estado
+        };
+        
+        setPapeletaSeleccionada(papeletaMapeada);
+        setIsModalPapeletaOpen(true);
+      } else {
+        toast.error('No se encontró la información de la papeleta.');
+      }
+    } catch (error) {
+      console.error('Error al cargar detalles de papeleta:', error);
+      toast.error('Error al cargar detalles de papeleta');
+    } finally {
+      setLoadingPapeleta(false);
+    }
+  };
+
+  const handleCloseModalPapeleta = () => {
+    setIsModalPapeletaOpen(false);
+    setTimeout(() => {
+      setPapeletaSeleccionada(null);
+    }, 300);
   };
 
   const handleDelegateConfirm = async () => {
@@ -114,6 +298,17 @@ const MisVisitasTabla = ({
       toast.error('Debe seleccionar un personal');
       return;
     }
+
+    // Validar estado antes de enviar
+    if (delegateTo.estado === 'permiso') {
+      toast.error('No se puede delegar a un personal con permiso de salida');
+      return;
+    }
+    if (delegateTo.estado === 'ausente') {
+      toast.error('No se puede delegar a un personal ausente');
+      return;
+    }
+
     try {
       await visitasService.delegate(selectedVisita.id, delegateTo.value);
       toast.success('Visita delegada correctamente');
@@ -261,7 +456,7 @@ const MisVisitasTabla = ({
                     </div>
                   )}
                 </div>
-              );
+              ); 
             }
             return <span className="text-gray-400">-</span>;
           }
@@ -515,20 +710,60 @@ const MisVisitasTabla = ({
         title="Delegar Visita"
       >
         <div className="space-y-4">
-          <p>Seleccione el personal a quien desea delegar la visita:</p>
+          <p className="text-sm text-gray-600">Seleccione el área y personal a quien desea delegar la visita:</p>
+          
           <SelectCustom
+            label="Área (Opcional)"
+            options={areasList}
+            value={selectedArea}
+            onChange={handleAreaChange}
+            placeholder="Filtrar por área..."
+            isSearchable
+            isClearable
+          />
+
+          <SelectCustom
+            label="Personal"
             options={personalList}
             value={delegateTo}
-            onChange={setDelegateTo}
+            onChange={handlePersonalChange}
             placeholder="Buscar personal..."
             isSearchable
             isLoading={loadingPersonal}
+            required
           />
+
+          {mensajeEstadoEmpleado && (
+            <div
+              className={`text-xs rounded-md px-3 py-2 border flex items-center justify-between gap-2 ${
+                tipoMensajeEmpleado === 'warning'
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}
+            >
+              <span>{mensajeEstadoEmpleado}</span>
+              {tipoMensajeEmpleado === 'warning' && delegateTo?.detallePapeleta && (
+                <button
+                  type="button"
+                  onClick={handleVerDetallesPapeleta}
+                  disabled={loadingPapeleta}
+                  className="text-blue-600 hover:text-blue-800 font-medium underline whitespace-nowrap disabled:opacity-50"
+                >
+                  {loadingPapeleta ? 'Cargando...' : 'Ver detalles'}
+                </button>
+              )}
+            </div>
+          )}
+          
           <div className="flex justify-end space-x-2 mt-4">
             <Button variant="secondary" onClick={() => setDelegateModalOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" onClick={handleDelegateConfirm}>
+            <Button 
+              variant="primary" 
+              onClick={handleDelegateConfirm}
+              disabled={!!mensajeEstadoEmpleado}
+            >
               Delegar
             </Button>
           </div>
@@ -568,6 +803,90 @@ const MisVisitasTabla = ({
           </div>
         )}
       </ModalGenerico>
+
+      {/* Modal de Detalles de Papeleta */}
+      <ModalDetalles
+        isOpen={isModalPapeletaOpen}
+        onClose={handleCloseModalPapeleta}
+        data={papeletaSeleccionada}
+        title="Detalles de Papeleta de Salida"
+        size="lg"
+        fields={[
+          {
+            label: 'Código de Papeleta',
+            key: 'codigo_papeleta',
+          },
+          {
+            label: 'Solicitante',
+            key: 'personal_solicitante_nombre',
+          },
+          {
+            label: 'Motivo de Salida',
+            key: 'motivo_nombre',
+          },
+          {
+            label: 'Salida Programada',
+            key: 'fecha_hora_salida_programada',
+            render: (val) =>
+              val
+                ? new Date(val).toLocaleString('es-PE', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })
+                : '-',
+          },
+          {
+            label: 'Retorno Programado',
+            key: 'fecha_hora_retorno_programada',
+            render: (val) =>
+              val
+                ? new Date(val).toLocaleString('es-PE', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })
+                : '-',
+          },
+           {
+              label: 'Tiempo Restante',
+              key: 'tiempo_restante',
+              render: (val, data) => {
+                const retornoStr = data?.fecha_hora_retorno_programada;
+                if (!retornoStr) return '-';
+                
+                const retorno = new Date(retornoStr);
+                const now = new Date();
+                
+                if (now > retorno) return 'Vencido';
+                
+                const diff = retorno - now;
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                
+                if (days > 0) return `${days} días, ${hours} horas`;
+                return `${hours} horas`;
+              }
+            },
+          {
+            label: 'Estado',
+            key: 'estado',
+            render: (val) => (
+              <span
+                className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                  val === 'APROBADO'
+                    ? 'bg-green-100 text-green-800'
+                    : val === 'EN_CURSO'
+                    ? 'bg-blue-100 text-blue-800'
+                    : val === 'RETORNADO'
+                    ? 'bg-gray-100 text-gray-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}
+              >
+                {val === 'EN_CURSO' ? 'En Curso' : val}
+              </span>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 };

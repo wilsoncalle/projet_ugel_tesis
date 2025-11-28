@@ -361,6 +361,21 @@ const accept = asyncHandler(async (req, res) => {
   
   const visita = await service.acceptVisita(id, personalId);
   
+  // Emitir evento de socket
+  try {
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('estado_visita_actualizado', {
+        id: parseInt(id),
+        estado: 'ACEPTADO',
+        fecha_aceptacion: visita.fecha_aceptacion
+      });
+      logger.info(`Evento 'estado_visita_actualizado' (ACEPTADO) emitido para visita ID: ${id}`);
+    }
+  } catch (e) {
+    logger.warn('No se pudo emitir evento de visita aceptada:', e.message);
+  }
+  
   res.json({
     success: true,
     message: 'Visita aceptada exitosamente',
@@ -383,6 +398,22 @@ const reject = asyncHandler(async (req, res) => {
   
   const visita = await service.rejectVisita(id, personalId, motivo);
   
+  // Emitir evento de socket
+  try {
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('estado_visita_actualizado', {
+        id: parseInt(id),
+        estado: 'RECHAZADO',
+        fecha_rechazo: visita.fecha_rechazo,
+        motivo_rechazo: motivo
+      });
+      logger.info(`Evento 'estado_visita_actualizado' (RECHAZADO) emitido para visita ID: ${id}`);
+    }
+  } catch (e) {
+    logger.warn('No se pudo emitir evento de visita rechazada:', e.message);
+  }
+  
   res.json({
     success: true,
     message: 'Visita rechazada exitosamente',
@@ -404,6 +435,29 @@ const delegate = asyncHandler(async (req, res) => {
   }
   
   const visita = await service.delegateVisita(id, personalId, nuevoPersonalId);
+  
+  // Emitir evento de socket
+  try {
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('estado_visita_actualizado', {
+        id: parseInt(id),
+        estado: 'DELEGADO',
+        fecha_delegacion: visita.fecha_delegacion,
+        delegado_por_id: personalId,
+        // Datos del nuevo personal para actualizar la UI
+        nuevo_personal_id: visita.personal_visitado_id,
+        nuevo_personal_nombres: visita.personal_nombres,
+        nuevo_personal_apellidos: visita.personal_apellidos,
+        nuevo_personal_cargo: visita.personal_cargo,
+        nuevo_area_id: visita.area_destino_id,
+        nuevo_area_nombre: visita.nombre_area
+      });
+      logger.info(`Evento 'estado_visita_actualizado' (DELEGADO) emitido para visita ID: ${id}`);
+    }
+  } catch (e) {
+    logger.warn('No se pudo emitir evento de visita delegada:', e.message);
+  }
   
   res.json({
     success: true,
@@ -478,6 +532,20 @@ const finalizarAtencion = asyncHandler(async (req, res) => {
   }
   
   const visita = await service.finalizarAtencion(id, personalId);
+  
+  // Emitir evento de socket
+  try {
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('estado_visita_actualizado', {
+        id: parseInt(id),
+        estado: 'FINALIZADO'
+      });
+      logger.info(`Evento 'estado_visita_actualizado' (FINALIZADO) emitido para visita ID: ${id}`);
+    }
+  } catch (e) {
+    logger.warn('No se pudo emitir evento de visita finalizada:', e.message);
+  }
   
   res.json({
     success: true,
