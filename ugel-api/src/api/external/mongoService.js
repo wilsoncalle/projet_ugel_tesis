@@ -55,7 +55,7 @@ const calcularEstadoVirtual = (fechaInicio, fechaFin, estadoOriginal) => {
     return 'FINALIZADO';
 };
 
-// Filtra un array de objetos según rango de fechas
+// Filtra un array de objetos según rango de fechas (Inicio dentro del rango)
 const filtrarPorRangoFecha = (items, fechaInicio, fechaFin) => {
     if (!fechaInicio && !fechaFin) return items;
     
@@ -70,6 +70,25 @@ const filtrarPorRangoFecha = (items, fechaInicio, fechaFin) => {
     });
 };
 
+// Filtra un array de objetos por solapamiento de fechas (Overlap)
+// Retorna items cuyo rango [fechaInicio, fechaFin] se cruza con [rangoInicio, rangoFin]
+const filtrarPorSolapamiento = (items, fechaInicio, fechaFin) => {
+    if (!fechaInicio && !fechaFin) return items;
+    
+    const rangeStart = fechaInicio ? new Date(fechaInicio) : new Date('2000-01-01');
+    const rangeEnd = fechaFin ? new Date(fechaFin) : new Date('2100-01-01');
+    // Ajustar final del día para rangeEnd
+    rangeEnd.setHours(23, 59, 59, 999);
+
+    return items.filter(item => {
+        const itemStart = new Date(item.fechaInicio);
+        const itemEnd = new Date(item.fechaFin);
+        
+        // Lógica de solapamiento: (StartA <= EndB) y (EndA >= StartB)
+        return itemStart <= rangeEnd && itemEnd >= rangeStart;
+    });
+};
+
 // Obtiene la data cruda y la enriquece (Join manual)
 const getBaseData = async () => {
     await connectMongo();
@@ -79,7 +98,7 @@ const getBaseData = async () => {
 
     // 1. Traer todo
     const [solicitudes, usuarios, areas] = await Promise.all([
-        Solicitud.find({ estado: 'aprobado' }).lean(), // Solo las que base son aprobadas
+        Solicitud.find({ estado: { $regex: /^(aprobado|finalizado|completado|en curso)$/i } }).lean(),
         Usuario.find().lean(),
         Area.find().lean()
     ]);
@@ -246,8 +265,8 @@ const getEstadisticasHorasExternas = async ({ fechaInicio, fechaFin }) => {
 const getPapeletasAprobadasExternas = async ({ fechaInicio, fechaFin } = {}) => {
     const data = await getBaseData();
     
-    //aplicar filtro por rango usando helper ya existente
-    const dataFiltrada = filtrarPorRangoFecha(data, fechaInicio, fechaFin);
+    // Usar filtro por solapamiento para capturar todas las papeletas activas en el rango
+    const dataFiltrada = filtrarPorSolapamiento(data, fechaInicio, fechaFin);
 
     // Reutilizar la lógica de formateo anterior pero usando getBaseData que ya tiene estadoVirtual
     return dataFiltrada.map(sol => ({

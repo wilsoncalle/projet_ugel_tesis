@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { asistenciaPersonalService } from '../services/api';
 import { 
-  ChevronLeftIcon, 
-  ChevronRightIcon, 
   ArrowPathIcon,
   PencilSquareIcon,
   EyeIcon,
-  CheckIcon,
-  XMarkIcon
+  CheckIcon
 } from '@heroicons/react/24/outline';
 
 const MESES = [
@@ -15,20 +12,26 @@ const MESES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
+// [MODIFICADO] Definición de estados actualizada y ampliada
 const ESTADOS = {
   'Presente': { code: 'P', color: 'bg-green-500', label: 'Presente' },
   'Tardanza': { code: 'T', color: 'bg-amber-400', label: 'Tardanza' },
-  'Ausente': { code: 'F', color: 'bg-red-500', label: 'Falta' }, // Mapping Ausente to F (Falta) to match Blade
-  'Permiso': { code: 'J', color: 'bg-cyan-500', label: 'Justificado' },
-  'Comisión': { code: 'C', color: 'bg-purple-500', label: 'Comisión' }
+  'Ausente': { code: 'F', color: 'bg-red-500', label: 'Falta' }, 
+  'Permiso': { code: 'L', color: 'bg-blue-600', label: 'Permiso' }, // Nuevo código L para Permisos Externos (Papeletas)
+  'Comisión': { code: 'C', color: 'bg-purple-500', label: 'Comisión' },
+  'Justificada': { code: 'J', color: 'bg-cyan-500', label: 'Justificada' }, // J solo para Justificaciones internas
+  // Mapeos de compatibilidad
+  'En Permiso': { code: 'L', color: 'bg-blue-600', label: 'Permiso' },
+  'Falta': { code: 'F', color: 'bg-red-500', label: 'Falta' }
 };
 
-// Reverse mapping for saving
+// Reverse mapping for saving (solo permitimos editar a estados básicos manualmente)
 const CODE_TO_ESTADO = {
   'P': 'Presente',
   'T': 'Tardanza',
   'F': 'Ausente',
-  'J': 'Permiso',
+  'L': 'Permiso',
+  'J': 'Justificada',
   'C': 'Comisión'
 };
 
@@ -56,7 +59,6 @@ const AsistenciaPersonalCalendario = () => {
       const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon...
       
       if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-        // Use local YYYY-MM-DD format to match backend and avoid timezone shifts
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         
         days.push({
@@ -68,7 +70,6 @@ const AsistenciaPersonalCalendario = () => {
       }
     }
 
-    // Group into weeks
     const weeksArr = [];
     let currentWeek = [];
     
@@ -88,14 +89,12 @@ const AsistenciaPersonalCalendario = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Use local date components to avoid timezone issues
       const start = new Date(year, month - 1, 1);
       const end = new Date(year, month, 0);
       
       const fechaInicio = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
       const fechaFin = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
       
-      // Initial fetch (page 1)
       const limit = 100;
       const response = await asistenciaPersonalService.getAll({
         fechaInicio,
@@ -107,7 +106,6 @@ const AsistenciaPersonalCalendario = () => {
       let allAsistencias = response.data.data || [];
       const pagination = response.data.pagination;
 
-      // If there are more pages, fetch them
       if (pagination && pagination.totalPages > 1) {
         const promises = [];
         for (let p = 2; p <= pagination.totalPages; p++) {
@@ -151,14 +149,21 @@ const AsistenciaPersonalCalendario = () => {
           nombre: `${record.personal_apellidos} ${record.personal_nombres}`,
           cargo: record.personal_cargo_nombre,
           area: record.area_nombre,
-          attendance: {} // date -> status
+          attendance: {} 
         });
       }
       
-      // Ensure we match the local date format used in columns
       const dateStr = record.fecha.split('T')[0];
-      const code = ESTADOS[record.estado_presencia]?.code || '?';
-      map.get(record.personal_id).attendance[dateStr] = code;
+      // Mapeo robusto del estado al código visual
+      let estadoNormalizado = record.estado_presencia;
+      
+      // Si viene como 'Permiso' desde el backend (papeletas), usará 'L'.
+      // Si viene 'Justificada' (base de datos), usará 'J'.
+      const code = ESTADOS[estadoNormalizado]?.code || ''; 
+      
+      if (code) {
+        map.get(record.personal_id).attendance[dateStr] = code;
+      }
     });
 
     return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -166,7 +171,7 @@ const AsistenciaPersonalCalendario = () => {
 
   // Calculate global stats for the current month
   const globalStats = useMemo(() => {
-    const stats = { P: 0, T: 0, F: 0, J: 0 };
+    const stats = { P: 0, T: 0, F: 0, L: 0, J: 0, C: 0 };
     personalRows.forEach(person => {
       Object.values(person.attendance).forEach(code => {
         if (stats[code] !== undefined) {
@@ -177,16 +182,12 @@ const AsistenciaPersonalCalendario = () => {
     return stats;
   }, [personalRows]);
 
-  // Handle cell click
   const handleCellClick = (e, personalId, date) => {
     if (mode !== 'edit') return;
-    
-    // If clicking same cell, close it
     if (activeCell?.personalId === personalId && activeCell?.date === date) {
       setActiveCell(null);
       return;
     }
-
     const rect = e.currentTarget.getBoundingClientRect();
     setActiveCell({
       personalId,
@@ -197,10 +198,8 @@ const AsistenciaPersonalCalendario = () => {
     });
   };
 
-  // Handle option selection
   const handleOptionSelect = (code) => {
     if (!activeCell) return;
-    
     setModifiedAttendance(prev => ({
       ...prev,
       [activeCell.personalId]: {
@@ -211,12 +210,10 @@ const AsistenciaPersonalCalendario = () => {
     setActiveCell(null);
   };
 
-  // Save changes
   const handleSave = async () => {
     setSaving(true);
     try {
       const promises = [];
-      
       Object.entries(modifiedAttendance).forEach(([personalId, dates]) => {
         Object.entries(dates).forEach(([date, code]) => {
           const estado = CODE_TO_ESTADO[code];
@@ -228,7 +225,6 @@ const AsistenciaPersonalCalendario = () => {
           }
         });
       });
-
       await Promise.all(promises);
       await loadData();
       setMode('read');
@@ -241,7 +237,6 @@ const AsistenciaPersonalCalendario = () => {
     }
   };
 
-  // Close popover on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (popoverRef.current && !popoverRef.current.contains(event.target) && !event.target.closest('td')) {
@@ -254,7 +249,6 @@ const AsistenciaPersonalCalendario = () => {
 
   return (
     <div className="flex flex-col h-full max-h-[80vh]">
-      {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4 p-1">
         <div className="flex items-center gap-2">
           <div className="flex items-center border rounded-lg overflow-hidden">
@@ -315,118 +309,75 @@ const AsistenciaPersonalCalendario = () => {
         </div>
       </div>
 
-      {/* Table Container */}
       <div className="flex-1 overflow-auto border rounded-xl shadow-sm bg-white relative">
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-white shadow-sm">
             <tr>
-              <th rowSpan={3} className="bg-[#03366c] text-white font-bold p-2 border border-slate-200 w-10 text-center align-middle">
-                N°
-              </th>
-              <th rowSpan={3} className="bg-[#054f9f] text-white font-bold p-3 border border-slate-200 text-left align-middle min-w-[180px]">
-                Apellidos y Nombres
-              </th>
+              <th rowSpan={3} className="bg-[#03366c] text-white font-bold p-2 border border-slate-200 w-10 text-center align-middle">N°</th>
+              <th rowSpan={3} className="bg-[#054f9f] text-white font-bold p-3 border border-slate-200 text-left align-middle min-w-[180px]">Apellidos y Nombres</th>
               {weeks.map((week, idx) => (
-                <th key={`week-${idx}`} colSpan={week.length} className="bg-[#1067c4] text-white font-bold p-2 border border-slate-200 text-center">
-                  Semana {idx + 1}
-                </th>
+                <th key={`week-${idx}`} colSpan={week.length} className="bg-[#1067c4] text-white font-bold p-2 border border-slate-200 text-center">Semana {idx + 1}</th>
               ))}
-              <th rowSpan={3} className="bg-[#054f9f] text-white font-bold p-1 border border-slate-200 text-center align-middle w-[100px] text-xs">
-                Totales
-              </th>
+              <th rowSpan={3} className="bg-[#054f9f] text-white font-bold p-1 border border-slate-200 text-center align-middle w-[100px] text-xs">Totales</th>
             </tr>
             <tr>
               {weeks.flatMap((week) => week.map((day) => (
-                <th key={`initial-${day.date}`} className="bg-[#f8f8f8] text-gray-800 font-bold p-1 border border-slate-200 text-center w-8 text-xs">
-                  {day.initial}
-                </th>
+                <th key={`initial-${day.date}`} className="bg-[#f8f8f8] text-gray-800 font-bold p-1 border border-slate-200 text-center w-8 text-xs">{day.initial}</th>
               )))}
             </tr>
             <tr>
               {weeks.flatMap((week) => week.map((day) => (
-                <th key={`num-${day.date}`} className="bg-[#f8f8f8] text-gray-800 font-bold p-1 border border-slate-200 text-center text-xs">
-                  {day.day}
-                </th>
+                <th key={`num-${day.date}`} className="bg-[#f8f8f8] text-gray-800 font-bold p-1 border border-slate-200 text-center text-xs">{day.day}</th>
               )))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={100} className="p-8 text-center text-gray-500">
-                  Cargando datos...
-                </td>
-              </tr>
+              <tr><td colSpan={100} className="p-8 text-center text-gray-500">Cargando datos...</td></tr>
             ) : personalRows.length === 0 ? (
-              <tr>
-                <td colSpan={100} className="p-8 text-center text-gray-500">
-                  No se encontraron registros para este mes.
-                </td>
-              </tr>
+              <tr><td colSpan={100} className="p-8 text-center text-gray-500">No se encontraron registros.</td></tr>
             ) : (
               personalRows.map((person, idx) => {
-                // Calculate totals
-                const stats = { P: 0, T: 0, F: 0, J: 0 };
-                
+                const stats = { P: 0, T: 0, F: 0, L: 0, J: 0 };
                 return (
                   <tr key={person.id} className="hover:bg-gray-50">
-                    <td className="border border-slate-200 text-center p-1 text-xs text-gray-600">
-                      {idx + 1}
-                    </td>
+                    <td className="border border-slate-200 text-center p-1 text-xs text-gray-600">{idx + 1}</td>
                     <td className="border border-slate-200 p-2 text-xs">
                       <div className="font-medium text-[14px] text-gray-900">{person.nombre}</div>
                       <div className="text-[12px] text-gray-500">{person.cargo}</div>
                     </td>
                     {schoolDays.map((day) => {
-                      // Check modified first, then original
                       const modifiedCode = modifiedAttendance[person.id]?.[day.date];
                       const originalCode = person.attendance[day.date];
                       const code = modifiedCode || originalCode;
                       
-                      // Update stats
-                      if (code === 'P') stats.P++;
-                      else if (code === 'T') stats.T++;
-                      else if (code === 'F') stats.F++;
-                      else if (code === 'J') stats.J++;
+                      if (stats[code] !== undefined) stats[code]++;
 
                       let cellClass = "border border-slate-200 text-center p-0 h-8 w-8 text-xs font-bold cursor-default ";
                       if (mode === 'edit') cellClass += "cursor-pointer hover:ring-2 hover:ring-blue-400 hover:z-10 ";
                       
-                      let bgClass = "";
+                      // Clases de color basadas en el código
+                      let bgClass = "bg-white";
                       if (code === 'P') bgClass = "bg-[#28a745] text-white";
                       else if (code === 'T') bgClass = "bg-[#ffc107] text-white";
                       else if (code === 'F') bgClass = "bg-[#dc3545] text-white";
-                      else if (code === 'J') bgClass = "bg-[#17a2b8] text-white";
-                      else bgClass = "bg-white";
+                      else if (code === 'L') bgClass = "bg-[#2563eb] text-white"; // Permiso (Azul)
+                      else if (code === 'J') bgClass = "bg-[#17a2b8] text-white"; // Justificado (Cyan)
+                      else if (code === 'C') bgClass = "bg-[#a855f7] text-white";
 
                       return (
-                        <td 
-                          key={day.date} 
-                          className={cellClass + bgClass}
-                          onClick={(e) => handleCellClick(e, person.id, day.date)}
-                        >
+                        <td key={day.date} className={cellClass + bgClass} onClick={(e) => handleCellClick(e, person.id, day.date)}>
                           {code || ''}
                         </td>
                       );
                     })}
                     <td className="border border-slate-200 p-0 align-middle h-full">
-                      <div className="grid grid-cols-4 w-full h-full min-h-[32px]">
-                        <div className="flex items-center justify-center border-r border-slate-200" title="Presentes">
-                          <span className="text-green-600 text-[12px]">P</span>
-                          <span className="text-green-600 text-[12px] ml-[1px]">{stats.P}</span>
-                        </div>
-                        <div className="flex items-center justify-center border-r border-slate-200" title="Tardanzas">
-                          <span className="text-amber-500 text-[12px]">T</span>
-                          <span className="text-amber-500 text-[12px] ml-[1px]">{stats.T}</span>
-                        </div>
-                        <div className="flex items-center justify-center border-r border-slate-200" title="Faltas">
-                          <span className="text-red-600 text-[12px]">F</span>
-                          <span className="text-red-600 text-[12px] ml-[1px]">{stats.F}</span>
-                        </div>
-                        <div className="flex items-center justify-center" title="Justificados">
-                          <span className="text-cyan-600 text-[12px]">J</span>
-                          <span className="text-cyan-600 text-[12px] ml-[1px]">{stats.J}</span>
-                        </div>
+                      <div className="grid grid-cols-5 w-full h-full min-h-[32px]">
+                        <div className="flex items-center justify-center border-r border-slate-200" title="Presentes"><span className="text-green-600 text-[10px] font-bold">{stats.P}</span></div>
+                        <div className="flex items-center justify-center border-r border-slate-200" title="Tardanzas"><span className="text-amber-500 text-[10px] font-bold">{stats.T}</span></div>
+                        <div className="flex items-center justify-center border-r border-slate-200" title="Faltas"><span className="text-red-600 text-[10px] font-bold">{stats.F}</span></div>
+                        <div className="flex items-center justify-center border-r border-slate-200" title="Permisos"><span className="text-blue-600 text-[10px] font-bold">{stats.L}</span></div>
+                        <div className="flex items-center justify-center" title="Justificados"><span className="text-cyan-600 text-[10px] font-bold">{stats.J}</span></div>
                       </div>
                     </td>
                   </tr>
@@ -437,52 +388,41 @@ const AsistenciaPersonalCalendario = () => {
         </table>
       </div>
 
-      {/* Popover for Quick Edit */}
       {activeCell && (
         <div 
           ref={popoverRef}
           className="fixed z-50 bg-white rounded-lg shadow-xl border border-gray-200 flex overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-          style={{ 
-            top: Math.min(activeCell.top - 10, window.innerHeight - 50), // Prevent going off screen
-            left: Math.min(activeCell.left + 5, window.innerWidth - 180) 
-          }}
+          style={{ top: Math.min(activeCell.top - 10, window.innerHeight - 50), left: Math.min(activeCell.left + 5, window.innerWidth - 180) }}
         >
-          <button onClick={() => handleOptionSelect('P')} className="w-10 h-10 flex items-center justify-center font-bold text-white bg-[#28a745] hover:opacity-90 transition-opacity">P</button>
-          <button onClick={() => handleOptionSelect('T')} className="w-10 h-10 flex items-center justify-center font-bold text-white bg-[#ffc107] hover:opacity-90 transition-opacity">T</button>
-          <button onClick={() => handleOptionSelect('F')} className="w-10 h-10 flex items-center justify-center font-bold text-white bg-[#dc3545] hover:opacity-90 transition-opacity">F</button>
-          <button onClick={() => handleOptionSelect('J')} className="w-10 h-10 flex items-center justify-center font-bold text-white bg-[#17a2b8] hover:opacity-90 transition-opacity">J</button>
+          <button onClick={() => handleOptionSelect('P')} className="w-8 h-8 flex items-center justify-center font-bold text-white bg-[#28a745]" title="Presente">P</button>
+          <button onClick={() => handleOptionSelect('T')} className="w-8 h-8 flex items-center justify-center font-bold text-white bg-[#ffc107]" title="Tardanza">T</button>
+          <button onClick={() => handleOptionSelect('F')} className="w-8 h-8 flex items-center justify-center font-bold text-white bg-[#dc3545]" title="Falta">F</button>
+          <button onClick={() => handleOptionSelect('L')} className="w-8 h-8 flex items-center justify-center font-bold text-white bg-[#2563eb]" title="Permiso">L</button>
+          <button onClick={() => handleOptionSelect('J')} className="w-8 h-8 flex items-center justify-center font-bold text-white bg-[#17a2b8]" title="Justificado">J</button>
         </div>
       )}
 
-      {/* Legend */}
+      {/* Leyenda Actualizada */}
       <div className="mt-4 flex flex-wrap gap-3 justify-center">
-        <div 
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm cursor-help hover:bg-gray-50 transition-colors"
-          title={`Total Presentes en ${MESES[month-1]} ${year}: ${globalStats.P}`}
-        >
-          <span className="w-5 h-5 rounded-full bg-[#28a745] flex items-center justify-center text-white font-bold text-[10px]">P</span>
-          <span className="text-xs font-medium text-gray-700">Presente</span>
+        <div className="flex items-center gap-2 px-2 py-1 rounded bg-white border border-gray-200 text-xs">
+          <span className="w-4 h-4 rounded bg-[#28a745] flex items-center justify-center text-white font-bold text-[9px]">P</span>
+          <span>Presente</span>
         </div>
-        <div 
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm cursor-help hover:bg-gray-50 transition-colors"
-          title={`Total Tardanzas en ${MESES[month-1]} ${year}: ${globalStats.T}`}
-        >
-          <span className="w-5 h-5 rounded-full bg-[#ffc107] flex items-center justify-center text-white font-bold text-[10px]">T</span>
-          <span className="text-xs font-medium text-gray-700">Tardanza</span>
+        <div className="flex items-center gap-2 px-2 py-1 rounded bg-white border border-gray-200 text-xs">
+          <span className="w-4 h-4 rounded bg-[#ffc107] flex items-center justify-center text-white font-bold text-[9px]">T</span>
+          <span>Tardanza</span>
         </div>
-        <div 
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm cursor-help hover:bg-gray-50 transition-colors"
-          title={`Total Faltas en ${MESES[month-1]} ${year}: ${globalStats.F}`}
-        >
-          <span className="w-5 h-5 rounded-full bg-[#dc3545] flex items-center justify-center text-white font-bold text-[10px]">F</span>
-          <span className="text-xs font-medium text-gray-700">Falta</span>
+        <div className="flex items-center gap-2 px-2 py-1 rounded bg-white border border-gray-200 text-xs">
+          <span className="w-4 h-4 rounded bg-[#dc3545] flex items-center justify-center text-white font-bold text-[9px]">F</span>
+          <span>Falta</span>
         </div>
-        <div 
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm cursor-help hover:bg-gray-50 transition-colors"
-          title={`Total Justificados en ${MESES[month-1]} ${year}: ${globalStats.J}`}
-        >
-          <span className="w-5 h-5 rounded-full bg-[#17a2b8] flex items-center justify-center text-white font-bold text-[10px]">J</span>
-          <span className="text-xs font-medium text-gray-700">Justificado</span>
+        <div className="flex items-center gap-2 px-2 py-1 rounded bg-white border border-gray-200 text-xs">
+          <span className="w-4 h-4 rounded bg-[#2563eb] flex items-center justify-center text-white font-bold text-[9px]">L</span>
+          <span>Permiso</span>
+        </div>
+        <div className="flex items-center gap-2 px-2 py-1 rounded bg-white border border-gray-200 text-xs">
+          <span className="w-4 h-4 rounded bg-[#17a2b8] flex items-center justify-center text-white font-bold text-[9px]">J</span>
+          <span>Justificado</span>
         </div>
       </div>
     </div>
