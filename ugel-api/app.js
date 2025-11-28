@@ -44,6 +44,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Servir archivos estáticos (uploads)
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Logging de peticiones
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path} - ${req.ip}`);

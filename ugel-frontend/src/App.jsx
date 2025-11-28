@@ -45,6 +45,7 @@ import PapeletasPage from './pages/PapeletasPage';
 import VigilantePapeletasPage from './pages/VigilantePapeletasPage';
 import AdminCatalogosPage from './pages/AdminCatalogosPage';
 import ConfigAsistenciaPage from './pages/ConfigAsistenciaPage';
+import GestionJustificacionesPage from './pages/GestionJustificacionesPage';
 
 // Routes Configuration
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -89,6 +90,7 @@ function App() {
               <Route path="personal/crear" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
               <Route path="personal/editar/:id" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
               <Route path="papeletas" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PapeletasPage />} />} />
+              <Route path="justificaciones" element={<ProtectedRoute allowedRoles={['rrhh']} element={<GestionJustificacionesPage />} />} />
               {/* Usuarios es solo para Admin; no registrar aquí */}
             </Route>
 

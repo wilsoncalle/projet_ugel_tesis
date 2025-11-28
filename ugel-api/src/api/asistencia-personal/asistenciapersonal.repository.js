@@ -1613,5 +1613,93 @@ module.exports = {
   getConfiguracion,
   countDiasToleranciaUsados,
   getResumenMensualPersonal,
-  createJustificacion
+  createJustificacion,
+  findAllJustificaciones,
+  updateJustificacionEstado
+};
+
+/**
+ * Buscar justificaciones con filtros
+ * @param {Object} options - Opciones de filtrado
+ * @returns {Array} Lista de justificaciones
+ */
+async function findAllJustificaciones(options = {}) {
+  const { estado, q } = options;
+  
+  const queryParams = [];
+  let whereClause = [];
+  
+  if (estado) {
+    queryParams.push(estado);
+    whereClause.push(`j.estado = $${queryParams.length}`);
+  }
+
+  if (q) {
+    queryParams.push(`%${q}%`);
+    whereClause.push(`(p.nombres ILIKE $${queryParams.length} OR p.apellidos ILIKE $${queryParams.length} OR p.numero_documento ILIKE $${queryParams.length})`);
+  }
+
+  const whereString = whereClause.length > 0 ? 'WHERE ' + whereClause.join(' AND ') : '';
+  
+  const query = `
+    SELECT 
+      j.id,
+      j.control_asistencia_id,
+      j.motivo,
+      j.evidencia_url,
+      j.estado,
+      j.fecha_solicitud,
+      j.usuario_solicitante_id,
+      j.fecha_respuesta,
+      j.usuario_respuesta_id,
+      j.observacion_respuesta,
+      p.nombres, 
+      p.apellidos, 
+      p.numero_documento,
+      ca.fecha, 
+      ca.estado_presencia as estado_original, 
+      ca.hora_ingreso
+    FROM justificaciones j
+    INNER JOIN ControlAsistenciaPersonal ca ON j.control_asistencia_id = ca.id
+    INNER JOIN Personal p ON ca.personal_id = p.id
+    ${whereString}
+    ORDER BY j.fecha_solicitud DESC
+  `;
+  
+  try {
+    const result = await db.query(query, queryParams);
+    return result.rows;
+  } catch (error) {
+    logger.error('Error buscando justificaciones:', error);
+    throw error;
+  }
+};
+
+/**
+ * Actualizar estado de una justificación
+ * @param {number} id - ID de la justificación
+ * @param {string} estado - Nuevo estado
+ * @param {string} observacion - Observación de respuesta
+ * @param {number} usuarioRespuestaId - ID del usuario que responde
+ * @returns {Object} Justificación actualizada
+ */
+async function updateJustificacionEstado(id, estado, observacion, usuarioRespuestaId) {
+  const query = `
+    UPDATE justificaciones
+    SET 
+      estado = $1, 
+      observacion_respuesta = $2, 
+      usuario_respuesta_id = $3, 
+      fecha_respuesta = CURRENT_TIMESTAMP
+    WHERE id = $4
+    RETURNING *
+  `;
+  
+  try {
+    const result = await db.query(query, [estado, observacion, usuarioRespuestaId, id]);
+    return result.rows[0];
+  } catch (error) {
+    logger.error('Error actualizando estado de justificación:', error);
+    throw error;
+  }
 };

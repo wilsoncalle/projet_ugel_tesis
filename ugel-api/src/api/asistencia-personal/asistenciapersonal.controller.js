@@ -436,6 +436,42 @@ const justificar = asyncHandler(async (req, res) => {
   });
 });
 
+
+/**
+ * Obtener listado de justificaciones (RRHH/Admin)
+ * @route GET /api/asistencia-personal/justificaciones
+ */
+const getJustificaciones = asyncHandler(async (req, res) => {
+  const { estado, q } = req.query;
+  const justificaciones = await service.getJustificaciones({ estado, q });
+  
+  res.json({
+    success: true,
+    data: justificaciones
+  });
+});
+
+/**
+ * Evaluar justificación (RRHH/Admin)
+ * @route PUT /api/asistencia-personal/justificaciones/:id/evaluar
+ */
+const evaluarJustificacion = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { estado, observacion } = req.body;
+  
+  if (!['APROBADO', 'RECHAZADO'].includes(estado)) {
+    throw new AppError('Estado inválido. Debe ser APROBADO o RECHAZADO', 400);
+  }
+  
+  const result = await service.evaluarJustificacion(id, { estado, observacion }, req.user.id);
+  
+  res.json({
+    success: true,
+    message: `Justificación ${estado.toLowerCase()} correctamente`,
+    data: result
+  });
+});
+
 module.exports = {
   getAll,
   getHoy,
@@ -453,5 +489,7 @@ module.exports = {
   exportarAPDF,
   getMiResumen,
   getMiAsistencia,
-  justificar
+  justificar,
+  getJustificaciones,
+  evaluarJustificacion
 };
