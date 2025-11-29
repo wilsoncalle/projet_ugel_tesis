@@ -8,6 +8,7 @@ const app = require('./app');
 const config = require('./src/config');
 const logger = require('./src/utils/logger');
 const { nowLima } = require('./src/utils/fechas');
+const cron = require('node-cron');
 
 const PORT = config.port || 3000;
 const SYSTEM_USER_ID = config.systemUserId;
@@ -142,6 +143,30 @@ server.listen(PORT, () => {
   // También se ejecutará automáticamente cuando se superen las horas límite
   setInterval(ejecutarCierreAutomatico, 30 * 60 * 1000);
   logger.info('Tarea programada de cierre automático de visitas iniciada (cada 30 minutos)');
+
+  // Helper para sincronizar papeletas externas hacia asistencia
+  const sincronizarPapeletasCron = async (inicio, fin, motivo) => {
+    try {
+      logger.info(`Sincronización de papeletas (${motivo}) desde ${inicio} hasta ${fin}`);
+      await asistenciaPersonalService.sincronizarPapeletas(inicio, fin, SYSTEM_USER_ID);
+    } catch (err) {
+      logger.error(`Error sincronizando papeletas (${motivo}):`, err);
+    }
+  };
+
+  // Cron diario a las 06:00 AM
+  cron.schedule('0 6 * * *', async () => {
+    const { fecha: hoy } = nowLima();
+    const inicioMes = `${hoy.slice(0, 7)}-01`;
+    await sincronizarPapeletasCron(inicioMes, hoy, 'cron 06:00');
+  });
+
+  // Sincronización correctiva al iniciar el servidor (año en curso)
+  (async () => {
+    const { fecha: hoy } = nowLima();
+    const anio = hoy.slice(0, 4);
+    await sincronizarPapeletasCron(`${anio}-01-01`, `${anio}-12-31`, 'startup');
+  })();
   
   // Configuración de horarios para marcado de ausentes
   // Formato: { hora, minuto, crearSiNoExiste }

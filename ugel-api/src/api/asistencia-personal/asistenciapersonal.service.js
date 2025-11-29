@@ -129,13 +129,8 @@ const getAllAsistencias = async (options = {}) => {
       estadoPresencia
     });
     
-    // Integración corregida
-    const asistenciasIntegradas = await integrarPapeletasEnAsistencias(
-      result.asistencias, fecha || fechaInicio, fecha || fechaFin
-    );
-
     return {
-      asistencias: asistenciasIntegradas,
+      asistencias: result.asistencias,
       pagination: {
         page: parseInt(page), limit: parseInt(limit),
         total: result.total, totalPages: Math.ceil(result.total / limit)
@@ -153,11 +148,8 @@ const getAsistenciasHoy = async (options = {}) => {
     const { fecha: hoy } = nowLima();
     const result = await repository.findAll({ page, limit, search: q, fecha: hoy });
     
-    // Integración corregida para hoy
-    const asistenciasIntegradas = await integrarPapeletasEnAsistencias(result.asistencias, hoy, hoy);
-
     return {
-      asistencias: asistenciasIntegradas,
+      asistencias: result.asistencias,
       pagination: {
         page: parseInt(page), limit: parseInt(limit),
         total: result.total, totalPages: Math.ceil(result.total / limit)
@@ -218,11 +210,8 @@ const getMiAsistencia = async (personalId, options = {}) => {
       page, limit, fechaInicio: firstDay, fechaFin: lastDay, personalId,
     });
 
-    // Integración corregida para mi asistencia
-    const asistenciasIntegradas = await integrarPapeletasEnAsistencias(result.asistencias, firstDay, lastDay);
-
     return {
-      asistencias: asistenciasIntegradas,
+      asistencias: result.asistencias,
       pagination: {
         page: parseInt(page), limit: parseInt(limit),
         total: result.total, totalPages: Math.ceil(result.total / limit)
@@ -415,6 +404,70 @@ const marcarAusentesProgresivo = async (usuarioSistemaId = config.systemUserId) 
   return { fecha: hoy, procesados, ausentes };
 };
 
+/**
+ * Sincroniza papeletas externas (Mongo) en la tabla de asistencia (Postgres).
+ * Inserta/actualiza estado Permiso/Comisión por cada día cubierto.
+ */
+const sincronizarPapeletas = async (fechaInicio, fechaFin, usuarioId = config.systemUserId || 1) => {
+  try {
+    logger.info(`CRON: Sincronizando papeletas ${fechaInicio} - ${fechaFin}`);
+
+    const papeletas = await mongoService.getPapeletasAprobadasExternas({ fechaInicio, fechaFin });
+    if (!papeletas || papeletas.length === 0) {
+      logger.info('CRON: Sin papeletas para sincronizar');
+      return { procesados: 0 };
+    }
+
+    const { personal: listaPersonal = [] } = await personalRepository.findAll({
+      page: 1,
+      limit: 10000,
+      activo: true
+    });
+
+    let procesados = 0;
+
+    for (const p of papeletas) {
+      const persona = listaPersonal.find((per) => {
+        if (per.numero_documento && p.solicitante_numero_documento) {
+          return per.numero_documento === p.solicitante_numero_documento;
+        }
+        const nombrePer = `${per.nombres || ''} ${per.apellidos || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const nombrePap = `${p.solicitante_nombres || ''} ${p.solicitante_apellidos || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        return nombrePer && nombrePap && (nombrePer.includes(nombrePap) || nombrePap.includes(nombrePer));
+      });
+      if (!persona) continue;
+
+      const esComision = p.nombre_motivo?.toLowerCase().includes('comis');
+      const nuevoEstado = esComision ? 'Comisión' : 'Permiso';
+      const observacion = `Sincronizado Auto: ${p.codigo_papeleta}`;
+
+      const inicio = new Date(p.fecha_hora_salida_programada);
+      const fin = new Date(p.fecha_hora_retorno_programada);
+
+      for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+        const fechaStr = d.toISOString().split('T')[0];
+        if (fechaInicio && fechaStr < fechaInicio) continue;
+        if (fechaFin && fechaStr > fechaFin) continue;
+
+        const actualizado = await repository.updatePorPapeletaExterna(
+          persona.id,
+          fechaStr,
+          nuevoEstado,
+          observacion,
+          usuarioId
+        );
+        if (actualizado) procesados++;
+      }
+    }
+
+    logger.info(`CRON: Sincronización completada. Registros afectados: ${procesados}`);
+    return { procesados };
+  } catch (error) {
+    logger.error('CRON: Error sincronizando papeletas externas:', error);
+    return { procesados: 0, error: error.message };
+  }
+};
+
 const getEstadisticas = async (opt) => await repository.getEstadisticas(opt.fechaInicio, opt.fechaFin);
 const getEstadisticasTotales = async (opt) => await repository.getEstadisticasTotales(opt.fechaInicio, opt.fechaFin);
 const getEstadisticasPuntualidad = async (opt) => await repository.getEstadisticasPuntualidad(opt.fechaInicio, opt.fechaFin);
@@ -478,10 +531,8 @@ const exportarAPDF = async (filtros = {}) => {
       search: filtros.q || '', fechaInicio: filtros.fechaInicio, fechaFin: filtros.fechaFin,
       personalId: filtros.personalId ? parseInt(filtros.personalId) : undefined, estadoPresencia: filtros.estadoPresencia
     }, false);
-    
-    // Integración en PDF
-    const asistencias = await integrarPapeletasEnAsistencias(result.asistencias, filtros.fechaInicio, filtros.fechaFin);
-    
+
+    const asistencias = result.asistencias;
     return new Promise((resolve, reject) => {
         const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40, bufferPages: true });
         const chunks = [];
@@ -537,9 +588,27 @@ async function evaluarJustificacion(id, data, usuarioRespuestaId) {
 }
 
 module.exports = {
-  getAllAsistencias, getAsistenciasHoy, getAsistenciaById, registrarIngreso, registrarSalida,
-  registrarEstadoPresencia, marcarAusentesAlFinalDelDia, getEstadisticas, getEstadisticasTotales,
-  getEstadisticasPuntualidad, getEstadisticasAusencias, getEstadisticasAreas, getEstadisticasPersonal,
-  getPersonalDetalle, exportarAExcel, exportarAPDF, getMiResumen, getMiAsistencia, marcarAusentesProgresivo,
-  justificarAsistencia, getJustificaciones, evaluarJustificacion
+  getAllAsistencias,
+  getAsistenciasHoy,
+  getAsistenciaById,
+  registrarIngreso,
+  registrarSalida,
+  registrarEstadoPresencia,
+  marcarAusentesAlFinalDelDia,
+  marcarAusentesProgresivo,
+  sincronizarPapeletas,
+  getEstadisticas,
+  getEstadisticasTotales,
+  getEstadisticasPuntualidad,
+  getEstadisticasAusencias,
+  getEstadisticasAreas,
+  getEstadisticasPersonal,
+  getPersonalDetalle,
+  exportarAExcel,
+  exportarAPDF,
+  getMiResumen,
+  getMiAsistencia,
+  justificarAsistencia,
+  getJustificaciones,
+  evaluarJustificacion
 };

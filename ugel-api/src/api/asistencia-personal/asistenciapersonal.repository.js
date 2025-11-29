@@ -1592,6 +1592,52 @@ const createJustificacion = async (data) => {
   }
 };
 
+/**
+ * Actualiza o inserta un permiso basado en una papeleta externa.
+ * Solo sobrescribe si el estado es 'Ausente', 'Falta' o nulo y no hay hora de ingreso.
+ */
+const updatePorPapeletaExterna = async (personalId, fecha, nuevoEstado, observacion, usuarioId) => {
+  try {
+    // Intentar actualizar si existe registro susceptible de ser sobrescrito
+    const updateQuery = `
+      UPDATE ControlAsistenciaPersonal
+      SET 
+        estado_presencia = $1,
+        observacion = $2,
+        usuario_registro_id = $3,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE personal_id = $4 
+        AND fecha = $5::date
+        AND (estado_presencia IN ('Ausente', 'Falta', 'Sin marca') OR estado_presencia IS NULL)
+        AND hora_ingreso IS NULL
+      RETURNING id
+    `;
+    const result = await db.query(updateQuery, [nuevoEstado, observacion, usuarioId, personalId, fecha]);
+    if (result.rows.length > 0) return result.rows[0];
+
+    // Si no se actualizó, revisar si hay registro protegido (Presente/Tardanza)
+    const checkQuery = `SELECT id FROM ControlAsistenciaPersonal WHERE personal_id = $1 AND fecha = $2::date`;
+    const checkResult = await db.query(checkQuery, [personalId, fecha]);
+
+    // Si no existe registro, crear uno nuevo
+    if (checkResult.rows.length === 0) {
+      const insertQuery = `
+        INSERT INTO ControlAsistenciaPersonal (
+          personal_id, fecha, estado_presencia, observacion, usuario_registro_id
+        ) VALUES ($1, $2::date, $3, $4, $5)
+        RETURNING id
+      `;
+      const insertResult = await db.query(insertQuery, [personalId, fecha, nuevoEstado, observacion, usuarioId]);
+      return insertResult.rows[0];
+    }
+
+    return null; // ya había un registro protegido
+  } catch (error) {
+    logger.error('Error actualizando por papeleta externa:', error);
+    return null;
+  }
+};
+
 module.exports = {
   findAll,
   findById,
@@ -1615,7 +1661,8 @@ module.exports = {
   getResumenMensualPersonal,
   createJustificacion,
   findAllJustificaciones,
-  updateJustificacionEstado
+  updateJustificacionEstado,
+  updatePorPapeletaExterna
 };
 
 /**
