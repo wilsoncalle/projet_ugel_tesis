@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { visitasService } from '../services/api';
 import MisVisitasTabla from '../components/personal_visitas/MisVisitasTabla';
 import { toast } from 'react-hot-toast';
@@ -26,6 +26,56 @@ const MisVisitasPage = () => {
     total: 0
   });
 
+  // Estados para filtro de año y mes
+  const hoy = useMemo(() => new Date(), []);
+  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [mes, setMes] = useState(hoy.getMonth() + 1);
+
+  // Opciones de año
+  const yearOptions = useMemo(() => {
+    const currentYear = hoy.getFullYear();
+    const years = [];
+    for (let y = currentYear; y >= currentYear - 4; y--) {
+      years.push({ value: y, label: y.toString() });
+    }
+    return years;
+  }, [hoy]);
+
+  const monthOptions = useMemo(
+    () => [
+      { value: 0, label: 'Todos' },
+      { value: 1, label: 'Enero' },
+      { value: 2, label: 'Febrero' },
+      { value: 3, label: 'Marzo' },
+      { value: 4, label: 'Abril' },
+      { value: 5, label: 'Mayo' },
+      { value: 6, label: 'Junio' },
+      { value: 7, label: 'Julio' },
+      { value: 8, label: 'Agosto' },
+      { value: 9, label: 'Setiembre' },
+      { value: 10, label: 'Octubre' },
+      { value: 11, label: 'Noviembre' },
+      { value: 12, label: 'Diciembre' },
+    ],
+    []
+  );
+
+  const handleChangeYear = (option) => {
+    if (!option) return;
+    setAnio(option.value);
+    // Reset pagination when filter changes
+    setActivosPagination(prev => ({ ...prev, page: 1 }));
+    setHistorialPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleChangeMonth = (option) => {
+    if (!option) return;
+    setMes(option.value);
+    // Reset pagination when filter changes
+    setActivosPagination(prev => ({ ...prev, page: 1 }));
+    setHistorialPagination(prev => ({ ...prev, page: 1 }));
+  };
+
   const fetchVisitas = useCallback(async () => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
@@ -52,7 +102,9 @@ const MisVisitasPage = () => {
       const response = await visitasService.getMisVisitas({
         page,
         limit,
-        estados
+        estados,
+        anio,
+        mes: mes === 0 ? undefined : mes
       });
       
       const { data, pagination } = response.data;
@@ -82,7 +134,7 @@ const MisVisitasPage = () => {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [activeTab, activosPagination.page, activosPagination.limit, historialPagination.page, historialPagination.limit, personalId]);
+  }, [activeTab, activosPagination.page, activosPagination.limit, historialPagination.page, historialPagination.limit, personalId, anio, mes]);
 
   useEffect(() => {
     fetchVisitas();
@@ -192,6 +244,15 @@ const MisVisitasPage = () => {
               itemsPerPage: historialPagination.limit
             }}
             onHistorialPageChange={(page) => setHistorialPagination(prev => ({ ...prev, page }))}
+
+            filters={{
+              yearOptions,
+              monthOptions,
+              anio,
+              mes,
+              onYearChange: handleChangeYear,
+              onMonthChange: handleChangeMonth
+            }}
           />
         </div>
       </div>

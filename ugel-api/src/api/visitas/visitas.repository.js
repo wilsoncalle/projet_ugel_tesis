@@ -1254,7 +1254,9 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
   const { 
     page = 1, 
     limit = 10, 
-    estados = [] // Array de estados: ['PENDIENTE', 'ACEPTADO'] o ['FINALIZADO', 'RECHAZADO']
+    estados = [], // Array de estados: ['PENDIENTE', 'ACEPTADO'] o ['FINALIZADO', 'RECHAZADO']
+    anio,
+    mes
   } = options;
   
   const offset = (page - 1) * limit;
@@ -1304,6 +1306,13 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
     
     const queryParams = [personalId];
     let paramCounter = 2;
+
+    // Filtro por Año y Mes
+    if (anio && mes) {
+      query += ` AND EXTRACT(YEAR FROM rv.fecha_ingreso) = $${paramCounter} AND EXTRACT(MONTH FROM rv.fecha_ingreso) = $${paramCounter + 1}`;
+      queryParams.push(anio, mes);
+      paramCounter += 2;
+    }
     
     // Filtro por estados con lógica personalizada para manejar fecha_fin_atencion
     if (estados && estados.length > 0) {
@@ -1350,6 +1359,12 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
     // Replicar lógica de filtros para el count
     const countParams = [personalId];
     let countParamCounter = 2;
+    
+    if (anio && mes) {
+      countQuery += ` AND EXTRACT(YEAR FROM rv.fecha_ingreso) = $${countParamCounter} AND EXTRACT(MONTH FROM rv.fecha_ingreso) = $${countParamCounter + 1}`;
+      countParams.push(anio, mes);
+      countParamCounter += 2;
+    }
     
     if (estados && estados.length > 0) {
       const countStateConditions = [];

@@ -3,7 +3,7 @@ import Card from "../components/Card";
 import TableGenerica from "../components/TableGenerica";
 import ModalDetalles from "../components/ModalDetalles";
 import TabView from "../components/TabView";
-import DateRangeFilter from "../components/DateRangeFilter";
+import SelectCustom from "../components/SelectCustom";
 import { EyeIcon } from "@heroicons/react/24/outline";
 import { papeletasSalidaService } from "../services/api";
 import { useDocumentTitle } from "../hooks/useDocumentTitle";
@@ -44,10 +44,10 @@ const VigilantePapeletasPage = () => {
   // Estado para la categoría de estadísticas
   const [categoriaEstadisticas, setCategoriaEstadisticas] = useState('estado');
 
-  // Estados para filtro de fechas
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [semanaUI, setSemanaUI] = useState(null);
+  // Estados para filtro de año y mes
+  const hoy = useMemo(() => new Date(), []);
+  const [anio, setAnio] = useState(hoy.getFullYear());
+  const [mes, setMes] = useState(hoy.getMonth() + 1);
 
   // Modales
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -56,6 +56,46 @@ const VigilantePapeletasPage = () => {
   // Bloqueo de cargas simultáneas
   const isLoadingRef = useRef(false);
   const searchTimeoutRef = useRef(null);
+
+  // Opciones de año
+  const yearOptions = useMemo(() => {
+    const currentYear = hoy.getFullYear();
+    const years = [];
+    for (let y = currentYear; y >= currentYear - 4; y--) {
+      years.push({ value: y, label: y.toString() });
+    }
+    return years;
+  }, [hoy]);
+
+  const monthOptions = useMemo(
+    () => [
+      { value: 1, label: 'Enero' },
+      { value: 2, label: 'Febrero' },
+      { value: 3, label: 'Marzo' },
+      { value: 4, label: 'Abril' },
+      { value: 5, label: 'Mayo' },
+      { value: 6, label: 'Junio' },
+      { value: 7, label: 'Julio' },
+      { value: 8, label: 'Agosto' },
+      { value: 9, label: 'Setiembre' },
+      { value: 10, label: 'Octubre' },
+      { value: 11, label: 'Noviembre' },
+      { value: 12, label: 'Diciembre' },
+    ],
+    []
+  );
+
+  const handleChangeYear = (option) => {
+    if (!option) return;
+    setAnio(option.value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleChangeMonth = (option) => {
+    if (!option) return;
+    setMes(option.value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
 
   // ---------- LOADERS ----------
   const loadPapeletas = async (opts = {}) => {
@@ -66,10 +106,23 @@ const VigilantePapeletasPage = () => {
       const { page = pagination.page, limit = pagination.limit } = opts;
       const q = search.toLowerCase() || "";
 
-      // 🔹 Construir params para backend con fechas
+      // 🔹 Construir params para backend con fechas calculadas del año/mes
       const params = {};
-      if (fechaDesde) params.fechaInicio = fechaDesde; // 'YYYY-MM-DD'
-      if (fechaHasta) params.fechaFin = fechaHasta;
+      
+      // Calcular primer y último día del mes seleccionado
+      const primerDia = new Date(anio, mes - 1, 1);
+      const ultimoDia = new Date(anio, mes, 0);
+      
+      // Formatear a YYYY-MM-DD
+      const formatDate = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+
+      params.fechaInicio = formatDate(primerDia);
+      params.fechaFin = formatDate(ultimoDia);
 
       // Llamar DIRECTAMENTE al nuevo endpoint de MongoDB para obtener datos externos
       const response = await papeletasSalidaService.getExternas(params);
@@ -153,7 +206,7 @@ const VigilantePapeletasPage = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, search, fechaDesde, fechaHasta]);
+  }, [activeTab, search, anio, mes]);
 
   // ---------- UI HELPERS ----------
   const estadoBadge = (estado) => {
@@ -277,29 +330,7 @@ const VigilantePapeletasPage = () => {
             </div>
           </div>
 
-          {/* Filtro por rango de fechas */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
-            <DateRangeFilter
-              fechaDesde={fechaDesde}
-              fechaHasta={fechaHasta}
-              onFechaDesdeChange={(value) => {
-                setFechaDesde(value || '');
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}
-              onFechaHastaChange={(value) => {
-                setFechaHasta(value || '');
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}
-              onClear={() => {
-                setFechaDesde('');
-                setFechaHasta('');
-                setSemanaUI(null);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}
-              semanaUIProp={semanaUI}
-              onSemanaChange={setSemanaUI}
-            />
-          </div>
+
 
           {/* Tabs */}
           <TabView tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
@@ -341,6 +372,32 @@ const VigilantePapeletasPage = () => {
                 currentPage={pagination.page}
                 totalItems={pagination.total}
                 onPageChange={(newPage) => loadPapeletas({ page: newPage })}
+                actions={
+                  <div className="flex items-center gap-2">
+                    <div className="w-32">
+                      <SelectCustom
+                        label="Año"
+                        hideLabel
+                        options={yearOptions}
+                        value={yearOptions.find((y) => y.value === anio) || null}
+                        onChange={handleChangeYear}
+                        isSearchable={false}
+                        placeholder="Año"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <SelectCustom
+                        label="Mes"
+                        hideLabel
+                        options={monthOptions}
+                        value={monthOptions.find((m) => m.value === mes) || null}
+                        onChange={handleChangeMonth}
+                        isSearchable={false}
+                        placeholder="Mes"
+                      />
+                    </div>
+                  </div>
+                }
               />
             </Card>
           )}
@@ -486,4 +543,3 @@ const VigilantePapeletasPage = () => {
 };
 
 export default VigilantePapeletasPage;
-

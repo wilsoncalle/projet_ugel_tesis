@@ -487,7 +487,9 @@ const getMisVisitas = asyncHandler(async (req, res) => {
     const { 
       page = 1, 
       limit = 10,
-      estados = '' // Parámetro opcional: 'PENDIENTE,ACEPTADO' o 'FINALIZADO,RECHAZADO'
+      estados = '', // Parámetro opcional: 'PENDIENTE,ACEPTADO' o 'FINALIZADO,RECHAZADO'
+      anio,
+      mes
     } = req.query;
     
     // Convertir estados de string a array
@@ -499,7 +501,9 @@ const getMisVisitas = asyncHandler(async (req, res) => {
       {
         page: parseInt(page),
         limit: parseInt(limit),
-        estados: estadosArray
+        estados: estadosArray,
+        anio: anio ? parseInt(anio) : undefined,
+        mes: mes ? parseInt(mes) : undefined
       }
     );
     

@@ -32,6 +32,7 @@ const MisVisitasTabla = ({
   onActivosPageChange,
   historialPagination,
   onHistorialPageChange,
+  filters,
   className = ""
 }) => {
   // Estados para modales
@@ -693,8 +694,34 @@ const MisVisitasTabla = ({
       <Card className="shadow-lg border border-gray-200 bg-card flex-1 flex flex-col rounded-2xl h-full">
         <div className="p-0 flex flex-col h-full">
           <div className="px-0">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-3 px-1 pt-0">
               <h2 className="text-lg font-semibold text-gray-800">Mis Visitas</h2>
+              {filters && (
+                <div className="flex items-center gap-2">
+                  <div className="w-32">
+                    <SelectCustom
+                      label="Año"
+                      hideLabel
+                      options={filters.yearOptions}
+                      value={filters.yearOptions.find((y) => y.value === filters.anio) || null}
+                      onChange={filters.onYearChange}
+                      isSearchable={false}
+                      placeholder="Año"
+                    />
+                  </div>
+                  <div className="w-32">
+                    <SelectCustom
+                      label="Mes"
+                      hideLabel
+                      options={filters.monthOptions}
+                      value={filters.monthOptions.find((m) => m.value === filters.mes) || null}
+                      onChange={filters.onMonthChange}
+                      isSearchable={false}
+                      placeholder="Mes"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             
             <TabView
@@ -720,6 +747,7 @@ const MisVisitasTabla = ({
                   ? 'No hay visitas activas'
                   : 'No hay historial de visitas'
               }
+
             />
           </div>
         </div>
