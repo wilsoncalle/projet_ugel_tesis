@@ -8,9 +8,11 @@ import {
   CheckCircleIcon, 
   XCircleIcon, 
   DocumentTextIcon, 
-  EyeIcon 
+  EyeIcon,
+  ClockIcon 
 } from '@heroicons/react/24/outline';
 import ModalGenerico from '../components/ModalGenerico';
+import TabView from '../components/TabView';
 
 const GestionJustificacionesPage = () => {
   useDocumentTitle('Gestión de Justificaciones - RRHH');
@@ -175,50 +177,39 @@ const GestionJustificacionesPage = () => {
     }
   ];
 
+  const tabs = [
+    { key: 'PENDIENTE', label: 'Pendientes', icon: <ClockIcon className="h-5 w-5" /> },
+    { key: 'APROBADO', label: 'Aprobados', icon: <CheckCircleIcon className="h-5 w-5" /> },
+    { key: 'RECHAZADO', label: 'Rechazados', icon: <XCircleIcon className="h-5 w-5" /> }
+  ];
+
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Gestión de Justificaciones</h1>
-        <p className="text-sm text-gray-500 mt-1">Administre las solicitudes de justificación de inasistencias y tardanzas.</p>
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de Justificaciones</h1>
+          <p className="mt-1 text-sm text-gray-500">Administre las solicitudes de justificación de inasistencias y tardanzas.</p>
+        </div>
       </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <div className="relative w-full md:w-64">
-          <input
-            type="text"
-            placeholder="Buscar por nombre o DNI..."
-            className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+      <TabView 
+        tabs={tabs} 
+        activeTab={filtroEstado} 
+        onTabChange={setFiltroEstado}
+      >
+        <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl">
+          <TableGenerica 
+            columns={columns} 
+            data={justificaciones} 
+            isLoading={loading}
+            emptyMessage="No hay solicitudes en este estado."
+            searchable={true}
+            searchPlaceholder="Buscar por nombre o DNI..."
+            searchValue={searchTerm}
+            onSearch={setSearchTerm}
           />
-          <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-
-        <div className="flex bg-white rounded-lg p-1 shadow-sm border">
-          {['PENDIENTE', 'APROBADO', 'RECHAZADO'].map(est => (
-            <button
-              key={est}
-              onClick={() => setFiltroEstado(est)}
-              className={`px-4 py-2 text-sm rounded-md transition-colors ${
-                filtroEstado === est ? 'bg-blue-600 text-white shadow' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {est}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Card className="bg-white">
-        <TableGenerica 
-          columns={columns} 
-          data={justificaciones} 
-          isLoading={loading}
-          emptyMessage="No hay solicitudes en este estado."
-        />
-      </Card>
+        </Card>
+      </TabView>
 
       {/* Modal de Confirmación */}
       <ModalGenerico
