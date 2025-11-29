@@ -1,7 +1,7 @@
 {
   "name": "ugel-api",
-  "version": "1.0.0",
-  "description": "API para el Sistema de Control de Acceso de la UGEL Talara",
+  "version": "2.08.06",
+  "description": "API para el Sistema de Control de Acceso de UGEL Talara",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -42,6 +42,6 @@
     "postgresql",
     "express"
   ],
-  "author": "UGEL Talara",
+  "author": "Wilson Calle",
   "license": "MIT"
 }

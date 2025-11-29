@@ -7,39 +7,36 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // --- ESTO ES LO QUE DEBES AGREGAR ---
       devOptions: {
-        enabled: false, // Desactiva el Service Worker mientras desarrollas (npm run dev)
+        enabled: false,
       },
-      // -------------------------------------
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: [
+        'favicon.ico',
+        'img/favicon-16x16.png',
+        'img/favicon-32x32.png',
+        'img/apple-touch-icon.png',
+        'img/maskable-512x512.png'
+      ],
       manifest: {
-        name: 'Sistema Integral de Control de Acceso UGEL',
-        short_name: 'UGEL Access',
-        description: 'Sistema de control de acceso para UGEL',
+        name: 'Control de Acceso UGEL',
+        short_name: 'COAC UGEL',
+        description: 'Sistema de control de acceso de personal y visitas para UGEL Talara',
         theme_color: '#ffffff',
         icons: [
-          {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
-          }
+          { src: 'img/pwa-64x64.png', sizes: '64x64', type: 'image/png' },
+          { src: 'img/pwa-128x128.png', sizes: '128x128', type: 'image/png' },
+          { src: 'img/pwa-152x152.png', sizes: '152x152', type: 'image/png' },
+          { src: 'img/pwa-167x167.png', sizes: '167x167', type: 'image/png' },
+          { src: 'img/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+          { src: 'img/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'img/pwa-256x256.png', sizes: '256x256', type: 'image/png' },
+          { src: 'img/pwa-384x384.png', sizes: '384x384', type: 'image/png' },
+          { src: 'img/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: 'img/maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
       workbox: {
-        // Ojo: Esta caché de API también te estaba dando datos viejos del backend
         runtimeCaching: [
           {
             urlPattern: /^\/api\/.*/,
