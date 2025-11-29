@@ -332,11 +332,12 @@ const VigilantePapeletasPage = () => {
 
 
 
-          {/* Tabs */}
-          <TabView tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+          <div className="space-y-1">
+            {/* Tabs */}
+            <TabView tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
-          {/* Contenido según pestaña activa */}
-          {activeTab === "estadisticas" ? (
+            {/* Contenido según pestaña activa */}
+            {activeTab === "estadisticas" ? (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               {/* Contenido de la estadística seleccionada (izquierda) */}
               <div className="lg:col-span-3">
@@ -401,6 +402,7 @@ const VigilantePapeletasPage = () => {
               />
             </Card>
           )}
+          </div>
         </div>
       </div>
 

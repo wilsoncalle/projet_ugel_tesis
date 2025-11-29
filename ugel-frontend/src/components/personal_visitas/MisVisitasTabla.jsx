@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Card from '../Card';
 import Button from '../Button';
 import TabView from '../TabView';
@@ -16,7 +16,9 @@ import {
   UserGroupIcon, 
   EyeIcon,
   ArrowRightOnRectangleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  MagnifyingGlassIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline';
 import { formatHora } from '../../utils/dateHelpers';
 import { visitasService, personalService, areasService, papeletasSalidaService } from '../../services/api';
@@ -46,8 +48,8 @@ const MisVisitasTabla = ({
   // Estados para delegación
   const [delegateTo, setDelegateTo] = useState(null);
   const [selectedArea, setSelectedArea] = useState(null);
-  const [personalList, setPersonalList] = useState([]); // Lista filtrada
-  const [fullPersonalList, setFullPersonalList] = useState([]); // Lista completa
+  const [personalList, setPersonalList] = useState([]); 
+  const [fullPersonalList, setFullPersonalList] = useState([]); 
   const [areasList, setAreasList] = useState([]);
   const [loadingPersonal, setLoadingPersonal] = useState(false);
   
@@ -61,18 +63,91 @@ const MisVisitasTabla = ({
   const [loadingPapeleta, setLoadingPapeleta] = useState(false);
   const [papeletasExternas, setPapeletasExternas] = useState([]);
 
+  // --- ESTADOS PARA BUSCADOR Y ORIENTACIÓN ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [orientationResult, setOrientationResult] = useState(null);
+  const [searchingGlobal, setSearchingGlobal] = useState(false);
+  const searchTimeoutRef = useRef(null);
+  // -------------------------------------------
+
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Update time every minute to refresh the "Tiempo" column
+  // Update time every minute
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Update every minute
+    }, 60000); 
 
     return () => clearInterval(timer);
   }, []);
 
-  // Acciones
+  // --- LÓGICA DE BÚSQUEDA Y ORIENTACIÓN ---
+  
+  // Limpiar búsqueda al cambiar de pestaña
+  useEffect(() => {
+    setSearchTerm('');
+    setOrientationResult(null);
+  }, [activeTab]);
+
+  const handleSearchChange = (e) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+    setOrientationResult(null); // Limpiar resultado previo
+
+    // Si estamos en historial, solo filtramos localmente (no hacemos búsqueda global)
+    if (activeTab === 'historial') return;
+
+    // Si el término es corto, no buscar globalmente
+    if (term.length < 3) return;
+
+    // Debounce para búsqueda global
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      // 1. Primero verificar si ya lo tengo en MI lista (visitasActivas)
+      const foundInMyList = visitasActivas.some(v => 
+        v.numero_documento.includes(term) || 
+        `${v.visitante_nombres} ${v.visitante_apellidos}`.toLowerCase().includes(term.toLowerCase())
+      );
+
+      // Si NO está en mi lista y tengo un término válido, buscar globalmente para orientar
+      if (!foundInMyList) {
+        setSearchingGlobal(true);
+        try {
+          // Usamos buscarGlobal del servicio
+          const response = await visitasService.buscarGlobal(term);
+          if (response.data && response.data.success && response.data.data) {
+            // Filtramos para ver si hay una visita activa en otra área
+            const visitaActivaOtra = response.data.data.find(v => 
+              v.estado_visita === 'PENDIENTE' || v.estado_visita === 'EN_CURSO' || v.estado_visita === 'ACEPTADO'
+            );
+            setOrientationResult(visitaActivaOtra || null);
+          } else {
+            setOrientationResult(null);
+          }
+        } catch (error) {
+          console.error("Error en búsqueda global:", error);
+          setOrientationResult(null);
+        } finally {
+          setSearchingGlobal(false);
+        }
+      }
+    }, 600); // 600ms delay
+  };
+
+  // Función para filtrar los datos de la tabla basado en el input
+  const getFilteredData = (data) => {
+    if (!searchTerm) return data;
+    const lowerTerm = searchTerm.toLowerCase();
+    return data.filter(item => 
+      (item.visitante_nombres && item.visitante_nombres.toLowerCase().includes(lowerTerm)) ||
+      (item.visitante_apellidos && item.visitante_apellidos.toLowerCase().includes(lowerTerm)) ||
+      (item.numero_documento && item.numero_documento.includes(lowerTerm))
+    );
+  };
+  // -------------------------------------------
+
+  // Acciones (handleAccept, handleReject, etc. - Mismo código que antes)
   const handleAccept = async (visita) => {
     try {
       await visitasService.accept(visita.id);
@@ -113,8 +188,6 @@ const MisVisitasTabla = ({
     setMensajeEstadoEmpleado(null);
     setTipoMensajeEmpleado(null);
     setDelegateModalOpen(true);
-    
-    // Cargar datos si no están cargados o recargar para tener estados actualizados
     setLoadingPersonal(true);
     try {
       const [personalRes, areasRes, papeletasRes] = await Promise.all([
@@ -123,7 +196,6 @@ const MisVisitasTabla = ({
         papeletasSalidaService.getExternas()
       ]);
 
-      // Procesar áreas
       if (areasRes.data.success) {
         setAreasList(areasRes.data.data.map(a => ({
           value: a.id.toString(),
@@ -131,14 +203,11 @@ const MisVisitasTabla = ({
         })));
       }
 
-      // Guardar papeletas externas para uso posterior
       const papeletasExternasData = papeletasRes?.data?.data || [];
       setPapeletasExternas(papeletasExternasData);
 
-      // Procesar personal con estados (lógica copiada de RegistroForm)
       if (personalRes.data.success) {
         const papeletasActivasMap = new Map();
-
         papeletasExternasData.forEach(p => {
           if (p.estado === 'EN_CURSO') {
             if (p.solicitante_numero_documento) {
@@ -182,7 +251,7 @@ const MisVisitasTabla = ({
         });
 
         setFullPersonalList(empleadosProcesados);
-        setPersonalList(empleadosProcesados); // Inicialmente mostrar todos
+        setPersonalList(empleadosProcesados);
       }
     } catch (error) {
       console.error('Error cargando datos para delegación:', error);
@@ -194,16 +263,11 @@ const MisVisitasTabla = ({
 
   const handleAreaChange = (option) => {
     setSelectedArea(option);
-    
     if (!option) {
-      // Si se limpia el área, mostrar todos los empleados
       setPersonalList(fullPersonalList);
     } else {
-      // Filtrar empleados por área seleccionada
       const filtrados = fullPersonalList.filter(p => p.areaId === option.value);
       setPersonalList(filtrados);
-      
-      // Si el empleado seleccionado no pertenece a la nueva área, limpiarlo
       if (delegateTo && delegateTo.areaId !== option.value) {
         setDelegateTo(null);
         setMensajeEstadoEmpleado(null);
@@ -216,41 +280,27 @@ const MisVisitasTabla = ({
     setDelegateTo(option);
     setMensajeEstadoEmpleado(null);
     setTipoMensajeEmpleado(null);
-    
     if (option) {
-      // Validar estado del empleado
       if (option.estado === 'permiso') {
         setMensajeEstadoEmpleado('No se puede delegar: El empleado tiene permiso de salida.');
-        setTipoMensajeEmpleado('warning'); // Usamos warning para mostrar el botón de ver detalles
+        setTipoMensajeEmpleado('warning');
       } else if (option.estado === 'ausente') {
         setMensajeEstadoEmpleado('No se puede delegar: El empleado está ausente.');
         setTipoMensajeEmpleado('error');
       }
-
       if (option.areaId) {
-        // Auto-seleccionar el área del empleado
         const areaDelEmpleado = areasList.find(a => a.value === option.areaId);
-        if (areaDelEmpleado) {
-          setSelectedArea(areaDelEmpleado);
-        }
+        if (areaDelEmpleado) setSelectedArea(areaDelEmpleado);
       }
     }
   };
 
   const handleVerDetallesPapeleta = async () => {
-    if (!delegateTo?.detallePapeleta) {
-      console.log('No hay código de papeleta');
-      return;
-    }
-
+    if (!delegateTo?.detallePapeleta) return;
     setLoadingPapeleta(true);
     try {
-      console.log('Buscando papeleta con código:', delegateTo.detallePapeleta);
-      
       let papeletaExterna = papeletasExternas.find(p => p.codigo_papeleta === delegateTo.detallePapeleta);
-      
       if (!papeletaExterna) {
-         console.log('No encontrada en cache, recargando externas...');
          const response = await papeletasSalidaService.getExternas();
          if (response.data.success) {
            const freshData = response.data.data || [];
@@ -258,7 +308,6 @@ const MisVisitasTabla = ({
            papeletaExterna = freshData.find(p => p.codigo_papeleta === delegateTo.detallePapeleta);
          }
       }
-
       if (papeletaExterna) {
         const papeletaMapeada = {
           ...papeletaExterna,
@@ -273,14 +322,12 @@ const MisVisitasTabla = ({
           sustento: papeletaExterna.observacion || papeletaExterna.sustento || '-',
           estado: papeletaExterna.estado
         };
-        
         setPapeletaSeleccionada(papeletaMapeada);
         setIsModalPapeletaOpen(true);
       } else {
         toast.error('No se encontró la información de la papeleta.');
       }
     } catch (error) {
-      console.error('Error al cargar detalles de papeleta:', error);
       toast.error('Error al cargar detalles de papeleta');
     } finally {
       setLoadingPapeleta(false);
@@ -289,9 +336,7 @@ const MisVisitasTabla = ({
 
   const handleCloseModalPapeleta = () => {
     setIsModalPapeletaOpen(false);
-    setTimeout(() => {
-      setPapeletaSeleccionada(null);
-    }, 300);
+    setTimeout(() => setPapeletaSeleccionada(null), 300);
   };
 
   const handleDelegateConfirm = async () => {
@@ -299,8 +344,6 @@ const MisVisitasTabla = ({
       toast.error('Debe seleccionar un personal');
       return;
     }
-
-    // Validar estado antes de enviar
     if (delegateTo.estado === 'permiso') {
       toast.error('No se puede delegar a un personal con permiso de salida');
       return;
@@ -309,7 +352,6 @@ const MisVisitasTabla = ({
       toast.error('No se puede delegar a un personal ausente');
       return;
     }
-
     try {
       await visitasService.delegate(selectedVisita.id, delegateTo.value);
       toast.success('Visita delegada correctamente');
@@ -337,7 +379,6 @@ const MisVisitasTabla = ({
     setDetailsModalOpen(true);
   };
 
-  // Columnas de la tabla (misma estructura para ambas pestañas)
   const getColumns = () => {
     const baseColumns = [
       {
@@ -398,9 +439,7 @@ const MisVisitasTabla = ({
             FINALIZADO: 'bg-gray-100 text-gray-800',
             NO_PRESENTADO: 'bg-gray-100 text-gray-800'
           };
-          
           const isDelegado = row.estado_visita === 'DELEGADO';
-          
           return (
            <span
               className={`
@@ -410,12 +449,8 @@ const MisVisitasTabla = ({
               `}
               onClick={(e) => {
                 if (!isDelegado) return;
-                
-                // Evita que el click se propague si la fila tiene acciones
                 e.stopPropagation();
-
                 if (row.delegado_por_nombres) {
-                  // Toast limpio, estilo sistema (blanco con sombra y borde sutil)
                   toast.success(
                     <div className="flex flex-col">
                       <span className="font-bold text-gray-800 text-sm">Visita Delegada</span>
@@ -426,10 +461,7 @@ const MisVisitasTabla = ({
                     {
                       duration: 4000,
                       position: 'top-center',
-                      iconTheme: {
-                        primary: '#3b82f6',
-                        secondary: '#fff',
-                      },
+                      iconTheme: { primary: '#3b82f6', secondary: '#fff' },
                       style: {
                         background: '#ffffff',
                         color: '#1f2937',
@@ -462,19 +494,13 @@ const MisVisitasTabla = ({
           render: (row) => {
             const ingreso = new Date(row.fecha_ingreso);
             const diffMinutes = differenceInMinutes(currentTime, ingreso);
-            
-            // Clase base para los contenedores (Flexbox centrado estricto)
             const containerBase = "flex items-center gap-1.5"; 
-
             if (row.estado_visita === 'PENDIENTE' || row.estado_visita === 'DELEGADO') {
               const isOverLimit = diffMinutes > 5;
               return (
                 <div className={`${containerBase} ${isOverLimit ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-                  {/* shrink-0 evita que el icono se deforme */}
                   <ClockIcon className="h-4 w-4 shrink-0" />
-                  {/* leading-none elimina el espacio vertical extra del texto */}
                   <span className="leading-none">{diffMinutes} min</span>
-                  
                   {isOverLimit && (
                     <ExclamationTriangleIcon
                       className="h-4 w-4 shrink-0"
@@ -488,18 +514,12 @@ const MisVisitasTabla = ({
               return (
                 <div className={`${containerBase} ${isOverLimit ? 'bg-orange-100 text-orange-700 px-2 py-1 rounded-md w-fit' : 'text-green-600'}`}>
                   <ClockIcon className="h-4 w-4 shrink-0" />
-                  
-                  {/* Ajuste fino: leading-none alinea el texto con el icono */}
                   <span className={`leading-none ${isOverLimit ? 'font-bold' : ''}`}>
                     {diffMinutes} min
                   </span>
-
                   {isOverLimit && (
-                    // Flexbox aquí también para asegurar que el texto pequeño quede centrado respecto a su propio borde
                     <div className="flex items-center border-l border-orange-300 pl-1.5 h-full">
-                       <span className="text-xs font-bold leading-none">
-                        Excedido
-                      </span>
+                       <span className="text-xs font-bold leading-none">Excedido</span>
                     </div>
                   )}
                 </div>
@@ -585,45 +605,25 @@ const MisVisitasTabla = ({
         )
       });
     }
-
     return baseColumns;
   };
 
-  // Datos según pestaña (igual idea que en VisitantesTabla)
   const getTabData = () => {
-    if (activeTab === 'activos') {
-      return visitasActivas || [];
-    }
-    return historialVisitas || [];
+    // Aplicamos el filtro local del buscador
+    const data = activeTab === 'activos' ? visitasActivas || [] : historialVisitas || [];
+    return getFilteredData(data);
   };
 
-  // Paginación dinámica (igual idea que en VisitantesTabla)
   const getPaginationProps = () => {
     const data = getTabData();
     const totalItemsLocal = data.length;
 
     if (activeTab === 'activos') {
-      const itemsPerPage =
-        activosPagination?.itemsPerPage ||
-        activosPagination?.limit ||
-        10;
+      const itemsPerPage = activosPagination?.itemsPerPage || activosPagination?.limit || 10;
+      const currentPage = activosPagination?.currentPage || activosPagination?.page || 1;
+      const totalItems = activosPagination?.totalItems ?? activosPagination?.total ?? totalItemsLocal;
+      const totalPages = activosPagination?.totalPages ?? activosPagination?.pages ?? Math.ceil((totalItems || 0) / itemsPerPage);
 
-      const currentPage =
-        activosPagination?.currentPage ||
-        activosPagination?.page ||
-        1;
-
-      const totalItems =
-        activosPagination?.totalItems ??
-        activosPagination?.total ??
-        totalItemsLocal;
-
-      const totalPages =
-        activosPagination?.totalPages ??
-        activosPagination?.pages ??
-        Math.ceil((totalItems || 0) / itemsPerPage);
-
-      // 🔥 Regla dinámica: si no hay datos o el total cabe en una página, no muestres paginación
       if (!totalItems || totalItems <= itemsPerPage) {
         return { pagination: false };
       }
@@ -638,28 +638,11 @@ const MisVisitasTabla = ({
       };
     }
 
-    // HISTORIAL
-    const itemsPerPage =
-      historialPagination?.itemsPerPage ||
-      historialPagination?.limit ||
-      10;
+    const itemsPerPage = historialPagination?.itemsPerPage || historialPagination?.limit || 10;
+    const currentPage = historialPagination?.currentPage || historialPagination?.page || 1;
+    const totalItems = historialPagination?.totalItems ?? historialPagination?.total ?? totalItemsLocal;
+    const totalPages = historialPagination?.totalPages ?? historialPagination?.pages ?? Math.ceil((totalItems || 0) / itemsPerPage);
 
-    const currentPage =
-      historialPagination?.currentPage ||
-      historialPagination?.page ||
-      1;
-
-    const totalItems =
-      historialPagination?.totalItems ??
-      historialPagination?.total ??
-      totalItemsLocal;
-
-    const totalPages =
-      historialPagination?.totalPages ??
-      historialPagination?.pages ??
-      Math.ceil((totalItems || 0) / itemsPerPage);
-
-    // 🔥 Mismo criterio dinámico para Historial
     if (!totalItems || totalItems <= itemsPerPage) {
       return { pagination: false };
     }
@@ -694,42 +677,112 @@ const MisVisitasTabla = ({
       <Card className="shadow-lg border border-gray-200 bg-card flex-1 flex flex-col rounded-2xl h-full">
         <div className="p-0 flex flex-col h-full">
           <div className="px-0">
-            <div className="flex items-center justify-between mb-3 px-1 pt-0">
-              <h2 className="text-lg font-semibold text-gray-800">Mis Visitas</h2>
-              {filters && (
-                <div className="flex items-center gap-2">
-                  <div className="w-32">
-                    <SelectCustom
-                      label="Año"
-                      hideLabel
-                      options={filters.yearOptions}
-                      value={filters.yearOptions.find((y) => y.value === filters.anio) || null}
-                      onChange={filters.onYearChange}
-                      isSearchable={false}
-                      placeholder="Año"
+            {/* ENCABEZADO MODIFICADO: FLEXBOX CON BUSCADOR CENTRAL */}
+            <div className="flex flex-col mb-3 px-1 pt-0 gap-2">
+              <h2 className="text-lg font-semibold text-gray-800 whitespace-nowrap">Mis Visitas</h2>
+              
+              <TabView
+                tabs={tabs}
+                activeTab={activeTab}
+                onTabChange={onTabChange}
+                className="mb-0"
+              />
+
+              <div className="flex flex-col md:flex-row items-end justify-between gap-4 mt-0">
+                {/* BUSCADOR TIPO PÍLDORA (IZQUIERDA) */}
+                <div className="relative w-full max-w-md">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                    </div>
+                    <input
+                      type="text"
+                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-full leading-5 bg-gray-50 placeholder-gray-500 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors duration-200"
+                      placeholder={activeTab === 'activos' ? "Buscar visitante asignado..." : "Buscar en historial..."}
+                      value={searchTerm}
+                      onChange={handleSearchChange}
                     />
+                    {searchingGlobal && (
+                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                       </div>
+                    )}
                   </div>
-                  <div className="w-32">
-                    <SelectCustom
-                      label="Mes"
-                      hideLabel
-                      options={filters.monthOptions}
-                      value={filters.monthOptions.find((m) => m.value === filters.mes) || null}
-                      onChange={filters.onMonthChange}
-                      isSearchable={false}
-                      placeholder="Mes"
-                    />
-                  </div>
+
+                  {/* RESULTADO DE ORIENTACIÓN (SOLO VISIBLE EN TAB ACTIVOS) */}
+                  {activeTab === 'activos' && orientationResult && (
+                    <div className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-blue-100 p-3 animate-fade-in-down">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 bg-blue-100 rounded-full p-2">
+                          <InformationCircleIcon className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-semibold text-gray-900 mb-1">
+                            Visitante encontrado en otra asignación
+                          </h4>
+                          <p className="text-xs text-gray-600 mb-2">
+                            Este visitante no está asignado a usted. Por favor oriéntelo a:
+                          </p>
+                          <div className="bg-gray-50 rounded-md p-2 text-xs space-y-1 border border-gray-200">
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-500">Personal:</span>
+                              <span className="font-semibold text-gray-800">
+                                {orientationResult.personal_nombres} {orientationResult.personal_apellidos}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-500">Área:</span>
+                              <span className="font-semibold text-gray-800">{orientationResult.nombre_area}</span>
+                            </div>
+                             <div className="flex justify-between">
+                              <span className="font-medium text-gray-500">Motivo:</span>
+                              <span className="font-semibold text-blue-700">{orientationResult.nombre_motivo}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setOrientationResult(null);
+                            setSearchTerm('');
+                          }}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <XCircleIcon className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* Filtros (DERECHA) */}
+                {filters && activeTab === 'historial' && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-32">
+                      <SelectCustom
+                        label="Año"
+                        hideLabel
+                        options={filters.yearOptions}
+                        value={filters.yearOptions.find((y) => y.value === filters.anio) || null}
+                        onChange={filters.onYearChange}
+                        isSearchable={false}
+                        placeholder="Año"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <SelectCustom
+                        label="Mes"
+                        hideLabel
+                        options={filters.monthOptions}
+                        value={filters.monthOptions.find((m) => m.value === filters.mes) || null}
+                        onChange={filters.onMonthChange}
+                        isSearchable={false}
+                        placeholder="Mes"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            
-            <TabView
-              tabs={tabs}
-              activeTab={activeTab}
-              onTabChange={onTabChange}
-              className="mb-4"
-            />
           </div>
 
           <div
@@ -744,16 +797,15 @@ const MisVisitasTabla = ({
               maxBodyHeight="100%"
               emptyMessage={
                 activeTab === 'activos'
-                  ? 'No hay visitas activas'
+                  ? (searchTerm ? 'No se encontraron visitantes con ese criterio' : 'No hay visitas activas')
                   : 'No hay historial de visitas'
               }
-
             />
           </div>
         </div>
       </Card>
 
-      {/* Modales */}
+      {/* Modales (Sin cambios) */}
       <ModalGenerico
         isOpen={rejectModalOpen}
         onClose={() => setRejectModalOpen(false)}
