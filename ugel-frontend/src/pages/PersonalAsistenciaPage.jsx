@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence, motion } from "framer-motion";
 
 import Card from '../components/Card';
@@ -550,14 +550,18 @@ const PersonalAsistenciaPage = () => {
     }, 300); // 300ms coincide con la duración de la animación
   };
 
-  // Obtener estadísticas del día
-  const estadisticas = {
-    total: asistenciasHoy.length,
-    presentes: asistenciasHoy.filter(a => a.estado_presencia === 'Presente').length,
-    tardes: asistenciasHoy.filter(a => a.estado_presencia === 'Tarde' || a.estado_presencia === 'Tardanza').length,
-    ausentes: asistenciasHoy.filter(a => a.estado_presencia === 'Ausente').length,
-    permisos: asistenciasHoy.filter(a => a.estado_presencia === 'Permiso').length
-  };
+  // Obtener estadísticas según el tab activo
+  const estadisticas = useMemo(() => {
+    const data = activeTab === 'historial' ? historialAsistencias : asistenciasHoy;
+    
+    return {
+      total: data.length,
+      presentes: data.filter(a => a.estado_presencia === 'Presente').length,
+      tardes: data.filter(a => a.estado_presencia === 'Tarde' || a.estado_presencia === 'Tardanza').length,
+      ausentes: data.filter(a => a.estado_presencia === 'Ausente').length,
+      permisos: data.filter(a => a.estado_presencia === 'Permiso').length
+    };
+  }, [activeTab, asistenciasHoy, historialAsistencias]);
 
   // Obtener datos de tabla según el tab activo
   const getTabData = () => {
