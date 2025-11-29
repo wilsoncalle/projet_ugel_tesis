@@ -76,61 +76,6 @@ const ejecutarCierreAutomatico = async () => {
   }
 };
 
-/**
- * Función para marcar ausentes con opción de crear o solo actualizar
- * @param {boolean} crearSiNoExiste - Si es true, crea registros nuevos. Si es false, solo actualiza existentes
- */
-const ejecutarMarcadoAusentes = async (crearSiNoExiste = true) => {
-  try {
-    const modoOperacion = crearSiNoExiste ? 'crear y actualizar' : 'solo actualizar';
-    logger.info(`Ejecutando marcado automático de ausentes (modo: ${modoOperacion})...`);
-    
-    // Obtener fecha actual en zona horaria Lima
-    const { fecha: fechaActual } = nowLima();
-    
-    // Usar usuario técnico del sistema para acciones automáticas
-    const resultado = await asistenciaPersonalService.marcarAusentesAlFinalDelDia(
-      fechaActual,
-      SYSTEM_USER_ID,
-      crearSiNoExiste
-    );
-
-    logger.info(
-      `Marcado de ausentes completado: ${resultado.total} registros procesados para fecha ${resultado.fecha} ` +
-      `(${resultado.registrosCreados} creados, ${resultado.registrosActualizados} actualizados)` 
-    );
-  } catch (error) {
-    logger.error('Error en marcado automático de ausentes:', error);
-  }
-};
-
-/**
- * Calcular el tiempo hasta la próxima ejecución de un horario específico
- * @param {number} hora - Hora objetivo (0-23)
- * @param {number} minuto - Minuto objetivo (0-59)
- * @returns {number} Tiempo en milisegundos hasta el horario especificado
- */
-const calcularTiempoHasta = (hora, minuto) => {
-  const { fechaHora: limaTime } = nowLima();
-  
-  // Crear fecha objetivo para hoy con el horario especificado
-  const objetivo = new Date(limaTime);
-  objetivo.setHours(hora, minuto, 0, 0);
-  
-  // Si ya pasó el horario de hoy, programar para mañana
-  if (limaTime >= objetivo) {
-    objetivo.setDate(objetivo.getDate() + 1);
-  }
-  
-  // Calcular diferencia en milisegundos
-  const diferencia = objetivo.getTime() - limaTime.getTime();
-  
-  const horarioFormateado = `${hora.toString().padStart(2, '0')}:${minuto.toString().padStart(2, '0')}`;
-  logger.info(`Próxima ejecución de marcado de ausentes (${horarioFormateado}) programada para: ${objetivo.toISOString()} (en ${Math.round(diferencia / 1000 / 60)} minutos)`);
-  
-  return diferencia;
-};
-
 server.listen(PORT, () => {
   logger.info(`Servidor UGEL API ejecutándose en puerto ${PORT}`);
   logger.info(`Entorno: ${config.nodeEnv}`);
@@ -144,134 +89,54 @@ server.listen(PORT, () => {
   setInterval(ejecutarCierreAutomatico, 30 * 60 * 1000);
   logger.info('Tarea programada de cierre automático de visitas iniciada (cada 30 minutos)');
 
-  // Helper para sincronizar papeletas externas hacia asistencia
-  const sincronizarPapeletasCron = async (inicio, fin, motivo) => {
-    try {
-      logger.info(`Sincronización de papeletas (${motivo}) desde ${inicio} hasta ${fin}`);
-      await asistenciaPersonalService.sincronizarPapeletas(inicio, fin, SYSTEM_USER_ID);
-    } catch (err) {
-      logger.error(`Error sincronizando papeletas (${motivo}):`, err);
-    }
-  };
+  // =========================================================================
+  // TAREAS PROGRAMADAS (CRON JOBS)
+  // =========================================================================
 
-  // Cron diario a las 06:00 AM
-  cron.schedule('0 6 * * *', async () => {
-    const { fecha: hoy } = nowLima();
-    const inicioMes = `${hoy.slice(0, 7)}-01`;
-    await sincronizarPapeletasCron(inicioMes, hoy, 'cron 06:00');
-  });
-
-  // Sincronización correctiva al iniciar el servidor (año en curso)
-  (async () => {
-    const { fecha: hoy } = nowLima();
-    const anio = hoy.slice(0, 4);
-    await sincronizarPapeletasCron(`${anio}-01-01`, `${anio}-12-31`, 'startup');
-  })();
-  
-  // Configuración de horarios para marcado de ausentes
-  // Formato: { hora, minuto, crearSiNoExiste }
-  const horariosActualizacion = [
-    { hora: 10, minuto: 0, crearSiNoExiste: false },  // 10:00 AM - Solo actualizar
-    { hora: 12, minuto: 0, crearSiNoExiste: false },  // 12:00 PM - Solo actualizar
-    { hora: 17, minuto: 0, crearSiNoExiste: false },  // 5:00 PM - Solo actualizar
-    { hora: 23, minuto: 59, crearSiNoExiste: true }   // 11:59 PM - Crear y actualizar
-  ];
-  
   /**
-   * Programar una ejecución de marcado de ausentes para un horario específico
-   * @param {Object} config - Configuración del horario { hora, minuto, crearSiNoExiste }
+   * TAREA 1: Evaluación Reactiva de Asistencia (Cada 15 minutos)
+   * Horario: De 8:00 AM a 6:00 PM (Hora 18)
+   * Días: Lunes a Viernes (1-5)
+   * Objetivo: Marcar Permisos si existen o Ausentes si ya pasó su tolerancia.
    */
-  const programarMarcadoParaHorario = (config) => {
-    const { hora, minuto, crearSiNoExiste } = config;
-    const horarioFormateado = `${hora.toString().padStart(2, '0')}:${minuto.toString().padStart(2, '0')}`;
-    
-    const ejecutarYReprogramar = () => {
-      // Ejecutar el marcado de ausentes
-      ejecutarMarcadoAusentes(crearSiNoExiste);
-      
-      // Reprogramar para el mismo horario del día siguiente (24 horas después)
-      const tiempoHastaProximaEjecucion = calcularTiempoHasta(hora, minuto);
-      setTimeout(ejecutarYReprogramar, tiempoHastaProximaEjecucion);
-    };
-    
-    // Calcular tiempo hasta la primera ejecución
-    const tiempoHastaPrimeraEjecucion = calcularTiempoHasta(hora, minuto);
-    setTimeout(ejecutarYReprogramar, tiempoHastaPrimeraEjecucion);
-    
-    const modoOperacion = crearSiNoExiste ? 'crear y actualizar' : 'solo actualizar';
-    logger.info(`Tarea programada de marcado automático de ausentes configurada para ${horarioFormateado} (modo: ${modoOperacion})`);
-  };
-  
-  /**
-   * Verificar y crear registros de asistencia del día si es necesario
-   * Solo crea registros si ya pasaron las 10:00 AM y no existen registros
-   */
-  const verificarYCrearRegistrosDiarios = async () => {
+  cron.schedule('*/15 8-18 * * 1-5', async () => {
     try {
-      // Obtener hora actual en zona horaria Lima
-      const { fechaHora: limaTime, fecha: fechaActual } = nowLima();
-      const horaActual = limaTime.getHours();
-      const minutoActual = limaTime.getMinutes();
-      const horaFormateada = `${horaActual.toString().padStart(2, '0')}:${minutoActual.toString().padStart(2, '0')}`;
-      
-      logger.info(`Verificando registros de asistencia del día... (Hora actual: ${horaFormateada})`);
-      
-      // Solo crear registros si ya pasaron las 10:00 AM
-      if (horaActual < 10) {
-        logger.info('Hora actual antes de las 10:00 AM. No se crearán registros. Esperando ejecución programada.');
-        return;
-      }
-      
-      // Verificar si existen registros para hoy
-      const repository = require('./src/api/asistencia-personal/asistenciapersonal.repository');
-      const verificacion = await repository.verificarRegistrosDelDia(fechaActual);
-      
-      logger.info(`Registros encontrados: ${verificacion.totalRegistros}/${verificacion.totalPersonalActivo} (${verificacion.porcentaje}%)`);
-      
-      // Si no hay registros o hay muy pocos (menos del 10%), crear registros base
-      if (verificacion.necesitaCreacion || verificacion.porcentaje < 10) {
-        logger.info('No se encontraron suficientes registros. Creando registros base...');
-        await ejecutarMarcadoAusentes(true); // true = crear registros nuevos
-        logger.info('Registros base creados exitosamente.');
-      } else {
-        logger.info('Ya existen registros suficientes. No se requiere creación inicial.');
-      }
-      
+      logger.info('CRON: Ejecutando evaluación reactiva de asistencia...');
+      const resultado = await asistenciaPersonalService.evaluarAsistenciasAutomaticas(SYSTEM_USER_ID);
+      logger.info(`CRON: Evaluación completada. Permisos: ${resultado.permisos}, Ausentes nuevos: ${resultado.ausentes}, Aún en tiempo: ${resultado.ignorados}`);
     } catch (error) {
-      logger.error('Error verificando y creando registros diarios:', error);
-      // No lanzar error para no bloquear el inicio del servidor
+      logger.error('CRON Error en evaluación reactiva:', error);
     }
-  };
-  
-  /**
-   * Programar todos los horarios de marcado de ausentes
-   */
-  const programarMarcadosMultiples = () => {
-    horariosActualizacion.forEach(config => {
-      programarMarcadoParaHorario(config);
-    });
-  };
-  
-  // Verificar y crear registros del día si es necesario (solo después de las 10:00 AM)
-  verificarYCrearRegistrosDiarios().then(() => {
-    // Después de verificar, programar los horarios múltiples
-    programarMarcadosMultiples();
-    logger.info(`Sistema de marcado automático de ausentes iniciado con ${horariosActualizacion.length} horarios configurados`);
   });
 
-  // Marcado reactivo cada 5 minutos basado en hora_entrada + tolerancia
-  const REACTIVE_INTERVAL_MS = 5 * 60 * 1000;
-  setInterval(async () => {
+  /**
+   * TAREA 2: Cierre Final del Día (Barrido de seguridad)
+   * Horario: 6:05 PM (18:05)
+   * Días: Lunes a Viernes (1-5)
+   * Objetivo: Asegurar que cualquier registro que haya quedado en el limbo se marque como Ausente.
+   * Nota: Reutiliza la misma lógica, ya que a las 18:05 todos habrán superado su hora de entrada.
+   */
+  cron.schedule('5 18 * * 1-5', async () => {
     try {
-      const resumen = await asistenciaPersonalService.marcarAusentesProgresivo(SYSTEM_USER_ID);
-      logger.info(
-        `Marcado reactivo de ausentes: fecha ${resumen.fecha}, procesados ${resumen.procesados}, ausentes ${resumen.ausentes}`
-      );
-    } catch (err) {
-      logger.error('Error en marcado reactivo de ausentes:', err);
+      logger.info('CRON: Ejecutando cierre final del día (Barrido de las 18:05)...');
+      const resultado = await asistenciaPersonalService.evaluarAsistenciasAutomaticas(SYSTEM_USER_ID);
+      logger.info(`CRON: Cierre final completado. ${resultado.ausentes} ausencias forzadas.`);
+    } catch (error) {
+      logger.error('CRON Error en cierre final:', error);
     }
-  }, REACTIVE_INTERVAL_MS);
-  logger.info(`Marcado reactivo de ausentes iniciado (cada ${REACTIVE_INTERVAL_MS / 60000} minutos)`);
+  });
+
+  /**
+   * TAREA 3: Sincronización de Papeletas Diarias (Mantenimiento)
+   * Horario: 6:00 AM
+   * Días: Todos los días (incluye fines de semana por si hay comisiones especiales)
+   */
+  cron.schedule('0 6 * * *', async () => {
+      const { fecha: hoy } = nowLima();
+      // Sincroniza desde el inicio del mes hasta hoy por si hubo cambios retroactivos aprobados
+      const inicioMes = `${hoy.slice(0, 7)}-01`;
+      await asistenciaPersonalService.sincronizarPapeletas(inicioMes, hoy, SYSTEM_USER_ID);
+  });
 });
 
 // Manejo de cierre graceful

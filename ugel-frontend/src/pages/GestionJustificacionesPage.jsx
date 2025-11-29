@@ -136,7 +136,7 @@ const GestionJustificacionesPage = () => {
         <div>
           {row.evidencia_url ? (
             <button 
-              onClick={() => window.open(`http://localhost:3000${row.evidencia_url}`, '_blank')}
+              onClick={() => window.open(row.evidencia_url, '_blank')}
               className="bg-blue-100 hover:bg-blue-200 text-blue-800 border border-blue-200 rounded-full px-2 py-1 transition-all shadow-sm flex flex-row items-center gap-2"
             >
               <DocumentTextIcon className="h-4 w-4 text-blue-800" />

@@ -587,6 +587,90 @@ async function evaluarJustificacion(id, data, usuarioRespuestaId) {
   return justificacion;
 }
 
+const evaluarAsistenciasAutomaticas = async (usuarioSistemaId) => {
+  // 1. Obtener fecha y hora exacta en Lima
+  const { fecha: fechaHoy, hora: horaActualStr, fechaHora } = nowLima();
+  const minutosActuales = timeToMinutes(horaActualStr);
+  const diaSemana = fechaHora.getDay(); // 0 = Domingo, 6 = Sábado
+
+  // Doble seguridad para no ejecutar en fin de semana (aunque el cron lo limite)
+  if (diaSemana === 0 || diaSemana === 6) {
+    logger.info('Intento de ejecución en fin de semana bloqueado por lógica de negocio.');
+    return { procesados: 0, mensaje: 'Fin de semana' };
+  }
+
+  // 2. Obtener personal activo sin asistencia registrada hoy
+  // Nota: Debes asegurarte que tu repositorio soporte filtrar "sin registro hoy" o hacerlo en memoria
+  const { personal } = await personalRepository.findAll({ page: 1, limit: 10000, activo: true });
+  
+  // Obtener todas las papeletas aprobadas para hoy de una sola vez para optimizar
+  const papeletasHoy = await mongoService.getPapeletasAprobadasExternas({ 
+    fechaInicio: fechaHoy, 
+    fechaFin: fechaHoy 
+  });
+
+  let contadores = { permisos: 0, ausentes: 0, ignorados: 0 };
+
+  for (const p of personal) {
+    // Verificar si ya tiene registro hoy (Ingreso, Falta, Permiso, etc.)
+    const registroExistente = await repository.findByPersonalAndFecha(p.id, fechaHoy);
+    if (registroExistente) {
+      continue; // Ya tiene estado, pasamos al siguiente
+    }
+
+    // --- NIVEL 1: Verificar Papeletas (Permisos/Comisiones) ---
+    // Buscamos si tiene papeleta válida para hoy
+    const papeleta = papeletasHoy.find(pap => 
+      pap.solicitante_numero_documento === p.numero_documento && 
+      pap.estado === 'APROBADO'
+    );
+
+    if (papeleta) {
+      const esComision = papeleta.nombre_motivo?.toLowerCase().includes('comis');
+      await repository.create({
+        personal_id: p.id,
+        fecha: fechaHoy,
+        hora_ingreso: null,
+        hora_salida: null,
+        estado_presencia: esComision ? 'Comisión' : 'Permiso',
+        usuario_registro_id: usuarioSistemaId,
+        observacion: `Generado Automático: ${papeleta.codigo_papeleta}`
+      });
+      contadores.permisos++;
+      continue; // Terminamos con este usuario
+    }
+
+    // --- NIVEL 2: Verificar Configuración y Tolerancia ---
+    const config = await asistenciaConfigService.getConfigEfectiva(p.id);
+    const horaEntradaConfig = config?.hora_entrada || '08:00:00'; // Hora defecto si falla config
+    const minutosTolerancia = Number(config?.minutos_tolerancia_por_dia || 0); // Tolerancia diaria
+    
+    // Calcular minutos límite (Entrada + Tolerancia)
+    const minutosEntrada = timeToMinutes(horaEntradaConfig);
+    const minutosLimite = minutosEntrada + minutosTolerancia;
+
+    // --- NIVEL 3: Decisión de Ausencia ---
+    // Solo marcamos ausente si la hora actual YA SUPERÓ el límite
+    if (minutosActuales > minutosLimite) {
+      await repository.create({
+        personal_id: p.id,
+        fecha: fechaHoy,
+        hora_ingreso: null,
+        hora_salida: null,
+        estado_presencia: 'Ausente',
+        usuario_registro_id: usuarioSistemaId,
+        minutos_tardanza: 0 // La tardanza se calcula si llegan, la ausencia es estado
+      });
+      contadores.ausentes++;
+    } else {
+      // Aún está a tiempo de llegar, no hacemos nada
+      contadores.ignorados++;
+    }
+  }
+
+  return { fecha: fechaHoy, ...contadores };
+};
+
 module.exports = {
   getAllAsistencias,
   getAsistenciasHoy,
@@ -610,5 +694,7 @@ module.exports = {
   getMiAsistencia,
   justificarAsistencia,
   getJustificaciones,
-  evaluarJustificacion
+  evaluarJustificacion,
+  evaluarAsistenciasAutomaticas
 };
+
