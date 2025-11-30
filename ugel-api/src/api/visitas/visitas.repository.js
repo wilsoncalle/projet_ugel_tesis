@@ -215,7 +215,6 @@ const findActivas = async (options = {}) => {
       JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
       JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
       WHERE rv.fecha_salida IS NULL
-        AND DATE(rv.fecha_ingreso) = CURRENT_DATE
     `;
     
     // Agregar filtro de búsqueda si existe
@@ -242,7 +241,6 @@ const findActivas = async (options = {}) => {
       JOIN Visitantes v ON rv.visitante_id = v.id
       LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
       WHERE rv.fecha_salida IS NULL
-        AND DATE(rv.fecha_ingreso) = CURRENT_DATE
       ${search ? `AND (
         v.nombres ILIKE $1 OR 
         v.apellidos ILIKE $1 OR 
@@ -650,7 +648,6 @@ const findVisitaActivaPorVisitante = async (visitanteId) => {
       JOIN AreasDestino a ON rv.area_destino_id = a.id
       WHERE rv.visitante_id = $1 
         AND rv.fecha_salida IS NULL
-        AND DATE(rv.fecha_ingreso) = CURRENT_DATE
       ORDER BY rv.fecha_ingreso DESC
       LIMIT 1
     `;
