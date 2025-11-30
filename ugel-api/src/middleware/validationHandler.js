@@ -6,6 +6,7 @@
 const Joi = require("joi");
 const { AppError, asyncHandler } = require("./errorHandler");
 const config = require("../config");
+const { commonRules } = require('./joiCommonRules');
 
 /**
  * Middleware genérico para validación con Joi
@@ -100,7 +101,7 @@ const schemas = {
           "string.min": "El nombre de usuario debe tener al menos 3 caracteres",
           "string.max": "El nombre de usuario no puede exceder 100 caracteres",
         }),
-      email: Joi.string().email().max(150).required().messages({
+      email: commonRules.email.required().messages({
         "string.email": "Debe ser un email válido",
       }),
       contrasena: Joi.string()
@@ -141,7 +142,7 @@ const schemas = {
   usuarios: {
     create: Joi.object({
       nombreUsuario: Joi.string().alphanum().min(3).max(100).required(),
-      email: Joi.string().email().max(150).required(),
+      email: commonRules.email.required(),
       contrasena: Joi.string()
         .min(config.validation.minPasswordLength)
         .max(255)
@@ -153,7 +154,7 @@ const schemas = {
 
     update: Joi.object({
       nombreUsuario: Joi.string().alphanum().min(3).max(100).optional(),
-      email: Joi.string().email().max(150).optional(),
+      email: commonRules.email.optional(),
       contrasena: Joi.string()
         .min(config.validation.minPasswordLength)
         .max(255)
@@ -170,7 +171,7 @@ const schemas = {
         .messages({
           'string.pattern.name': 'El nombre de usuario no puede contener espacios'
         }),
-      email: Joi.string().email().max(150).required(),
+      email: commonRules.email.required(),
     }),
 
     updatePassword: Joi.object({
@@ -191,34 +192,24 @@ const schemas = {
       numeroDocumento: Joi.string()
         .when('tipoDocumento', {
           is: 'DNI',
-          then: Joi.string().pattern(/^\d{8}$/).required().messages({
+          then: commonRules.dni.required().messages({
             "string.pattern.base": "El DNI debe tener exactamente 8 dígitos"
           }),
           otherwise: Joi.string().pattern(/^\d+$/).min(8).max(20).required().messages({
             "string.pattern.base": "El número de documento solo puede contener números"
           })
         }),
-      nombres: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .required()
-        .messages({
-          "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
-      apellidos: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .required()
-        .messages({
-          "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
+      nombres: commonRules.nombrePersona.required().messages({
+        "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
+      apellidos: commonRules.nombrePersona.required().messages({
+        "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
       fechaNacimiento: Joi.date().iso().required().messages({
         "date.base": "La fecha de nacimiento debe ser una fecha válida",
         "any.required": "La fecha de nacimiento es requerida"
       }),
-      email: Joi.string().email().max(150).required().messages({
+      email: commonRules.email.required().messages({
         "string.email": "Debe ser un email válido",
         "any.required": "El email es requerido"
       }),
@@ -234,31 +225,21 @@ const schemas = {
       numeroDocumento: Joi.string()
         .when('tipoDocumento', {
           is: 'DNI',
-          then: Joi.string().pattern(/^\d{8}$/).optional().messages({
+          then: commonRules.dni.optional().messages({
             "string.pattern.base": "El DNI debe tener exactamente 8 dígitos"
           }),
           otherwise: Joi.string().pattern(/^\d+$/).min(8).max(20).optional().messages({
             "string.pattern.base": "El número de documento solo puede contener números"
           })
         }),
-      nombres: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .optional()
-        .messages({
-          "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
-      apellidos: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .optional()
-        .messages({
-          "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
+      nombres: commonRules.nombrePersona.optional().messages({
+        "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
+      apellidos: commonRules.nombrePersona.optional().messages({
+        "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
       fechaNacimiento: Joi.date().iso().optional(),
-      email: Joi.string().email().max(150).optional(),
+      email: commonRules.email.optional(),
       cargo: Joi.string().min(2).max(100).optional(),
       areaDestinoId: Joi.number().integer().positive().optional(),
       tipoContratoId: Joi.number().integer().positive().optional(),
@@ -278,22 +259,12 @@ const schemas = {
         .messages({
           "string.pattern.base": "El número de documento solo puede contener números"
         }),
-      nombres: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .required()
-        .messages({
-          "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
-      apellidos: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .required()
-        .messages({
-          "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
+      nombres: commonRules.nombrePersona.required().messages({
+        "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
+      apellidos: commonRules.nombrePersona.required().messages({
+        "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
     }),
 
     update: Joi.object({
@@ -306,32 +277,19 @@ const schemas = {
         .messages({
           "string.pattern.base": "El número de documento solo puede contener números"
         }),
-      nombres: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .optional()
-        .messages({
-          "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
-      apellidos: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .optional()
-        .messages({
-          "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
+      nombres: commonRules.nombrePersona.optional().messages({
+        "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
+      apellidos: commonRules.nombrePersona.optional().messages({
+        "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
     }).min(1),
 
     consultarDNI: Joi.object({
-      dni: Joi.string()
-        .pattern(/^\d{8}$/)
-        .required()
-        .messages({
-          "string.pattern.base": "El DNI debe tener exactamente 8 dígitos",
-          "any.required": "El DNI es requerido",
-        }),
+      dni: commonRules.dni.required().messages({
+        "string.pattern.base": "El DNI debe tener exactamente 8 dígitos",
+        "any.required": "El DNI es requerido",
+      }),
     }),
   },
 
@@ -350,20 +308,12 @@ const schemas = {
         .messages({
           "string.pattern.base": "El número de documento solo puede contener números"
         }),
-      nombres: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .messages({
-          "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
-      apellidos: Joi.string()
-        .pattern(/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/)
-        .min(2)
-        .max(150)
-        .messages({
-          "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
-        }),
+      nombres: commonRules.nombrePersona.messages({
+        "string.pattern.base": "Los nombres solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
+      apellidos: commonRules.nombrePersona.messages({
+        "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
+      }),
 
       // Datos de la visita
       areaDestinoId: Joi.number().integer().positive().required(),

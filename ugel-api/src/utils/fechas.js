@@ -1,91 +1,53 @@
-/**
- * Utilidades para manejo de fechas en zona horaria de Lima
- * Sistema Integral de Control de Acceso - UGEL Talara
- */
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+const isBetween = require('dayjs/plugin/isBetween');
 
-/**
- * Normaliza un input de fecha (ISO string, Date object, o YYYY-MM-DD) 
- * a formato YYYY-MM-DD en zona horaria de Lima (America/Lima, UTC-5)
- * 
- * @param {string|Date|null|undefined} input - Fecha a normalizar
- * @returns {string|null} - Fecha en formato YYYY-MM-DD o null si no hay input
- */
-function toLimaDateYYYYMMDD(input) {
-  if (!input) return null;
-  
-  // Si ya viene como YYYY-MM-DD (sin hora), devolverlo directo comprobando el regex
-  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
-    return input;
-  }
-  
-  // Si viene como ISO string o Date object, convertirlo
-  let date;
-  if (input instanceof Date) {
-    date = new Date(input);
-  } else if (typeof input === 'string') {
-    // Parsear el string
-    date = new Date(input);
-  } else {
-    return null;
-  }
-  
-  // Verificar que sea una fecha válida
-  if (isNaN(date.getTime())) {
-    return null;
-  }
-  
-  // Convertir a zona horaria de Lima (UTC-5)
-  // Lima está 5 horas detrás de UTC
-  // Para obtener la fecha en Lima, restamos 5 horas a la fecha UTC
-  const limaOffset = -5 * 60; // -5 horas en minutos
-  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
-  const limaTime = new Date(utcTime + (limaOffset * 60000));
-  
-  // Formatear a YYYY-MM-DD
-  const year = limaTime.getUTCFullYear();
-  const month = String(limaTime.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(limaTime.getUTCDate()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}`;
-}
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(isBetween);
 
-/**
- * Obtiene la fecha y hora actual en zona horaria de Lima (UTC-5)
- * @returns {Object} Objeto con fecha (YYYY-MM-DD) y hora (HH:MM:SS) en Lima
- */
+const LIMA_TZ = 'America/Lima';
+
 function nowLima() {
-  const ahora = new Date();
-  const limaOffset = -5 * 60; // -5 horas en minutos
-  const utcTime = ahora.getTime() + (ahora.getTimezoneOffset() * 60000);
-  const limaTime = new Date(utcTime + (limaOffset * 60000));
-  
-  const fecha = limaTime.toISOString().split('T')[0]; // YYYY-MM-DD
-  const hora = limaTime.toTimeString().split(' ')[0]; // HH:MM:SS
-  
-  return { fecha, hora, fechaHora: limaTime };
+  const now = dayjs().tz(LIMA_TZ);
+  return {
+    fecha: now.format('YYYY-MM-DD'),
+    hora: now.format('HH:mm:ss'),
+    fechaHora: now.toDate(),
+    dayjs: now
+  };
 }
 
-/**
- * Convierte una fecha/hora a formato de hora (HH:MM:SS) en zona horaria de Lima
- * @param {string|Date} fechaHora - Fecha/hora a convertir
- * @returns {string} Hora en formato HH:MM:SS en Lima
- */
-function toLimaTime(fechaHora) {
-  if (!fechaHora) return null;
-  
-  const date = fechaHora instanceof Date ? fechaHora : new Date(fechaHora);
-  if (isNaN(date.getTime())) return null;
-  
-  const limaOffset = -5 * 60; // -5 horas en minutos
-  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
-  const limaTime = new Date(utcTime + (limaOffset * 60000));
-  
-  return limaTime.toTimeString().split(' ')[0]; // HH:MM:SS
+function toLimaDayjs(dateInput) {
+  return dayjs(dateInput).tz(LIMA_TZ);
 }
 
-module.exports = { 
-  toLimaDateYYYYMMDD,
+function toLimaDateYYYYMMDD(dateInput) {
+  return toLimaDayjs(dateInput).format('YYYY-MM-DD');
+}
+
+function toLimaTime(dateInput) {
+  return toLimaDayjs(dateInput).format('HH:mm:ss');
+}
+
+function parseDateRangeInclusive(startDateStr, endDateStr) {
+  const start = dayjs.tz(startDateStr, LIMA_TZ).startOf('day');
+  const end = dayjs.tz(endDateStr, LIMA_TZ).endOf('day');
+  return { start, end };
+}
+
+function isDateBetweenInclusive(dateInput, start, end, unit = 'millisecond') {
+  return dayjs(dateInput).isBetween(start, end, unit, '[]');
+}
+
+module.exports = {
+  LIMA_TZ,
   nowLima,
-  toLimaTime
+  toLimaDayjs,
+  toLimaDateYYYYMMDD,
+  toLimaTime,
+  parseDateRangeInclusive,
+  isDateBetweenInclusive
 };
 

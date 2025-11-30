@@ -1,4 +1,10 @@
 const mongoose = require('mongoose');
+const {
+    parseDateRangeInclusive,
+    isDateBetweenInclusive,
+    toLimaDayjs,
+    toLimaDateYYYYMMDD
+} = require('../../utils/fechas');
 
 const MONGO_URI = "mongodb+srv://songer_db_user:jCIFFjqauOCgusyH@proyectopermisos.xyv7m4t.mongodb.net/test?retryWrites=true&w=majority&appName=ProyectoPermisos";
 
@@ -46,12 +52,12 @@ const calcularEstadoVirtual = (fechaInicio, fechaFin, estadoOriginal) => {
     if (estadoOriginal && estadoOriginal.toLowerCase() !== 'aprobado') {
         return estadoOriginal.toUpperCase(); 
     }
-    const ahora = new Date();
-    const inicio = new Date(fechaInicio);
-    const fin = new Date(fechaFin);
+    const ahora = toLimaDayjs();
+    const inicio = toLimaDayjs(fechaInicio);
+    const fin = toLimaDayjs(fechaFin);
 
-    if (ahora < inicio) return 'APROBADO';
-    if (ahora >= inicio && ahora <= fin) return 'EN_CURSO';
+    if (ahora.isBefore(inicio)) return 'APROBADO';
+    if (ahora.isBetween(inicio, fin, 'millisecond', '[]')) return 'EN_CURSO';
     return 'FINALIZADO';
 };
 
@@ -59,14 +65,13 @@ const calcularEstadoVirtual = (fechaInicio, fechaFin, estadoOriginal) => {
 const filtrarPorRangoFecha = (items, fechaInicio, fechaFin) => {
     if (!fechaInicio && !fechaFin) return items;
     
-    const start = fechaInicio ? new Date(fechaInicio) : new Date('2000-01-01');
-    const end = fechaFin ? new Date(fechaFin) : new Date('2100-01-01');
-    // Ajustar final del día para fechaFin
-    end.setHours(23, 59, 59, 999);
+    const startStr = fechaInicio || '2000-01-01';
+    const endStr = fechaFin || '2100-01-01';
+    const { start, end } = parseDateRangeInclusive(startStr, endStr);
 
     return items.filter(item => {
-        const itemDate = new Date(item.fechaInicio);
-        return itemDate >= start && itemDate <= end;
+        const itemDate = toLimaDayjs(item.fechaInicio);
+        return isDateBetweenInclusive(itemDate, start, end, 'day');
     });
 };
 
@@ -75,17 +80,16 @@ const filtrarPorRangoFecha = (items, fechaInicio, fechaFin) => {
 const filtrarPorSolapamiento = (items, fechaInicio, fechaFin) => {
     if (!fechaInicio && !fechaFin) return items;
     
-    const rangeStart = fechaInicio ? new Date(fechaInicio) : new Date('2000-01-01');
-    const rangeEnd = fechaFin ? new Date(fechaFin) : new Date('2100-01-01');
-    // Ajustar final del día para rangeEnd
-    rangeEnd.setHours(23, 59, 59, 999);
+    const startStr = fechaInicio || '2000-01-01';
+    const endStr = fechaFin || '2100-01-01';
+    const { start: rangeStart, end: rangeEnd } = parseDateRangeInclusive(startStr, endStr);
 
     return items.filter(item => {
-        const itemStart = new Date(item.fechaInicio);
-        const itemEnd = new Date(item.fechaFin);
+        const itemStart = toLimaDayjs(item.fechaInicio);
+        const itemEnd = toLimaDayjs(item.fechaFin);
         
-        // Lógica de solapamiento: (StartA <= EndB) y (EndA >= StartB)
-        return itemStart <= rangeEnd && itemEnd >= rangeStart;
+        // Solapamiento inclusivo: StartA <= EndB && EndA >= StartB
+        return !itemStart.isAfter(rangeEnd) && !itemEnd.isBefore(rangeStart);
     });
 };
 
@@ -183,14 +187,14 @@ const getEstadisticasEstadoExternas = async ({ fechaInicio, fechaFin }) => {
     // 2. Flujo diario (para el gráfico de líneas)
     const diasCount = {};
     filtered.forEach(s => {
-        const dia = new Date(s.fechaInicio).toISOString().split('T')[0]; // YYYY-MM-DD
+        const dia = toLimaDateYYYYMMDD(s.fechaInicio);
         diasCount[dia] = (diasCount[dia] || 0) + 1;
     });
 
     const flujo_diario = Object.keys(diasCount).map(dia => ({
         dia: dia,
         total: diasCount[dia]
-    })).sort((a, b) => new Date(a.dia) - new Date(b.dia));
+    })).sort((a, b) => toLimaDayjs(a.dia).valueOf() - toLimaDayjs(b.dia).valueOf());
 
     const total = filtered.length;
 
@@ -284,7 +288,7 @@ const getPapeletasAprobadasExternas = async ({ fechaInicio, fechaFin } = {}) => 
         estado: sol.estadoVirtual
     })).sort((a, b) => {
         const peso = { 'EN_CURSO': 1, 'APROBADO': 2, 'FINALIZADO': 3 };
-        return (peso[a.estado] - peso[b.estado]) || (new Date(b.fecha_hora_salida_programada) - new Date(a.fecha_hora_salida_programada));
+        return (peso[a.estado] - peso[b.estado]) || (toLimaDayjs(b.fecha_hora_salida_programada).valueOf() - toLimaDayjs(a.fecha_hora_salida_programada).valueOf());
     });
 };
 

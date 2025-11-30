@@ -13,6 +13,33 @@ const logger = require('../../utils/logger');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit-table');
 const { getTheme } = require('../../config/exportStyles');
+const { toLimaDayjs, nowLima } = require('../../utils/fechas');
+
+const getPeriodoRangoLima = (periodo = 'todo') => {
+  const ahora = toLimaDayjs();
+
+  switch (periodo) {
+    case 'hoy': {
+      const start = ahora.startOf('day');
+      return { fechaInicio: start.toDate(), fechaFin: start.endOf('day').toDate() };
+    }
+    case 'semana': {
+      const start = ahora.startOf('week').startOf('day');
+      return { fechaInicio: start.toDate(), fechaFin: start.endOf('week').endOf('day').toDate() };
+    }
+    case 'mes': {
+      const start = ahora.startOf('month');
+      return { fechaInicio: start.toDate(), fechaFin: start.endOf('month').toDate() };
+    }
+    case 'anio': {
+      const start = ahora.startOf('year');
+      return { fechaInicio: start.toDate(), fechaFin: start.endOf('year').toDate() };
+    }
+    case 'todo':
+    default:
+      return { fechaInicio: null, fechaFin: null };
+  }
+};
 
 /**
  * Obtener todas las visitas con paginación y filtros
@@ -200,23 +227,26 @@ const createVisita = async (visitaData) => {
     
     // Verificar si el visitante ya tiene una visita activa (sin salida) en la misma área
     const visitaActiva = await repository.findVisitaActivaPorVisitante(visitante.id);
-if (visitaActiva) {
-  throw new AppError(
-    `El visitante ya tiene una visita activa en el área "${visitaActiva.nombre_area}" desde ${new Date(visitaActiva.fecha_ingreso).toLocaleString()}. Debe registrar su salida antes de una nueva entrada.`, 
-    409
-  );
-}
+    if (visitaActiva) {
+      const fechaIngresoActiva = toLimaDayjs(visitaActiva.fecha_ingreso).format('YYYY-MM-DD HH:mm:ss');
+      throw new AppError(
+        `El visitante ya tiene una visita activa en el área "${visitaActiva.nombre_area}" desde ${fechaIngresoActiva}. Debe registrar su salida antes de una nueva entrada.`,
+        409
+      );
+    }
     
     // Construir fecha de ingreso (usar fecha/hora originales si están disponibles)
     let fechaIngresoFinal;
     if (fechaIngreso && horaIngreso) {
-      // Combinar fecha y hora originales del evento offline
-      fechaIngresoFinal = new Date(`${fechaIngreso}T${horaIngreso}:00`);
-      logger.info(`Usando fecha/hora originales: ${fechaIngreso} ${horaIngreso} -> ${fechaIngresoFinal.toISOString()}`);
+      // Combinar fecha y hora originales del evento offline en zona Lima
+      const fechaHora = toLimaDayjs(`${fechaIngreso}T${horaIngreso}`);
+      fechaIngresoFinal = fechaHora.toDate();
+      logger.info(`Usando fecha/hora originales: ${fechaIngreso} ${horaIngreso} -> ${fechaHora.toISOString()}`);
     } else {
-      // Usar fecha/hora actual (comportamiento normal)
-      fechaIngresoFinal = new Date();
-      logger.info(`Usando fecha/hora actual: ${fechaIngresoFinal.toISOString()}`);
+      // Usar fecha/hora actual (comportamiento normal) en Lima
+      const ahora = toLimaDayjs();
+      fechaIngresoFinal = ahora.toDate();
+      logger.info(`Usando fecha/hora actual: ${ahora.toISOString()}`);
     }
 
     // Crear la visita
@@ -366,7 +396,7 @@ const exportarAExcel = async (filtros = {}, themeName = 'corporate') => {
     // Crear el libro de Excel
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Sistema de Control de Acceso UGEL';
-    workbook.created = new Date();
+    workbook.created = nowLima().fechaHora;
     
     const worksheet = workbook.addWorksheet('Historial de Visitas');
     
@@ -420,8 +450,8 @@ const exportarAExcel = async (filtros = {}, themeName = 'corporate') => {
         cargo: visita.personal_cargo || 'N/A',
         motivo: visita.nombre_motivo,
         lugar: visita.nombre_area,
-        fechaIngreso: visita.fecha_ingreso ? new Date(visita.fecha_ingreso).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : 'N/A',
-        fechaSalida: visita.fecha_salida ? new Date(visita.fecha_salida).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : 'Aún dentro',
+        fechaIngreso: visita.fecha_ingreso ? toLimaDayjs(visita.fecha_ingreso).format('YYYY-MM-DD HH:mm:ss') : 'N/A',
+        fechaSalida: visita.fecha_salida ? toLimaDayjs(visita.fecha_salida).format('YYYY-MM-DD HH:mm:ss') : 'Aún dentro',
         usuarioRegistro: visita.usuario_ingreso || 'N/A'
       });
       
@@ -464,7 +494,7 @@ const exportarAExcel = async (filtros = {}, themeName = 'corporate') => {
     footerRow.getCell(1).font = { bold: true, size: 10 };
     
     const dateRow = worksheet.getRow(footerRowNum + 1);
-    dateRow.getCell(1).value = `Generado el: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}`;
+    dateRow.getCell(1).value = `Generado el: ${toLimaDayjs().format('YYYY-MM-DD HH:mm:ss')}`;
     dateRow.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF6B7280' } };
     
     // Generar el buffer
@@ -543,7 +573,7 @@ const exportarAPDF = async (filtros = {}) => {
           // Información de filtros
           doc.fontSize(9)
              .fillColor('#6B7280')
-             .text(`Generado: ${new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' })}`, doc.page.margins.left, 85, { align: 'left' });
+             .text(`Generado: ${toLimaDayjs().format('YYYY-MM-DD HH:mm:ss')}`, doc.page.margins.left, 85, { align: 'left' });
           
           if (filtros.fechaInicio || filtros.fechaFin) {
             let rangoText = 'Rango de fechas: ';
@@ -585,25 +615,11 @@ const exportarAPDF = async (filtros = {}) => {
             (visita.personal_cargo || 'N/A').substring(0, 25),
             (visita.nombre_motivo || 'N/A').substring(0, 22),
             (visita.nombre_area || 'N/A').substring(0, 22),
-            visita.fecha_ingreso 
-              ? new Date(visita.fecha_ingreso).toLocaleString('es-PE', { 
-                  timeZone: 'America/Lima',
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
+            visita.fecha_ingreso
+              ? toLimaDayjs(visita.fecha_ingreso).format('DD/MM/YY HH:mm')
               : 'N/A',
-            visita.fecha_salida 
-              ? new Date(visita.fecha_salida).toLocaleString('es-PE', { 
-                  timeZone: 'America/Lima',
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
+            visita.fecha_salida
+              ? toLimaDayjs(visita.fecha_salida).format('DD/MM/YY HH:mm')
               : 'Dentro',
             (visita.usuario_ingreso || 'N/A').substring(0, 18)
           ])
@@ -700,38 +716,7 @@ const getVisitasPorArea = async (periodo = 'todo') => {
   try {
     logger.info(`Obteniendo estadísticas por área para periodo: ${periodo}`);
     
-    // Calcular fechas según el periodo
-    let fechaInicio, fechaFin;
-    const ahora = new Date();
-    
-    switch (periodo) {
-      case 'hoy':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'semana':
-        const inicioSemana = new Date(ahora);
-        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
-        inicioSemana.setHours(0, 0, 0, 0);
-        fechaInicio = inicioSemana;
-        fechaFin = new Date(inicioSemana);
-        fechaFin.setDate(inicioSemana.getDate() + 6);
-        fechaFin.setHours(23, 59, 59);
-        break;
-      case 'mes':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'anio':
-        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'todo':
-      default:
-        fechaInicio = null;
-        fechaFin = null;
-        break;
-    }
+    const { fechaInicio, fechaFin } = getPeriodoRangoLima(periodo);
     
     // Obtener estadísticas del repositorio
     const estadisticas = await repository.getVisitasPorArea(fechaInicio, fechaFin);
@@ -750,38 +735,7 @@ const getVisitasPorMotivo = async (periodo = 'todo') => {
   try {
     logger.info(`Obteniendo estadísticas por motivo para periodo: ${periodo}`);
     
-    // Calcular fechas según el periodo
-    let fechaInicio, fechaFin;
-    const ahora = new Date();
-    
-    switch (periodo) {
-      case 'hoy':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'semana':
-        const inicioSemana = new Date(ahora);
-        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
-        inicioSemana.setHours(0, 0, 0, 0);
-        fechaInicio = inicioSemana;
-        fechaFin = new Date(inicioSemana);
-        fechaFin.setDate(inicioSemana.getDate() + 6);
-        fechaFin.setHours(23, 59, 59);
-        break;
-      case 'mes':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'anio':
-        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'todo':
-      default:
-        fechaInicio = null;
-        fechaFin = null;
-        break;
-    }
+    const { fechaInicio, fechaFin } = getPeriodoRangoLima(periodo);
     
     // Obtener estadísticas del repositorio
     const estadisticas = await repository.getVisitasPorMotivo(fechaInicio, fechaFin);
@@ -805,38 +759,7 @@ const getVisitasTotales = async (periodo = 'mes') => {
   try {
     logger.info(`Obteniendo estadísticas totales para periodo: ${periodo}`);
     
-    // Calcular fechas según el periodo
-    let fechaInicio, fechaFin;
-    const ahora = new Date();
-    
-    switch (periodo) {
-      case 'hoy':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'semana':
-        const inicioSemana = new Date(ahora);
-        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
-        inicioSemana.setHours(0, 0, 0, 0);
-        fechaInicio = inicioSemana;
-        fechaFin = new Date(inicioSemana);
-        fechaFin.setDate(inicioSemana.getDate() + 6);
-        fechaFin.setHours(23, 59, 59);
-        break;
-      case 'mes':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'anio':
-        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'todo':
-      default:
-        fechaInicio = null;
-        fechaFin = null;
-        break;
-    }
+    const { fechaInicio, fechaFin } = getPeriodoRangoLima(periodo);
     
     // Obtener total de visitas y flujo diario del repositorio
     const [totalVisitas, flujoDiario] = await Promise.all([
@@ -866,38 +789,7 @@ const getVisitasPorPersonal = async (periodo = 'mes') => {
   try {
     logger.info(`Obteniendo estadísticas por personal para periodo: ${periodo}`);
     
-    // Calcular fechas según el periodo
-    let fechaInicio, fechaFin;
-    const ahora = new Date();
-    
-    switch (periodo) {
-      case 'hoy':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'semana':
-        const inicioSemana = new Date(ahora);
-        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
-        inicioSemana.setHours(0, 0, 0, 0);
-        fechaInicio = inicioSemana;
-        fechaFin = new Date(inicioSemana);
-        fechaFin.setDate(inicioSemana.getDate() + 6);
-        fechaFin.setHours(23, 59, 59);
-        break;
-      case 'mes':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'anio':
-        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'todo':
-      default:
-        fechaInicio = null;
-        fechaFin = null;
-        break;
-    }
+    const { fechaInicio, fechaFin } = getPeriodoRangoLima(periodo);
     
     // Obtener estadísticas del repositorio
     const estadisticas = await repository.getVisitasPorPersonal(fechaInicio, fechaFin);
@@ -921,38 +813,7 @@ const getVisitantesFrecuentes = async (periodo = 'mes') => {
   try {
     logger.info(`Obteniendo visitantes frecuentes para periodo: ${periodo}`);
     
-    // Calcular fechas según el periodo
-    let fechaInicio, fechaFin;
-    const ahora = new Date();
-    
-    switch (periodo) {
-      case 'hoy':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'semana':
-        const inicioSemana = new Date(ahora);
-        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
-        inicioSemana.setHours(0, 0, 0, 0);
-        fechaInicio = inicioSemana;
-        fechaFin = new Date(inicioSemana);
-        fechaFin.setDate(inicioSemana.getDate() + 6);
-        fechaFin.setHours(23, 59, 59);
-        break;
-      case 'mes':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'anio':
-        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'todo':
-      default:
-        fechaInicio = null;
-        fechaFin = null;
-        break;
-    }
+    const { fechaInicio, fechaFin } = getPeriodoRangoLima(periodo);
     
     // Obtener visitantes frecuentes del repositorio
     const visitantes = await repository.getVisitantesFrecuentes(fechaInicio, fechaFin);
@@ -977,38 +838,7 @@ const getVisitanteDetalle = async (visitanteId, periodo = 'mes') => {
   try {
     logger.info(`Obteniendo detalle del visitante ${visitanteId} para periodo: ${periodo}`);
     
-    // Calcular fechas según el periodo
-    let fechaInicio, fechaFin;
-    const ahora = new Date();
-    
-    switch (periodo) {
-      case 'hoy':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'semana':
-        const inicioSemana = new Date(ahora);
-        inicioSemana.setDate(ahora.getDate() - ahora.getDay());
-        inicioSemana.setHours(0, 0, 0, 0);
-        fechaInicio = inicioSemana;
-        fechaFin = new Date(inicioSemana);
-        fechaFin.setDate(inicioSemana.getDate() + 6);
-        fechaFin.setHours(23, 59, 59);
-        break;
-      case 'mes':
-        fechaInicio = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'anio':
-        fechaInicio = new Date(ahora.getFullYear(), 0, 1);
-        fechaFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59);
-        break;
-      case 'todo':
-      default:
-        fechaInicio = null;
-        fechaFin = null;
-        break;
-    }
+    const { fechaInicio, fechaFin } = getPeriodoRangoLima(periodo);
     
     // Obtener detalle del visitante
     const detalle = await repository.getVisitanteDetalle(visitanteId, fechaInicio, fechaFin);
