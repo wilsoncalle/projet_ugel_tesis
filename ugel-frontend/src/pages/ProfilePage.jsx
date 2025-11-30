@@ -17,7 +17,9 @@ import {
   ArrowLeftIcon,
   CheckCircleIcon,
   XCircleIcon,
+  BellAlertIcon,
 } from '@heroicons/react/24/outline';
+import { pedirPermisoNotificaciones } from '../utils/notificationUtils';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const ProfilePage = () => {
@@ -54,6 +56,52 @@ const ProfilePage = () => {
   // Validaciones
   const [errors, setErrors] = useState({});
   const [passwordErrors, setPasswordErrors] = useState({});
+
+  // Estado de permisos de notificación (Navegador)
+  const [notificationPermission, setNotificationPermission] = useState(
+    ("Notification" in window) ? Notification.permission : 'default'
+  );
+
+  // Estado de preferencia del usuario (Local)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    // Si ya tiene permiso concedido, verificamos la preferencia guardada
+    // Si no hay preferencia guardada pero hay permiso, asumimos true (para usuarios existentes)
+    if (("Notification" in window) && Notification.permission === 'granted') {
+      return localStorage.getItem('notifications_enabled') !== 'false';
+    }
+    return false;
+  });
+
+  const handleToggleNotifications = async () => {
+    // Si no tenemos permiso, lo pedimos
+    if (notificationPermission !== 'granted') {
+      const permission = await pedirPermisoNotificaciones();
+      setNotificationPermission(permission);
+      
+      if (permission === 'granted') {
+        setNotificationsEnabled(true);
+        localStorage.setItem('notifications_enabled', 'true');
+        setSuccessMessage('¡Notificaciones activadas correctamente!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else if (permission === 'denied') {
+        setErrorMessage('Permiso de notificaciones denegado. Revisa la configuración del navegador.');
+      }
+    } else {
+      // Si ya tenemos permiso, solo alternamos el estado local
+      const newState = !notificationsEnabled;
+      setNotificationsEnabled(newState);
+      localStorage.setItem('notifications_enabled', String(newState));
+      
+      if (newState) {
+        setSuccessMessage('Notificaciones activadas.');
+        // Enviar una de prueba para confirmar
+        // enviarNotificacionSistema('Notificaciones Activadas', 'Ahora recibirás alertas del sistema.');
+      } else {
+        // setSuccessMessage('Notificaciones desactivadas.');
+      }
+      setTimeout(() => setSuccessMessage(''), 3000);
+    }
+  };
 
   // Handlers para formulario de datos personales
   const handleInputChange = (e) => {
@@ -224,13 +272,12 @@ const ProfilePage = () => {
             </h1>
           </div>
 
-          <Button
-            variant="outline"
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center justify-center"
-          >
-            <ArrowLeftIcon className="h-4 w-4 mr-2" />
-            Volver al Dashboard
+          <Button variant="outline" onClick={() => navigate(-1)} className="">
+            {/* Creamos un contenedor interno que fuerce la fila */}
+            <div className="flex items-center justify-center">
+              <ArrowLeftIcon className="h-4 w-4 mr-2" />
+              <span>Volver al Dashboard</span>
+            </div>
           </Button>
         </div>
 
@@ -325,6 +372,47 @@ const ProfilePage = () => {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Toggle de Notificaciones estilo iOS */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BellAlertIcon className={`h-5 w-5 ${notificationsEnabled ? 'text-blue-600' : 'text-gray-400'}`} />
+                      <span className="text-sm font-medium text-gray-700">Notificaciones de Escritorio</span>
+                    </div>
+                    
+                    {/* Switch iOS */}
+                    <button 
+                      onClick={handleToggleNotifications}
+                      // Solo deshabilitar si está explícitamente denegado por el navegador
+                      disabled={notificationPermission === 'denied'}
+                      className={`
+                        relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                        ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-200'}
+                        ${notificationPermission === 'denied' ? 'opacity-50 cursor-not-allowed' : ''}
+                      `}
+                      role="switch"
+                      aria-checked={notificationsEnabled}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`
+                          pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+                          ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}
+                        `}
+                      />
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-3">
+                    {notificationsEnabled 
+                      ? 'Las notificaciones están activas. Recibirás alertas de visitas y justificaciones.'
+                      : notificationPermission === 'denied'
+                        ? 'Has bloqueado las notificaciones. Debes habilitarlas manualmente en la configuración del navegador.'
+                        : 'Activa las notificaciones para recibir alertas en tiempo real.'
+                    }
+                  </p>
                 </div>
               </div>
             </Card>

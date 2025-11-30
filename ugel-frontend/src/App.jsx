@@ -50,8 +50,13 @@ import GestionJustificacionesPage from './pages/GestionJustificacionesPage';
 // Routes Configuration
 import ProtectedRoute from './routes/ProtectedRoute';
 
+import { useSystemNotifications } from './hooks/useSystemNotifications';
+
 function App() {
   const { isAuthenticated, checkAuth } = useAuth();
+  
+  // Activar notificaciones del sistema
+  useSystemNotifications();
 
   useEffect(() => {
     checkAuth();

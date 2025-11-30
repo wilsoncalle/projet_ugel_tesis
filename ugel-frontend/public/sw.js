@@ -1,7 +1,7 @@
 // Service Worker Mejorado con Background Sync
 // Sistema Integral de Control de Acceso - UGEL Talara
 
-const CACHE_NAME = 'ugel-access-cache-v2';
+const CACHE_NAME = 'ugel-access-cache-v3';
 const OFFLINE_URL = '/offline.html';
 // Usar ruta relativa para que funcione con el proxy en dev y producción
 const API_BASE_URL = '/api';
@@ -270,3 +270,38 @@ function openDatabase() {
 }
 
 console.log('[Service Worker] Script cargado');
+
+// ========== NOTIFICACIONES DEL SISTEMA ==========
+
+// 1. Escuchar peticiones desde la aplicación (Frontend)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    // Esta función invoca la notificación nativa de Windows/Android
+    self.registration.showNotification(event.data.title, {
+      ...event.data.options,
+      data: event.data.options.data || {} // Asegurar que data existe
+    });
+  }
+});
+
+// 2. Manejar clics en la notificación (Cuando el usuario la pulsa en Windows)
+self.addEventListener('notificationclick', (event) => {
+  console.log('[Service Worker] Click en notificación');
+  event.notification.close();
+
+  // Intentar abrir o enfocar la ventana de la app
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Si ya hay una ventana abierta, enfocarla
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Si no, abrir una nueva (opcional, ajusta la URL si es necesario)
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
+    })
+  );
+});

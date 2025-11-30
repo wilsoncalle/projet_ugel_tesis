@@ -7,8 +7,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw.js',
       devOptions: {
-        enabled: false,
+        enabled: true,
+        type: 'module',
       },
       registerType: 'autoUpdate',
       includeAssets: [
@@ -17,70 +21,34 @@ export default defineConfig({
         'img/apple-icon-180.png'  
       ],
       manifest: {
-      name: 'Control de Acceso UGEL',
-      short_name: 'COAC UGEL',
-      description: 'Sistema de control de acceso de personal y visitas para UGEL Talara',
-      theme_color: '#ffffff',
-      icons: [
-        {
-          src: 'img/manifest-icon-192.maskable.png',
-          sizes: '192x192',
-          type: 'image/png',
-          purpose: 'any'
-        },
-        {
-          src: 'img/manifest-icon-192.maskable.png',
-          sizes: '192x192',
-          type: 'image/png',
-          purpose: 'maskable'
-        },
-        {
-          src: 'img/manifest-icon-512.maskable.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'any'
-        },
-        {
-          src: 'img/manifest-icon-512.maskable.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'maskable'
-        }
-      ]
-    },
-      workbox: {
-        runtimeCaching: [
+        name: 'Control de Acceso UGEL',
+        short_name: 'COAC UGEL',
+        description: 'Sistema de control de acceso de personal y visitas para UGEL Talara',
+        theme_color: '#ffffff',
+        icons: [
           {
-            urlPattern: /^\/api\/.*/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 7 
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
+            src: 'img/manifest-icon-192.maskable.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
           },
           {
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'images',
-              expiration: {
-                maxEntries: 60,
-                maxAgeSeconds: 30 * 24 * 60 * 60 
-              }
-            }
+            src: 'img/manifest-icon-192.maskable.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
           },
           {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com/,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'google-fonts-stylesheets'
-            }
+            src: 'img/manifest-icon-512.maskable.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'img/manifest-icon-512.maskable.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       }
@@ -96,6 +64,11 @@ export default defineConfig({
       '/uploads': {
         target: 'http://localhost:3000',
         changeOrigin: true
+      },
+      '/socket.io': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true
       }
     }
   },
