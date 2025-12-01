@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { useCalendarMatrix } from '../hooks/useCalendarMatrix';
 
 // === Helpers de fecha ===
 const parseDate = (dateString) => {
@@ -149,33 +150,7 @@ const CalendarComponent = ({
     }
   };
 
-  const generateCalendarMatrix = (month, year) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-
-    const start = new Date(firstDay);
-    const offset = (start.getDay() + 6) % 7;
-    start.setDate(start.getDate() - offset);
-
-    const end = new Date(lastDay);
-    const endOffset = (7 - ((end.getDay() + 6) % 7) - 1 + 7) % 7;
-    end.setDate(end.getDate() + endOffset);
-
-    const days = [];
-    const cur = new Date(start);
-    while (cur <= end) {
-      days.push(new Date(cur));
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    const weeks = [];
-    for (let i = 0; i < days.length; i += 7) {
-      weeks.push(days.slice(i, i + 7));
-    }
-    return weeks;
-  };
-
-  const weeks = generateCalendarMatrix(calendarMonth, calendarYear);
+  const weeks = useCalendarMatrix(calendarMonth, calendarYear, 1);
 
   const isSameDay = (a, b) =>
     a &&

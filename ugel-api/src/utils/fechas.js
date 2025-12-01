@@ -24,6 +24,7 @@ function toLimaDayjs(dateInput) {
 }
 
 function toLimaDateYYYYMMDD(dateInput) {
+  if (!dateInput) return null;
   return toLimaDayjs(dateInput).format('YYYY-MM-DD');
 }
 

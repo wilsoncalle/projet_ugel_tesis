@@ -384,6 +384,7 @@ const VigilantePapeletasPage = () => {
                         onChange={handleChangeYear}
                         isSearchable={false}
                         placeholder="Año"
+                        minMenuWidth="128px"
                       />
                     </div>
                     <div className="w-32">
@@ -395,6 +396,7 @@ const VigilantePapeletasPage = () => {
                         onChange={handleChangeMonth}
                         isSearchable={false}
                         placeholder="Mes"
+                        minMenuWidth="128px"
                       />
                     </div>
                   </div>

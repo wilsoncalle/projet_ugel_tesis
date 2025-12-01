@@ -3,6 +3,7 @@ import { format, parse, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { Popover, Transition, Listbox } from '@headlessui/react';
+import { useCalendarMatrix } from '../hooks/useCalendarMatrix';
 
 const DateRangeFilter = ({ 
   fechaDesde, 
@@ -251,35 +252,6 @@ const DateRangeFilter = ({
     return date > today;
   };
 
-  // ==== Calendario con semanas (lunes-domingo) ====
-  const generateCalendarWeeks = (month, year) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay  = new Date(year, month + 1, 0);
-
-    const start = new Date(firstDay);
-    const dow = firstDay.getDay(); // 0=Dom … 1=Lun
-    const toSubtract = dow === 0 ? 6 : dow - 1;
-    start.setDate(start.getDate() - toSubtract);
-
-    const end = new Date(lastDay);
-    const dowEnd = lastDay.getDay();
-    const toAdd = dowEnd === 0 ? 0 : 7 - dowEnd;
-    end.setDate(end.getDate() + toAdd);
-
-    const days = [];
-    const cur = new Date(start);
-    while (cur <= end) {
-      days.push(new Date(cur));
-      cur.setDate(cur.getDate() + 1);
-    }
-
-    const weeks = [];
-    for (let i = 0; i < days.length; i += 7) {
-      weeks.push(days.slice(i, i + 7));
-    }
-    return weeks; // 5-6 filas
-  };
-
   const generateYearOptions = () => {
     const currentYear = new Date().getFullYear();
     const years = [];
@@ -316,7 +288,7 @@ const DateRangeFilter = ({
     calendarMonth, setCalendarMonth, 
     calendarYear, setCalendarYear,
   }) => {
-    const weeks = generateCalendarWeeks(calendarMonth, calendarYear);
+    const weeks = useCalendarMatrix(calendarMonth, calendarYear, 1);
     const selectedDateObj = selectedDate ? parseDate(selectedDate) : null;
     const today = getTodayDate();
 

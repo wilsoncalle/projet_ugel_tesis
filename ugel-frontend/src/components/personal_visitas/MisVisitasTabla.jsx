@@ -772,6 +772,7 @@ const MisVisitasTabla = ({
                         onChange={filters.onYearChange}
                         isSearchable={false}
                         placeholder="Año"
+                        minMenuWidth="128px"
                       />
                     </div>
                     <div className="w-32">
@@ -783,6 +784,7 @@ const MisVisitasTabla = ({
                         onChange={filters.onMonthChange}
                         isSearchable={false}
                         placeholder="Mes"
+                        minMenuWidth="128px"
                       />
                     </div>
                   </div>

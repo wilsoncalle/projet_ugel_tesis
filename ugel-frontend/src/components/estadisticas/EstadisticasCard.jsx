@@ -90,6 +90,7 @@ const EstadisticasCard = ({
                 options={opcionesPeriodo}
                 placeholder="Período"
                 isClearable={false}
+                minMenuWidth="192px"
               />
             </div>
           </div>

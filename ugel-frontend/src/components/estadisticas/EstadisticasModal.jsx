@@ -259,6 +259,7 @@ const EstadisticasModal = ({
                 options={opcionesPeriodo}
                 placeholder="Seleccionar período"
                 isClearable={false}
+                minMenuWidth="192px"
               />
             </div>
             <button

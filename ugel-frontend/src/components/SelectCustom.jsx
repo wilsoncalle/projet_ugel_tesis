@@ -23,6 +23,7 @@ const SelectCustom = ({
   required = false,
   noOptionsMessage = 'No se encontraron resultados',
   menuWidth = 'auto',
+  minMenuWidth = '250px',
   isSearchable = true,
   hideLabel,
   ...props
@@ -30,7 +31,7 @@ const SelectCustom = ({
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [calculatedMenuWidth, setCalculatedMenuWidth] = useState('250px');
+  const [calculatedMenuWidth, setCalculatedMenuWidth] = useState(minMenuWidth);
   const [menuPosition, setMenuPosition] = useState({
     openUpwards: false,
     alignRight: false,
@@ -55,7 +56,7 @@ const SelectCustom = ({
   const calculatePositionAndWidth = useCallback(() => {
     if (!containerRef.current) {
       return {
-        width: '250px',
+        width: minMenuWidth,
         openUpwards: false,
         alignRight: false,
         rect: null,
@@ -71,13 +72,14 @@ const SelectCustom = ({
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       ctx.font = '14px system-ui, -apple-system, sans-serif';
-      let maxText = 250;
+      let maxText = parseInt(minMenuWidth, 10) || 0;
       options.forEach((opt) => {
         if (opt.label) {
           maxText = Math.max(maxText, ctx.measureText(opt.label).width + 40);
         }
       });
-      width = `${Math.max(rect.width, maxText, 250)}px`;
+      const minW = parseInt(minMenuWidth, 10) || 0;
+      width = `${Math.max(rect.width, maxText, minW)}px`;
     }
 
     const menuHeightGuess = Math.max(menuHeight, 240);
@@ -90,7 +92,7 @@ const SelectCustom = ({
     const alignRight = spaceRight < menuW && rect.right > menuW;
 
     return { width, openUpwards, alignRight, rect };
-  }, [options, menuWidth, menuHeight]);
+  }, [options, menuWidth, menuHeight, minMenuWidth]);
 
   const scrollToOption = useCallback((index) => {
     if (optionRefs.current[index]) {
@@ -424,7 +426,7 @@ const SelectCustom = ({
               top: `${menuTop}px`,
               left: `${menuLeft}px`,
               width: calculatedMenuWidth,
-              minWidth: '250px',
+              minWidth: minMenuWidth,
               maxWidth: '450px',
               pointerEvents: 'auto',
             }}

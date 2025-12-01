@@ -4,6 +4,7 @@ import { Popover, Transition, Listbox } from '@headlessui/react';
 import { format, parse, isValid, setHours, setMinutes, setDate } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { useCalendarMatrix } from '../hooks/useCalendarMatrix';
 
 const DatePicker = ({
   value, // ahora espera 'yyyy-MM-dd HH:mm'
@@ -139,26 +140,7 @@ const DatePicker = ({
   const BLOCK_MINUTES = 60;
 
   // ===== Lógica del Calendario =====
-  const weeks = useMemo(() => {
-    const firstDay = new Date(calYear, calMonth, 1);
-    const lastDay = new Date(calYear, calMonth + 1, 0);
-    const start = new Date(firstDay);
-    const dow = firstDay.getDay();
-    start.setDate(start.getDate() - (dow === 0 ? 6 : dow - 1));
-    const end = new Date(lastDay);
-    const dowE = lastDay.getDay();
-    end.setDate(end.getDate() + (dowE === 0 ? 0 : 7 - dowE));
-
-    const days = [];
-    let cur = new Date(start);
-    while (cur <= end) {
-      days.push(new Date(cur));
-      cur.setDate(cur.getDate() + 1);
-    }
-    const weeksArr = [];
-    for (let i = 0; i < days.length; i += 7) weeksArr.push(days.slice(i, i + 7));
-    return weeksArr;
-  }, [calMonth, calYear]);
+  const weeks = useCalendarMatrix(calMonth, calYear, 1);
 
   const navigateMonth = (dir) => {
     const newDate = new Date(calYear, calMonth, 1);
