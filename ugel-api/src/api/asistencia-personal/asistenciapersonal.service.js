@@ -471,7 +471,70 @@ const sincronizarPapeletas = async (fechaInicio, fechaFin, usuarioId = config.sy
 const getEstadisticas = async (opt) => await repository.getEstadisticas(opt.fechaInicio, opt.fechaFin);
 const getEstadisticasTotales = async (opt) => await repository.getEstadisticasTotales(opt.fechaInicio, opt.fechaFin);
 const getEstadisticasPuntualidad = async (opt) => await repository.getEstadisticasPuntualidad(opt.fechaInicio, opt.fechaFin);
-const getEstadisticasAusencias = async (opt) => await repository.getEstadisticasAusencias(opt.fechaInicio, opt.fechaFin);
+const getEstadisticasAusencias = async (opt) => {
+  try {
+    // 1. Obtener estadísticas locales (Postgres)
+    const statsLocal = await repository.getEstadisticasAusencias(opt.fechaInicio, opt.fechaFin);
+    
+    // 2. Obtener estadísticas externas (Mongo)
+    const statsMotivosMongo = await mongoService.getEstadisticasMotivosExternas({ fechaInicio: opt.fechaInicio, fechaFin: opt.fechaFin });
+    const statsHorasMongo = await mongoService.getEstadisticasHorasExternas({ fechaInicio: opt.fechaInicio, fechaFin: opt.fechaFin });
+
+    // 3. Combinar Motivos (tipo_ausencia)
+    const motivosMap = {};
+    
+    // Agregar locales
+    if (statsLocal.por_tipo) {
+      statsLocal.por_tipo.forEach(item => {
+        motivosMap[item.tipo_ausencia] = (motivosMap[item.tipo_ausencia] || 0) + parseInt(item.total);
+      });
+    }
+    
+    // Agregar externos
+    if (statsMotivosMongo.por_motivo) {
+      statsMotivosMongo.por_motivo.forEach(item => {
+        const nombre = item.nombre_motivo || 'Otros';
+        motivosMap[nombre] = (motivosMap[nombre] || 0) + item.total;
+      });
+    }
+    
+    const por_tipo_combinado = Object.keys(motivosMap).map(key => ({
+      tipo_ausencia: key,
+      total: motivosMap[key]
+    })).sort((a, b) => b.total - a.total);
+
+    // 4. Combinar Top Faltas (personal)
+    const personalMap = {};
+    
+    if (statsLocal.top_faltas) {
+      statsLocal.top_faltas.forEach(item => {
+        personalMap[item.personal] = (personalMap[item.personal] || 0) + parseInt(item.faltas);
+      });
+    }
+    
+    if (statsHorasMongo.por_persona) {
+      statsHorasMongo.por_persona.forEach(item => {
+        personalMap[item.personal] = (personalMap[item.personal] || 0) + item.total_papeletas;
+      });
+    }
+    
+    const top_faltas_combinado = Object.keys(personalMap).map(key => ({
+      personal: key,
+      faltas: personalMap[key]
+    }))
+    .sort((a, b) => b.faltas - a.faltas)
+    .slice(0, 10);
+
+    return {
+      por_tipo: por_tipo_combinado,
+      top_faltas: top_faltas_combinado
+    };
+  } catch (error) {
+    logger.error('Error combinando estadísticas de ausencias:', error);
+    // Fallback a local si falla algo
+    return await repository.getEstadisticasAusencias(opt.fechaInicio, opt.fechaFin);
+  }
+};
 const getEstadisticasAreas = async (opt) => await repository.getEstadisticasAreas(opt.fechaInicio, opt.fechaFin);
 const getEstadisticasPersonal = async (opt) => await repository.getEstadisticasPersonal(opt.fechaInicio, opt.fechaFin, opt.personalId);
 const getPersonalDetalle = async (id, opt) => await repository.getPersonalDetalle(id, opt.fechaInicio, opt.fechaFin);

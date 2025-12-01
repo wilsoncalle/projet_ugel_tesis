@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-
+import SelectCustom from './SelectCustom';
 import { asistenciaPersonalService } from '../services/api';
 
 import {
@@ -388,28 +388,26 @@ const AsistenciaPersonalCalendario = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <select
-            value={month}
-            onChange={(e) => setMonth(parseInt(e.target.value))}
-            className="border border-slate-200 rounded-lg text-sm px-2 py-1.5 bg-white shadow-sm focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-          >
-            {MESES.map((m, i) => (
-              <option key={i} value={i + 1}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <select
-            value={year}
-            onChange={(e) => setYear(parseInt(e.target.value))}
-            className="border border-slate-200 rounded-lg text-sm px-2 py-1.5 bg-white shadow-sm focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-          >
-            {[2023, 2024, 2025, 2026].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          <div className="w-32">
+            <SelectCustom
+              value={{ value: month, label: MESES[month - 1] }}
+              onChange={(option) => setMonth(option.value)}
+              options={MESES.map((m, i) => ({ value: i + 1, label: m }))}
+              placeholder="Mes"
+              isClearable={false}
+              minMenuWidth="128px"
+            />
+          </div>
+          <div className="w-32">
+            <SelectCustom
+              value={{ value: year, label: year.toString() }}
+              onChange={(option) => setYear(option.value)}
+              options={[2023, 2024, 2025, 2026].map((y) => ({ value: y, label: y.toString() }))}
+              placeholder="Año"
+              isClearable={false}
+              minMenuWidth="128px"
+            />
+          </div>
           <button
             onClick={loadData}
             className="p-2 text-slate-500 hover:text-sky-600 hover:bg-slate-100 rounded-full transition-colors"
