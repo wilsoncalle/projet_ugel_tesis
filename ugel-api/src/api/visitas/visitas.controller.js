@@ -440,6 +440,7 @@ const delegate = asyncHandler(async (req, res) => {
   try {
     const io = req.app.get('socketio');
     if (io) {
+      // Notificar cambio de estado
       io.emit('estado_visita_actualizado', {
         id: parseInt(id),
         estado: 'DELEGADO',
@@ -455,7 +456,24 @@ const delegate = asyncHandler(async (req, res) => {
         nuevo_area_id: visita.area_destino_id,
         nuevo_area_nombre: visita.nombre_area
       });
-      logger.info(`Evento 'estado_visita_actualizado' (DELEGADO) emitido para visita ID: ${id}`);
+
+      // Emitir la visita completa como si fuera una nueva asignación para el nuevo responsable
+      const visitaCompleta = await service.getVisitaById(id);
+      io.emit('nueva_visita_registrada', visitaCompleta);
+
+      // Emitir evento explícito de delegación para notificaciones/push
+      io.emit('visita_delegada', {
+        visita_id: visitaCompleta.id,
+        personal_visitado_id: visitaCompleta.personal_visitado_id,
+        nombres_visitante: visitaCompleta.visitante_nombres,
+        apellidos_visitante: visitaCompleta.visitante_apellidos,
+        nombre_motivo: visitaCompleta.nombre_motivo,
+        delegado_por_id: personalId,
+        delegado_por_nombres: visitaCompleta.delegado_por_nombres,
+        delegado_por_apellidos: visitaCompleta.delegado_por_apellidos
+      });
+
+      logger.info(`Eventos de delegación emitidos para visita ID: ${id}`);
     }
   } catch (e) {
     logger.warn('No se pudo emitir evento de visita delegada:', e.message);

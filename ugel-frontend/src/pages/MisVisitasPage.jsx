@@ -99,13 +99,19 @@ const MisVisitasPage = () => {
       const page = activeTab === 'activos' ? activosPagination.page : historialPagination.page;
       const limit = activeTab === 'activos' ? activosPagination.limit : historialPagination.limit;
 
-      const response = await visitasService.getMisVisitas({
+      const filters = {
         page,
         limit,
-        estados,
-        anio,
-        mes: mes === 0 ? undefined : mes
-      });
+        estados
+      };
+
+      // Solo aplicar filtros de calendario al historial; las visitas activas son del presente.
+      if (activeTab === 'historial') {
+        filters.anio = anio;
+        filters.mes = mes === 0 ? undefined : mes;
+      }
+
+      const response = await visitasService.getMisVisitas(filters);
       
       const { data, pagination } = response.data;
       const apiPagination = pagination || {};
