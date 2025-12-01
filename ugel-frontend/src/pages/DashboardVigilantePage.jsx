@@ -593,7 +593,7 @@ const DashboardVigilantePage = () => {
           const entradaHistorial = {
             ...visita,
             // Preservar la fecha y hora de ingreso original
-            fecha_ingreso: visita.fecha_ingreso || visita.fechaIngreso || formatFecha(new Date(), 'yyyy-MM-dd'),
+            fecha_ingreso: visita.fecha_ingreso || visita.fechaIngreso || formatFecha(new Date(), 'YYYY-MM-DD'),
             hora_ingreso: formatHora(visita.hora_ingreso || visita.horaIngreso || new Date()),
             // Agregar datos de salida
             fecha_salida: new Date(timestamp).toISOString(),
@@ -1289,7 +1289,7 @@ const DashboardVigilantePage = () => {
             motivoVisitaId: parseInt(motivoId),
             areaDestinoId: parseInt(lugarId),
             usuarioIngresoId: user?.id ? parseInt(user.id) : 1,
-            fechaIngreso: visitante.fechaIngreso || formatFecha(new Date(), 'yyyy-MM-dd'),
+            fechaIngreso: visitante.fechaIngreso || formatFecha(new Date(), 'YYYY-MM-DD'),
             horaIngreso: horaIngresoOriginal, // Usar la hora original del visitante
             // Datos adicionales para completar la información
             personal_nombres: empleadoNombre,
