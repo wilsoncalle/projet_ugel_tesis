@@ -1,5 +1,5 @@
 // src/components/BirthdatePicker.jsx
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { format, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -301,7 +301,7 @@ const BirthdatePicker = ({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [calendarPosition, setCalendarPosition] = useState({ top: 0, left: 0 });
+  const [calendarPosition, setCalendarPosition] = useState(null);
   const today = getTodayDate();
   const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
   const [calendarYear, setCalendarYear] = useState(today.getFullYear());
@@ -352,7 +352,7 @@ const BirthdatePicker = ({
     setCalendarYear(today.getFullYear());
   }, [value]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isOpen) {
       setCalendarPosition(calculatePosition());
     }
@@ -458,7 +458,7 @@ const BirthdatePicker = ({
 
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
 
-      {isOpen &&
+      {isOpen && calendarPosition &&
         createPortal(
           <div ref={calendarRef}>
             <CalendarComponent

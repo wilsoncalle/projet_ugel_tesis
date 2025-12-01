@@ -281,6 +281,7 @@ const DateConfig = ({
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [calendarPosition, setCalendarPosition] = useState(null);
+  const [positionReady, setPositionReady] = useState(false);
   const today = getTodayDate();
   const [calendarMonth, setCalendarMonth] = useState(today.getMonth());
   const [calendarYear, setCalendarYear] = useState(today.getFullYear());
@@ -383,20 +384,27 @@ const DateConfig = ({
   // 🔹 Evitar “salto”: calcular posición ANTES de abrir el calendario
   const handleInputClick = () => {
     if (!isOpen) {
+      setPositionReady(false);
       setCalendarPosition(null);
       setIsOpen(true);
     } else {
       setIsOpen(false);
       setCalendarPosition(null);
+      setPositionReady(false);
     }
   };
 
   // Asegurar que la posición se calcule inmediatamente al abrir (evita parpadeo)
   useLayoutEffect(() => {
     if (!isOpen) return;
-    let frame = requestAnimationFrame(() => {
+    setPositionReady(false);
+    const recalc = () => {
       setCalendarPosition(calculatePosition());
-    });
+      setPositionReady(true);
+    };
+    // Calcular dos veces para cubrir cambios de layout (scrollbars, animaciones)
+    recalc();
+    const frame = requestAnimationFrame(recalc);
     return () => cancelAnimationFrame(frame);
   }, [isOpen, calculatePosition]);
 
@@ -450,7 +458,10 @@ const DateConfig = ({
 
       {isOpen && calendarPosition &&
         createPortal(
-          <div ref={calendarRef}>
+          <div
+            ref={calendarRef}
+            className={!positionReady ? 'opacity-0 pointer-events-none' : ''}
+          >
             <CalendarComponent
               selectedDate={value}
               onSelect={handleSelect}
