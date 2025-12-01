@@ -253,7 +253,7 @@ export const requestNotificationPermission = async () => {
 };
 
 /**
- * Devuelve si el usuario tiene activadas las notificaciones (preferencia local)
+ * Devuelve si el usuario tiene activadas las notificaciones (Preferencia local)
  */
 export const areNotificationsEnabled = () => getUserNotificationsEnabled();
 
