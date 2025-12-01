@@ -23,6 +23,7 @@ import {
 import { formatHora } from '../../utils/dateHelpers';
 import { visitasService, personalService, areasService, papeletasSalidaService } from '../../services/api';
 import { differenceInMinutes } from 'date-fns';
+import { useAuth } from '../../hooks/useAuth';
 
 const MisVisitasTabla = ({
   visitasActivas,
@@ -37,6 +38,9 @@ const MisVisitasTabla = ({
   filters,
   className = ""
 }) => {
+  const { user } = useAuth();
+  const personalId = user?.personal_id || user?.personalId;
+
   // Estados para modales
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [delegateModalOpen, setDelegateModalOpen] = useState(false);
@@ -218,7 +222,9 @@ const MisVisitasTabla = ({
           }
         });
 
-        const empleadosProcesados = personalRes.data.data.map(empleado => {
+        const empleadosProcesados = personalRes.data.data
+          .filter(empleado => String(empleado.id) !== String(personalId))
+          .map(empleado => {
           const estadoBruto = (empleado.estado_presencia || '').toString().trim().toLowerCase();
           let estado = 'disponible';
           let codigoPapeleta = empleado.codigo_papeleta_activa || null;

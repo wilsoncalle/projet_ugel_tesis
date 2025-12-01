@@ -23,7 +23,7 @@ export const useSystemNotifications = () => {
     try {
       // Obtenemos solo el conteo de pendientes
       const response = await visitasService.getMisVisitas({ 
-        estados: 'PENDIENTE',
+        estados: 'PENDIENTE,DELEGADO,ACEPTADO',
         limit: 1 
       });
       
