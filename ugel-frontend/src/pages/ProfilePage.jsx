@@ -19,7 +19,7 @@ import {
   XCircleIcon,
   BellAlertIcon,
 } from '@heroicons/react/24/outline';
-import { pedirPermisoNotificaciones } from '../utils/notificationUtils';
+import { requestNotificationPermission } from '../utils/notificationUtils';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const ProfilePage = () => {
@@ -75,7 +75,7 @@ const ProfilePage = () => {
   const handleToggleNotifications = async () => {
     // Si no tenemos permiso, lo pedimos
     if (notificationPermission !== 'granted') {
-      const permission = await pedirPermisoNotificaciones();
+      const permission = await requestNotificationPermission();
       setNotificationPermission(permission);
       
       if (permission === 'granted') {

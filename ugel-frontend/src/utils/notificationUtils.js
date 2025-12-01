@@ -1,5 +1,65 @@
+// utils/notificationUtils.js
+
+// ========================
+// Constantes de configuración
+// ========================
+const NOTIFICATION_COUNT_KEY = 'notification_count';
+const NOTIFICATIONS_ENABLED_KEY = 'notifications_enabled';
+
+const DEFAULT_ICON = '/img/icono_ugel.png';
+const BADGE_ICON = '/img/favicon-196.png';
+const DEFAULT_TAG = 'sistema-ugel';
+
+// ========================
+// Helpers internos
+// ========================
+const isBrowser = typeof window !== 'undefined';
+const isNotificationSupported = () =>
+  isBrowser && 'Notification' in window;
+const isServiceWorkerSupported = () =>
+  typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
+
+const getNotificationPermission = () => {
+  if (!isNotificationSupported()) return 'default';
+  return Notification.permission;
+};
+
+const getStoredBadgeCount = () => {
+  if (!isBrowser) return 0;
+  return parseInt(localStorage.getItem(NOTIFICATION_COUNT_KEY) || '0', 10);
+};
+
+const setStoredBadgeCount = (count) => {
+  if (!isBrowser) return;
+  localStorage.setItem(NOTIFICATION_COUNT_KEY, String(count));
+};
+
+const getUserNotificationsEnabled = () => {
+  if (!isBrowser || !isNotificationSupported()) return false;
+
+  const pref = localStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
+  const permission = Notification.permission;
+
+  // Si no hay preferencia guardada pero el permiso está concedido,
+  // asumimos true (comportamiento legacy).
+  if (pref === null && permission === 'granted') return true;
+
+  return pref === 'true';
+};
+
+const setUserNotificationsEnabled = (enabled) => {
+  if (!isBrowser) return;
+  localStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(enabled));
+};
+
+// ========================
+// Favicon + Badge
+// ========================
+
 // Helper para actualizar el favicon con un badge
 const updateFaviconWithBadge = (count) => {
+  if (!isBrowser) return;
+
   const favicon = document.querySelector('link[rel="icon"]');
   if (!favicon) return;
 
@@ -11,47 +71,51 @@ const updateFaviconWithBadge = (count) => {
 
   const img = new Image();
   img.src = '/favicon.ico';
-  img.crossOrigin = 'anonymous'; // Evitar problemas de CORS si fuera necesario
+  img.crossOrigin = 'anonymous';
 
   img.onload = () => {
     const canvas = document.createElement('canvas');
     canvas.width = 32;
     canvas.height = 32;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     // Dibujar icono original
     ctx.drawImage(img, 0, 0, 32, 32);
 
-    // Configuración del badge (Más grande)
-    const badgeSize = 20; // Aumentado de 14 a 20
+    // Configuración del badge
+    const badgeSize = 20;
     const x = 32 - badgeSize;
     const y = 0;
 
-    // Dibujar círculo rojo
+    // Círculo rojo
     ctx.beginPath();
-    ctx.arc(x + badgeSize/2, y + badgeSize/2, badgeSize/2, 0, 2 * Math.PI);
-    ctx.fillStyle = '#ef4444'; // red-500
+    ctx.arc(x + badgeSize / 2, y + badgeSize / 2, badgeSize / 2, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ef4444';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2; // Borde un poco más grueso
+    ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Dibujar número
-    ctx.font = 'bold 14px "Roboto", sans-serif'; // Fuente más grande y legible
+    // Texto
+    ctx.font = 'bold 14px "Roboto", sans-serif';
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const text = count > 9 ? '9+' : count.toString();
-    ctx.fillText(text, x + badgeSize/2, y + badgeSize/2 + 1);
+    ctx.fillText(text, x + badgeSize / 2, y + badgeSize / 2 + 1);
 
-    // Actualizar href del favicon
     favicon.href = canvas.toDataURL('image/png');
   };
 };
 
-// Gestión del Badge (Contador de notificaciones)
-export const setAppBadge = async (count) => {
-  // 1. Actualizar Badge del Sistema (PWA/Barra de tareas)
+/**
+ * Establece el número del badge de notificaciones (App Badge + Favicon)
+ */
+export const setNotificationBadge = async (count) => {
+  if (!isBrowser) return;
+
+  // 1. Badge de PWA / barra de tareas
   if ('setAppBadge' in navigator) {
     try {
       await navigator.setAppBadge(count);
@@ -59,13 +123,21 @@ export const setAppBadge = async (count) => {
       console.error('Error setting app badge:', e);
     }
   }
-  
-  // 2. Actualizar Favicon (Pestaña del navegador)
+
+  // 2. Favicon
   updateFaviconWithBadge(count);
+
+  // 3. Persistir
+  setStoredBadgeCount(count);
 };
 
-export const clearAppBadge = async () => {
-  // 1. Limpiar Badge del Sistema
+/**
+ * Limpia el badge de notificaciones
+ */
+export const clearNotificationBadge = async () => {
+  if (!isBrowser) return;
+
+  // 1. Badge del sistema
   if ('clearAppBadge' in navigator) {
     try {
       await navigator.clearAppBadge();
@@ -73,51 +145,59 @@ export const clearAppBadge = async () => {
       console.error('Error clearing app badge:', e);
     }
   }
-  
-  // 2. Limpiar Favicon
+
+  // 2. Favicon
   updateFaviconWithBadge(0);
-  
-  // 3. Limpiar LocalStorage
-  localStorage.setItem('notification_count', '0');
+
+  // 3. LocalStorage
+  setStoredBadgeCount(0);
 };
 
-export const incrementAppBadge = () => {
-  const current = parseInt(localStorage.getItem('notification_count') || '0', 10);
+/**
+ * Incrementa el badge de notificaciones en 1 y devuelve el nuevo valor
+ */
+export const incrementNotificationBadge = () => {
+  const current = getStoredBadgeCount();
   const newCount = current + 1;
-  localStorage.setItem('notification_count', String(newCount));
-  setAppBadge(newCount);
+  setNotificationBadge(newCount);
   return newCount;
 };
 
-export const enviarNotificacionSistema = (titulo, cuerpo, icono = '/img/icono_ugel.png') => {
-  // 1. Verificar soporte
-  if (!("serviceWorker" in navigator) || !("Notification" in window)) return;
+// ========================
+// Notificaciones del sistema
+// ========================
 
-  // Verificar preferencia del usuario (localStorage)
-  const userPref = localStorage.getItem('notifications_enabled');
-  const isEnabled = userPref === 'true' || (userPref === null && Notification.permission === 'granted');
-  if (!isEnabled) return;
+/**
+ * Envía una notificación del sistema (via Service Worker)
+ */
+export const sendSystemNotification = ({
+  title,
+  body,
+  url,
+  icon = DEFAULT_ICON,
+}) => {
+  if (!isNotificationSupported() || !isServiceWorkerSupported()) return;
 
-  // Incrementar el badge (contador rojo en el icono de la app)
-  incrementAppBadge();
+  // Respetar preferencia del usuario
+  if (!getUserNotificationsEnabled()) return;
 
-  // 2. Verificar permiso
+  // Incrementar badge
+  incrementNotificationBadge();
+
   if (Notification.permission === 'granted') {
-    // 3. Verificar que el SW esté activo y listo
     navigator.serviceWorker.ready.then((registration) => {
-      // Enviamos el mensaje al SW en lugar de llamar directo
       if (registration.active) {
         registration.active.postMessage({
           type: 'SHOW_NOTIFICATION',
-          title: titulo,
+          title,
           options: {
-            body: cuerpo,
-            icon: icono,
-            badge: '/img/favicon-196.png',
-            tag: 'sistema-ugel',
+            body,
+            icon,
+            badge: BADGE_ICON,
+            tag: DEFAULT_TAG,
             vibrate: [200, 100, 200],
-            data: { url: window.location.href }
-          }
+            data: { url: url || window.location.href },
+          },
         });
       }
     });
@@ -126,34 +206,70 @@ export const enviarNotificacionSistema = (titulo, cuerpo, icono = '/img/icono_ug
   }
 };
 
-export const pedirPermisoNotificaciones = async () => {
-  if (!("Notification" in window)) {
-    alert("Tu navegador no soporta notificaciones de sistema.");
-    return;
+/**
+ * Solicita permiso para mostrar notificaciones
+ */
+export const requestNotificationPermission = async () => {
+  if (!isNotificationSupported()) {
+    alert('Tu navegador no soporta notificaciones de sistema.');
+    return 'default';
   }
 
-  // Si ya está denegado, avisar al usuario cómo desbloquearlo
+  // Si ya está denegado, mensaje explicando cómo desbloquear
   if (Notification.permission === 'denied') {
-    alert("Las notificaciones están bloqueadas. Por favor, haz clic en el icono de candado o configuración junto a la URL (arriba a la izquierda) y selecciona 'Permitir' o 'Restablecer permisos' para las notificaciones.");
+    alert(
+      "Las notificaciones están bloqueadas. Por favor, haz clic en el icono de candado o configuración junto a la URL y selecciona 'Permitir' o 'Restablecer permisos' para las notificaciones."
+    );
     return 'denied';
   }
 
   try {
     const permiso = await Notification.requestPermission();
-  
-    if (permiso === "granted") {
-      enviarNotificacionSistema("¡Permiso concedido!", "Ahora recibirás avisos aquí.");
+
+    if (permiso === 'granted') {
+      setUserNotificationsEnabled(true);
+      sendSystemNotification({
+        title: '¡Permiso concedido!',
+        body: 'Ahora recibirás avisos aquí.',
+      });
     } else if (permiso === 'denied') {
-      // Si el usuario lo deniega en ese momento
-      alert("No podremos avisarte de nuevas visitas si no activas las notificaciones.");
+      setUserNotificationsEnabled(false);
+      alert('No podremos avisarte de nuevas visitas si no activas las notificaciones.');
     } else {
-       // Caso 'default' (ignorado o bloqueado automáticamente por el navegador)
-       alert("El navegador ha bloqueado la solicitud. Por favor revisa el icono de configuración junto a la barra de direcciones.");
+      alert(
+        'El navegador ha bloqueado la solicitud. Por favor revisa el icono de configuración junto a la barra de direcciones.'
+      );
     }
-    
+
     return permiso;
   } catch (error) {
-    console.error("Error solicitando permisos:", error);
+    console.error('Error solicitando permisos:', error);
+    setUserNotificationsEnabled(false);
     return 'denied';
   }
 };
+
+/**
+ * Devuelve si el usuario tiene activadas las notificaciones (preferencia local)
+ */
+export const areNotificationsEnabled = () => getUserNotificationsEnabled();
+
+/**
+ * Permite activar/desactivar manualmente la preferencia local
+ * (útil si quieres un toggle global fuera del ProfilePage)
+ */
+export const setNotificationsEnabled = (enabled) => {
+  setUserNotificationsEnabled(enabled);
+};
+
+// ========================
+// Aliases para compatibilidad hacia atrás
+// ========================
+
+export const enviarNotificacionSistema = (titulo, cuerpo, icono) =>
+  sendSystemNotification({ title: titulo, body: cuerpo, icon: icono });
+
+export const pedirPermisoNotificaciones = requestNotificationPermission;
+export const setAppBadge = setNotificationBadge;
+export const clearAppBadge = clearNotificationBadge;
+export const incrementAppBadge = incrementNotificationBadge;
