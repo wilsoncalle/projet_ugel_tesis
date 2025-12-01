@@ -9,16 +9,19 @@ El Dashboard Administrativo es una vista unificada que integra las estadísticas
 ### ✨ Funcionalidades Implementadas
 
 1. **Vista Unificada**
+
    - KPIs principales de ambos módulos siempre visibles
    - Toggle para alternar entre vista de Personal y Visitas
    - Diseño responsive y adaptable
 
 2. **Filtros Globales**
+
    - Selector de período (Hoy, Semana, Mes, Año, Todo)
    - Botón de actualización manual
    - Exportación a CSV
 
 3. **Tarjetas KPI**
+
    - Total Asistencias
    - Total Visitas
    - Puntualidad
@@ -27,6 +30,7 @@ El Dashboard Administrativo es una vista unificada que integra las estadísticas
    - Comparación con período anterior
 
 4. **Componentes Reutilizables**
+
    - Todos los componentes de estadísticas mantienen su funcionalidad
    - Modales de maximización funcionan correctamente
    - Gráficos interactivos (líneas, barras, pie/doughnut)
@@ -86,17 +90,19 @@ ugel-frontend/
 **Props:** Ninguna (usa el hook `useDashboardData`)
 
 **Características:**
+
 - Integra todos los componentes de estadísticas
 - Maneja estados de carga y error
 - Implementa exportación de datos
 - Toggle entre vistas de Personal y Visitas
 
 **Uso:**
+
 ```jsx
-import DashboardAdminPage from './pages/DashboardAdminPage';
+import DashboardAdminPage from "./pages/DashboardAdminPage";
 
 // En tu router
-<Route path="/dashboard-admin" element={<DashboardAdminPage />} />
+<Route path="/dashboard-admin" element={<DashboardAdminPage />} />;
 ```
 
 ---
@@ -108,19 +114,21 @@ import DashboardAdminPage from './pages/DashboardAdminPage';
 **Descripción:** Tarjeta de KPI con indicadores de tendencia.
 
 **Props:**
+
 ```typescript
 {
-  title: string;           // Título del KPI
-  value: number;           // Valor numérico
-  change: number;          // Cambio porcentual (opcional)
-  icon: LucideIcon;        // Ícono de Lucide React
-  loading: boolean;        // Estado de carga
-  subtitle: string;        // Subtítulo (opcional)
-  colorScheme: 'blue' | 'green' | 'purple' | 'orange'; // Esquema de color
+  title: string; // Título del KPI
+  value: number; // Valor numérico
+  change: number; // Cambio porcentual (opcional)
+  icon: LucideIcon; // Ícono de Lucide React
+  loading: boolean; // Estado de carga
+  subtitle: string; // Subtítulo (opcional)
+  colorScheme: "blue" | "green" | "purple" | "orange"; // Esquema de color
 }
 ```
 
 **Uso:**
+
 ```jsx
 <KPICard
   title="Total Asistencias"
@@ -141,6 +149,7 @@ import DashboardAdminPage from './pages/DashboardAdminPage';
 **Descripción:** Panel de filtros globales del dashboard.
 
 **Props:**
+
 ```typescript
 {
   periodo: string;                    // Período actual
@@ -160,6 +169,7 @@ import DashboardAdminPage from './pages/DashboardAdminPage';
 **Descripción:** Toggle para alternar entre vistas de Personal y Visitas.
 
 **Props:**
+
 ```typescript
 {
   vistaActiva: 'personal' | 'visitas'; // Vista activa
@@ -186,6 +196,7 @@ import DashboardAdminPage from './pages/DashboardAdminPage';
 **Descripción:** Componente de error con opción de reintentar.
 
 **Props:**
+
 ```typescript
 {
   error: string;        // Mensaje de error
@@ -204,6 +215,7 @@ import DashboardAdminPage from './pages/DashboardAdminPage';
 **Descripción:** Hook que maneja toda la lógica de datos del dashboard.
 
 **Retorna:**
+
 ```typescript
 {
   // Estados
@@ -241,7 +253,7 @@ import DashboardAdminPage from './pages/DashboardAdminPage';
     puntualidad: number;
     visitantesFrecuentes: number;
   };
-  
+
   // Funciones
   cambiarPeriodo: (periodo: string) => void;
   cambiarVista: (vista: string) => void;
@@ -250,16 +262,13 @@ import DashboardAdminPage from './pages/DashboardAdminPage';
 ```
 
 **Uso:**
+
 ```jsx
-import useDashboardData from '../hooks/useDashboardData';
+import useDashboardData from "../hooks/useDashboardData";
 
 const MiComponente = () => {
-  const { 
-    loading, 
-    kpis, 
-    cambiarPeriodo 
-  } = useDashboardData();
-  
+  const { loading, kpis, cambiarPeriodo } = useDashboardData();
+
   // ... usar los datos
 };
 ```
@@ -275,49 +284,60 @@ const MiComponente = () => {
 **Funciones Principales:**
 
 #### Formateo
+
 ```javascript
-formatNumber(num)              // Formatea números con separadores
-formatPercentage(value, decimals) // Formatea porcentajes
-formatDate(date, format)       // Formatea fechas
+formatNumber(num); // Formatea números con separadores
+formatPercentage(value, decimals); // Formatea porcentajes
+formatDate(date, format); // Formatea fechas
 ```
 
 #### Cálculos
+
 ```javascript
-calculatePercentageChange(current, previous) // Calcula cambio porcentual
-calculateAverage(values)       // Calcula promedio
-findMax(values)                // Encuentra valor máximo
-findMin(values)                // Encuentra valor mínimo
-sumBy(data, key)               // Suma valores por clave
+calculatePercentageChange(current, previous); // Calcula cambio porcentual
+calculateAverage(values); // Calcula promedio
+findMax(values); // Encuentra valor máximo
+findMin(values); // Encuentra valor mínimo
+sumBy(data, key); // Suma valores por clave
 ```
 
 #### Tendencias
+
 ```javascript
-getTrendInfo(change)           // Retorna info de tendencia (color, ícono, etc.)
+getTrendInfo(change); // Retorna info de tendencia (color, ícono, etc.)
 ```
 
 #### Transformación de Datos
+
 ```javascript
-transformToPieData(data, labelKey, valueKey)  // Para gráficos pie
-transformToLineData(data, labelKey, valueKey) // Para gráficos línea
-groupBy(data, key)             // Agrupa datos
-sortBy(data, key, order)       // Ordena datos
+transformToPieData(data, labelKey, valueKey); // Para gráficos pie
+transformToLineData(data, labelKey, valueKey); // Para gráficos línea
+groupBy(data, key); // Agrupa datos
+sortBy(data, key, order); // Ordena datos
 ```
 
 #### Exportación
+
 ```javascript
-exportToCSV(data, filename)    // Exporta a CSV
+exportToCSV(data, filename); // Exporta a CSV
 ```
 
 #### Utilidades
+
 ```javascript
-debounce(func, wait)           // Debounce para búsquedas
-generateColors(count)          // Genera colores para gráficos
-getDateRangeFromPeriod(periodo) // Obtiene rango de fechas
+debounce(func, wait); // Debounce para búsquedas
+generateColors(count); // Genera colores para gráficos
+getDateRangeFromPeriod(periodo); // Obtiene rango de fechas
 ```
 
 **Ejemplo de Uso:**
+
 ```javascript
-import { formatNumber, getTrendInfo, exportToCSV } from '../utils/dashboardUtils';
+import {
+  formatNumber,
+  getTrendInfo,
+  exportToCSV,
+} from "../utils/dashboardUtils";
 
 // Formatear número
 const formatted = formatNumber(1234567); // "1,234,567"
@@ -327,7 +347,7 @@ const trend = getTrendInfo(5.2);
 // { color: 'text-green-600', icon: '↑', direction: 'up', ... }
 
 // Exportar datos
-exportToCSV(data, 'reporte.csv');
+exportToCSV(data, "reporte.csv");
 ```
 
 ---
@@ -355,6 +375,7 @@ GET /api/visitas/estadisticas/visitantes-frecuentes?periodo={periodo}
 ### Estructura de Respuesta Esperada
 
 #### Totales (Personal/Visitas)
+
 ```json
 {
   "success": true,
@@ -371,14 +392,17 @@ GET /api/visitas/estadisticas/visitantes-frecuentes?periodo={periodo}
 ```
 
 #### Por Motivo/Área/Estado
+
 ```json
 {
   "success": true,
   "data": {
     "labels": ["Reunión", "Trámite", "Visita"],
-    "datasets": [{
-      "data": [120, 85, 45]
-    }]
+    "datasets": [
+      {
+        "data": [120, 85, 45]
+      }
+    ]
   }
 }
 ```
@@ -390,12 +414,14 @@ GET /api/visitas/estadisticas/visitantes-frecuentes?periodo={periodo}
 ### Paleta de Colores
 
 **KPIs:**
+
 - **Blue:** `from-blue-500 to-blue-600` - Asistencias
 - **Green:** `from-green-500 to-green-600` - Visitas
 - **Purple:** `from-purple-500 to-purple-600` - Puntualidad
 - **Orange:** `from-orange-500 to-orange-600` - Visitantes Frecuentes
 
 **Tendencias:**
+
 - **Positivo:** `text-green-600`, `bg-green-50`
 - **Negativo:** `text-red-600`, `bg-red-50`
 - **Neutral:** `text-gray-600`, `bg-gray-50`
@@ -457,21 +483,19 @@ GET /api/visitas/estadisticas/visitantes-frecuentes?periodo={periodo}
 
 ```jsx
 // App.jsx o Router.jsx
-import DashboardAdminPage from './pages/DashboardAdminPage';
+import DashboardAdminPage from "./pages/DashboardAdminPage";
 
 <Routes>
   <Route path="/dashboard-admin" element={<DashboardAdminPage />} />
-</Routes>
+</Routes>;
 ```
 
 ### 2. Navegación
 
 ```jsx
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 
-<Link to="/dashboard-admin">
-  Dashboard Administrativo
-</Link>
+<Link to="/dashboard-admin">Dashboard Administrativo</Link>;
 ```
 
 ### 3. Personalización
@@ -491,9 +515,9 @@ import { Link } from 'react-router-dom';
 ```jsx
 // En DashboardFilters.jsx
 const opcionesPeriodo = [
-  { value: 'hoy', label: 'Hoy' },
-  { value: 'semana', label: 'Esta Semana' },
-  { value: 'mes', label: 'Este Mes' },
+  { value: "hoy", label: "Hoy" },
+  { value: "semana", label: "Esta Semana" },
+  { value: "mes", label: "Este Mes" },
   // Agregar más opciones aquí
 ];
 ```
@@ -541,6 +565,7 @@ const dataExport = [
 ### Problema: Los datos no se cargan
 
 **Solución:**
+
 1. Verificar que el backend esté corriendo
 2. Revisar la consola del navegador para errores
 3. Verificar que el token de autenticación sea válido
@@ -549,6 +574,7 @@ const dataExport = [
 ### Problema: Los gráficos no se muestran
 
 **Solución:**
+
 1. Verificar que los datos tengan el formato correcto
 2. Revisar la consola para errores de Recharts/Chart.js
 3. Asegurar que las dependencias estén instaladas
@@ -556,6 +582,7 @@ const dataExport = [
 ### Problema: La exportación no funciona
 
 **Solución:**
+
 1. Verificar que los datos no estén vacíos
 2. Revisar permisos del navegador para descargas
 3. Comprobar la función `exportToCSV` en utils
@@ -608,6 +635,6 @@ Para preguntas o problemas, contactar al equipo de desarrollo.
 
 ---
 
-**Última actualización:** Noviembre 2024  
+**Última actualización:** Diciembre 2025  
 **Versión:** 1.0.0  
 **Autor:** Sistema UGEL - Dashboard Administrativo

@@ -1,10 +1,10 @@
 # 📚 Documentación Actualizada - Sistema de Control de Acceso UGEL Talara
 
-**Fecha de Actualización**: Noviembre 11, 2025  
+**Fecha de Actualización**: Diciembre 01, 2025  
 **Versión del Sistema**: Alpha  
 **Base de Datos**: PostgreSQL  
 **Framework Frontend**: React + Vite  
-**Framework Backend**: Node.js + Express  
+**Framework Backend**: Node.js + Express
 
 ---
 
@@ -32,8 +32,9 @@ ugel-frontend/src/
 │   ├── offlineDB.js               📦 IndexedDB para datos offline
 │   ├── offlineSync.js             🔄 Motor de sincronización
 │   ├── exportHelpers.js           📤 Utilidades para exportación
-│   ├── dateHelpers.js             📅 Utilidades de fechas
-│   └── dashboardUtils.js          📊 Utilidades de dashboard
+│   ├── dateHelpers.js             📅 Utilidades de fechas (Powered by Day.js)
+│   ├── dashboardUtils.js          📊 Utilidades de dashboard
+│   └── notificationUtils.js       🔔 Utilidades de notificaciones
 ├── config/
 │   └── formFields.jsx             ⚙️ Configuración de formularios
 ├── contexts/
@@ -58,25 +59,26 @@ ugel-api/src/
 
 #### Componentes Disponibles:
 
-| Componente | Descripción | Hook Asociado |
-|-----------|-------------|---------------|
-| `VisitasTotalesCard` | Total de visitas en el período | `useVisitasTotales` |
-| `VisitasMotivoCard` | Distribución por motivo de visita | `useVisitasMotivo` |
-| `VisitasAreaCard` | Distribución por área/lugar | `useVisitasArea` |
-| `VisitasPersonalCard` | Visitantes por empleado | `useVisitasPersonal` |
-| `VisitantesFrecuentesCard` | Visitantes más frecuentes | `useVisitantesFrecuentes` |
-| `CalendarioVisitas` | Calendario de visitas | Interno |
-| `ModalVisitanteDetalle` | Modal con detalles | Interno |
+| Componente                 | Descripción                       | Hook Asociado             |
+| -------------------------- | --------------------------------- | ------------------------- |
+| `VisitasTotalesCard`       | Total de visitas en el período    | `useVisitasTotales`       |
+| `VisitasMotivoCard`        | Distribución por motivo de visita | `useVisitasMotivo`        |
+| `VisitasAreaCard`          | Distribución por área/lugar       | `useVisitasArea`          |
+| `VisitasPersonalCard`      | Visitantes por empleado           | `useVisitasPersonal`      |
+| `VisitantesFrecuentesCard` | Visitantes más frecuentes         | `useVisitantesFrecuentes` |
+| `CalendarioVisitas`        | Calendario de visitas             | Interno                   |
+| `ModalVisitanteDetalle`    | Modal con detalles                | Interno                   |
 
 **Archivo de exportación**: `index.js`
+
 ```javascript
-export { default as VisitasTotalesCard } from './VisitasTotalesCard';
-export { default as VisitasMotivoCard } from './VisitasMotivoCard';
-export { default as VisitasAreaCard } from './VisitasAreaCard';
-export { default as VisitasPersonalCard } from './VisitasPersonalCard';
-export { default as VisitantesFrecuentesCard } from './VisitantesFrecuentesCard';
-export { default as CalendarioVisitas } from './CalendarioVisitas';
-export { default as ModalVisitanteDetalle } from './ModalVisitanteDetalle';
+export { default as VisitasTotalesCard } from "./VisitasTotalesCard";
+export { default as VisitasMotivoCard } from "./VisitasMotivoCard";
+export { default as VisitasAreaCard } from "./VisitasAreaCard";
+export { default as VisitasPersonalCard } from "./VisitasPersonalCard";
+export { default as VisitantesFrecuentesCard } from "./VisitantesFrecuentesCard";
+export { default as CalendarioVisitas } from "./CalendarioVisitas";
+export { default as ModalVisitanteDetalle } from "./ModalVisitanteDetalle";
 ```
 
 ---
@@ -87,20 +89,21 @@ export { default as ModalVisitanteDetalle } from './ModalVisitanteDetalle';
 
 #### Componentes Disponibles:
 
-| Componente | Descripción | Hook Asociado | Datos |
-|-----------|-------------|---------------|-------|
-| `AsistenciasTotalesCard` | Resumen total de asistencias | `useAsistenciasTotales` | Total, presentes, ausentes |
-| `PuntualidadCard` | Análisis de puntualidad | `useAsistenciasPuntualidad` | A tiempo, retrasados |
-| `AusenciasCard` | Registro de ausencias | `useAsistenciasAusencias` | Justificadas, injustificadas |
-| `AreasCard` | Asistencia por área | `useAsistenciasAreas` | Por área |
-| `PersonalCard` | Detalle por empleado | `useAsistenciasPersonal` | Individual |
-| `PanelSeleccionEstadisticas` | Panel selector (3 pestañas) | Interno | Switcher |
-| `CalendarioAsistencias` | Calendario con asistencias | Interno | Visual |
-| `ModalPersonalDetalle` | Modal de detalles | Interno | Detalle |
+| Componente                   | Descripción                  | Hook Asociado               | Datos                        |
+| ---------------------------- | ---------------------------- | --------------------------- | ---------------------------- |
+| `AsistenciasTotalesCard`     | Resumen total de asistencias | `useAsistenciasTotales`     | Total, presentes, ausentes   |
+| `PuntualidadCard`            | Análisis de puntualidad      | `useAsistenciasPuntualidad` | A tiempo, retrasados         |
+| `AusenciasCard`              | Registro de ausencias        | `useAsistenciasAusencias`   | Justificadas, injustificadas |
+| `AreasCard`                  | Asistencia por área          | `useAsistenciasAreas`       | Por área                     |
+| `PersonalCard`               | Detalle por empleado         | `useAsistenciasPersonal`    | Individual                   |
+| `PanelSeleccionEstadisticas` | Panel selector (3 pestañas)  | Interno                     | Switcher                     |
+| `CalendarioAsistencias`      | Calendario con asistencias   | Interno                     | Visual                       |
+| `ModalPersonalDetalle`       | Modal de detalles            | Interno                     | Detalle                      |
 
 **Archivo de exportación**: `index.js`
 
 **Estructura de Datos por Hook**:
+
 - `useAsistenciasTotales`: `{ total, presentes, ausentes, porcentajeAsistencia }`
 - `useAsistenciasPuntualidad`: `{ aTiempo, retrasados, totalDias }`
 - `useAsistenciasAreas`: `[{ nombre_area, presentes, ausentes, total }]`
@@ -113,13 +116,13 @@ export { default as ModalVisitanteDetalle } from './ModalVisitanteDetalle';
 
 #### Componentes Disponibles:
 
-| Componente | Descripción | Hook Asociado |
-|-----------|-------------|---------------|
-| `PapeletasMotivosCard` | Papeletas por motivo de salida | `usePapeletasMotivos` |
-| `PapeletasAreasCard` | Papeletas por área | `usePapeletasAreas` |
-| `PapeletasEstadoCard` | Estado de papeletas (aprobadas, rechazadas) | `usePapeletasEstado` |
-| `PapeletasHorasCard` | Papeletas por rango de horas | `usePapeletasHoras` |
-| `PanelSeleccionEstadisticas` | Panel selector (4 pestañas) | Interno |
+| Componente                   | Descripción                                 | Hook Asociado         |
+| ---------------------------- | ------------------------------------------- | --------------------- |
+| `PapeletasMotivosCard`       | Papeletas por motivo de salida              | `usePapeletasMotivos` |
+| `PapeletasAreasCard`         | Papeletas por área                          | `usePapeletasAreas`   |
+| `PapeletasEstadoCard`        | Estado de papeletas (aprobadas, rechazadas) | `usePapeletasEstado`  |
+| `PapeletasHorasCard`         | Papeletas por rango de horas                | `usePapeletasHoras`   |
+| `PanelSeleccionEstadisticas` | Panel selector (4 pestañas)                 | Interno               |
 
 **Estructura**: Similar a los otros módulos con configuración genérica.
 
@@ -134,18 +137,21 @@ Estos componentes forman la base de todo sistema de estadísticas, permitiendo r
 #### Componentes:
 
 **`EstadisticasChart.jsx`**
+
 - Tipos soportados: `pie`, `doughnut`, `bar`, `line`
 - Usa Chart.js como librería base
 - Configurable por props
 - Estados de carga y error integrados
 
 **`EstadisticasMetricas.jsx`**
+
 - Muestra tarjetas KPI
 - Calcula automáticamente: total, máximo, mínimo, promedio
 - Responsive design
 - Soporta iconos personalizados
 
 **`EstadisticasTabla.jsx`**
+
 - Tabla con búsqueda en tiempo real
 - Ordenamiento por múltiples columnas
 - Exportación integrada
@@ -153,22 +159,24 @@ Estos componentes forman la base de todo sistema de estadísticas, permitiendo r
 - Props: `data`, `totalVisitas`, `onExport`, `config`
 
 **Ejemplo de uso**:
+
 ```jsx
 <EstadisticasTabla
   data={data}
   totalVisitas={1000}
   onExport={handleExport}
   config={{
-    type: 'motivos',
-    title: 'Detalle de Datos',
-    nameLabel: 'Motivo',
-    countLabel: 'Cantidad',
-    distributionLabel: 'Porcentaje',
+    type: "motivos",
+    title: "Detalle de Datos",
+    nameLabel: "Motivo",
+    countLabel: "Cantidad",
+    distributionLabel: "Porcentaje",
   }}
 />
 ```
 
 **`EstadisticasCard.jsx`**
+
 - Componente principal que agrupa todo
 - Layout: `two-columns`, `stacked`, `auto`
 - Props de configuración completa: `chartConfig`, `tableConfig`, `metricsConfig`
@@ -176,6 +184,7 @@ Estos componentes forman la base de todo sistema de estadísticas, permitiendo r
 - Exportación integrada
 
 **`EstadisticasModal.jsx`**
+
 - Modal con vista detallada
 - Misma configuración que Card
 - Fullscreen en móviles
@@ -214,34 +223,37 @@ Estos componentes forman la base de todo sistema de estadísticas, permitiendo r
 ### Componentes del Sistema Offline
 
 **1. `offlineDB.js`** - Base de Datos Local (IndexedDB)
+
 - 3 Object Stores principales:
   - `pending_visitas`: Visitas registradas offline
   - `pending_salidas`: Salidas de visitantes offline
   - `sync_queue`: Cola genérica de sincronización
-  
 - Funciones principales:
   ```javascript
-  saveVisitaOffline(visitaData, visitanteData)    // Guardar visita offline
-  saveSalidaOffline(visitaId, exitData)           // Guardar salida offline
-  getPendingVisitas()                              // Obtener visitas pendientes
-  getPendingSalidas()                              // Obtener salidas pendientes
-  getVisitasActivasCompletas()                     // Combinación de online + offline
-  clearPendingItem(store, id)                      // Eliminar después de sincronización
+  saveVisitaOffline(visitaData, visitanteData); // Guardar visita offline
+  saveSalidaOffline(visitaId, exitData); // Guardar salida offline
+  getPendingVisitas(); // Obtener visitas pendientes
+  getPendingSalidas(); // Obtener salidas pendientes
+  getVisitasActivasCompletas(); // Combinación de online + offline
+  clearPendingItem(store, id); // Eliminar después de sincronización
   ```
 
 **2. `offlineSync.js`** - Motor de Sincronización
+
 - Detecta cambios en conectividad
 - Sincronización automática Background Sync API
 - Fallback para navegadores sin Background Sync
 - Eventos personalizados para actualización UI
 
 **3. `offlineApiService.js`** - Wrapper de API
+
 - Intercepta llamadas HTTP
 - Detecta si hay conexión
 - Transparente para el código existente
 - Manejo de fallbacks
 
 **4. `OfflineIndicator.jsx`** - Indicador Visual
+
 - Muestra estado (online/offline)
 - Contador de elementos pendientes
 - Botón de sincronización manual
@@ -257,38 +269,40 @@ Estos componentes forman la base de todo sistema de estadísticas, permitiendo r
 
 ```javascript
 // 1. Captura de gráficos
-captureChartJSImage(chartRef)              // Chart.js → Base64
-captureRechartsImage(containerRef)         // Recharts → Base64
+captureChartJSImage(chartRef); // Chart.js → Base64
+captureRechartsImage(containerRef); // Recharts → Base64
 
 // 2. Formatos de archivo
-formatFechaArchivo()                       // YYYY-MM-DD
-generateExcelFromData(data, config)        // Exportar a Excel
-generatePDFFromData(data, config)          // Exportar a PDF
+formatFechaArchivo(); // YYYY-MM-DD
+generateExcelFromData(data, config); // Exportar a Excel
+generatePDFFromData(data, config); // Exportar a PDF
 
 // 3. Funciones auxiliares
-formatearDatosExportacion(datos, config)   // Preparar datos
-validarDatosExportacion(datos)             // Validar antes de exportar
+formatearDatosExportacion(datos, config); // Preparar datos
+validarDatosExportacion(datos); // Validar antes de exportar
 ```
 
 ### Implementación en Componentes
 
 **`VisitantesTabla.jsx`** - Referencia para exportación:
+
 ```jsx
 const handleExport = async (format) => {
   try {
-    const endpoint = format === 'excel' 
-      ? '/api/visitas/export/excel'
-      : '/api/visitas/export/pdf';
-    
+    const endpoint =
+      format === "excel"
+        ? "/api/visitas/export/excel"
+        : "/api/visitas/export/pdf";
+
     const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
     });
-    
+
     const blob = await response.blob();
-    saveAs(blob, `visitas-${new Date().toISOString().split('T')[0]}.${format}`);
+    saveAs(blob, `visitas-${new Date().toISOString().split("T")[0]}.${format}`);
   } catch (error) {
-    console.error('[Export] Error:', error);
+    console.error("[Export] Error:", error);
   }
 };
 ```
@@ -296,10 +310,12 @@ const handleExport = async (format) => {
 ### Endpoint Backend: `/api/visitas/export`
 
 **Métodos**:
+
 - `GET /api/visitas/export/excel` - Descarga Excel
 - `GET /api/visitas/export/pdf` - Descarga PDF
 
 **Parámetros de Query**:
+
 ```javascript
 {
   busqueda: string,           // Búsqueda por texto
@@ -318,6 +334,7 @@ const handleExport = async (format) => {
 ### Problema Actual
 
 La tabla "Detalle de Datos" con columnas **Nombre | Cantidad | Porcentaje** sale vacía o sin nombres correctos en exportaciones de:
+
 - Visitantes
 - Asistencia de Personal
 - Papeletas de Salida
@@ -327,6 +344,7 @@ La tabla "Detalle de Datos" con columnas **Nombre | Cantidad | Porcentaje** sale
 Usar la lógica implementada en `VisitantesTabla.jsx` como referencia:
 
 **Paso 1**: Extraer helpers de exportación
+
 ```javascript
 // exportHelpers.js - Nuevas funciones
 export const extractTableDataFromStats = (data, config) => {
@@ -334,12 +352,13 @@ export const extractTableDataFromStats = (data, config) => {
   return data.labels.map((label, idx) => ({
     nombre: label,
     cantidad: data.datasets[0].data[idx],
-    porcentaje: ((data.datasets[0].data[idx] / total) * 100).toFixed(2)
+    porcentaje: ((data.datasets[0].data[idx] / total) * 100).toFixed(2),
   }));
 };
 ```
 
 **Paso 2**: Centralizar generación de tabla
+
 ```javascript
 // Usar en EstadisticasTabla.jsx
 const generarTablaExportacion = (data, config) => {
@@ -355,42 +374,42 @@ const generarTablaExportacion = (data, config) => {
 
 ### Hooks de Vigilancia (Visitantes)
 
-| Hook | Ubicación | Retorna |
-|------|-----------|---------|
-| `useVisitasTotales` | `hooks/` | `{ data, loading, error, periodo, setPeriodo, totalVisitas }` |
-| `useVisitasMotivo` | `hooks/` | `{ data, loading, error, periodo, setPeriodo, totalVisitas }` |
-| `useVisitasArea` | `hooks/` | `{ data, loading, error, periodo, setPeriodo, totalVisitas }` |
-| `useVisitasPersonal` | `hooks/` | `{ data, loading, error, periodo, setPeriodo, totalVisitas }` |
-| `useVisitantesFrecuentes` | `hooks/` | `{ data, loading, error, top: number }` |
+| Hook                      | Ubicación | Retorna                                                       |
+| ------------------------- | --------- | ------------------------------------------------------------- |
+| `useVisitasTotales`       | `hooks/`  | `{ data, loading, error, periodo, setPeriodo, totalVisitas }` |
+| `useVisitasMotivo`        | `hooks/`  | `{ data, loading, error, periodo, setPeriodo, totalVisitas }` |
+| `useVisitasArea`          | `hooks/`  | `{ data, loading, error, periodo, setPeriodo, totalVisitas }` |
+| `useVisitasPersonal`      | `hooks/`  | `{ data, loading, error, periodo, setPeriodo, totalVisitas }` |
+| `useVisitantesFrecuentes` | `hooks/`  | `{ data, loading, error, top: number }`                       |
 
 ### Hooks de Asistencia (Personal)
 
-| Hook | Descripción |
-|------|-------------|
-| `useAsistenciasTotales` | Totales de asistencia |
+| Hook                        | Descripción             |
+| --------------------------- | ----------------------- |
+| `useAsistenciasTotales`     | Totales de asistencia   |
 | `useAsistenciasPuntualidad` | Análisis de puntualidad |
-| `useAsistenciasAusencias` | Registro de ausencias |
-| `useAsistenciasAreas` | Asistencia por área |
-| `useAsistenciasPersonal` | Detalle por empleado |
+| `useAsistenciasAusencias`   | Registro de ausencias   |
+| `useAsistenciasAreas`       | Asistencia por área     |
+| `useAsistenciasPersonal`    | Detalle por empleado    |
 
 ### Hooks de Papeletas
 
-| Hook | Descripción |
-|------|-------------|
+| Hook                  | Descripción          |
+| --------------------- | -------------------- |
 | `usePapeletasMotivos` | Papeletas por motivo |
-| `usePapeletasAreas` | Papeletas por área |
-| `usePapeletasEstado` | Estado de papeletas |
-| `usePapeletasHoras` | Papeletas por horas |
+| `usePapeletasAreas`   | Papeletas por área   |
+| `usePapeletasEstado`  | Estado de papeletas  |
+| `usePapeletasHoras`   | Papeletas por horas  |
 
 ### Hooks Genéricos
 
-| Hook | Propósito |
-|------|-----------|
-| `useApiState` | Manejo de estado API |
-| `useAuth` | Autenticación |
-| `useCrud` | Operaciones CRUD genéricas |
-| `useDashboardData` | Datos del dashboard |
-| `useKeyboardShortcuts` | Atajos de teclado |
+| Hook                   | Propósito                  |
+| ---------------------- | -------------------------- |
+| `useApiState`          | Manejo de estado API       |
+| `useAuth`              | Autenticación              |
+| `useCrud`              | Operaciones CRUD genéricas |
+| `useDashboardData`     | Datos del dashboard        |
+| `useKeyboardShortcuts` | Atajos de teclado          |
 
 ---
 
@@ -399,13 +418,16 @@ const generarTablaExportacion = (data, config) => {
 ```
 pages/
 ├── DashboardVigilantePage.jsx      👁️ Dashboard principal de vigilancia
-├── DashboardPersonalPage.jsx       👤 Dashboard de asistencia del personal
-├── DashboardPapeletasPage.jsx      📄 Dashboard de papeletas
-├── HistorialVisitasPage.jsx        📜 Historial completo de visitas
-├── CatalogsPage.jsx                📋 Gestión de catálogos
+├── PersonalAsistenciaPage.jsx      👤 Gestión de asistencia (RRHH)
+├── MiAsistenciaPersonalPage.jsx    👤 Mi asistencia (Personal)
+├── VigilantePapeletasPage.jsx      📄 Control de papeletas (Vigilante)
+├── PapeletasPage.jsx               📄 Gestión de papeletas (Admin)
+├── MisVisitasPage.jsx              📜 Historial de mis visitas
+├── AdminCatalogosPage.jsx          📋 Gestión de catálogos
 ├── ProfilePage.jsx                 🔐 Perfil de usuario
-├── SettingsPage.jsx                ⚙️ Configuración
-└── AdminDashboardPage.jsx          🔑 Panel administrativo (si existe)
+├── DashboardAdminPage.jsx          🔑 Dashboard Administrativo
+├── DashboardRRHHPage.jsx           👥 Dashboard RRHH
+└── [Otras páginas de gestión]
 ```
 
 ---
@@ -463,6 +485,7 @@ pages/
 
 **Archivo**: `src/components/personal_estadisticas/`
 **Pasos**:
+
 1. Revisar qué componentes exportan actualmente
 2. Basarse en la lógica de `VisitantesTabla.jsx`
 3. Aplicar helpers centralizados de `exportHelpers.js`
@@ -478,6 +501,7 @@ pages/
 ## 🚀 Features Completados
 
 ### ✅ Offline
+
 - Funcionalidad PWA completa
 - IndexedDB para almacenamiento local
 - Background Sync automático
@@ -485,6 +509,7 @@ pages/
 - Indicador visual de estado
 
 ### ✅ Exportación
+
 - Excel con diseño profesional
 - PDF con orientación landscape
 - Gráficos incluidos en PDF
@@ -492,12 +517,14 @@ pages/
 - Descarga directa al navegador
 
 ### ✅ Estadísticas
+
 - Componentes genéricos reutilizables
 - Tres módulos principales (Vigilancia, Personal, Papeletas)
 - Gráficos interactivos (Chart.js y Recharts)
 - Tablas con búsqueda y ordenamiento
 
 ### ✅ Interfaz
+
 - Responsive design
 - Atajos de teclado
 - Temas personalizables
@@ -511,6 +538,7 @@ pages/
 ### 🔴 Alta Prioridad
 
 1. **Tabla "Detalle de Datos" en Exportaciones**
+
    - Asegurar que se exporte correctamente en Personal y Papeletas
    - Verificar que los nombres de categorías sean correctos
    - Implementar función centralizada
@@ -523,6 +551,7 @@ pages/
 ### 🟡 Media Prioridad
 
 1. **Dashboard Administrativo**
+
    - Si existe, documentar completamente
 
 2. **Reportes Avanzados**
@@ -546,6 +575,6 @@ pages/
 
 ---
 
-**Última actualización**: 11 de Noviembre 2025  
+**Última actualización**: 01 de Diciembre 2025  
 **Autor**: Sistema Integral UGEL Talara  
 **Rama**: alpha
