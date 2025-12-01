@@ -119,7 +119,6 @@ export const useSystemNotifications = () => {
     };
 
     initializeSocket();
-    
     // Carga inicial del contador
     actualizarContadorVisitas();
 
