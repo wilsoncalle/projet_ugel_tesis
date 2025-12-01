@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import Card from './Card';
-import AdaptiveTable from './AdaptiveTable';
+import TableGenerica from './TableGenerica';
 import ModalGenerico from './ModalGenerico';
 import FormularioGenerico from './FormularioGenerico';
 import Button from './Button';
@@ -456,7 +456,7 @@ const CatalogoPage = ({
           {{
             active: (
               <Card>
-                <AdaptiveTable
+                <TableGenerica
                   columns={finalColumns}
                   data={items}
                   isLoading={loading}
@@ -465,12 +465,13 @@ const CatalogoPage = ({
                   searchPlaceholder={`Buscar ${moduleName.toLowerCase()}...`}
                   pagination={pagination}
                   itemsPerPage={itemsPerPage}
+                  adaptive
                 />
               </Card>
             ),
             deleted: (
               <Card>
-                <AdaptiveTable
+                <TableGenerica
                   columns={[
                     ...tableColumns.map(col => {
                       if (col.key === 'activo' || col.key === 'activa' || col.key === 'estado') {
@@ -504,6 +505,7 @@ const CatalogoPage = ({
                   pagination={pagination}
                   itemsPerPage={itemsPerPage}
                   rowClassName="opacity-50"
+                  adaptive
                 />
               </Card>
             ),
@@ -511,7 +513,7 @@ const CatalogoPage = ({
         </TabView>
       ) : (
         <Card>
-          <AdaptiveTable
+          <TableGenerica
             columns={finalColumns}
             data={items}
             isLoading={loading}
@@ -520,6 +522,7 @@ const CatalogoPage = ({
             searchPlaceholder={`Buscar ${moduleName.toLowerCase()}...`}
             pagination={pagination}
             itemsPerPage={itemsPerPage}
+            adaptive
           />
         </Card>
       )}
