@@ -1,6 +1,6 @@
-# Sistema Integral de Control de Acceso (SICA) - UGEL Talara
+# Control de Acceso (COAC) - UGEL Talara
 
-Plataforma empresarial para la UGEL Talara que gestiona en tiempo real la asistencia del personal y el flujo de visitantes. Funciona como PWA: puede instalarse en equipos locales y seguir registrando datos cuando la conectividad es inestable.
+Plataforma para la UGEL Talara que gestiona en tiempo real la asistencia del personal y el flujo de visitantes. Funciona como PWA: puede instalarse en equipos locales y seguir registrando datos cuando la conectividad es inestable.
 
 ## Arquitectura y stack
 - **Backend (`ugel-api`)**: Node.js + Express, PostgreSQL, Socket.io para sincronización en vivo, node-cron para tareas automáticas, seguridad con Helmet, CORS, JWT y Bcrypt.
