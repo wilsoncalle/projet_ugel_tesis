@@ -27,12 +27,11 @@ export const useSystemNotifications = () => {
         limit: 1 
       });
       
-      if (response.data && typeof response.data.total !== 'undefined') {
-        const count = response.data.total;
-        console.log('[SystemNotifications] Badge actualizado a:', count);
-        setAppBadge(count);
-        localStorage.setItem('notification_count', String(count));
-      }
+      const pag = response?.data?.pagination || {};
+      const count = typeof pag.total !== 'undefined' ? pag.total : (response?.data?.total ?? 0);
+      console.log('[SystemNotifications] Badge actualizado a:', count);
+      setAppBadge(count);
+      localStorage.setItem('notification_count', String(count));
     } catch (error) {
       console.error('[SystemNotifications] Error sincronizando badge:', error);
     }
@@ -83,7 +82,8 @@ export const useSystemNotifications = () => {
           enviarNotificacionSistema(
             'Nueva Visita', 
             `Motivo: ${data.nombre_motivo || 'General'} - Visitante: ${data.nombres_visitante || data.visitante_nombres || 'Visitante'}`,
-            '/img/icono_ugel.png'
+            '/img/icono_ugel.png',
+            { incrementBadge: false }
           );
           return true;
         }
@@ -102,7 +102,8 @@ export const useSystemNotifications = () => {
             enviarNotificacionSistema(
               'Visita Delegada', 
               `Te han delegado una visita de ${data.nombres_visitante || 'Alguien'}. Delegado por: ${quien || 'Compañero'}.`,
-              '/img/icono_ugel.png'
+              '/img/icono_ugel.png',
+              { incrementBadge: false }
             );
           }
           // En ambos casos (delegador o delegado), actualizamos badge
@@ -131,7 +132,7 @@ export const useSystemNotifications = () => {
           if (estado === 'APROBADO') mensaje = '¡Tu justificación ha sido aprobada!';
           if (estado === 'RECHAZADO') mensaje = 'Tu justificación ha sido rechazada.';
 
-          enviarNotificacionSistema('Estado de Justificación', mensaje, '/img/icono_ugel.png');
+          enviarNotificacionSistema('Estado de Justificación', mensaje, '/img/icono_ugel.png', { incrementBadge: false });
           return false; // No afecta badge de visitas
         }
         return false;

@@ -175,14 +175,17 @@ export const sendSystemNotification = ({
   body,
   url,
   icon = DEFAULT_ICON,
+  incrementBadge = false
 }) => {
   if (!isNotificationSupported() || !isServiceWorkerSupported()) return;
 
   // Respetar preferencia del usuario
   if (!getUserNotificationsEnabled()) return;
 
-  // Incrementar badge
-  incrementNotificationBadge();
+  // Incrementar badge solo si se solicita explícitamente
+  if (incrementBadge) {
+    incrementNotificationBadge();
+  }
 
   if (Notification.permission === 'granted') {
     navigator.serviceWorker.ready.then((registration) => {
@@ -266,8 +269,8 @@ export const setNotificationsEnabled = (enabled) => {
 // Aliases para compatibilidad hacia atrás
 // ========================
 
-export const enviarNotificacionSistema = (titulo, cuerpo, icono) =>
-  sendSystemNotification({ title: titulo, body: cuerpo, icon: icono });
+export const enviarNotificacionSistema = (titulo, cuerpo, icono, opciones = {}) =>
+  sendSystemNotification({ title: titulo, body: cuerpo, icon: icono, ...opciones });
 
 export const pedirPermisoNotificaciones = requestNotificationPermission;
 export const setAppBadge = setNotificationBadge;
