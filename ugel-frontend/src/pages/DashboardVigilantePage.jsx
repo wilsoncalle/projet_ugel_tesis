@@ -1657,7 +1657,7 @@ const DashboardVigilantePage = () => {
       // Verificar si es una respuesta offline
       if (isOfflineResponse(response)) {
         const message = getResponseMessage(response);
-          setError(`⚠️ ${message.title}: ${message.message}`);
+          setError(message.title + ': ' + message.message);
           
           // En modo offline, la UI ya se actualiza automáticamente via eventos
           // No necesitamos recargar visitantes activos

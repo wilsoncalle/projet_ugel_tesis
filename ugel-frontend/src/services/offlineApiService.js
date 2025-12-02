@@ -80,11 +80,11 @@ export async function createVisitaWithOfflineSupport(visitaData, visitanteData =
       (error.response?.status >= 500 && error.response?.status < 600); // Errores de servidor
     
     if (isNetworkError) {
-      console.log('[Offline API] ⚠️ Error de red/servidor detectado, activando modo offline...');
+      console.log('[Offline API] Error de red/servidor detectado, activando modo offline...');
       
       try {
         const savedData = await saveVisitaOffline(visitaData, visitanteData);
-        console.log('[Offline API] ✅ Guardado offline después de fallo:', savedData);
+        console.log('[Offline API] Guardado offline después de fallo:', savedData);
         registerBackgroundSync('offline-sync');
         
         return {
@@ -101,13 +101,13 @@ export async function createVisitaWithOfflineSupport(visitaData, visitanteData =
           }
         };
       } catch (offlineError) {
-        console.error('[Offline API] ❌ Error guardando offline:', offlineError);
+        console.error('[Offline API] Error guardando offline:', offlineError);
         throw new Error('No se pudo guardar offline: ' + offlineError.message);
       }
     }
     
     // Si es otro tipo de error (400, 401, 404, etc.), lanzarlo para que lo maneje la UI
-    console.error('[Offline API] ❌ Error NO es de red (código ' + error.response?.status + '), lanzando error');
+    console.error('[Offline API] Error NO es de red (código ' + error.response?.status + '), lanzando error');
     throw error;
   }
 }

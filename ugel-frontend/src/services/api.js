@@ -248,36 +248,6 @@ export const asistenciaPersonalService = {
       },
     });
   },
-  getActivas: (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.page) params.append('page', filters.page);
-    if (filters.limit) params.append('limit', filters.limit);
-    return api.get(`/visitas/activas?${params.toString()}`);
-  },
-  getById: (id) => api.get(`/visitas/${id}`),
-  create: (visita) => api.post('/visitas', visita),
-  createLote: (visitas) => api.post('/visitas/lote', visitas), // Para registros en lote
-  update: (id, visita) => api.put(`/visitas/${id}`, visita),
-  delete: (id) => api.delete(`/visitas/${id}`),
-  registrarSalida: (id) => api.put(`/visitas/${id}/salida`),
-  getVisitasPorArea: (periodo = 'todo') => api.get(`/visitas/por-area?periodo=${periodo}`),
-  getVisitasPorMotivo: (periodo = 'todo') => api.get(`/visitas/por-motivo?periodo=${periodo}`),
-  getVisitasPorPersonal: (periodo = 'mes') => api.get(`/visitas/por-personal?periodo=${periodo}`),
-  getVisitantesFrecuentes: (periodo = 'mes') => api.get(`/visitas/visitantes-frecuentes?periodo=${periodo}`),
-  getVisitanteDetalle: (visitanteId, periodo = 'mes') => api.get(`/visitas/visitante/${visitanteId}/detalle?periodo=${periodo}`),
-  getMisVisitas: (filters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.page) params.append('page', filters.page);
-    if (filters.limit) params.append('limit', filters.limit);
-    if (filters.q) params.append('q', filters.q);
-    if (filters.estados) params.append('estados', filters.estados);
-    return api.get(`/visitas/mis-visitas?${params.toString()}`);
-  },
-  buscarGlobal: (documento) => api.get(`/visitas/buscar?documento=${documento}`),
-  accept: (id) => api.post(`/visitas/${id}/aceptar`),
-  reject: (id, motivo) => api.post(`/visitas/${id}/rechazar`, { motivo }),
-  delegate: (id, nuevoPersonalId) => api.post(`/visitas/${id}/delegar`, { nuevoPersonalId }),
-  finalizarAtencion: (id) => api.post(`/visitas/${id}/finalizar-atencion`),
 };
 
 export const tiposDocumentoService = {
