@@ -4,13 +4,15 @@
  */
 
 const DB_NAME = 'ugel-offline-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Nombres de las tablas (object stores)
 const STORES = {
   PENDING_VISITAS: 'pending_visitas',
   PENDING_SALIDAS: 'pending_salidas',
-  SYNC_QUEUE: 'sync_queue'
+  SYNC_QUEUE: 'sync_queue',
+  PENDING_PERSONAL_INGRESO: 'pending_personal_ingreso',
+  PENDING_PERSONAL_SALIDA: 'pending_personal_salida'
 };
 
 /**
@@ -60,6 +62,26 @@ function openDB() {
         syncStore.createIndex('type', 'type', { unique: false });
         syncStore.createIndex('timestamp', 'timestamp', { unique: false });
         syncStore.createIndex('status', 'status', { unique: false });
+      }
+
+      // Crear tabla para ingresos de personal pendientes
+      if (!db.objectStoreNames.contains(STORES.PENDING_PERSONAL_INGRESO)) {
+        const ingresoStore = db.createObjectStore(STORES.PENDING_PERSONAL_INGRESO, { 
+          keyPath: 'id', 
+          autoIncrement: true 
+        });
+        ingresoStore.createIndex('personalId', 'personalId', { unique: false });
+        ingresoStore.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+
+      // Crear tabla para salidas de personal pendientes
+      if (!db.objectStoreNames.contains(STORES.PENDING_PERSONAL_SALIDA)) {
+        const salidaStore = db.createObjectStore(STORES.PENDING_PERSONAL_SALIDA, { 
+          keyPath: 'id', 
+          autoIncrement: true 
+        });
+        salidaStore.createIndex('personalId', 'personalId', { unique: false });
+        salidaStore.createIndex('timestamp', 'timestamp', { unique: false });
       }
 
       console.log('[IndexedDB] Base de datos creada/actualizada correctamente');
@@ -512,6 +534,207 @@ export async function updateVisitaStatus(id, status) {
       };
 
       getRequest.onerror = () => reject(new Error('Error al obtener visita'));
+    });
+  } catch (error) {
+    console.error('[IndexedDB] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Guarda un ingreso de personal cuando no hay conexión
+ */
+export async function saveIngresoPersonalOffline(personalData) {
+  try {
+    // Obtener configuración cacheada para calcular estado (tardanza/tolerancia)
+    let config = null;
+    try {
+      const stored = localStorage.getItem('asistenciaConfigOffline');
+      if (stored) config = JSON.parse(stored);
+    } catch (e) {
+      console.warn('[IndexedDB] No se pudo leer asistenciaConfigOffline de localStorage', e);
+    }
+
+    const horaEntradaConfig = config?.hora_entrada || '09:00:00';
+    const minutosTolerancia = Number(config?.minutos_tolerancia_por_dia ?? config?.minutos_tolerancia_dia ?? 0);
+    const personalId = personalData.value || personalData.id;
+
+    const timeToMinutes = (timeStr = '') => {
+      if (!timeStr || typeof timeStr !== 'string') return 0;
+      const [h = '0', m = '0', s = '0'] = timeStr.split(':');
+      return parseInt(h, 10) * 60 + parseInt(m, 10) + Math.floor(parseInt(s, 10) / 60);
+    };
+
+    const db = await openDB();
+    const transaction = db.transaction([STORES.PENDING_PERSONAL_INGRESO], 'readwrite');
+    const store = transaction.objectStore(STORES.PENDING_PERSONAL_INGRESO);
+
+    const now = new Date();
+    const horaIngresoStr = now.toTimeString().substring(0, 8);
+    const fechaIngresoStr = now.toISOString().split('T')[0];
+    const minutosIngreso = timeToMinutes(horaIngresoStr);
+    const minutosEntrada = timeToMinutes(horaEntradaConfig);
+    const ingresoConTolerancia = minutosEntrada + minutosTolerancia;
+    const estadoCalculado = minutosIngreso > ingresoConTolerancia ? 'Tardanza' : 'Presente';
+
+    // Evitar duplicados: si ya existe un ingreso pendiente para este personal en la fecha, no guardar
+    let registroExistente = null;
+    const yaExiste = await new Promise((resolve, reject) => {
+      try {
+        const index = store.index('personalId');
+        const request = index.getAll(IDBKeyRange.only(personalId));
+        request.onsuccess = () => {
+          const mismos = request.result.filter(
+            (r) => r.status === 'pending' && r.fecha === fechaIngresoStr
+          );
+          registroExistente = mismos[0] || null;
+          resolve(mismos.length > 0);
+        };
+        request.onerror = () => reject(request.error);
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    if (yaExiste) {
+      return {
+        id: registroExistente.id,
+        ...registroExistente,
+        alreadyRegistered: true
+      };
+    }
+
+    const ingresoOffline = {
+      personalId,
+      personalData,
+      timestamp: Date.now(),
+      fecha: fechaIngresoStr,
+      horaIngreso: horaIngresoStr,
+      status: 'pending',
+      syncAttempts: 0,
+      estado_presencia: estadoCalculado
+    };
+
+    return new Promise((resolve, reject) => {
+      const request = store.add(ingresoOffline);
+      request.onsuccess = () => resolve({ id: request.result, ...ingresoOffline });
+      request.onerror = () => reject(new Error('Error al guardar ingreso personal offline'));
+    });
+  } catch (error) {
+    console.error('[IndexedDB] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Guarda una salida de personal cuando no hay conexión
+ */
+export async function saveSalidaPersonalOffline(personalId) {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORES.PENDING_PERSONAL_SALIDA], 'readwrite');
+    const store = transaction.objectStore(STORES.PENDING_PERSONAL_SALIDA);
+
+    const now = new Date();
+    const salidaOffline = {
+      personalId,
+      timestamp: Date.now(),
+      fecha: now.toISOString().split('T')[0],
+      horaSalida: now.toTimeString().substring(0, 8),
+      status: 'pending',
+      syncAttempts: 0
+    };
+
+    return new Promise((resolve, reject) => {
+      const request = store.add(salidaOffline);
+      request.onsuccess = () => resolve({ id: request.result, ...salidaOffline });
+      request.onerror = () => reject(new Error('Error al guardar salida personal offline'));
+    });
+  } catch (error) {
+    console.error('[IndexedDB] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Obtiene ingresos de personal pendientes
+ */
+export async function getPendingIngresosPersonal() {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORES.PENDING_PERSONAL_INGRESO], 'readonly');
+    const store = transaction.objectStore(STORES.PENDING_PERSONAL_INGRESO);
+
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const pending = request.result.filter(item => item.status === 'pending');
+        resolve(pending);
+      };
+      request.onerror = () => reject(new Error('Error al obtener ingresos pendientes'));
+    });
+  } catch (error) {
+    console.error('[IndexedDB] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Obtiene salidas de personal pendientes
+ */
+export async function getPendingSalidasPersonal() {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORES.PENDING_PERSONAL_SALIDA], 'readonly');
+    const store = transaction.objectStore(STORES.PENDING_PERSONAL_SALIDA);
+
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const pending = request.result.filter(item => item.status === 'pending');
+        resolve(pending);
+      };
+      request.onerror = () => reject(new Error('Error al obtener salidas pendientes'));
+    });
+  } catch (error) {
+    console.error('[IndexedDB] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Elimina ingreso de personal sincronizado
+ */
+export async function deleteIngresoPersonalOffline(id) {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORES.PENDING_PERSONAL_INGRESO], 'readwrite');
+    const store = transaction.objectStore(STORES.PENDING_PERSONAL_INGRESO);
+
+    return new Promise((resolve, reject) => {
+      const request = store.delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(new Error('Error al eliminar ingreso personal offline'));
+    });
+  } catch (error) {
+    console.error('[IndexedDB] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Elimina salida de personal sincronizada
+ */
+export async function deleteSalidaPersonalOffline(id) {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([STORES.PENDING_PERSONAL_SALIDA], 'readwrite');
+    const store = transaction.objectStore(STORES.PENDING_PERSONAL_SALIDA);
+
+    return new Promise((resolve, reject) => {
+      const request = store.delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(new Error('Error al eliminar salida personal offline'));
     });
   } catch (error) {
     console.error('[IndexedDB] Error:', error);

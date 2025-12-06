@@ -13,11 +13,13 @@ import ModalGenerico from '../components/ModalGenerico';
 import AsistenciaPersonalCalendario from '../components/AsistenciaPersonalCalendario';
 import DateRangeFilter from '../components/DateRangeFilter';
 import QuickSearchBar from '../components/QuickSearchBar';
-import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService } from '../services/api';
+import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService, asistenciaConfigService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { MagnifyingGlassIcon, ClockIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, UserGroupIcon, CalendarIcon, DocumentArrowDownIcon, ChevronDownIcon, DocumentTextIcon, XMarkIcon, EyeIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import { AsistenciasTotalesCard, PuntualidadCard, AusenciasCard, AreasCard, PersonalCard, PanelSeleccionEstadisticas } from '../components/personal_estadisticas';
+import { registrarIngresoPersonalWithOfflineSupport, registrarSalidaPersonalWithOfflineSupport } from '../services/offlineApiService';
+import { getPendingIngresosPersonal, getPendingSalidasPersonal } from '../utils/offlineDB';
 
 // Variantes de animación
 const containerVariants = {
@@ -202,6 +204,7 @@ const PersonalAsistenciaPage = () => {
   useEffect(() => {
     cargarPersonalActivo();
     cargarAsistenciasHoy();
+    cacheAsistenciaConfig();
     
     // Cargar historial inicial
     const filtrosIniciales = {
@@ -219,6 +222,18 @@ const PersonalAsistenciaPage = () => {
       }
     };
   }, []);
+
+  const cacheAsistenciaConfig = async () => {
+    if (!navigator.onLine) return;
+    try {
+      const response = await asistenciaConfigService.getGlobal();
+      if (response.data?.success && response.data.data) {
+        localStorage.setItem('asistenciaConfigOffline', JSON.stringify(response.data.data));
+      }
+    } catch (error) {
+      console.warn('No se pudo cachear la configuración de asistencia', error);
+    }
+  };
 
   const cargarPersonalActivo = async () => {
     try {
@@ -257,21 +272,75 @@ const PersonalAsistenciaPage = () => {
   const cargarAsistenciasHoy = async () => {
     try {
       setLoading(true);
-      const response = await asistenciaPersonalService.getHoy({
-        page: 1,
-        limit: 100
-      });
-      
-      if (response.data.success) {
-        const dataHoy = response.data.data || [];
-        setAsistenciasHoy(limpiarAusentesTempranos(dataHoy));
-        
-        setHoyPagination(prev => ({
-          ...prev,
-          totalItems: dataHoy.length || 0,
-          totalPages: Math.ceil((dataHoy.length || 0) / prev.itemsPerPage)
-        }));
+      setError('');
+
+      let dataServer = [];
+      try {
+        const response = await asistenciaPersonalService.getHoy({
+          page: 1,
+          limit: 100
+        });
+        if (response.data.success) {
+          dataServer = response.data.data || [];
+        }
+      } catch (e) {
+        console.warn('No se pudo cargar asistencias desde el servidor, usando datos previos/locales', e);
+        dataServer = asistenciasHoy || [];
       }
+
+      const ingresosOffline = await getPendingIngresosPersonal();
+      const salidasOffline = await getPendingSalidasPersonal();
+
+      const dataLocal = ingresosOffline.map(item => ({
+        personal_id: item.personalId,
+        personal_nombres: item.personalData?.nombres || '',
+        personal_apellidos: item.personalData?.apellidos || '',
+        personal_numero_documento: item.personalData?.numero_documento || item.personalData?.numeroDocumento || '',
+        personal_tipo_documento: item.personalData?.tipo_documento || 'DNI',
+        personal_cargo_nombre: item.personalData?.cargo_nombre || item.personalData?.cargo || '',
+        personal_area_nombre: item.personalData?.area_nombre || item.personalData?.area || '',
+        hora_ingreso: item.horaIngreso,
+        hora_salida: null,
+        estado_presencia: item.estado_presencia || 'Presente offline',
+        isOffline: true
+      }));
+
+      const baseCombinada = [...dataServer];
+
+      dataLocal.forEach((localRow) => {
+        const idx = baseCombinada.findIndex(
+          (row) => String(row.personal_id || row.personalId) === String(localRow.personal_id)
+        );
+        if (idx >= 0) {
+          baseCombinada[idx] = {
+            ...baseCombinada[idx],
+            hora_ingreso: localRow.hora_ingreso,
+            hora_salida: localRow.hora_salida,
+            estado_presencia: localRow.estado_presencia,
+            isOffline: true
+          };
+        } else {
+          baseCombinada.push(localRow);
+        }
+      });
+
+      const dataCombinada = baseCombinada.map(row => {
+        const salidaPendiente = salidasOffline.find(
+          (s) => String(s.personalId) === String(row.personal_id || row.personalId)
+        );
+        if (salidaPendiente) {
+          return { ...row, hora_salida: salidaPendiente.horaSalida, isOffline: true };
+        }
+        return row;
+      });
+
+      setAsistenciasHoy(limpiarAusentesTempranos(dataCombinada));
+      
+      setHoyPagination(prev => ({
+        ...prev,
+        totalItems: dataCombinada.length || 0,
+        totalPages: Math.ceil((dataCombinada.length || 0) / prev.itemsPerPage)
+      }));
     } catch (error) {
       console.error('Error al cargar asistencias de hoy:', error);
       setError('Error al cargar asistencias del día');
@@ -288,11 +357,44 @@ const PersonalAsistenciaPage = () => {
     
     try {
       setLoading(true);
-      const response = await asistenciaPersonalService.registrarIngreso(parseInt(personalSeleccionado.value));
+      const response = await registrarIngresoPersonalWithOfflineSupport(
+        personalSeleccionado,
+        (id) => asistenciaPersonalService.registrarIngreso(parseInt(id))
+      );
       
       if (response.data.success) {
         setPersonalSeleccionado(null);
-        await cargarAsistenciasHoy();
+        if (response.data.offline) {
+          const saved = response.data.data;
+          const nuevoOffline = {
+            personal_id: saved.personalId,
+            personal_nombres: saved.personalData?.nombres || '',
+            personal_apellidos: saved.personalData?.apellidos || '',
+            personal_numero_documento: saved.personalData?.numero_documento || saved.personalData?.numeroDocumento || '',
+            personal_tipo_documento: saved.personalData?.tipo_documento || 'DNI',
+            personal_cargo_nombre: saved.personalData?.cargo_nombre || saved.personalData?.cargo || '',
+            personal_area_nombre: saved.personalData?.area_nombre || saved.personalData?.area || '',
+            hora_ingreso: saved.horaIngreso,
+            hora_salida: null,
+            estado_presencia: saved.estado_presencia || 'Presente offline',
+            isOffline: true
+          };
+          setAsistenciasHoy(prev => {
+            const lista = prev || [];
+            const idx = lista.findIndex(
+              (row) => String(row.personal_id || row.personalId) === String(saved.personalId)
+            );
+            if (idx >= 0) {
+              const copia = [...lista];
+              copia[idx] = { ...copia[idx], ...nuevoOffline };
+              return limpiarAusentesTempranos(copia);
+            }
+            return limpiarAusentesTempranos([...lista, nuevoOffline]);
+          });
+          console.warn('Ingreso de personal guardado en modo offline');
+        } else {
+          await cargarAsistenciasHoy();
+        }
       } else {
         // No mostrar error global si ya existe registro, ya que el formulario muestra la advertencia
         // setError(response.data.message);
@@ -306,12 +408,18 @@ const PersonalAsistenciaPage = () => {
   
   const registrarSalida = async (personalId) => {
     try {
-      const response = await asistenciaPersonalService.registrarSalida(personalId);
+      const response = await registrarSalidaPersonalWithOfflineSupport(
+        personalId,
+        (id) => asistenciaPersonalService.registrarSalida(id)
+      );
       
       if (response.data.success) {
         await cargarAsistenciasHoy();
         if (activeTab === 'historial') {
           handleBuscarHistorial(filtros, historialPagination.currentPage);
+        }
+        if (response.data.offline) {
+          console.warn('Salida de personal guardada en modo offline');
         }
       }
     } catch (error) {
@@ -1978,10 +2086,11 @@ const EstadoBadge = ({ estado }) => {
   
   const config = configs[estado] || { bg: 'bg-gray-100', text: 'text-gray-800', icon: XCircleIcon };
   const Icon = config.icon;
+  const isOfflineLabel = typeof estado === 'string' && estado.toLowerCase().includes('offline');
   
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-      <Icon className="h-3 w-3 mr-1" />
+      {!isOfflineLabel && <Icon className="h-3 w-3 mr-1" />}
       {estado}
     </span>
   );

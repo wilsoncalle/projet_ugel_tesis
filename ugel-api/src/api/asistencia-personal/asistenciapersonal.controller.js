@@ -189,13 +189,13 @@ const getById = asyncHandler(async (req, res) => {
 const registrarIngreso = asyncHandler(async (req, res) => {
   logger.info('Registrando ingreso de personal');
   
-  const { personalId } = req.body;
+  const { personalId, fecha, hora, _isOfflineSync } = req.body;
   
   if (!personalId) {
     throw new AppError('ID de personal requerido', 400);
   }
   
-  const asistencia = await service.registrarIngreso(personalId, req.user.id);
+  const asistencia = await service.registrarIngreso(personalId, req.user.id, { fecha, hora, _isOfflineSync });
   
   if (asistencia.alreadyRegistered) {
     return res.status(200).json({
@@ -220,13 +220,13 @@ const registrarIngreso = asyncHandler(async (req, res) => {
 const registrarSalida = asyncHandler(async (req, res) => {
   logger.info('Registrando salida de personal');
   
-  const { personalId } = req.body;
+  const { personalId, fecha, hora, _isOfflineSync } = req.body;
   
   if (!personalId) {
     throw new AppError('ID de personal requerido', 400);
   }
   
-  const asistencia = await service.registrarSalida(personalId, req.user.id);
+  const asistencia = await service.registrarSalida(personalId, req.user.id, { fecha, hora, _isOfflineSync });
   
   logger.info(`Salida registrada exitosamente para personal ID: ${personalId}`);
   

@@ -9,7 +9,11 @@ import {
   deleteVisitaOffline,
   deleteSalidaOffline,
   updateVisitaStatus,
-  updateSalidaVisitaId
+  updateSalidaVisitaId,
+  getPendingIngresosPersonal,
+  getPendingSalidasPersonal,
+  deleteIngresoPersonalOffline,
+  deleteSalidaPersonalOffline
 } from './offlineDB';
 
 const API_BASE_URL = '/api';
@@ -472,13 +476,96 @@ async function actualizarSalidasPendientesConNuevoId(visitaIdOffline, nuevaVisit
 }
 
 /**
+ * Sincroniza ingresos y salidas de personal pendientes
+ */
+async function syncPendingPersonal() {
+  const token = localStorage.getItem('token');
+  const ingresos = await getPendingIngresosPersonal();
+  const salidas = await getPendingSalidasPersonal();
+  const results = { success: [], failed: [] };
+
+  if (!token) {
+    console.warn('[Sync] No hay token de autenticación para personal');
+    return results;
+  }
+
+  if (ingresos.length > 0 || salidas.length > 0) {
+    console.log(`[Sync] Sincronizando personal: ${ingresos.length} ingresos y ${salidas.length} salidas pendientes`);
+  }
+
+  for (const item of ingresos) {
+    try {
+      const payload = {
+        personalId: item.personalId,
+        fecha: item.fecha,
+        hora: item.horaIngreso,
+        _isOfflineSync: true
+      };
+
+      const response = await fetch(`${API_BASE_URL}/asistencia-personal/ingreso`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      await deleteIngresoPersonalOffline(item.id);
+      results.success.push(item);
+    } catch (error) {
+      console.error('Error sync ingreso personal', error);
+      results.failed.push({ item, error: error.message });
+    }
+  }
+
+  for (const item of salidas) {
+    try {
+      const payload = {
+        personalId: item.personalId,
+        fecha: item.fecha,
+        hora: item.horaSalida,
+        _isOfflineSync: true
+      };
+
+      const response = await fetch(`${API_BASE_URL}/asistencia-personal/salida`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      await deleteSalidaPersonalOffline(item.id);
+      results.success.push(item);
+    } catch (error) {
+      console.error('Error sync salida personal', error);
+      results.failed.push({ item, error: error.message });
+    }
+  }
+
+  return results;
+}
+
+/**
  * Sincroniza todos los datos pendientes
  */
 export async function syncPendingData() {
   // Log solo si hay datos para sincronizar
   const pendingVisitas = await getPendingVisitas();
   const pendingSalidas = await getPendingSalidas();
-  if (pendingVisitas.length > 0 || pendingSalidas.length > 0) {
+  const pendingIngresosPersonal = await getPendingIngresosPersonal();
+  const pendingSalidasPersonal = await getPendingSalidasPersonal();
+  if (pendingVisitas.length > 0 || pendingSalidas.length > 0 || pendingIngresosPersonal.length > 0 || pendingSalidasPersonal.length > 0) {
     console.log('[Sync] 🔄 Iniciando sincronización de datos pendientes...');
   }
 
@@ -497,8 +584,12 @@ export async function syncPendingData() {
     console.log('[Sync] 🔄 Sincronizando salidas...');
     const salidasResults = await syncPendingSalidas();
 
-    const totalSuccess = visitasResults.success.length + salidasResults.success.length;
-    const totalFailed = visitasResults.failed.length + salidasResults.failed.length;
+    // Sincronizar personal
+    console.log('[Sync] 🔄 Sincronizando personal...');
+    const personalResults = await syncPendingPersonal();
+
+    const totalSuccess = visitasResults.success.length + salidasResults.success.length + personalResults.success.length;
+    const totalFailed = visitasResults.failed.length + salidasResults.failed.length + personalResults.failed.length;
 
     console.log(`[Sync] ✅ Sincronización completada: ${totalSuccess} éxitos, ${totalFailed} fallos`);
 
@@ -511,7 +602,8 @@ export async function syncPendingData() {
       success: totalSuccess,
       failed: totalFailed,
       visitas: visitasResults,
-      salidas: salidasResults
+      salidas: salidasResults,
+      personal: personalResults
     };
   } catch (error) {
     console.error('[Sync] ❌ Error general de sincronización:', error);
