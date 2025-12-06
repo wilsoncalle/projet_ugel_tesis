@@ -234,13 +234,18 @@ const getAsistenciaById = async (id) => {
   }
 };
 
-const registrarIngreso = async (personalId, usuarioId) => {
+const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
   try {
     const personal = await personalRepository.findById(personalId);
     if (!personal) throw new AppError('Personal no encontrado', 404);
     if (!personal.activo) throw new AppError('Personal inactivo', 400);
     
     const { fecha: fechaActual, hora: horaActual } = nowLima();
+    const fechaOffline = offlineData?._isOfflineSync ? offlineData.fecha : null;
+    const horaOffline = offlineData?._isOfflineSync ? offlineData.hora : null;
+    const fechaEvento = fechaOffline || fechaActual;
+    const horaEvento = horaOffline || horaActual;
+
     const configAsistencia = await asistenciaConfigService.getConfigEfectiva(personalId);
     
     const minutosToleranciaDia = Number(configAsistencia?.minutos_tolerancia_por_dia ?? configAsistencia?.minutos_tolerancia_dia ?? 10);
@@ -248,16 +253,16 @@ const registrarIngreso = async (personalId, usuarioId) => {
     const horaEntradaConfig = configAsistencia?.hora_entrada || '09:00:00';
     const fechaInicioConfig = configAsistencia?.aplica_desde || null;
 
-    const minutosLlegada = timeToMinutes(horaActual);
+    const minutosLlegada = timeToMinutes(horaEvento);
     const minutosEntrada = timeToMinutes(horaEntradaConfig);
     const diferenciaMinutos = minutosLlegada - minutosEntrada;
 
-    const fechaObj = new Date(fechaActual);
+    const fechaObj = new Date(fechaEvento);
     const diasUsados = await repository.countDiasToleranciaUsados(personalId, fechaObj.getMonth() + 1, fechaObj.getFullYear(), horaEntradaConfig, fechaInicioConfig);
     const tieneSaldoTolerancia = diasUsados < diasToleranciaMes;
 
-    const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaActual);
-    const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);
+    const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaEvento);
+    const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaEvento);
     
     let minutosTardanzaCalculados = 0;
 
@@ -296,10 +301,10 @@ const registrarIngreso = async (personalId, usuarioId) => {
     if (registroExistente && registroExistente.estado_presencia === 'Tardanza') nuevoEstado = 'Tardanza';
 
     if (registroExistente) {
-        return await repository.updateIngreso(registroExistente.id, horaActual, nuevoEstado, usuarioId, minutosAImputar);
+        return await repository.updateIngreso(registroExistente.id, horaEvento, nuevoEstado, usuarioId, minutosAImputar);
     } else {
         return await repository.create({
-            personal_id: personalId, fecha: fechaActual, hora_ingreso: horaActual, hora_salida: null,
+            personal_id: personalId, fecha: fechaEvento, hora_ingreso: horaEvento, hora_salida: null,
             estado_presencia: nuevoEstado, usuario_registro_id: usuarioId, minutos_tardanza: minutosAImputar
         });
     }
@@ -309,18 +314,23 @@ const registrarIngreso = async (personalId, usuarioId) => {
   }
 };
 
-const registrarSalida = async (personalId, usuarioId) => {
+const registrarSalida = async (personalId, usuarioId, offlineData = {}) => {
   try {
     const personal = await personalRepository.findById(personalId);
     if (!personal) throw new AppError('Personal no encontrado', 404);
     
     const { fecha: fechaActual, hora: horaActual } = nowLima();
-    const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);
+    const fechaOffline = offlineData?._isOfflineSync ? offlineData.fecha : null;
+    const horaOffline = offlineData?._isOfflineSync ? offlineData.hora : null;
+    const fechaEvento = fechaOffline || fechaActual;
+    const horaEvento = horaOffline || horaActual;
+
+    const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaEvento);
     
     if (!registroExistente) throw new AppError('No hay registro de ingreso para hoy', 400);
     if (registroExistente.hora_salida) throw new AppError('Ya tiene salida registrada', 400);
     
-    return await repository.updateSalida(registroExistente.id, horaActual);
+    return await repository.updateSalida(registroExistente.id, horaEvento);
   } catch (error) {
     logger.error(`Error registrando salida ID ${personalId}:`, error);
     throw error;
