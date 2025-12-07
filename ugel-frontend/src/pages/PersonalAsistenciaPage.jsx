@@ -285,7 +285,20 @@ const PersonalAsistenciaPage = () => {
         }
       } catch (e) {
         console.warn('No se pudo cargar asistencias desde el servidor, usando datos previos/locales', e);
-        dataServer = asistenciasHoy || [];
+        // Fallback a cache local si existe
+        try {
+          const cached = localStorage.getItem('cache_asistencia_hoy');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed.data)) {
+              dataServer = parsed.data;
+            }
+          } else {
+            dataServer = asistenciasHoy || [];
+          }
+        } catch (err) {
+          dataServer = asistenciasHoy || [];
+        }
       }
 
       const ingresosOffline = await getPendingIngresosPersonal();
@@ -335,6 +348,12 @@ const PersonalAsistenciaPage = () => {
       });
 
       setAsistenciasHoy(limpiarAusentesTempranos(dataCombinada));
+      // Cachear resultado final para usarlo en offline
+      try {
+        localStorage.setItem('cache_asistencia_hoy', JSON.stringify({ ts: Date.now(), data: dataCombinada }));
+      } catch (e) {
+        console.warn('No se pudo cachear asistencia de hoy', e);
+      }
       
       setHoyPagination(prev => ({
         ...prev,
@@ -446,26 +465,84 @@ const PersonalAsistenciaPage = () => {
       if (filtrosData.fechaDesde) params.fechaInicio = filtrosData.fechaDesde;
       if (filtrosData.fechaHasta) params.fechaFin = filtrosData.fechaHasta;
       
-      const response = await asistenciaPersonalService.getAll(params);
-      
-      if (response.data.success) {
-        const historialData = response.data.data || [];
-        setHistorialAsistencias(historialData);
+      let historialData = [];
+      let paginationLocal = null;
+      let fromCache = false;
+
+      if (navigator.onLine) {
+        const response = await asistenciaPersonalService.getAll(params);
         
-        if (response.data.pagination) {
-          setHistorialPagination({
-            currentPage: response.data.pagination.page || page,
-            totalPages: response.data.pagination.totalPages || 1,
-            totalItems: response.data.pagination.total || 0,
-            itemsPerPage: response.data.pagination.limit || 15
-          });
+        if (response.data.success) {
+          historialData = response.data.data || [];
+          if (response.data.pagination) {
+            paginationLocal = {
+              currentPage: response.data.pagination.page || page,
+              totalPages: response.data.pagination.totalPages || 1,
+              totalItems: response.data.pagination.total || 0,
+              itemsPerPage: response.data.pagination.limit || 15
+            };
+          }
+          // Cachear
+          try {
+            localStorage.setItem('cache_asistencia_historial', JSON.stringify({
+              ts: Date.now(),
+              data: historialData,
+              pagination: paginationLocal,
+              filtros: filtrosData
+            }));
+          } catch (e) {
+            console.warn('No se pudo cachear historial de asistencia', e);
+          }
+        } else {
+          setError('Error al buscar en el historial');
         }
       } else {
-        setError('Error al buscar en el historial');
+        // Offline: usar cache si existe
+        try {
+          const cached = localStorage.getItem('cache_asistencia_historial');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed.data)) {
+              historialData = parsed.data;
+              paginationLocal = parsed.pagination || null;
+              fromCache = true;
+            }
+          }
+        } catch (e) {
+          console.warn('No se pudo leer cache de historial de asistencia', e);
+        }
+      }
+
+      if (historialData) {
+        setHistorialAsistencias(historialData);
+      }
+      if (paginationLocal) {
+        setHistorialPagination(paginationLocal);
+      } else if (historialData) {
+        setHistorialPagination(prev => ({
+          ...prev,
+          currentPage: fromCache ? prev.currentPage : page,
+          totalPages: 1,
+          totalItems: historialData.length,
+          itemsPerPage: prev.itemsPerPage
+        }));
       }
       
     } catch (err) {
       console.error('Error al buscar historial:', err);
+      // Intentar cache como último recurso
+      try {
+        const cached = localStorage.getItem('cache_asistencia_historial');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.data)) {
+            setHistorialAsistencias(parsed.data);
+            if (parsed.pagination) setHistorialPagination(parsed.pagination);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
       setError('Error al buscar en el historial');
     } finally {
       setLoading(false);
@@ -1586,6 +1663,20 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
     setFormData(newFormData);
     limpiarBusqueda(); // Limpiar estado de búsqueda y mensajes
   };
+
+  // Sincronizar estado local con el padre (selección -> prop)
+  useEffect(() => {
+    if (onPersonalChange) {
+      onPersonalChange(formData.personalSeleccionado);
+    }
+  }, [formData.personalSeleccionado]);
+
+  // Sincronizar prop con estado local (prop null -> limpiar)
+  useEffect(() => {
+    if (personalSeleccionado === null && formData.personalSeleccionado !== null) {
+      handleLimpiarFormulario();
+    }
+  }, [personalSeleccionado]);
 
   const handleFormChange = (field, value) => {
     let validatedValue = value;
