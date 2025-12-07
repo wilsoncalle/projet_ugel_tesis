@@ -618,6 +618,18 @@ export const asistenciaConfigService = {
   disable: (id) => api.delete(`/asistencia-config/${id}`),
 };
 
+export const reniecProvidersService = {
+  // Alias list to getAll for CatalogoPage compatibility
+  getAll: (filters = {}) => api.get('/reniec-proveedores'),
+  list: () => api.get('/reniec-proveedores'),
+  getById: (id) => api.get(`/reniec-proveedores/${id}`),
+  getActive: () => api.get('/reniec-proveedores/activo'),
+  create: (data) => api.post('/reniec-proveedores', data),
+  update: (id, data) => api.put(`/reniec-proveedores/${id}`, data),
+  delete: (id) => api.delete(`/reniec-proveedores/${id}`),
+  activate: (id) => api.post(`/reniec-proveedores/${id}/activar`),
+};
+
 
 export const visitasService = {
   getAll: (filters = {}) => {

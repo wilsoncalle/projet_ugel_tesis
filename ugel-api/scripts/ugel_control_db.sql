@@ -1276,3 +1276,46 @@ ALTER TABLE ONLY public.visitantes
 -- PostgreSQL database dump complete
 --
 
+
+--
+-- Tabla de proveedores RENIEC
+--
+
+CREATE TABLE IF NOT EXISTS public.reniec_proveedores (
+    id integer NOT NULL,
+    nombre character varying(150) NOT NULL,
+    base_url text NOT NULL,
+    token text,
+    notas text,
+    activo boolean DEFAULT false NOT NULL,
+    usuario_creador_id integer,
+    fecha_creacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    fecha_actualizacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    fecha_activacion timestamp without time zone,
+    fecha_desactivacion timestamp without time zone
+);
+
+CREATE SEQUENCE IF NOT EXISTS public.reniec_proveedores_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.reniec_proveedores_id_seq OWNED BY public.reniec_proveedores.id;
+ALTER TABLE ONLY public.reniec_proveedores ALTER COLUMN id SET DEFAULT nextval('public.reniec_proveedores_id_seq'::regclass);
+ALTER TABLE ONLY public.reniec_proveedores
+    ADD CONSTRAINT IF NOT EXISTS reniec_proveedores_pkey PRIMARY KEY (id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reniec_proveedores_activo ON public.reniec_proveedores USING btree (activo) WHERE (activo = true);
+ALTER TABLE ONLY public.reniec_proveedores
+    ADD CONSTRAINT IF NOT EXISTS reniec_proveedores_usuario_creador_id_fkey FOREIGN KEY (usuario_creador_id) REFERENCES public.usuarios(id);
+
+INSERT INTO public.reniec_proveedores (nombre, base_url, token, activo, notas, fecha_activacion)
+SELECT
+    'APIS.net.pe',
+    'https://api.apis.net.pe/v2/reniec/dni?numero={dni}',
+    'apis-token-14158.uFeMfwK5k9el9LYH7077UJJuzuFqsebv',
+    true,
+    'Proveedor inicial migrado desde código',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM public.reniec_proveedores WHERE activo = true);

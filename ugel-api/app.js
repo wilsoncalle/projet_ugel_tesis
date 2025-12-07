@@ -26,6 +26,7 @@ const asistenciaPersonalRoutes = require('./src/api/asistencia-personal/asistenc
 const cargosRoutes = require('./src/api/cargos/cargos.routes');
 const healthRoutes = require('./src/api/health/health.routes');
 const asistenciaConfigRoutes = require('./src/api/asistencia-config/asistencia-config.routes');
+const reniecProveedoresRoutes = require('./src/api/reniec-proveedores/reniec-proveedores.routes');
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/asistencia-personal', asistenciaPersonalRoutes);
 app.use('/api/cargos', cargosRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/asistencia-config', asistenciaConfigRoutes);
+app.use('/api/reniec-proveedores', reniecProveedoresRoutes);
 
 // Ruta raíz
 app.get('/', (req, res) => {

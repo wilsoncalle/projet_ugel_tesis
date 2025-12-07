@@ -221,6 +221,11 @@ const consultarDNI = async (req, res, next) => {
         success: false,
         message: 'Demasiadas consultas. Intente nuevamente en unos minutos'
       });
+    } else if (error.statusCode === 503) {
+      return res.status(503).json({
+        success: false,
+        message: error.message || 'Proveedor RENIEC no configurado'
+      });
     } else {
       return res.status(500).json({
         success: false,
