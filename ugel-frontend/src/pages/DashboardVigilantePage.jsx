@@ -19,32 +19,26 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 // Función para consultar RENIEC
 const consultarRENIEC = async (numeroDocumento) => {
   try {
-    console.log('[RENIEC] Consultando DNI:', numeroDocumento);
-    const response = await fetch(`https://api.reniec.gob.pe/v1/dni/${numeroDocumento}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('[RENIEC] Datos obtenidos:', data);
+    console.log('[RENIEC] Consultando DNI vía backend:', numeroDocumento);
+    const response = await visitantesService.consultarDNI(numeroDocumento);
+    const payload = response.data;
+
+    if (payload?.success && payload.data) {
       return {
         success: true,
         data: {
-          nombres: data.nombres || '',
-          apellidos: data.apellidoPaterno + ' ' + data.apellidoMaterno || '',
+          nombres: payload.data.nombres || '',
+          apellidos: payload.data.apellidos || '',
           numeroDocumento: numeroDocumento
         }
       };
-    } else {
-      console.warn('[RENIEC] Error en respuesta:', response.status);
-      return { success: false, error: 'DNI no encontrado en RENIEC' };
     }
+
+    return { success: false, error: payload?.message || 'No se encontraron datos de RENIEC' };
   } catch (error) {
     console.error('[RENIEC] Error al consultar:', error);
-    return { success: false, error: 'Error al consultar RENIEC' };
+    const message = error.response?.data?.message || 'Error al consultar RENIEC';
+    return { success: false, error: message };
   }
 };
 

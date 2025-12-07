@@ -46,6 +46,7 @@ import VigilantePapeletasPage from './pages/VigilantePapeletasPage';
 import AdminCatalogosPage from './pages/AdminCatalogosPage';
 import ConfigAsistenciaPage from './pages/ConfigAsistenciaPage';
 import GestionJustificacionesPage from './pages/GestionJustificacionesPage';
+import ReniecProvidersPage from './pages/ReniecProvidersPage';
 
 // Routes Configuration
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -86,6 +87,7 @@ function App() {
               
               <Route path="usuarios" element={<ProtectedRoute allowedRoles={['admin']} element={<UsuariosPage />} />} />
               <Route path="config-asistencia" element={<ProtectedRoute allowedRoles={['admin']} element={<ConfigAsistenciaPage />} />} />
+              <Route path="reniec-proveedores" element={<ProtectedRoute allowedRoles={['admin']} element={<ReniecProvidersPage />} />} />
             </Route>
             
             {/* RRHH Routes */}

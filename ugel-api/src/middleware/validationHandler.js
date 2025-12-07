@@ -517,6 +517,37 @@ const schemas = {
       activo: Joi.boolean().optional(),
     }).min(1),
   },
+
+  // Proveedores de RENIEC
+  reniecProviders: {
+    create: Joi.object({
+      nombre: Joi.string().min(3).max(150).required(),
+      baseUrl: Joi.string()
+        .pattern(/^https?:\/\/.+/)
+        .max(500)
+        .required()
+        .messages({
+          "string.pattern.base": "La URL debe iniciar con http:// o https://",
+        }),
+      token: Joi.string().max(500).allow("", null).optional(),
+      notas: Joi.string().max(500).allow("", null).optional(),
+      activar: Joi.boolean().optional(),
+    }),
+    update: Joi.object({
+      nombre: Joi.string().min(3).max(150).optional(),
+      baseUrl: Joi.string()
+        .pattern(/^https?:\/\/.+/)
+        .max(500)
+        .optional()
+        .messages({
+          "string.pattern.base": "La URL debe iniciar con http:// o https://",
+        }),
+      token: Joi.string().max(500).allow("", null).optional(),
+      notas: Joi.string().max(500).allow("", null).optional(),
+      activar: Joi.boolean().optional(),
+      activo: Joi.boolean().optional(),
+    }).min(1),
+  },
 };
 
 /**
@@ -581,6 +612,16 @@ const validationMiddleware = {
   // Cargos
   validateCreateCargo: validate(schemas.cargos.create),
   validateUpdateCargo: validate(schemas.cargos.update),
+
+  // RENIEC
+  validateCreateReniecProvider: validate(schemas.reniecProviders.create),
+  validateUpdateReniecProvider: validate(schemas.reniecProviders.update),
+  validateReniecProviderId: validate(
+    Joi.object({
+      id: Joi.number().integer().required(),
+    }),
+    "params"
+  ),
 };
 
 module.exports = {

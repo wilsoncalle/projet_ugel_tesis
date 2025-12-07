@@ -8,6 +8,7 @@ const tiposDocumentoRepository = require('../tipos-documento/tiposdocumento.repo
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 const axios = require('axios');
+const reniecProvidersService = require('../reniec-proveedores/reniec-proveedores.service');
 
 /**
  * Obtener todos los visitantes con paginación y filtros
@@ -282,27 +283,55 @@ const getVisitanteByDNI = async (dni) => {
  * @param {string} dni - Número de DNI
  * @returns {Object} Datos de la persona
  */
+const buildReniecUrl = (baseUrl, dni) => {
+  if (!baseUrl) {
+    throw new AppError('URL del proveedor RENIEC no configurada', 500);
+  }
+
+  if (baseUrl.includes('{dni}')) {
+    return baseUrl.replace('{dni}', dni);
+  }
+
+  if (baseUrl.endsWith('/') || baseUrl.endsWith('=') || baseUrl.includes('?')) {
+    return `${baseUrl}${dni}`;
+  }
+
+  return `${baseUrl}/${dni}`;
+};
+
 const consultarDNIExterno = async (dni) => {
   try {
-    const token = 'apis-token-14158.uFeMfwK5k9el9LYH7077UJJuzuFqsebv';
+    const provider = await reniecProvidersService.getActiveProvider();
     
-    const response = await axios.get(`https://api.apis.net.pe/v2/reniec/dni?numero=${dni}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      },
+    if (!provider) {
+      throw new AppError('No hay un proveedor RENIEC activo configurado', 503);
+    }
+    
+    const url = buildReniecUrl(provider.base_url, dni);
+    
+    const headers = { 'Accept': 'application/json' };
+    if (provider.token) {
+      headers['Authorization'] = `Bearer ${provider.token}`;
+    }
+
+    const response = await axios.get(url, {
+      headers,
       timeout: 10000 // 10 segundos de timeout
     });
     
     if (response.data && response.data.nombres) {
-      logger.info(`DNI ${dni} consultado exitosamente en API externa`);
+      logger.info(`DNI ${dni} consultado exitosamente en proveedor RENIEC ${provider.nombre}`);
       return response.data;
     } else {
-      logger.warn(`DNI ${dni} no encontrado en API externa`);
+      logger.warn(`DNI ${dni} no encontrado en proveedor RENIEC ${provider.nombre}`);
       return null;
     }
     
   } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
     logger.error(`Error consultando DNI ${dni} en API externa:`, error.message);
     
     // Manejar errores específicos

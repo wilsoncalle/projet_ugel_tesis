@@ -230,6 +230,16 @@ const AdminSidebar = ({ isExpanded }) => (
           } 
           label="Config. Asistencia" 
         />
+        <NavItem 
+          to="/admin/reniec-proveedores" 
+          isExpanded={isExpanded}
+          icon={
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          } 
+          label="Proveedor RENIEC" 
+        />
       </ul>
     </div>
     

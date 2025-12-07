@@ -132,6 +132,24 @@ CREATE TABLE IF NOT EXISTS ControlAsistenciaPersonal (
     FOREIGN KEY (usuario_registro_id) REFERENCES Usuarios(id)
 );
 
+-- CONFIGURACIÓN DE PROVEEDORES RENIEC
+CREATE TABLE IF NOT EXISTS ReniecProveedores (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    base_url TEXT NOT NULL,
+    token TEXT NULL,
+    notas TEXT NULL,
+    activo BOOLEAN NOT NULL DEFAULT FALSE,
+    usuario_creador_id INT NULL,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_activacion TIMESTAMP NULL,
+    fecha_desactivacion TIMESTAMP NULL,
+    FOREIGN KEY (usuario_creador_id) REFERENCES Usuarios(id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reniec_proveedores_activo ON ReniecProveedores(activo) WHERE activo = TRUE;
+
 -- Insertar datos iniciales para pruebas
 
 -- Insertar un usuario administrador inicial si no existe
@@ -207,3 +225,14 @@ WHERE NOT EXISTS (SELECT 1 FROM MotivosVisita WHERE nombre_motivo = 'Reunión');
 INSERT INTO MotivosVisita (nombre_motivo)
 SELECT 'Entrega de Documentos' 
 WHERE NOT EXISTS (SELECT 1 FROM MotivosVisita WHERE nombre_motivo = 'Entrega de Documentos');
+
+-- Proveedor RENIEC inicial (plantilla actual)
+INSERT INTO ReniecProveedores (nombre, base_url, token, activo, notas, fecha_activacion)
+SELECT 
+    'APIS.net.pe',
+    'https://api.apis.net.pe/v2/reniec/dni?numero={dni}',
+    'apis-token-14158.uFeMfwK5k9el9LYH7077UJJuzuFqsebv',
+    true,
+    'Proveedor inicial migrado desde código',
+    NOW()
+WHERE NOT EXISTS (SELECT 1 FROM ReniecProveedores WHERE activo = true);
