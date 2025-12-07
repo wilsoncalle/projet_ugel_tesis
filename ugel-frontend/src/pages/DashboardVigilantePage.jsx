@@ -857,6 +857,13 @@ const DashboardVigilantePage = () => {
               console.log('[Online] Total de visitas después de sincronización:', resultado.length);
             }
             
+            // Cachear resultado final
+            try {
+              localStorage.setItem('cache_visitas_activas', JSON.stringify({ ts: Date.now(), data: resultado }));
+            } catch (e) {
+              console.warn('No se pudo cachear visitas activas', e);
+            }
+
             return resultado;
           });
           
@@ -884,6 +891,18 @@ const DashboardVigilantePage = () => {
         // Las visitas con salida se manejarán en el historial
         if (visitasConSalida.length > 0) {
           console.log('[Offline] Visitas con salida encontradas (se mostrarán en historial):', visitasConSalida.length);
+        }
+        // Intentar cache si existe
+        try {
+          const cached = localStorage.getItem('cache_visitas_activas');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed.data)) {
+              activosData = parsed.data;
+            }
+          }
+        } catch (e) {
+          console.warn('No se pudo leer cache de visitas activas', e);
         }
       }
       
@@ -1448,9 +1467,20 @@ const DashboardVigilantePage = () => {
       const response = await visitasService.getAll(params);
       
       if (response.data.success) {
-        const historialData = response.data.data || [];
+          const historialData = response.data.data || [];
         
         setHistorialVisitas(historialData);
+        // Cachear historial de visitas
+        try {
+          localStorage.setItem('cache_visitas_historial', JSON.stringify({
+            ts: Date.now(),
+            data: historialData,
+            pagination: response.data.pagination,
+            filtros: filtrosData
+          }));
+        } catch (e) {
+          console.warn('No se pudo cachear historial de visitas', e);
+        }
         
         // Actualizar paginación si la respuesta incluye información de paginación
         if (response.data.pagination) {
@@ -1476,7 +1506,19 @@ const DashboardVigilantePage = () => {
       } else {
         // Modo offline: usar solo los datos locales del historial
         console.log('[Offline] Buscando en historial local...');
-        const historialData = historialVisitas || [];
+        let historialData = historialVisitas || [];
+        try {
+          const cached = localStorage.getItem('cache_visitas_historial');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed.data)) {
+              historialData = parsed.data;
+              if (parsed.pagination) setHistorialPagination(parsed.pagination);
+            }
+          }
+        } catch (e) {
+          console.warn('No se pudo leer cache de historial de visitas', e);
+        }
         
         // Aplicar filtros básicos en modo offline
         let historialFiltrado = historialData;
@@ -1505,6 +1547,19 @@ const DashboardVigilantePage = () => {
       
     } catch (err) {
       console.error('Error al buscar historial:', err);
+      // Fallback cache
+      try {
+        const cached = localStorage.getItem('cache_visitas_historial');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed.data)) {
+            setHistorialVisitas(parsed.data);
+            if (parsed.pagination) setHistorialPagination(parsed.pagination);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
       setError('Error al buscar en el historial');
     } finally {
       setLoading(false);

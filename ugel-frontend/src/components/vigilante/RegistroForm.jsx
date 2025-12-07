@@ -22,6 +22,7 @@ import {
   getVisitantesActivos,
   papeletasSalidaService,
 } from '../../services/api';
+import { getPendingIngresosPersonal } from '../../utils/offlineDB';
 
 const RegistroForm = forwardRef(
   (
@@ -135,6 +136,9 @@ const RegistroForm = forwardRef(
 
     useEffect(() => {
       cargarDatosIniciales();
+      const handleOfflineIngreso = () => cargarDatosIniciales();
+      window.addEventListener('offline-personal-ingreso', handleOfflineIngreso);
+      return () => window.removeEventListener('offline-personal-ingreso', handleOfflineIngreso);
     }, []);
 
     const [previousTab, setPreviousTab] = useState(activeTab);
@@ -224,12 +228,14 @@ const RegistroForm = forwardRef(
           empleadosResponse,
           areasResponse,
           papeletasResponse,
+          ingresosOffline
         ] = await Promise.all([
           tiposDocumentoService.getAll(),
           motivosVisitaService.getAll(),
           personalService.getAll(),
           areasService.getAll(),
           papeletasSalidaService.getExternas(),
+          getPendingIngresosPersonal()
         ]);
 
         if (tiposResponse.data.success) {
@@ -287,6 +293,10 @@ const RegistroForm = forwardRef(
             }
           });
 
+          const ingresosOfflineIds = new Set(
+            (ingresosOffline || []).map((ing) => ing.personalId?.toString())
+          );
+
           const empleadosData = empleadosResponse.data.data.map(
             (empleado) => {
               const estadoBruto = (empleado.estado_presencia || '')
@@ -330,6 +340,10 @@ const RegistroForm = forwardRef(
                 empleado.tiene_papeleta_activa
               ) {
                 estado = 'permiso';
+              }
+
+              if (ingresosOfflineIds.has(empleado.id?.toString())) {
+                estado = 'disponible';
               }
 
               return {
