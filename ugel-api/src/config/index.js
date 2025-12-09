@@ -24,7 +24,7 @@ const config = {
   },
   
   // Configuración CORS
-  corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:5173').split(','),
+  corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
   
   // Configuración de logs
   logLevel: process.env.LOG_LEVEL || 'debug',

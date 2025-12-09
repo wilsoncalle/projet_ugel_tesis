@@ -205,10 +205,13 @@ const schemas = {
       apellidos: commonRules.nombrePersona.required().messages({
         "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
       }),
-      fechaNacimiento: Joi.date().iso().required().messages({
-        "date.base": "La fecha de nacimiento debe ser una fecha válida",
-        "any.required": "La fecha de nacimiento es requerida"
-      }),
+      fechaNacimiento: Joi.string()
+        .pattern(/^\d{4}-\d{2}-\d{2}$/)
+        .required()
+        .messages({
+          "string.pattern.base": "La fecha de nacimiento debe estar en formato YYYY-MM-DD",
+          "any.required": "La fecha de nacimiento es requerida"
+        }),
       email: commonRules.email.required().messages({
         "string.email": "Debe ser un email válido",
         "any.required": "El email es requerido"
@@ -238,7 +241,12 @@ const schemas = {
       apellidos: commonRules.nombrePersona.optional().messages({
         "string.pattern.base": "Los apellidos solo pueden contener letras, espacios, acentos y caracteres como ñ, ü, ', -"
       }),
-      fechaNacimiento: Joi.date().iso().optional(),
+      fechaNacimiento: Joi.string()
+        .pattern(/^\d{4}-\d{2}-\d{2}$/)
+        .optional()
+        .messages({
+          "string.pattern.base": "La fecha de nacimiento debe estar en formato YYYY-MM-DD"
+        }),
       email: commonRules.email.optional(),
       cargo: Joi.string().min(2).max(100).optional(),
       areaDestinoId: Joi.number().integer().positive().optional(),
@@ -492,12 +500,6 @@ const schemas = {
       descripcion: Joi.string().max(500).allow("").optional().messages({
         "string.max": "La descripción no puede exceder 500 caracteres",
       }),
-      area_destino_id: Joi.number().integer().positive().required().messages({
-        "number.base": "El área de destino debe ser un número válido",
-        "number.integer": "El área de destino debe ser un número entero",
-        "number.positive": "El área de destino debe ser un número positivo",
-        "any.required": "El área de destino es requerida",
-      }),
       activo: Joi.boolean().optional(),
     }),
 
@@ -508,11 +510,6 @@ const schemas = {
       }),
       descripcion: Joi.string().max(500).allow("").optional().messages({
         "string.max": "La descripción no puede exceder 500 caracteres",
-      }),
-      area_destino_id: Joi.number().integer().positive().optional().messages({
-        "number.base": "El área de destino debe ser un número válido",
-        "number.integer": "El área de destino debe ser un número entero",
-        "number.positive": "El área de destino debe ser un número positivo",
       }),
       activo: Joi.boolean().optional(),
     }).min(1),

@@ -4,7 +4,7 @@
  */
 
 const repository = require('./cargos.repository');
-const areasRepository = require('../areas/areas.repository');
+
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 
@@ -14,7 +14,7 @@ const logger = require('../../utils/logger');
  * @returns {Object} Cargos y datos de paginación
  */
 const getAllCargos = async (options = {}) => {
-  const { page = 1, limit = 20, q = '', activo, areaDestinoId } = options;
+  const { page = 1, limit = 20, q = '', activo } = options;
   
   try {
     // Obtener cargos con paginación
@@ -22,8 +22,7 @@ const getAllCargos = async (options = {}) => {
       page,
       limit,
       search: q,
-      activo: activo !== undefined ? activo === 'true' : undefined,
-      areaDestinoId: areaDestinoId ? parseInt(areaDestinoId) : undefined
+      activo: activo !== undefined ? activo === 'true' : undefined
     });
     
     // Formatear respuesta
@@ -72,7 +71,7 @@ const getCargoById = async (id) => {
  */
 const createCargo = async (cargoData, userId) => {
   try {
-    const { nombre_cargo, descripcion, area_destino_id } = cargoData;
+    const { nombre_cargo, descripcion } = cargoData;
     
     // Verificar si ya existe un cargo con el mismo nombre
     const existingCargo = await repository.findByName(nombre_cargo);
@@ -80,20 +79,12 @@ const createCargo = async (cargoData, userId) => {
       throw new AppError('Ya existe un cargo con este nombre', 409);
     }
     
-    // Verificar que el área de destino exista y esté activa
-    const area = await areasRepository.findById(area_destino_id);
-    if (!area) {
-      throw new AppError('Área de destino no encontrada', 404);
-    }
-    if (!area.activa) {
-      throw new AppError('Área de destino inactiva', 400);
-    }
+
     
     // Crear cargo
     const newCargo = await repository.create({
       nombre_cargo,
       descripcion,
-      area_destino_id,
       activo: true
     });
     
@@ -122,7 +113,7 @@ const updateCargo = async (id, cargoData, userId) => {
       throw new AppError('Cargo no encontrado', 404);
     }
     
-    const { nombre_cargo, descripcion, area_destino_id, activo } = cargoData;
+    const { nombre_cargo, descripcion, activo } = cargoData;
     const updateData = {};
     
     // Preparar datos a actualizar
@@ -140,18 +131,7 @@ const updateCargo = async (id, cargoData, userId) => {
       updateData.descripcion = descripcion;
     }
     
-    if (area_destino_id !== undefined) {
-      // Verificar que el área de destino exista y esté activa
-      const area = await areasRepository.findById(area_destino_id);
-      if (!area) {
-        throw new AppError('Área de destino no encontrada', 404);
-      }
-      if (!area.activa) {
-        throw new AppError('Área de destino inactiva', 400);
-      }
-      
-      updateData.area_destino_id = area_destino_id;
-    }
+
     
     if (activo !== undefined) {
       updateData.activo = activo;

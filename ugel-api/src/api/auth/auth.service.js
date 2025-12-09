@@ -119,6 +119,8 @@ const loginUser = async (loginData) => {
   
   // Buscar personal asociado al usuario
   let personalId = user.personal_id || null;
+  let personalNombres = null;
+  let personalApellidos = null;
   
   // Si no hay personal_id en el usuario, intentar buscarlo por documento (si el nombre de usuario es un DNI)
   if (!personalId) {
@@ -129,25 +131,40 @@ const loginUser = async (loginData) => {
         const personal = await personalRepository.findByDocumento('DNI', nombreUsuario);
         if (personal) {
           personalId = personal.id;
+          personalNombres = personal.nombres;
+          personalApellidos = personal.apellidos;
           logger.info(`Personal encontrado para usuario ${nombreUsuario}: ID ${personalId}`);
         }
       }
     } catch (error) {
       logger.warn(`No se pudo obtener personal para usuario ${user.nombre_usuario}: ${error.message}`);
     }
+  } else {
+    // Si ya tiene personal_id, obtener los datos del personal
+    try {
+      const personal = await personalRepository.findById(personalId);
+      if (personal) {
+        personalNombres = personal.nombres;
+        personalApellidos = personal.apellidos;
+      }
+    } catch (error) {
+      logger.warn(`No se pudieron obtener datos del personal ID ${personalId}: ${error.message}`);
+    }
   }
   
-  // Agregar personalId al objeto user para incluirlo en el token
+  // Agregar personalId y datos de personal al objeto user para incluirlo en el token
   const userWithPersonal = {
     ...user,
-    personal_id: personalId
+    personal_id: personalId,
+    personal_nombres: personalNombres,
+    personal_apellidos: personalApellidos
   };
   
   // Generar token
   const token = generateToken(userWithPersonal);
   
-  // Remover datos sensibles
-  const { hash_contrasena, ...userWithoutPassword } = user;
+  // Remover datos sensibles pero incluir datos de personal en la respuesta
+  const { hash_contrasena, ...userWithoutPassword } = userWithPersonal;
   
   logger.info(`Login exitoso para usuario: ${user.nombre_usuario}${personalId ? ` (Personal ID: ${personalId})` : ''}`);
   

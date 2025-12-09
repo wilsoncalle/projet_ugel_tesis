@@ -34,6 +34,22 @@ const io = new Server(server, {
 
 app.set('socketio', io);
 
+const getUserRoom = (userId) => `user_${userId}`;
+
+const getMobileSocketsInRoom = (roomName) => {
+  const room = io.sockets.adapter.rooms.get(roomName);
+  if (!room) return [];
+
+  return [...room]
+    .map((socketId) => io.sockets.sockets.get(socketId))
+    .filter(
+      (s) =>
+        s &&
+        (s.handshake?.auth?.clientType === 'mobile-scanner' ||
+          s.handshake?.query?.clientType === 'mobile-scanner')
+    );
+};
+
 // Middleware de autenticación para Socket.IO
 io.use((socket, next) => {
   const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
@@ -55,7 +71,80 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  logger.info(`Socket conectado: ${socket.id} (Usuario: ${socket.user.nombreUsuario})`);
+  const userId = socket.user?.id;
+  const userRoom = getUserRoom(userId);
+  const clientType = (socket.handshake?.auth?.clientType || socket.handshake?.query?.clientType || 'unknown').toString();
+  const isMobileScanner = clientType === 'mobile-scanner';
+
+  socket.join(userRoom);
+  logger.info(`Socket conectado: ${socket.id} (Usuario: ${socket.user.nombreUsuario}) en sala ${userRoom} - tipo ${clientType}`);
+
+  const emitScannerStatus = () => {
+    const mobileSockets = getMobileSocketsInRoom(userRoom);
+    if (mobileSockets.length > 0) {
+      io.to(userRoom).emit('scanner-connected', { deviceId: mobileSockets[0].id });
+    } else {
+      io.to(userRoom).emit('scanner-disconnected');
+    }
+  };
+
+  if (isMobileScanner) {
+    emitScannerStatus();
+  } else {
+    const mobileSockets = getMobileSocketsInRoom(userRoom);
+    if (mobileSockets.length > 0) {
+      socket.emit('scanner-connected', { deviceId: mobileSockets[0].id });
+    }
+  }
+
+  socket.on('join-room', (payload = {}) => {
+    const requestedUserId = payload.userId ? parseInt(payload.userId, 10) : userId;
+    if (requestedUserId !== userId) {
+      logger.warn(`Socket ${socket.id} intentó unirse a sala de otro usuario (${requestedUserId})`);
+      return;
+    }
+
+    socket.join(userRoom);
+    const payloadClientType = payload.clientType?.toString?.().toLowerCase?.();
+    const joinedAsMobile = payloadClientType === 'mobile-scanner' || isMobileScanner;
+
+    if (joinedAsMobile) {
+      emitScannerStatus();
+    } else {
+      const mobileSockets = getMobileSocketsInRoom(userRoom);
+      if (mobileSockets.length > 0) {
+        socket.emit('scanner-connected', { deviceId: mobileSockets[0].id });
+      }
+    }
+  });
+
+  socket.on('scan-data', ({ userId: targetUserId, dni }) => {
+    const targetId = targetUserId ? parseInt(targetUserId, 10) : userId;
+    if (targetId !== userId) {
+      logger.warn(`Socket ${socket.id} intentó enviar scan a otro usuario (${targetId})`);
+      return;
+    }
+
+    const cleanDni = String(dni || '').replace(/[^0-9]/g, '');
+    if (!cleanDni) {
+      logger.warn(`Socket ${socket.id} envió scan vacío o inválido`);
+      return;
+    }
+
+    io.to(userRoom).emit('receive-scan', cleanDni);
+    logger.info(`DNI recibido via socket para usuario ${userId}: ${cleanDni}`);
+  });
+
+  socket.on('disconnect', () => {
+    if (isMobileScanner) {
+      const mobileSockets = getMobileSocketsInRoom(userRoom).filter((s) => s?.id !== socket.id);
+      if (mobileSockets.length === 0) {
+        io.to(userRoom).emit('scanner-disconnected');
+      }
+    }
+
+    logger.info(`Socket desconectado: ${socket.id} (Usuario: ${socket.user.nombreUsuario})`);
+  });
 });
 
 // Importar servicios para tareas programadas

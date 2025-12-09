@@ -20,6 +20,12 @@ function nowLima() {
 }
 
 function toLimaDayjs(dateInput) {
+  // Si viene un string simple de fecha (YYYY-MM-DD), interpretarlo directamente en zona Lima
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    return dayjs.tz(dateInput, 'YYYY-MM-DD', LIMA_TZ);
+  }
+
+  // En otros casos, respetar el instante recibido y convertirlo a Lima
   return dayjs(dateInput).tz(LIMA_TZ);
 }
 

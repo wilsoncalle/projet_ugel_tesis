@@ -132,4 +132,17 @@
   .animate-fadeIn {
     animation: fadeIn 0.2s ease-out;
   }
+  /* Oculta el marco nativo del html5-qrcode */
+#reader .qr-shaded-region,
+#reader video + div, 
+#reader div[style*="border"] {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Evita que el sombreado nativo oscurezca el video */
+#reader .qr-shaded-region {
+    background: transparent !important;
+}
+
 }

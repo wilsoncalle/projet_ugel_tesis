@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import CatalogoPage from '../components/CatalogoPage';
 import Input from '../components/Input';
 import SelectCustom from '../components/SelectCustom';
-import { cargosService, areasService } from '../services/api';
+import { cargosService } from '../services/api';
 import { cargosFormFields, getTableColumns, transformCargos, transformCargosToBackend } from '../config/formFields.jsx';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
@@ -11,32 +11,7 @@ const CargosPage = () => {
   const [formFields, setFormFields] = useState(cargosFormFields);
   const tableColumns = getTableColumns('cargos');
 
-  // Cargar áreas para llenar el campo select
-  useEffect(() => {
-    const loadOptions = async () => {
-      try {
-        // Cargar áreas (solo activas por defecto)
-        const areasResp = await areasService.getAll();
-        const areasData = areasResp?.data?.data || areasResp?.data || [];
-        const areasOptions = Array.isArray(areasData) ? areasData.map(area => ({
-          value: area.id?.toString(),
-          label: area.nombre_area || area.nombre
-        })) : [];
 
-        // Actualizar los campos del formulario con las opciones cargadas
-        setFormFields(prev => prev.map(field => {
-          if (field.name === 'area_destino_id') {
-            return { ...field, options: areasOptions };
-          }
-          return field;
-        }));
-      } catch (error) {
-        console.error('Error cargando opciones para el formulario:', error);
-      }
-    };
-
-    loadOptions();
-  }, []);
 
   return (
     <CatalogoPage
@@ -103,27 +78,7 @@ const CargosPage = () => {
           };
         }
 
-        if (field.name === 'area_destino_id') {
-          return {
-            ...field,
-            render: ({ value, onChange, error, field: fullField }) => (
-              <div>
-                <SelectCustom
-                  label="Área de Destino"
-                  value={(fullField.options || []).find(opt => opt.value?.toString() === (value ?? '').toString()) || null}
-                  onChange={(selected) => onChange(selected?.value || '')}
-                  options={fullField.options || []}
-                  placeholder="Seleccione un área"
-                  isSearchable={true}
-                  noOptionsMessage="No se encontraron áreas"
-                />
-                {error && (
-                  <p className="mt-1 text-sm text-red-600">{error}</p>
-                )}
-              </div>
-            )
-          };
-        }
+
 
         return field;
       })}

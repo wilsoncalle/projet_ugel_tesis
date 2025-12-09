@@ -11,7 +11,10 @@ import {
   UserGroupIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
+  DevicePhoneMobileIcon,
 } from '@heroicons/react/24/outline';
+import { io } from 'socket.io-client';
+import { useAuth } from '../../hooks/useAuth';
 import {
   tiposDocumentoService,
   motivosVisitaService,
@@ -38,6 +41,7 @@ const RegistroForm = forwardRef(
     },
     ref
   ) => {
+    const { user } = useAuth();
     const [formVisitante, setFormVisitante] = useState({
       tipoDocumentoId: '',
       numeroDocumento: '',
@@ -84,6 +88,7 @@ const RegistroForm = forwardRef(
     const [tipoMensajeEmpleado, setTipoMensajeEmpleado] =
       useState(null);
     const [empleadoSeleccionadoActual, setEmpleadoSeleccionadoActual] = useState(null);
+    const [movilConectado, setMovilConectado] = useState(false);
 
     const [loadingData, setLoadingData] = useState(false);
     
@@ -96,6 +101,8 @@ const RegistroForm = forwardRef(
 
     // Ref para rastrear el conteo anterior de visitantes en espera
     const previousWaitingCount = useRef(visitantesEnEspera?.length || 0);
+    const socketRef = useRef(null);
+    const tiposDocumentoRef = useRef([]);
 
     useImperativeHandle(ref, () => ({
       getCurrentFormData: () => {
@@ -140,6 +147,59 @@ const RegistroForm = forwardRef(
       window.addEventListener('offline-personal-ingreso', handleOfflineIngreso);
       return () => window.removeEventListener('offline-personal-ingreso', handleOfflineIngreso);
     }, []);
+
+    useEffect(() => {
+      tiposDocumentoRef.current = tiposDocumento;
+    }, [tiposDocumento]);
+
+    useEffect(() => {
+      if (!user?.id) return;
+
+      const token = localStorage.getItem('token');
+      const socketURL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+      const socket = io(socketURL, {
+        transports: ['websocket'],
+        auth: { token, clientType: 'desktop' },
+      });
+
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        socket.emit('join-room', { userId: user.id, clientType: 'desktop' });
+      });
+
+      socket.on('scanner-connected', () => setMovilConectado(true));
+      socket.on('scanner-disconnected', () => setMovilConectado(false));
+      socket.on('receive-scan', (dniEscaneado) => {
+        const cleanDni = String(dniEscaneado || '').replace(/[^0-9]/g, '');
+        if (!cleanDni) return;
+
+        const tipoDNI =
+          tiposDocumentoRef.current.find(
+            (tipo) =>
+              tipo.label?.toLowerCase().includes('dni') ||
+              tipo.label?.toLowerCase().includes('documento nacional')
+          ) || null;
+
+        setDocumentoYaBuscado('');
+        setVisitanteEncontrado(null);
+        setMensajeVisitante('');
+        setTipoMensaje('');
+
+        setFormVisitante((prev) => ({
+          ...prev,
+          tipoDocumentoId: tipoDNI?.value || prev.tipoDocumentoId || '',
+          numeroDocumento: cleanDni,
+        }));
+
+        documentoInput?.current?.focus?.();
+      });
+
+      return () => {
+        socket.disconnect();
+        setMovilConectado(false);
+      };
+    }, [user, documentoInput]);
 
     const [previousTab, setPreviousTab] = useState(activeTab);
 
@@ -1573,8 +1633,14 @@ const RegistroForm = forwardRef(
             <div className="p-0 flex-1 flex flex-col overflow-visible">
             {activeTab === 'activos' && (
               <div className="flex-shrink-0 space-y-3 border border-gray-200 rounded-xl pb-3 mb-3 p-3">
-                <h3 className="text-base font-semibold text-gray-800 mb-3">
-                  Datos del Visitante
+                <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                  <span>Datos del Visitante</span>
+                  {movilConectado && (
+                    <span className="flex items-center text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full animate-pulse">
+                      <DevicePhoneMobileIcon className="h-3 w-3 mr-1" />
+                      Escáner Móvil Activo
+                    </span>
+                  )}
                 </h3>
 
                 <div className="grid grid-cols-2 gap-3">

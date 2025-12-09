@@ -7,11 +7,16 @@ const OFFLINE_URL = '/offline.html';
 const API_BASE_URL = '/api';
 
 // Assets estáticos para cachear
+// Workbox inyectará automáticamente los assets generados aquí (placeholder obligatorio)
+const WB_MANIFEST = self.__WB_MANIFEST || [];
+
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/offline.html',
-  '/manifest.json'
+  '/manifest.json',
+  // Añade también los assets generados por Vite para que queden precacheados
+  ...WB_MANIFEST.map((entry) => (entry && entry.url ? entry.url : entry)).filter(Boolean)
 ];
 
 // ========== INSTALL EVENT ==========

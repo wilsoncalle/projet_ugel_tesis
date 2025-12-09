@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import OfflineIndicator from './components/OfflineIndicator';
@@ -22,6 +22,7 @@ import MainLayout from './components/MainLayout';
 
 // Public Pages
 import LoginPage from './pages/LoginPage';
+import MobileLoginPage from './pages/MobileLoginPage';
 
 // Protected Pages
 import DashboardAdminPage from './pages/DashboardAdminPage';
@@ -29,14 +30,12 @@ import DashboardRRHHPage from './pages/DashboardRRHHPage';
 import DashboardVigilantePage from './pages/DashboardVigilantePage';
 import PersonalAsistenciaPage from './pages/PersonalAsistenciaPage';
 import ProfilePage from './pages/ProfilePage';
-
 import AreasPage from './pages/AreasPage';
 import TiposDocumentoPage from './pages/TiposDocumentoPage';
 import MisVisitasPage from './pages/MisVisitasPage';
 import MiAsistenciaPersonalPage from './pages/MiAsistenciaPersonalPage';
 import MotivosVisitaPage from './pages/MotivosVisitaPage';
 import TiposContratoPage from './pages/TiposContratoPage';
-import MotivosSalidaPage from './pages/MotivosSalidaPage';
 import CargosPage from './pages/CargosPage';
 import PersonalPage from './pages/PersonalPage';
 import UsuariosPage from './pages/UsuariosPage';
@@ -47,6 +46,9 @@ import AdminCatalogosPage from './pages/AdminCatalogosPage';
 import ConfigAsistenciaPage from './pages/ConfigAsistenciaPage';
 import GestionJustificacionesPage from './pages/GestionJustificacionesPage';
 import ReniecProvidersPage from './pages/ReniecProvidersPage';
+
+// Lazy load mobile scanner for better performance
+const MobileScannerPage = lazy(() => import('./pages/MobileScannerPage'));
 
 // Routes Configuration
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -69,8 +71,33 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />} />
         
+        {/* Mobile-optimized Login (lightweight) */}
+        <Route path="/m/login" element={!isAuthenticated ? <MobileLoginPage /> : <Navigate to="/escaner-movil" />} />
+        
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
+          {/* Mobile Scanner with Lazy Loading */}
+          <Route 
+            path="/escaner-movil" 
+            element={
+              <ProtectedRoute 
+                element={
+                  <Suspense 
+                    fallback={
+                      <div className="h-screen bg-black flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+                          <p className="text-white text-sm">Cargando escáner...</p>
+                        </div>
+                      </div>
+                    }
+                  >
+                    <MobileScannerPage />
+                  </Suspense>
+                } 
+              />
+            } 
+          />
           <Route element={<MainLayout />}>
             {/* Admin Routes */}
             <Route path="/admin">
@@ -81,7 +108,7 @@ function App() {
               <Route path="tipos-documento" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposDocumentoPage />} />} />
               <Route path="motivos-visita" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosVisitaPage />} />} />
               <Route path="tipos-contrato" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposContratoPage />} />} />
-              <Route path="motivos-salida" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosSalidaPage />} />} />
+
               <Route path="cargos" element={<ProtectedRoute allowedRoles={['admin']} element={<CargosPage />} />} />
               <Route path="catalogos" element={<ProtectedRoute allowedRoles={['admin']} element={<AdminCatalogosPage />} />} />
               
