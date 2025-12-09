@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 // import { io } from 'socket.io-client'; // Cargado dinámicamente
 import { AnimatePresence, motion } from "framer-motion";
 import Card from '../components/Card';
@@ -74,10 +75,33 @@ const itemVariants = {
     },
   },
 };
+
+
 const DashboardVigilantePage = () => {
   useDocumentTitle('Registro de Visitantes - COAC-UGEL');
+  const navigate = useNavigate();
   // Hook de autenticación
   const { user, isAuthenticated } = useAuth();
+  
+  // Detección de dispositivo móvil y redirección
+  useEffect(() => {
+    const checkMobile = () => {
+      // Detección combinada: ancho de pantalla < 768px O userAgent móvil
+      const isMobileWidth = window.innerWidth < 768;
+      const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobileWidth || isMobileUserAgent) {
+        console.log('[DashboardVigilante] Dispositivo móvil detectado, redirigiendo a escáner...');
+        navigate('/escaner-movil', { replace: true });
+      }
+    };
+    
+    checkMobile();
+    
+    // Opcional: escuchar cambios de tamaño
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [navigate]);
   // Estados principales del dashboard
   const [visitantesEnEspera, setVisitantesEnEspera] = useState([]);
   const [visitantesActivos, setVisitantesActivos] = useState([]);
@@ -250,7 +274,7 @@ const DashboardVigilantePage = () => {
         
         if (isCleaningUp) return null;
 
-        const socketURL = import.meta.env.VITE_SOCKET_URL || (window.location.origin.includes(':5173') ? 'http://localhost:3000' : window.location.origin);
+        const socketURL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
         // Conexión Socket.IO para actualizaciones en tiempo real
         const token = localStorage.getItem('token');

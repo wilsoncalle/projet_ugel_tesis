@@ -35,7 +35,10 @@ const LoginPage = () => {
     if (e) e.preventDefault();
     if (!validateForm()) return;
     try {
-      const result = await login(credentials);
+      const result = await login({
+        nombreUsuario: credentials.nombreUsuario.trim(),
+        contrasena: credentials.contrasena // Don't trim password as it might contain spaces, though unlikely in this context, it's safer to trim only username
+      });
       if (result?.success) {
         const user = JSON.parse(localStorage.getItem('user'));
         const role = user?.rol?.toLowerCase() || '';

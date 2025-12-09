@@ -55,6 +55,8 @@ export default defineConfig({
     })
   ],
   server: {
+    host: true,
+    allowedHosts: true, // Permitir cualquier host de tunel (Cloudflare/ngrok)
     port: 5173,
     proxy: {
       '/api': {

@@ -14,7 +14,6 @@ const { errorHandler } = require('./src/middleware/errorHandler');
 const authRoutes = require('./src/api/auth/auth.routes');
 const areasRoutes = require('./src/api/areas/areas.routes');
 const tiposContratoRoutes = require('./src/api/tipos-contrato/tiposcontrato.routes');
-const motivosSalidaRoutes = require('./src/api/motivos-salida/motivossalida.routes');
 const tiposDocumentoRoutes = require('./src/api/tipos-documento/tiposdocumento.routes');
 const motivosVisitaRoutes = require('./src/api/motivos-visita/motivosvisita.routes');
 const usuariosRoutes = require('./src/api/usuarios/usuarios.routes');
@@ -59,7 +58,6 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/areas', areasRoutes);
 app.use('/api/tipos-contrato', tiposContratoRoutes);
-app.use('/api/motivos-salida', motivosSalidaRoutes);
 app.use('/api/tipos-documento', tiposDocumentoRoutes);
 app.use('/api/motivos-visita', motivosVisitaRoutes);
 app.use('/api/usuarios', usuariosRoutes);

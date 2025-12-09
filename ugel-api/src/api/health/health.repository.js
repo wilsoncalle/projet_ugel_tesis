@@ -129,7 +129,6 @@ const checkTablesIntegrity = async () => {
       'Usuarios',
       'AreasDestino',
       'TiposContrato',
-      'MotivosSalidaPersonal',
       'TiposDocumento',
       'MotivosVisita',
       'Personal',

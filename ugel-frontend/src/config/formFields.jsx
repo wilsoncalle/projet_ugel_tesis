@@ -49,16 +49,7 @@ export const tiposContratoFormFields = [
   },
 ];
 
-// Configuración de campos para el módulo de Motivos de Salida
-export const motivosSalidaFormFields = [
-  {
-    name: 'nombre_motivo',
-    label: 'Nombre del Motivo',
-    type: 'text',
-    placeholder: 'Ingrese el nombre del motivo de salida',
-    required: true,
-  },
-];
+
 
 // Configuración de campos para el módulo de Cargos
 export const cargosFormFields = [
@@ -76,14 +67,7 @@ export const cargosFormFields = [
     placeholder: 'Ingrese una descripción del cargo (opcional)',
     required: false,
   },
-  {
-    name: 'area_destino_id',
-    label: 'Área de Destino',
-    type: 'select',
-    required: true,
-    placeholder: 'Seleccione un área',
-    options: [] // Se llena dinámicamente
-  },
+
 ];
 
 // Configuración de campos para el módulo de Personal
@@ -281,31 +265,7 @@ export const transformTiposContratoToBackend = (data) => {
   return transformed;
 };
 
-export const transformMotivosSalida = (data) => {
-  console.log('transformMotivosSalida - Datos de entrada:', data);
-  if (Array.isArray(data)) {
-    const transformed = data.map(item => ({
-      id: item.id,
-      nombre_motivo: item.nombre_motivo,
-      activo: item.activo
-    }));
-    console.log('transformMotivosSalida - Datos transformados:', transformed);
-    return transformed;
-  }
-  console.log('transformMotivosSalida - No es un array, retornando datos originales:', data);
-  return data;
-};
 
-// Función para transformar datos del frontend al backend
-export const transformMotivosSalidaToBackend = (data) => {
-  console.log('transformMotivosSalidaToBackend - Datos de entrada:', data);
-  const transformed = {
-    nombre: data.nombre_motivo, // Convertir nombre_motivo a nombre para el backend
-    activo: data.activo
-  };
-  console.log('transformMotivosSalidaToBackend - Datos transformados:', transformed);
-  return transformed;
-};
 
 // Transformación de datos para el módulo de Cargos
 export const transformCargos = (data) => {
@@ -314,8 +274,7 @@ export const transformCargos = (data) => {
       id: item.id,
       nombre_cargo: item.nombre_cargo,
       descripcion: item.descripcion || '',
-      area_destino_id: item.area_destino_id ? item.area_destino_id.toString() : '',
-      area_nombre: item.area_nombre || 'No asignado',
+
       activo: item.activo,
       fecha_creacion: item.fecha_creacion
     }));
@@ -325,8 +284,7 @@ export const transformCargos = (data) => {
       id: data.id,
       nombre_cargo: data.nombre_cargo,
       descripcion: data.descripcion || '',
-      area_destino_id: data.area_destino_id ? data.area_destino_id.toString() : '',
-      area_nombre: data.area_nombre || 'No asignado',
+
       activo: data.activo,
       fecha_creacion: data.fecha_creacion
     };
@@ -339,7 +297,7 @@ export const transformCargosToBackend = (data) => {
   const transformed = {
     nombre_cargo: data.nombre_cargo,
     descripcion: data.descripcion,
-    area_destino_id: parseInt(data.area_destino_id),
+
     activo: data.activo !== undefined ? data.activo : true // Valor por defecto si no se especifica
   };
   return transformed;
@@ -351,16 +309,27 @@ export const transformCargosToBackend = (data) => {
 const formatDateForInput = (value) => {
   if (!value) return '';
 
-  // Soporta string ISO, string YYYY-MM-DD, Date, etc.
+  // Si ya viene en formato YYYY-MM-DD
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  
+  // Si viene con hora (ISO), cortamos la parte de la fecha
+  if (typeof value === 'string' && value.includes('T')) {
+      return value.split('T')[0];
+  }
+
+  // Si es un objeto Date
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) {
     return '';
   }
 
+  // Extraer componentes locales
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`; // 2004-09-26
+  return `${year}-${month}-${day}`;
 };
 
 export const transformPersonal = (data) => {
@@ -713,29 +682,7 @@ export const getTableColumns = (moduleName) => {
         ),
       },
     ],
-    motivosSalida: [
-      { 
-        key: 'nombre_motivo', 
-        title: 'Nombre del Motivo',
-        minWidth: '200px',
-        maxWidth: '500px',
-        width: 'auto'
-      },
-      { 
-        key: 'activo', 
-        title: 'Estado',
-        minWidth: '90px',
-        maxWidth: '100px',
-        width: '90px',
-        render: (value) => (
-          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
-            value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-          }`}>
-            {value ? 'Activo' : 'Inactivo'}
-          </span>
-        ),
-      },
-    ],
+
     cargos: [
       { 
         key: 'nombre_cargo', 
@@ -751,13 +698,7 @@ export const getTableColumns = (moduleName) => {
         maxWidth: '400px',
         width: 'auto'
       },
-      { 
-        key: 'area_nombre', 
-        title: 'Área',
-        minWidth: '150px',
-        maxWidth: '200px',
-        width: 'auto'
-      },
+
       { 
         key: 'activo', 
         title: 'Estado',

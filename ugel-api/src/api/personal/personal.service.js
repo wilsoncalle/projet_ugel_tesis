@@ -92,8 +92,37 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
 
     if (existingUser && existingUser.activo === true) {
       logger.info(
-        `[ensureUsuarioParaPersonal] Personal ID ${personal.id} ya tiene usuario asociado activo (ID ${existingUser.id}), no se crea otro`
+        `[ensureUsuarioParaPersonal] Personal ID ${personal.id} ya tiene usuario asociado activo (ID ${existingUser.id}), verificando si necesita actualización...`
       );
+      
+      // Verificar si hay cambios en los datos críticos
+      const needsUpdate = 
+        existingUser.nombre_usuario !== personal.numero_documento ||
+        existingUser.email !== personal.email;
+      
+      if (needsUpdate || origen === 'actualización') {
+        logger.info(`[ensureUsuarioParaPersonal] Actualizando usuario existente con nuevos datos del personal...`);
+        
+        await usuariosService.updateUsuario(
+          existingUser.id,
+          {
+            nombreUsuario: personal.numero_documento,
+            email: personal.email,
+            contrasena: password, // Nueva contraseña basada en fecha de nacimiento actualizada
+            rol: existingUser.rol || 'Personal',
+            activo: true,
+            personalId: personal.id,
+          },
+          userId
+        );
+        
+        logger.info(
+          `[ensureUsuarioParaPersonal] Usuario ID ${existingUser.id} actualizado con datos de personal ID ${personal.id}`
+        );
+        return { created: false, updated: true, userId: existingUser.id };
+      }
+      
+      logger.info(`[ensureUsuarioParaPersonal] Usuario ya está actualizado, no se requieren cambios`);
       return { created: false, reason: 'ya_existe_activo', userId: existingUser.id };
     }
 
@@ -429,8 +458,21 @@ const createPersonal = async (personalData, userId) => {
       areaDestinoId, 
       tipoContratoId 
     } = personalData;
-    const fechaNacimientoInput = fechaNacimiento !== undefined ? fechaNacimiento : fechaNacimientoSnake;
-    const fechaNacimientoLima = toLimaDateYYYYMMDD(fechaNacimientoInput);
+    // Normalizar fecha: evitar conversión a Date que pueda restar un día por zona horaria
+    let fechaNacimientoLima;
+    let fechaNacimientoInput = fechaNacimiento !== undefined ? fechaNacimiento : fechaNacimientoSnake;
+    
+    if (typeof fechaNacimientoInput === 'string') {
+      // Si viene como string ISO o YYYY-MM-DD, tomar la parte de la fecha directamente
+      if (fechaNacimientoInput.includes('T')) {
+        fechaNacimientoLima = fechaNacimientoInput.split('T')[0];
+      } else {
+        fechaNacimientoLima = fechaNacimientoInput;
+      }
+    } else {
+      // Si por alguna razón es objeto Date u otro
+      fechaNacimientoLima = toLimaDateYYYYMMDD(fechaNacimientoInput);
+    }
     
     // Verificar que el tipo de documento sea válido
     if (!config.validation.validDocumentTypes.includes(tipoDocumento)) {
@@ -533,7 +575,10 @@ const updatePersonal = async (id, personalData, userId) => {
       activo
     } = personalData;
     
-    const fechaNacimientoInput = fechaNacimiento !== undefined ? fechaNacimiento : fechaNacimientoSnake;
+    let fechaNacimientoInput = fechaNacimiento !== undefined ? fechaNacimiento : fechaNacimientoSnake;
+    if (typeof fechaNacimientoInput === 'string' && fechaNacimientoInput.includes('T')) {
+      fechaNacimientoInput = fechaNacimientoInput.split('T')[0];
+    }
     
     const updateData = {};
     
@@ -569,8 +614,19 @@ const updatePersonal = async (id, personalData, userId) => {
     }
 
     if (fechaNacimientoInput !== undefined) {
-      // Normalizamos a YYYY-MM-DD en zona horaria Lima
-      const fechaNacStr = toLimaDateYYYYMMDD(fechaNacimientoInput);
+      // Normalizamos a YYYY-MM-DD evitando conversiones de zona horaria
+      let fechaNacStr;
+      
+      if (typeof fechaNacimientoInput === 'string') {
+        if (fechaNacimientoInput.includes('T')) {
+          fechaNacStr = fechaNacimientoInput.split('T')[0];
+        } else {
+          fechaNacStr = fechaNacimientoInput;
+        }
+      } else {
+        fechaNacStr = toLimaDateYYYYMMDD(fechaNacimientoInput);
+      }
+
       if (!fechaNacStr) {
         throw new AppError('Fecha de nacimiento inválida', 400);
       }
@@ -652,8 +708,10 @@ const updatePersonal = async (id, personalData, userId) => {
         logger.info(`[updatePersonal] Usuario creado exitosamente para personal ID ${id}`);
       } else if (resultado.reactivated) {
         logger.info(`[updatePersonal] Usuario reactivado para personal ID ${id}`);
+      } else if (resultado.updated) {
+        logger.info(`[updatePersonal] Usuario actualizado exitosamente con nuevos datos de personal ID ${id}`);
       } else if (resultado.reason === 'ya_existe_activo') {
-        logger.info(`[updatePersonal] Personal ID ${id} ya tiene usuario activo`);
+        logger.info(`[updatePersonal] Personal ID ${id} ya tiene usuario activo (sin cambios necesarios)`);
       } else if (resultado.reason === 'datos_incompletos') {
         logger.warn(`[updatePersonal] Personal ID ${id} aún no tiene datos completos para crear usuario`);
       } else if (resultado.error) {

@@ -23,12 +23,9 @@ const findAll = async (options = {}) => {
         c.id,
         c.nombre_cargo,
         c.descripcion,
-        c.area_destino_id,
-        a.nombre_area as area_nombre,
         c.activo,
         c.fecha_creacion
       FROM Cargos c
-      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
     `;
     
     // Construir la cláusula WHERE
@@ -58,12 +55,7 @@ const findAll = async (options = {}) => {
       paramCounter++;
     }
     
-    // Filtro por área de destino
-    if (areaDestinoId) {
-      whereConditions.push(`c.area_destino_id = $${paramCounter}`);
-      queryParams.push(areaDestinoId);
-      paramCounter++;
-    }
+
     
     // Agregar condiciones WHERE si existen
     if (whereConditions.length > 0) {
@@ -115,12 +107,9 @@ const findById = async (id) => {
         c.id,
         c.nombre_cargo,
         c.descripcion,
-        c.area_destino_id,
-        a.nombre_area as area_nombre,
         c.activo,
         c.fecha_creacion
       FROM Cargos c
-      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
       WHERE c.id = $1
     `;
     
@@ -145,12 +134,9 @@ const findByName = async (nombre) => {
         c.id,
         c.nombre_cargo,
         c.descripcion,
-        c.area_destino_id,
-        a.nombre_area as area_nombre,
         c.activo,
         c.fecha_creacion
       FROM Cargos c
-      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
       WHERE LOWER(c.nombre_cargo) = LOWER($1)
       AND c.activo = true
     `;
@@ -171,21 +157,20 @@ const findByName = async (nombre) => {
  */
 const create = async (cargoData) => {
   try {
-    const { nombre_cargo, descripcion, area_destino_id, activo = true } = cargoData;
+    const { nombre_cargo, descripcion, activo = true } = cargoData;
     
     const query = `
-      INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id, activo)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO Cargos (nombre_cargo, descripcion, activo)
+      VALUES ($1, $2, $3)
       RETURNING 
         id,
         nombre_cargo,
         descripcion,
-        area_destino_id,
         activo,
         fecha_creacion
     `;
     
-    const result = await db.query(query, [nombre_cargo, descripcion, area_destino_id, activo]);
+    const result = await db.query(query, [nombre_cargo, descripcion, activo]);
     
     if (result.rows.length === 0) {
       throw new AppError('Error creando cargo', 500);
@@ -235,10 +220,7 @@ const update = async (id, cargoData) => {
       queryParams.push(cargoData.descripcion);
     }
     
-    if (cargoData.area_destino_id !== undefined) {
-      updateFields.push(`area_destino_id = $${paramCounter++}`);
-      queryParams.push(cargoData.area_destino_id);
-    }
+
     
     if (cargoData.activo !== undefined) {
       updateFields.push(`activo = $${paramCounter++}`);
@@ -259,7 +241,6 @@ const update = async (id, cargoData) => {
         id,
         nombre_cargo,
         descripcion,
-        area_destino_id,
         activo,
         fecha_creacion
     `;
@@ -278,12 +259,7 @@ const update = async (id, cargoData) => {
       throw new AppError('Ya existe un cargo con este nombre', 409);
     }
     
-    if (error.code === '23503') {
-      // Violación de clave foránea
-      if (error.constraint && error.constraint.includes('area_destino_id')) {
-        throw new AppError('Área de destino no encontrada', 404);
-      }
-    }
+
     
     logger.error(`Error en repositorio actualizando cargo ID ${id}:`, error);
     throw error instanceof AppError ? error : new AppError('Error actualizando cargo', 500);
@@ -349,11 +325,8 @@ const getActiveCargosList = async () => {
     const query = `
       SELECT 
         c.id,
-        c.nombre_cargo,
-        c.area_destino_id,
-        a.nombre_area as area_nombre
+        c.nombre_cargo
       FROM Cargos c
-      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
       WHERE c.activo = true
       ORDER BY c.nombre_cargo ASC
     `;
@@ -367,32 +340,7 @@ const getActiveCargosList = async () => {
   }
 };
 
-/**
- * Obtener cargos por área de destino
- * @param {number} areaDestinoId - ID del área de destino
- * @returns {Array} Cargos encontrados
- */
-const findByAreaDestino = async (areaDestinoId) => {
-  try {
-    const query = `
-      SELECT 
-        c.id,
-        c.nombre_cargo,
-        c.descripcion,
-        c.activo
-      FROM Cargos c
-      WHERE c.area_destino_id = $1 AND c.activo = true
-      ORDER BY c.nombre_cargo ASC
-    `;
-    
-    const result = await db.query(query, [areaDestinoId]);
-    return result.rows;
-    
-  } catch (error) {
-    logger.error(`Error en repositorio buscando cargos por área ID ${areaDestinoId}:`, error);
-    throw new AppError('Error obteniendo cargos por área', 500);
-  }
-};
+
 
 /**
  * Buscar cargos eliminados (soft delete)
@@ -420,7 +368,7 @@ const findDeleted = async (options = {}) => {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM Cargos c
-      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
+
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -430,12 +378,9 @@ const findDeleted = async (options = {}) => {
         c.id,
         c.nombre_cargo,
         c.descripcion,
-        c.area_destino_id,
-        a.nombre_area as area_nombre,
         c.activo,
         c.fecha_creacion
       FROM Cargos c
-      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY c.nombre_cargo ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
@@ -473,12 +418,9 @@ const findByIdIncludingDeleted = async (id) => {
         c.id,
         c.nombre_cargo,
         c.descripcion,
-        c.area_destino_id,
-        a.nombre_area as area_nombre,
         c.activo,
         c.fecha_creacion
       FROM Cargos c
-      LEFT JOIN AreasDestino a ON c.area_destino_id = a.id
       WHERE c.id = $1
     `;
     
@@ -529,7 +471,7 @@ module.exports = {
   softDelete,
   checkCargoInUse,
   getActiveCargosList,
-  findByAreaDestino,
+
   findDeleted,
   findByIdIncludingDeleted,
   restore

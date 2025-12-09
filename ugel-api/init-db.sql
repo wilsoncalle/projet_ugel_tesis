@@ -26,12 +26,6 @@ CREATE TABLE IF NOT EXISTS TiposContrato (
     activo BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE TABLE IF NOT EXISTS MotivosSalidaPersonal (
-    id SERIAL PRIMARY KEY,
-    nombre_motivo VARCHAR(150) NOT NULL UNIQUE,
-    activo BOOLEAN NOT NULL DEFAULT TRUE
-);
-
 CREATE TABLE IF NOT EXISTS TiposDocumento (
     id SERIAL PRIMARY KEY,
     codigo VARCHAR(10) NOT NULL UNIQUE,
@@ -50,10 +44,8 @@ CREATE TABLE IF NOT EXISTS Cargos (
     id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nombre_cargo VARCHAR(150) NOT NULL UNIQUE,
     descripcion TEXT NULL,
-    area_destino_id INT NOT NULL,
     activo BOOLEAN NOT NULL DEFAULT TRUE,
-    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (area_destino_id) REFERENCES AreasDestino(id)
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- GESTIÓN DE PERSONAL INTERNO
@@ -102,20 +94,6 @@ CREATE TABLE IF NOT EXISTS RegistrosVisitas (
     FOREIGN KEY (motivo_visita_id) REFERENCES MotivosVisita(id),
     FOREIGN KEY (usuario_ingreso_id) REFERENCES Usuarios(id),
     FOREIGN KEY (usuario_salida_id) REFERENCES Usuarios(id)
-);
-
-CREATE TABLE IF NOT EXISTS RegistrosSalidaPersonal (
-    id BIGSERIAL PRIMARY KEY,
-    personal_id INT NOT NULL,
-    motivo_salida_id INT NOT NULL,
-    fecha_hora_salida TIMESTAMP NOT NULL,
-    fecha_hora_retorno_estimada TIMESTAMP NULL,
-    fecha_hora_retorno_real TIMESTAMP NULL,
-    observacion_salida TEXT NULL,
-    usuario_registro_id INT NOT NULL,
-    FOREIGN KEY (personal_id) REFERENCES Personal(id),
-    FOREIGN KEY (motivo_salida_id) REFERENCES MotivosSalidaPersonal(id),
-    FOREIGN KEY (usuario_registro_id) REFERENCES Usuarios(id)
 );
 
 CREATE TABLE IF NOT EXISTS ControlAsistenciaPersonal (
@@ -174,21 +152,21 @@ SELECT 'Permanente' WHERE NOT EXISTS (SELECT 1 FROM TiposContrato WHERE nombre_t
 INSERT INTO TiposContrato (nombre_tipo)
 SELECT 'Contratado' WHERE NOT EXISTS (SELECT 1 FROM TiposContrato WHERE nombre_tipo = 'Contratado');
 
--- Insertar cargos básicos
-INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id)
-SELECT 'Director', 'Director de la UGEL', (SELECT id FROM AreasDestino WHERE nombre_area = 'Dirección' LIMIT 1)
+-- Insertar cargos básicos without area_destino_id
+INSERT INTO Cargos (nombre_cargo, descripcion)
+SELECT 'Director', 'Director de la UGEL'
 WHERE NOT EXISTS (SELECT 1 FROM Cargos WHERE nombre_cargo = 'Director');
 
-INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id)
-SELECT 'Secretario', 'Secretario de Dirección', (SELECT id FROM AreasDestino WHERE nombre_area = 'Dirección' LIMIT 1)
+INSERT INTO Cargos (nombre_cargo, descripcion)
+SELECT 'Secretario', 'Secretario de Dirección'
 WHERE NOT EXISTS (SELECT 1 FROM Cargos WHERE nombre_cargo = 'Secretario');
 
-INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id)
-SELECT 'Jefe de Administración', 'Jefe del Área de Administración', (SELECT id FROM AreasDestino WHERE nombre_area = 'Administración' LIMIT 1)
+INSERT INTO Cargos (nombre_cargo, descripcion)
+SELECT 'Jefe de Administración', 'Jefe del Área de Administración'
 WHERE NOT EXISTS (SELECT 1 FROM Cargos WHERE nombre_cargo = 'Jefe de Administración');
 
-INSERT INTO Cargos (nombre_cargo, descripcion, area_destino_id)
-SELECT 'Jefe de RRHH', 'Jefe del Área de Recursos Humanos', (SELECT id FROM AreasDestino WHERE nombre_area = 'Recursos Humanos' LIMIT 1)
+INSERT INTO Cargos (nombre_cargo, descripcion)
+SELECT 'Jefe de RRHH', 'Jefe del Área de Recursos Humanos'
 WHERE NOT EXISTS (SELECT 1 FROM Cargos WHERE nombre_cargo = 'Jefe de RRHH');
 
 -- Insertar tipos de documento básicos
@@ -203,15 +181,6 @@ WHERE NOT EXISTS (SELECT 1 FROM TiposDocumento WHERE codigo = 'CE');
 INSERT INTO TiposDocumento (codigo, nombre_completo)
 SELECT 'PASS', 'Pasaporte' 
 WHERE NOT EXISTS (SELECT 1 FROM TiposDocumento WHERE codigo = 'PASS');
-
--- Insertar motivos de salida básicos
-INSERT INTO MotivosSalidaPersonal (nombre_motivo)
-SELECT 'Comisión de Servicio' 
-WHERE NOT EXISTS (SELECT 1 FROM MotivosSalidaPersonal WHERE nombre_motivo = 'Comisión de Servicio');
-
-INSERT INTO MotivosSalidaPersonal (nombre_motivo)
-SELECT 'Permiso Personal' 
-WHERE NOT EXISTS (SELECT 1 FROM MotivosSalidaPersonal WHERE nombre_motivo = 'Permiso Personal');
 
 -- Insertar motivos de visita básicos
 INSERT INTO MotivosVisita (nombre_motivo)

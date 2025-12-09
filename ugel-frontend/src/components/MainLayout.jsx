@@ -186,21 +186,6 @@ const AdminSidebar = ({ isExpanded }) => (
           label="Motivos de Visita" 
         />
         <NavItem 
-          to="/admin/motivos-salida" 
-          isExpanded={isExpanded}
-          icon={
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-              />
-            </svg>
-          } 
-          label="Motivos de Salida" 
-        />
-        <NavItem 
           to="/admin/cargos" 
           isExpanded={isExpanded}
           icon={
@@ -668,7 +653,11 @@ const MainLayout = () => {
                     </svg>
                   </div>
                   <div className="flex flex-col items-start">
-                    <span className="text-sm font-semibold">{user?.nombre_usuario || 'Usuario'}</span>
+                    <span className="text-sm font-semibold">
+                      {user?.personal_nombres && user?.personal_apellidos
+                        ? `${user.personal_nombres.split(' ')[0]} ${user.personal_apellidos.split(' ')[0]}`
+                        : user?.nombre_usuario || 'Usuario'}
+                    </span>
                     <span className="text-xs text-gray-500">{user?.rol || 'Sin rol'}</span>
                   </div>
                   <svg
