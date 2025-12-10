@@ -1,0 +1,9 @@
+SELECT setval('public.tiposdocumento_id_seq', (SELECT MAX(id) FROM public.tiposdocumento));
+SELECT setval('public.tiposcontrato_id_seq', (SELECT MAX(id) FROM public.tiposcontrato));
+SELECT setval('public.areasdestino_id_seq', (SELECT MAX(id) FROM public.areasdestino));
+SELECT setval('public.personal_id_seq', (SELECT MAX(id) FROM public.personal));
+SELECT setval('public.visitantes_id_seq', (SELECT MAX(id) FROM public.visitantes));
+SELECT setval('public.config_asistencia_personal_id_seq', (SELECT MAX(id) FROM public.config_asistencia_personal));
+SELECT setval('public.controlasistenciapersonal_id_seq', (SELECT MAX(id) FROM public.controlasistenciapersonal));
+SELECT setval('public.registrosvisitas_id_seq', (SELECT MAX(id) FROM public.registrosvisitas));
+SELECT setval('public.reniecproveedores_id_seq', (SELECT MAX(id) FROM public.reniecproveedores));

@@ -82,7 +82,6 @@ CREATE TABLE public.cargos (
     id integer NOT NULL,
     nombre_cargo character varying(150) NOT NULL,
     descripcion text,
-    area_destino_id integer NOT NULL,
     activo boolean DEFAULT true NOT NULL,
     fecha_creacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -222,41 +221,6 @@ ALTER TABLE public.justificaciones ALTER COLUMN id ADD GENERATED ALWAYS AS IDENT
 
 
 --
--- Name: motivossalidapersonal; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.motivossalidapersonal (
-    id integer NOT NULL,
-    nombre_motivo character varying(150) NOT NULL,
-    activo boolean DEFAULT true NOT NULL
-);
-
-
-ALTER TABLE public.motivossalidapersonal OWNER TO postgres;
-
---
--- Name: motivossalidapersonal_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.motivossalidapersonal_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.motivossalidapersonal_id_seq OWNER TO postgres;
-
---
--- Name: motivossalidapersonal_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.motivossalidapersonal_id_seq OWNED BY public.motivossalidapersonal.id;
-
-
---
 -- Name: motivosvisita; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -332,20 +296,6 @@ CREATE TABLE public.papeletassalida (
 ALTER TABLE public.papeletassalida OWNER TO postgres;
 
 --
--- Name: papeletassalida_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-ALTER TABLE public.papeletassalida ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME public.papeletassalida_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
 -- Name: personal; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -386,45 +336,6 @@ ALTER SEQUENCE public.personal_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.personal_id_seq OWNED BY public.personal.id;
-
-
---
--- Name: registrossalidapersonal; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.registrossalidapersonal (
-    id bigint NOT NULL,
-    personal_id integer NOT NULL,
-    motivo_salida_id integer NOT NULL,
-    fecha_hora_salida timestamp without time zone NOT NULL,
-    fecha_hora_retorno_estimada timestamp without time zone,
-    fecha_hora_retorno_real timestamp without time zone,
-    observacion_salida text,
-    usuario_registro_id integer NOT NULL
-);
-
-
-ALTER TABLE public.registrossalidapersonal OWNER TO postgres;
-
---
--- Name: registrossalidapersonal_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.registrossalidapersonal_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.registrossalidapersonal_id_seq OWNER TO postgres;
-
---
--- Name: registrossalidapersonal_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.registrossalidapersonal_id_seq OWNED BY public.registrossalidapersonal.id;
 
 
 --
@@ -482,6 +393,49 @@ ALTER SEQUENCE public.registrosvisitas_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.registrosvisitas_id_seq OWNED BY public.registrosvisitas.id;
+
+
+--
+-- Name: reniecproveedores; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.reniecproveedores (
+    id integer NOT NULL,
+    nombre character varying(150) NOT NULL,
+    base_url text NOT NULL,
+    token text,
+    notas text,
+    activo boolean DEFAULT false NOT NULL,
+    usuario_creador_id integer,
+    fecha_creacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    fecha_actualizacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    fecha_activacion timestamp without time zone,
+    fecha_desactivacion timestamp without time zone
+);
+
+
+ALTER TABLE public.reniecproveedores OWNER TO postgres;
+
+--
+-- Name: reniecproveedores_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.reniecproveedores_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.reniecproveedores_id_seq OWNER TO postgres;
+
+--
+-- Name: reniecproveedores_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.reniecproveedores_id_seq OWNED BY public.reniecproveedores.id;
 
 
 --
@@ -638,6 +592,79 @@ ALTER SEQUENCE public.visitantes_id_seq OWNED BY public.visitantes.id;
 
 
 --
+-- Name: vw_reporte_asistencia_detalle; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.vw_reporte_asistencia_detalle AS
+ SELECT cap.id,
+    cap.fecha,
+    cap.estado_presencia AS estado,
+    cap.hora_ingreso,
+    cap.hora_salida,
+    cap.minutos_tardanza,
+    cap.observacion,
+    p.id AS personal_id,
+    p.numero_documento AS dni,
+    (((p.nombres)::text || ' '::text) || (p.apellidos)::text) AS nombre_personal,
+    a.id AS area_id,
+    a.nombre_area
+   FROM ((public.controlasistenciapersonal cap
+     JOIN public.personal p ON ((p.id = cap.personal_id)))
+     JOIN public.areasdestino a ON ((a.id = p.area_destino_id)));
+
+
+ALTER VIEW public.vw_reporte_asistencia_detalle OWNER TO postgres;
+
+--
+-- Name: vw_reporte_asistencia_resumen; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.vw_reporte_asistencia_resumen AS
+ SELECT cap.personal_id,
+    a.id AS area_id,
+    a.nombre_area,
+    p.numero_documento AS dni,
+    (((p.nombres)::text || ' '::text) || (p.apellidos)::text) AS nombre_personal,
+    count(*) FILTER (WHERE ((cap.estado_presencia)::text = 'PRESENTE'::text)) AS presentes,
+    count(*) FILTER (WHERE ((cap.estado_presencia)::text = 'TARDANZA'::text)) AS tardanzas,
+    count(*) FILTER (WHERE ((cap.estado_presencia)::text = 'AUSENTE'::text)) AS ausentes,
+    count(*) FILTER (WHERE ((cap.estado_presencia)::text = 'PERMISO'::text)) AS permisos,
+    COALESCE(sum(cap.minutos_tardanza), (0)::bigint) AS minutos_tardanza,
+    count(*) AS total_registros
+   FROM ((public.controlasistenciapersonal cap
+     JOIN public.personal p ON ((p.id = cap.personal_id)))
+     JOIN public.areasdestino a ON ((a.id = p.area_destino_id)))
+  GROUP BY cap.personal_id, a.id, a.nombre_area, p.numero_documento, p.nombres, p.apellidos;
+
+
+ALTER VIEW public.vw_reporte_asistencia_resumen OWNER TO postgres;
+
+--
+-- Name: vw_reporte_visitas_detalle; Type: VIEW; Schema: public; Owner: postgres
+--
+
+CREATE VIEW public.vw_reporte_visitas_detalle AS
+ SELECT rv.id,
+    rv.fecha_ingreso,
+    rv.fecha_salida,
+    rv.estado_visita,
+    mv.nombre_motivo,
+    ad.id AS area_id,
+    ad.nombre_area,
+    v.numero_documento,
+    (((v.nombres)::text || ' '::text) || (v.apellidos)::text) AS nombre_visitante,
+    p.id AS personal_visitado_id,
+    (((p.nombres)::text || ' '::text) || (p.apellidos)::text) AS personal_visitado
+   FROM ((((public.registrosvisitas rv
+     JOIN public.visitantes v ON ((v.id = rv.visitante_id)))
+     JOIN public.areasdestino ad ON ((ad.id = rv.area_destino_id)))
+     JOIN public.motivosvisita mv ON ((mv.id = rv.motivo_visita_id)))
+     LEFT JOIN public.personal p ON ((p.id = rv.personal_visitado_id)));
+
+
+ALTER VIEW public.vw_reporte_visitas_detalle OWNER TO postgres;
+
+--
 -- Name: areasdestino id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -659,13 +686,6 @@ ALTER TABLE ONLY public.controlasistenciapersonal ALTER COLUMN id SET DEFAULT ne
 
 
 --
--- Name: motivossalidapersonal id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.motivossalidapersonal ALTER COLUMN id SET DEFAULT nextval('public.motivossalidapersonal_id_seq'::regclass);
-
-
---
 -- Name: motivosvisita id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -680,17 +700,17 @@ ALTER TABLE ONLY public.personal ALTER COLUMN id SET DEFAULT nextval('public.per
 
 
 --
--- Name: registrossalidapersonal id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.registrossalidapersonal ALTER COLUMN id SET DEFAULT nextval('public.registrossalidapersonal_id_seq'::regclass);
-
-
---
 -- Name: registrosvisitas id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.registrosvisitas ALTER COLUMN id SET DEFAULT nextval('public.registrosvisitas_id_seq'::regclass);
+
+
+--
+-- Name: reniecproveedores id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reniecproveedores ALTER COLUMN id SET DEFAULT nextval('public.reniecproveedores_id_seq'::regclass);
 
 
 --
@@ -786,22 +806,6 @@ ALTER TABLE ONLY public.justificaciones
 
 
 --
--- Name: motivossalidapersonal motivossalidapersonal_nombre_motivo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.motivossalidapersonal
-    ADD CONSTRAINT motivossalidapersonal_nombre_motivo_key UNIQUE (nombre_motivo);
-
-
---
--- Name: motivossalidapersonal motivossalidapersonal_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.motivossalidapersonal
-    ADD CONSTRAINT motivossalidapersonal_pkey PRIMARY KEY (id);
-
-
---
 -- Name: motivosvisita motivosvisita_nombre_motivo_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -815,22 +819,6 @@ ALTER TABLE ONLY public.motivosvisita
 
 ALTER TABLE ONLY public.motivosvisita
     ADD CONSTRAINT motivosvisita_pkey PRIMARY KEY (id);
-
-
---
--- Name: papeletassalida papeletassalida_codigo_papeleta_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.papeletassalida
-    ADD CONSTRAINT papeletassalida_codigo_papeleta_key UNIQUE (codigo_papeleta);
-
-
---
--- Name: papeletassalida papeletassalida_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.papeletassalida
-    ADD CONSTRAINT papeletassalida_pkey PRIMARY KEY (id);
 
 
 --
@@ -850,14 +838,6 @@ ALTER TABLE ONLY public.personal
 
 
 --
--- Name: registrossalidapersonal registrossalidapersonal_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.registrossalidapersonal
-    ADD CONSTRAINT registrossalidapersonal_pkey PRIMARY KEY (id);
-
-
---
 -- Name: registrosvisitas registrosvisitas_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -871,6 +851,14 @@ ALTER TABLE ONLY public.registrosvisitas
 
 ALTER TABLE ONLY public.registrosvisitas
     ADD CONSTRAINT registrosvisitas_sync_id_key UNIQUE (sync_id);
+
+
+--
+-- Name: reniecproveedores reniecproveedores_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reniecproveedores
+    ADD CONSTRAINT reniecproveedores_pkey PRIMARY KEY (id);
 
 
 --
@@ -982,31 +970,10 @@ CREATE INDEX idx_control_asistencia_personal_fecha ON public.controlasistenciape
 
 
 --
--- Name: idx_papeletas_codigo; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_papeletas_codigo ON public.papeletassalida USING btree (codigo_papeleta);
-
-
---
--- Name: idx_papeletas_estado_solicitante; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_papeletas_estado_solicitante ON public.papeletassalida USING btree (estado, personal_solicitante_id);
-
-
---
 -- Name: idx_personal_documento; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_personal_documento ON public.personal USING btree (tipo_documento, numero_documento);
-
-
---
--- Name: idx_registros_salida_personal_activo; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_registros_salida_personal_activo ON public.registrossalidapersonal USING btree (personal_id, fecha_hora_retorno_real);
 
 
 --
@@ -1045,6 +1012,13 @@ CREATE INDEX idx_registros_visitas_sync_id ON public.registrosvisitas USING btre
 
 
 --
+-- Name: idx_reniec_proveedores_activo; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX idx_reniec_proveedores_activo ON public.reniecproveedores USING btree (activo) WHERE (activo = true);
+
+
+--
 -- Name: idx_unique_active_visit_per_visitor_area; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1070,14 +1044,6 @@ CREATE INDEX idx_visitantes_documento ON public.visitantes USING btree (tipo_doc
 --
 
 CREATE TRIGGER tr_prevent_delete_system_user BEFORE DELETE ON public.usuarios FOR EACH ROW EXECUTE FUNCTION public.prevent_delete_system_user();
-
-
---
--- Name: cargos cargos_area_destino_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.cargos
-    ADD CONSTRAINT cargos_area_destino_id_fkey FOREIGN KEY (area_destino_id) REFERENCES public.areasdestino(id);
 
 
 --
@@ -1121,46 +1087,6 @@ ALTER TABLE ONLY public.justificaciones
 
 
 --
--- Name: papeletassalida papeletassalida_motivo_salida_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.papeletassalida
-    ADD CONSTRAINT papeletassalida_motivo_salida_id_fkey FOREIGN KEY (motivo_salida_id) REFERENCES public.motivossalidapersonal(id);
-
-
---
--- Name: papeletassalida papeletassalida_personal_autoriza_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.papeletassalida
-    ADD CONSTRAINT papeletassalida_personal_autoriza_id_fkey FOREIGN KEY (personal_autoriza_id) REFERENCES public.personal(id);
-
-
---
--- Name: papeletassalida papeletassalida_personal_solicitante_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.papeletassalida
-    ADD CONSTRAINT papeletassalida_personal_solicitante_id_fkey FOREIGN KEY (personal_solicitante_id) REFERENCES public.personal(id);
-
-
---
--- Name: papeletassalida papeletassalida_usuario_registro_retorno_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.papeletassalida
-    ADD CONSTRAINT papeletassalida_usuario_registro_retorno_id_fkey FOREIGN KEY (usuario_registro_retorno_id) REFERENCES public.usuarios(id);
-
-
---
--- Name: papeletassalida papeletassalida_usuario_registro_salida_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.papeletassalida
-    ADD CONSTRAINT papeletassalida_usuario_registro_salida_id_fkey FOREIGN KEY (usuario_registro_salida_id) REFERENCES public.usuarios(id);
-
-
---
 -- Name: personal personal_area_destino_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1174,30 +1100,6 @@ ALTER TABLE ONLY public.personal
 
 ALTER TABLE ONLY public.personal
     ADD CONSTRAINT personal_tipo_contrato_id_fkey FOREIGN KEY (tipo_contrato_id) REFERENCES public.tiposcontrato(id);
-
-
---
--- Name: registrossalidapersonal registrossalidapersonal_motivo_salida_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.registrossalidapersonal
-    ADD CONSTRAINT registrossalidapersonal_motivo_salida_id_fkey FOREIGN KEY (motivo_salida_id) REFERENCES public.motivossalidapersonal(id);
-
-
---
--- Name: registrossalidapersonal registrossalidapersonal_personal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.registrossalidapersonal
-    ADD CONSTRAINT registrossalidapersonal_personal_id_fkey FOREIGN KEY (personal_id) REFERENCES public.personal(id);
-
-
---
--- Name: registrossalidapersonal registrossalidapersonal_usuario_registro_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.registrossalidapersonal
-    ADD CONSTRAINT registrossalidapersonal_usuario_registro_id_fkey FOREIGN KEY (usuario_registro_id) REFERENCES public.usuarios(id);
 
 
 --
@@ -1257,6 +1159,14 @@ ALTER TABLE ONLY public.registrosvisitas
 
 
 --
+-- Name: reniecproveedores reniecproveedores_usuario_creador_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.reniecproveedores
+    ADD CONSTRAINT reniecproveedores_usuario_creador_id_fkey FOREIGN KEY (usuario_creador_id) REFERENCES public.usuarios(id);
+
+
+--
 -- Name: usuarios usuarios_personal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1276,46 +1186,3 @@ ALTER TABLE ONLY public.visitantes
 -- PostgreSQL database dump complete
 --
 
-
---
--- Tabla de proveedores RENIEC
---
-
-CREATE TABLE IF NOT EXISTS public.reniec_proveedores (
-    id integer NOT NULL,
-    nombre character varying(150) NOT NULL,
-    base_url text NOT NULL,
-    token text,
-    notas text,
-    activo boolean DEFAULT false NOT NULL,
-    usuario_creador_id integer,
-    fecha_creacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    fecha_actualizacion timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    fecha_activacion timestamp without time zone,
-    fecha_desactivacion timestamp without time zone
-);
-
-CREATE SEQUENCE IF NOT EXISTS public.reniec_proveedores_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-ALTER SEQUENCE public.reniec_proveedores_id_seq OWNED BY public.reniec_proveedores.id;
-ALTER TABLE ONLY public.reniec_proveedores ALTER COLUMN id SET DEFAULT nextval('public.reniec_proveedores_id_seq'::regclass);
-ALTER TABLE ONLY public.reniec_proveedores
-    ADD CONSTRAINT IF NOT EXISTS reniec_proveedores_pkey PRIMARY KEY (id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_reniec_proveedores_activo ON public.reniec_proveedores USING btree (activo) WHERE (activo = true);
-ALTER TABLE ONLY public.reniec_proveedores
-    ADD CONSTRAINT IF NOT EXISTS reniec_proveedores_usuario_creador_id_fkey FOREIGN KEY (usuario_creador_id) REFERENCES public.usuarios(id);
-
-INSERT INTO public.reniec_proveedores (nombre, base_url, token, activo, notas, fecha_activacion)
-SELECT
-    'APIS.net.pe',
-    'https://api.apis.net.pe/v2/reniec/dni?numero={dni}',
-    'apis-token-14158.uFeMfwK5k9el9LYH7077UJJuzuFqsebv',
-    true,
-    'Proveedor inicial migrado desde código',
-    NOW()
-WHERE NOT EXISTS (SELECT 1 FROM public.reniec_proveedores WHERE activo = true);
