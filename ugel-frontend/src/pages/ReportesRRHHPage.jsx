@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FileDown, FileSpreadsheet, FileText, Loader2, PieChart as PieChartIcon, Users, AlertTriangle, Clock3, Calendar } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
-import { asistenciaConfigService, asistenciaPersonalService, areasService } from '../services/api';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { asistenciaConfigService, asistenciaPersonalService, areasService, visitasService, motivosVisitaService } from '../services/api';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import TabView from '../components/TabView';
 import SelectCustom from '../components/SelectCustom';
@@ -141,6 +141,9 @@ const ReportesRRHHPage = () => {
   const [estado, setEstado] = useState(estados[0]);
   const [areasOptions, setAreasOptions] = useState([]);
   const [asistencias, setAsistencias] = useState([]);
+  const [visitas, setVisitas] = useState([]);
+  const [motivosOptions, setMotivosOptions] = useState([]);
+  const [motivoVisita, setMotivoVisita] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [horaEntradaConfig, setHoraEntradaConfig] = useState('09:00');
@@ -175,6 +178,20 @@ const ReportesRRHHPage = () => {
       }
     };
     cargarAreas();
+
+    const cargarMotivos = async () => {
+      try {
+        const res = await motivosVisitaService.getAll({ limit: 100 });
+        const opts = (res.data?.data || []).map((m) => ({
+          value: m.id,
+          label: m.nombre_motivo,
+        }));
+        setMotivosOptions(opts);
+      } catch (e) {
+        console.error('Error al cargar motivos de visita', e);
+      }
+    };
+    cargarMotivos();
   }, []);
 
   useEffect(() => {
@@ -229,10 +246,47 @@ const ReportesRRHHPage = () => {
       }
     };
 
+    const cargarVisitas = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const pageSize = 100;
+        let page = 1;
+        let totalPages = 1;
+        let acumulado = [];
+
+        do {
+          const response = await visitasService.getAll({
+            page,
+            limit: pageSize,
+            fechaInicio: rango.fechaInicio,
+            fechaFin: rango.fechaFin,
+            areaId: area?.value,
+            motivoVisitaId: motivoVisita?.value,
+          });
+          const data = response.data?.data || [];
+          const pagination = response.data?.pagination;
+          totalPages = pagination?.totalPages || 1;
+          acumulado = acumulado.concat(data);
+          page += 1;
+          if (!pagination) break;
+        } while (page <= totalPages);
+
+        setVisitas(acumulado);
+      } catch (e) {
+        console.error('Error al cargar visitas', e);
+        setError('No se pudieron cargar los datos de visitas');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (tabActiva === 'personal') {
       cargarAsistencias();
+    } else {
+      cargarVisitas();
     }
-  }, [rango.fechaInicio, rango.fechaFin, area, estado, tabActiva]);
+  }, [rango.fechaInicio, rango.fechaFin, area, estado, tabActiva, motivoVisita]);
 
   const horasAsignadasMin = useMemo(() => {
     const horaEntrada = normalizeTime(horaEntradaConfig) || '09:00';
@@ -636,6 +690,225 @@ const ReportesRRHHPage = () => {
     },
   ], [exportarDetallePersonal]);
 
+  const exportarVisitaIndividual = async (row) => {
+    const registros = (row?.visitas || []).sort((a, b) => new Date(a.fecha_ingreso) - new Date(b.fecha_ingreso));
+    if (!registros.length) {
+      toast.error('No hay datos de visita para este ciudadano');
+      return;
+    }
+    try {
+      const { default: ExcelJS } = await import('exceljs');
+      const { saveAs } = await import('file-saver');
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Historial de visitas');
+
+      sheet.mergeCells('A1:H1');
+      sheet.getCell('A1').value = `Historial de Visitas - ${row.nombre}`;
+      sheet.getCell('A1').font = { size: 16, bold: true };
+      sheet.mergeCells('A2:H2');
+      sheet.getCell('A2').value = `Documento: ${row.tipoDocumento} ${row.numeroDocumento}`;
+      sheet.mergeCells('A3:H3');
+      sheet.getCell('A3').value = `Periodo: ${rango.rangoTexto}`;
+
+      const cols = [
+        { header: 'Fecha', key: 'fecha', width: 14 },
+        { header: 'Hora ingreso', key: 'ingreso', width: 16 },
+        { header: 'Hora salida', key: 'salida', width: 16 },
+        { header: 'Duración', key: 'duracion', width: 14 },
+        { header: 'Área visitada', key: 'area', width: 22 },
+        { header: 'Personal visitado', key: 'personal', width: 24 },
+        { header: 'Motivo', key: 'motivo', width: 20 },
+        { header: 'Estado', key: 'estado', width: 16 },
+      ];
+      sheet.columns = cols;
+      const head = sheet.addRow(cols.map((c) => c.header));
+      head.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+        cell.border = { top: { style: 'thin', color: { argb: 'FFCCCCCC' } }, left: { style: 'thin', color: { argb: 'FFCCCCCC' } }, bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }, right: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+
+      let totalMinutos = 0;
+      const rows = registros.map((v) => {
+        const ingreso = v.fecha_ingreso ? dayjs(v.fecha_ingreso) : null;
+        const salida = v.fecha_salida ? dayjs(v.fecha_salida) : null;
+        const duracionMin = ingreso && salida ? salida.diff(ingreso, 'minute') : 0;
+        totalMinutos += duracionMin;
+        return {
+          fecha: ingreso ? ingreso.format('DD/MM/YYYY') : '-',
+          ingreso: ingreso ? ingreso.format('HH:mm') : '-',
+          salida: salida ? salida.format('HH:mm') : 'En curso',
+          duracion: duracionMin ? formatHoursFromMinutes(duracionMin) : '-',
+          area: v.nombre_area || 'Sin área',
+          personal: `${v.personal_nombres || ''} ${v.personal_apellidos || ''}`.trim() || 'No especificado',
+          motivo: v.nombre_motivo || 'Sin motivo',
+          estado: v.estado_visita || v.estado || 'Pendiente',
+        };
+      });
+      const excelRows = rows.map((r) => sheet.addRow(r));
+      excelRows.forEach((r, idx) => {
+        const isEven = idx % 2 === 0;
+        r.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFF8FAFF' : 'FFFFFFFF' } };
+          cell.border = { top: { style: 'thin', color: { argb: 'FFE5E7EB' } }, left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
+        });
+      });
+
+      sheet.addRow([]);
+      sheet.addTable({
+        name: 'ResumenVisitas',
+        ref: `A${sheet.lastRow.number + 1}`,
+        columns: [{ name: 'Concepto' }, { name: 'Valor' }],
+        rows: [
+          ['Total de visitas', registros.length],
+          ['Horas totales dentro', formatHoursFromMinutes(totalMinutos)],
+        ],
+        style: { theme: 'TableStyleLight9' },
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Historial de Visitas - ${row.nombre}.xlsx`);
+      toast.success('Excel generado');
+    } catch (e) {
+      console.error('Error exportando historial', e);
+      toast.error('No se pudo exportar el historial');
+    }
+  };
+
+  const exportarVisitasGlobal = async (formato) => {
+    if (!visitas.length) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+    if (formato === 'excel') {
+      try {
+        const { default: ExcelJS } = await import('exceljs');
+        const { saveAs } = await import('file-saver');
+        const wb = new ExcelJS.Workbook();
+        const resumenSheet = wb.addWorksheet('Resumen');
+        resumenSheet.addRow([`Reporte de visitas (${rango.etiqueta})`]).font = { bold: true, size: 14 };
+        resumenSheet.addRow([`Periodo: ${rango.rangoTexto}`]);
+        resumenSheet.addRow([`Generado: ${formatFechaReporte()}`]);
+        resumenSheet.addRow([]);
+        resumenSheet.addTable({
+          name: 'ResumenVisitasGlobal',
+          ref: `A${resumenSheet.lastRow.number + 1}`,
+          columns: [{ name: 'Concepto' }, { name: 'Valor' }],
+          rows: [
+            ['Visitantes distintos', visitasMetricas.visitantesDistintos],
+            ['Total visitas', visitasMetricas.totalVisitas],
+            ['Visitas rechazadas', visitasMetricas.rechazadas],
+            ['Visitas delegadas', visitasMetricas.delegadas],
+            ['Visitas finalizadas', visitasMetricas.finalizadas],
+            ['Tiempo promedio visita', formatHoursFromMinutes(
+              (() => {
+                const sum = visitasAgrupadas.reduce((acc, v) => acc + (v.promedioMin || 0), 0);
+                return visitasAgrupadas.length ? sum / visitasAgrupadas.length : 0;
+              })()
+            )],
+          ],
+          style: { theme: 'TableStyleMedium9' },
+        });
+
+        const detalleSheet = wb.addWorksheet('Resumen por visitante');
+        const cols = [
+          { header: 'Visitante', key: 'visitante', width: 28 },
+          { header: 'Total visitas', key: 'total', width: 14 },
+          { header: 'Área más visitada', key: 'area', width: 22 },
+          { header: 'Último ingreso', key: 'ultimo', width: 18 },
+          { header: 'Rechazadas', key: 'rechazadas', width: 14 },
+          { header: 'Delegadas', key: 'delegadas', width: 14 },
+          { header: 'Finalizadas', key: 'finalizadas', width: 14 },
+          { header: 'Promedio tiempo visita', key: 'promedio', width: 20 },
+        ];
+        detalleSheet.columns = cols;
+        const head = detalleSheet.addRow(cols.map((c) => c.header));
+        head.eachCell((cell) => {
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+          cell.border = { top: { style: 'thin', color: { argb: 'FFCCCCCC' } }, left: { style: 'thin', color: { argb: 'FFCCCCCC' } }, bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }, right: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+        visitasAgrupadas.forEach((v, idx) => {
+          const row = detalleSheet.addRow({
+            visitante: v.nombre,
+            total: v.total,
+            area: v.areaMasVisitada,
+            ultimo: v.ultimoIngreso ? dayjs(v.ultimoIngreso).format('DD/MM/YYYY HH:mm') : '-',
+            rechazadas: v.rechazadas || 0,
+            delegadas: v.delegadas || 0,
+            finalizadas: v.finalizadas || 0,
+            promedio: formatHoursFromMinutes(v.promedioMin || 0),
+          });
+          const isEven = idx % 2 === 0;
+          row.eachCell((cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFF8FAFF' : 'FFFFFFFF' } };
+            cell.border = { top: { style: 'thin', color: { argb: 'FFE5E7EB' } }, left: { style: 'thin', color: { argb: 'FFE5E7EB' } }, bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } }, right: { style: 'thin', color: { argb: 'FFE5E7EB' } } };
+          });
+        });
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        saveAs(blob, `reporte_visitas_${rango.etiqueta}.xlsx`);
+        toast.success('Excel generado');
+      } catch (e) {
+        console.error('Error exportando visitas', e);
+        toast.error('No se pudo exportar el reporte');
+      }
+    } else {
+      try {
+        const { jsPDF } = await import('jspdf');
+        const { default: autoTable } = await import('jspdf-autotable');
+        const doc = new jsPDF('p', 'mm', 'a4');
+        doc.setFontSize(14);
+        doc.text(`Reporte de visitas (${rango.etiqueta})`, 14, 18);
+        doc.setFontSize(10);
+        doc.text(`Periodo: ${rango.rangoTexto}`, 14, 24);
+        doc.text(`Generado: ${formatFechaReporte()}`, 14, 30);
+
+        autoTable(doc, {
+          startY: 36,
+          head: [['Visitantes distintos', 'Total visitas', 'Rechazadas', 'Delegadas', 'Finalizadas', 'Prom. tiempo visita']],
+          body: [[
+            visitasMetricas.visitantesDistintos,
+            visitasMetricas.totalVisitas,
+            visitasMetricas.rechazadas,
+            visitasMetricas.delegadas,
+            visitasMetricas.finalizadas,
+            (() => {
+              const sum = visitasAgrupadas.reduce((acc, v) => acc + (v.promedioMin || 0), 0);
+              return visitasAgrupadas.length ? formatHoursFromMinutes(sum / visitasAgrupadas.length) : '-';
+            })()
+          ]],
+        });
+
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 8,
+          head: [['Visitante', 'Total visitas', 'Área más visitada', 'Último ingreso', 'Rechazadas', 'Delegadas', 'Finalizadas', 'Prom. tiempo visita']],
+          body: visitasAgrupadas.map((v) => [
+            v.nombre,
+            v.total,
+            v.areaMasVisitada,
+            v.ultimoIngreso ? dayjs(v.ultimoIngreso).format('DD/MM/YYYY HH:mm') : '-',
+            v.rechazadas || 0,
+            v.delegadas || 0,
+            v.finalizadas || 0,
+            formatHoursFromMinutes(v.promedioMin || 0),
+          ]),
+          styles: { fontSize: 8 },
+        });
+        doc.save(`reporte_visitas_${rango.etiqueta}.pdf`);
+        toast.success('PDF generado');
+      } catch (e) {
+        console.error('Error exportando visitas', e);
+        toast.error('No se pudo exportar el PDF');
+      }
+    }
+  };
+
   const exportarTabla = async (formato) => {
     if (!filasTabla.length) {
       toast.error('No hay datos para exportar');
@@ -881,6 +1154,19 @@ const ReportesRRHHPage = () => {
             />
           </div>
           <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">Motivo visita</span>
+            <SelectCustom
+              options={motivosOptions}
+              value={motivoVisita}
+              onChange={setMotivoVisita}
+              placeholder="Todos"
+              minMenuWidth="200px"
+              menuWidth="auto"
+              hideLabel
+              isClearable
+            />
+          </div>
+          <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">Estado</span>
             <SelectCustom
               options={estados}
@@ -904,6 +1190,16 @@ const ReportesRRHHPage = () => {
       <KPICard title="Ausente" value={resumen.ausentes || 0} icon={FileText} loading={loading} colorScheme="purple" />
       <KPICard title="Permisos" value={resumen.permisos || 0} icon={FileText} loading={loading} colorScheme="blue" />
       <KPICard title="Horas tardanza" value={horasTardanza} subtitle="Total de horas acumuladas" icon={Clock3} loading={loading} colorScheme="green" />
+    </div>
+  );
+
+  const renderMetricasVisitas = () => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <KPICard title="Visitantes" value={visitasMetricas.visitantesDistintos} icon={Users} loading={loading} colorScheme="blue" />
+      <KPICard title="Visitas" value={visitasMetricas.totalVisitas} icon={FileText} loading={loading} colorScheme="green" />
+      <KPICard title="Rechazadas" value={visitasMetricas.rechazadas} icon={AlertTriangle} loading={loading} colorScheme="orange" />
+      <KPICard title="Delegadas" value={visitasMetricas.delegadas} icon={Clock3} loading={loading} colorScheme="purple" />
+      <KPICard title="Finalizadas" value={visitasMetricas.finalizadas} icon={FileText} loading={loading} colorScheme="green" />
     </div>
   );
 
@@ -936,6 +1232,62 @@ const ReportesRRHHPage = () => {
             </BarChart>
           </ResponsiveContainer>
         )}
+      </div>
+    </div>
+  );
+
+  const renderGraficosVisitas = () => (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Visitas por motivo</p>
+            <p className="text-xs text-gray-500">Distribución de motivos en el periodo seleccionado</p>
+          </div>
+          <PieChartIcon className="h-5 w-5 text-blue-600" />
+        </div>
+        <div style={{ height: 320 }}>
+          {visitasPorMotivo.labels.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-gray-500 text-sm">Sin datos</div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={visitasPorMotivo.labels.map((l, i) => ({ name: l, value: visitasPorMotivo.data[i] }))} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120}>
+                  {visitasPorMotivo.labels.map((_, idx) => (
+                    <Cell key={idx} fill={['#2563EB', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6'][idx % 5]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Afluencia por área de destino</p>
+            <p className="text-xs text-gray-500">Volumen de visitas por área</p>
+          </div>
+          <PieChartIcon className="h-5 w-5 text-blue-600" />
+        </div>
+        <div style={{ height: 320 }}>
+          {visitasPorArea.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-gray-500 text-sm">Sin datos</div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={visitasPorArea}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="area" tick={{ fontSize: 10 }} />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="total" fill="#2563EB" name="Visitas" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -978,6 +1330,219 @@ const ReportesRRHHPage = () => {
     </div>
   );
 
+  const renderTablaVisitas = () => (
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">Reporte de visitas</h3>
+          <p className="text-sm text-gray-500">Filtro activo: {rango.rangoTexto}</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => exportarVisitasGlobal('excel')}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Exportar Excel
+          </button>
+          <button
+            onClick={() => exportarVisitasGlobal('pdf')}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
+          >
+            <FileDown className="h-4 w-4" />
+            Exportar PDF
+          </button>
+        </div>
+      </div>
+      <TableGenerica
+        columns={visitasColumns}
+        data={visitasAgrupadas}
+        isLoading={loading}
+        emptyMessage="No hay visitas para los filtros seleccionados"
+        pagination
+        itemsPerPage={10}
+        minTableWidth="1200px"
+        searchable
+        searchPlaceholder="Buscar visitante..."
+      />
+    </div>
+  );
+
+  // ---- VISITAS ----
+  const visitasAgrupadas = useMemo(() => {
+    const mapa = new Map();
+    visitas.forEach((v) => {
+      const id = v.visitante_id || v.id_visitante || v.id;
+      if (!id) return;
+      if (!mapa.has(id)) {
+        mapa.set(id, {
+          visitanteId: id,
+          nombre: `${v.visitante_nombres || ''} ${v.visitante_apellidos || ''}`.trim() || 'Sin nombre',
+          tipoDocumento: v.tipo_documento_codigo || v.tipo_documento || 'DNI',
+      numeroDocumento: v.numero_documento || v.visitante_numero_documento || '',
+      visitas: [],
+      areasContador: {},
+      rechazadas: 0,
+      delegadas: 0,
+      finalizadas: 0,
+      acumuladoDuracion: 0,
+      conteoDuracion: 0,
+    });
+  }
+  const ref = mapa.get(id);
+  ref.visitas.push(v);
+  const area = v.nombre_area || v.area_destino || 'Sin área';
+  ref.areasContador[area] = (ref.areasContador[area] || 0) + 1;
+
+  const estadoTexto = (v.estado_visita || v.estado || '').toLowerCase();
+  if (estadoTexto.includes('rechaz')) ref.rechazadas += 1;
+  if (estadoTexto.includes('deleg')) ref.delegadas += 1;
+  if (estadoTexto.includes('final')) ref.finalizadas += 1;
+
+  const ingreso = v.fecha_ingreso ? dayjs(v.fecha_ingreso) : null;
+  const salida = v.fecha_salida ? dayjs(v.fecha_salida) : null;
+  if (ingreso && salida) {
+    const dur = salida.diff(ingreso, 'minute');
+    if (dur >= 0) {
+      ref.acumuladoDuracion += dur;
+      ref.conteoDuracion += 1;
+    }
+  }
+});
+
+return Array.from(mapa.values()).map((p) => {
+  const total = p.visitas.length;
+const areaMasVisitada = Object.entries(p.areasContador).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Sin área';
+const ultimoIngreso = p.visitas
+  .map((v) => v.fecha_ingreso)
+  .filter(Boolean)
+  .sort((a, b) => new Date(b) - new Date(a))[0];
+const promedioMin = p.conteoDuracion > 0 ? p.acumuladoDuracion / p.conteoDuracion : 0;
+return {
+  ...p,
+  total,
+  areaMasVisitada,
+  ultimoIngreso,
+  promedioMin,
+};
+}).sort((a, b) => a.nombre.localeCompare(b.nombre));
+}, [visitas]);
+
+const visitasMetricas = useMemo(() => {
+  const totalVisitas = visitas.length;
+  const visitantesDistintos = new Set(visitas.map((v) => v.visitante_id || v.id_visitante || v.id)).size;
+  const rechazadas = visitas.filter((v) => {
+    const est = (v.estado_visita || v.estado || '').toLowerCase();
+    return est.includes('rechaz');
+  }).length;
+  const delegadas = visitas.filter((v) => {
+    const est = (v.estado_visita || v.estado || '').toLowerCase();
+    return est.includes('deleg');
+  }).length;
+  const finalizadas = visitas.filter((v) => {
+    const est = (v.estado_visita || v.estado || '').toLowerCase();
+    return est.includes('final');
+  }).length;
+  return { totalVisitas, visitantesDistintos, rechazadas, delegadas, finalizadas };
+}, [visitas]);
+
+  const visitasPorMotivo = useMemo(() => {
+    const counts = {};
+    visitas.forEach((v) => {
+      const key = v.nombre_motivo || 'Sin motivo';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    const labels = Object.keys(counts);
+    const data = labels.map((k) => counts[k]);
+    return { labels, data };
+  }, [visitas]);
+
+  const visitasPorArea = useMemo(() => {
+    const counts = {};
+    visitas.forEach((v) => {
+      const key = v.nombre_area || 'Sin área';
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return Object.entries(counts).map(([area, total]) => ({ area, total }));
+  }, [visitas]);
+
+  const colorFrecuencia = (total) => {
+    if (total <= 1) return 'bg-green-50 text-green-700 border-green-200';
+    if (total <= 4) return 'bg-orange-50 text-orange-700 border-orange-200';
+    return 'bg-red-50 text-red-700 border-red-200';
+  };
+
+  const visitasColumns = [
+    {
+      key: 'nombre',
+      label: 'Visitante',
+      minWidth: '220px',
+      render: (row) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-gray-900">{row.nombre}</span>
+          <span className="text-xs text-gray-500">{row.tipoDocumento}: {row.numeroDocumento}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'total',
+      label: 'Total visitas',
+      minWidth: '140px',
+      render: (row) => (
+        <span className={`px-3 py-1 rounded-full border text-sm font-semibold ${colorFrecuencia(row.total)}`}>
+          {row.total} visita{row.total !== 1 ? 's' : ''}
+        </span>
+      ),
+    },
+    {
+      key: 'areaMasVisitada',
+      label: 'Área más visitada',
+      minWidth: '180px',
+    },
+    {
+      key: 'ultimoIngreso',
+      label: 'Último ingreso',
+      minWidth: '160px',
+      render: (row) => row.ultimoIngreso ? dayjs(row.ultimoIngreso).format('DD/MM/YYYY HH:mm') : '-',
+    },
+    {
+      key: 'promedioMin',
+      label: 'Promedio tiempo visita',
+      minWidth: '170px',
+      render: (row) => formatHoursFromMinutes(row.promedioMin || 0),
+    },
+    
+    {
+      key: 'rechazadas',
+      label: 'Rechazadas',
+      minWidth: '110px',
+      render: (row) => <span className="text-red-700 font-semibold">{row.rechazadas || 0}</span>,
+    },
+    {
+      key: 'delegadas',
+      label: 'Delegadas',
+      minWidth: '110px',
+      render: (row) => <span className="text-blue-700 font-semibold">{row.delegadas || 0}</span>,
+    },
+    {
+      key: 'acciones',
+      label: 'Exportar',
+      minWidth: '140px',
+      render: (row) => (
+        <div className="flex justify-center">
+          <button
+            onClick={() => exportarVisitaIndividual(row)}
+            className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+            title="Exportar historial individual"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Excel
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   const contenidoPersonal = (
     <>
       {renderFiltros()}
@@ -988,9 +1553,12 @@ const ReportesRRHHPage = () => {
   );
 
   const contenidoVisitas = (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8 text-center text-gray-500">
-      Aún no hay reportes de visitas en esta sección. Pronto estarán disponibles.
-    </div>
+    <>
+      {renderFiltros()}
+      {renderMetricasVisitas()}
+      {renderGraficosVisitas()}
+      {renderTablaVisitas()}
+    </>
   );
 
   return (
