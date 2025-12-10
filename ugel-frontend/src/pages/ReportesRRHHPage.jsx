@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FileDown, FileSpreadsheet, FileText, Loader2, PieChart as PieChartIcon, Users, AlertTriangle, Clock3, Calendar } from 'lucide-react';
+import { FileDown, FileSpreadsheet, FileText, Loader2, PieChart as PieChartIcon, Users, AlertTriangle, Clock3, Calendar, ChevronDown } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
@@ -128,6 +128,68 @@ const calcularRango = (periodo, anio, mes) => {
     etiqueta: 'mensual',
     rangoTexto: `${formatHumanDate(inicioMes)} - ${formatHumanDate(finMes)}`
   };
+};
+
+const ExportButton = ({ onExportExcel, onExportPdf }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center space-x-2 px-4 py-2 bg-white border-2 border-amber-500 text-amber-600 rounded-full hover:bg-amber-50 transition-all duration-200 shadow-sm hover:shadow-md"
+      >
+        <FileDown className="h-5 w-5" />
+        <span className="text-sm font-semibold">Exportar</span>
+        <ChevronDown 
+          className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+        />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-20 animate-fadeIn">
+            <div className="py-1">
+              <button
+                onClick={() => {
+                  onExportExcel();
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-green-50 transition-colors group"
+              >
+                <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                  <FileSpreadsheet className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-green-700">Excel</div>
+                  <div className="text-xs text-green-600">Formato .xlsx</div>
+                </div>
+              </button>
+
+              <div className="border-t border-gray-100 mx-2" />
+
+              <button
+                onClick={() => {
+                  onExportPdf();
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center space-x-3 px-4 py-3 text-left hover:bg-red-50 transition-colors group"
+              >
+                <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
+                  <FileDown className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-red-700">PDF</div>
+                  <div className="text-xs text-red-600">Formato .pdf</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 const ReportesRRHHPage = () => {
@@ -457,16 +519,6 @@ const ReportesRRHHPage = () => {
       const periodoTexto = rango.etiqueta;
       const fechaGeneracion = formatFechaReporte();
 
-      sheet.mergeCells('A1:K1');
-      sheet.getCell('A1').value = `Resumen de asistencia (${periodoTexto}) - ${row.nombre}`;
-      sheet.getCell('A1').font = { size: 16, bold: true };
-
-      sheet.mergeCells('A2:K2');
-      sheet.getCell('A2').value = `Periodo comprendido: ${rango.rangoTexto}`;
-      sheet.getCell('A3').value = `Generado: ${fechaGeneracion}`;
-      sheet.getCell('A3').font = { italic: true };
-      sheet.addRow([]);
-
       const columnasDetalle = [
         { header: 'N°', key: 'n', width: 6 },
         { header: 'Fecha', key: 'fecha', width: 12 },
@@ -480,7 +532,20 @@ const ReportesRRHHPage = () => {
         { header: 'Min. retraso', key: 'minRetraso', width: 14 },
         { header: 'Estado', key: 'estado', width: 14 },
       ];
-      sheet.columns = columnasDetalle;
+
+      // Define columns first WITHOUT headers to avoid overwriting row 1
+      sheet.columns = columnasDetalle.map(c => ({ key: c.key, width: c.width }));
+
+      sheet.mergeCells('A1:K1');
+      sheet.getCell('A1').value = `Resumen de asistencia (${periodoTexto}) - ${row.nombre}`;
+      sheet.getCell('A1').font = { size: 16, bold: true };
+
+      sheet.mergeCells('A2:K2');
+      sheet.getCell('A2').value = `Periodo comprendido: ${rango.rangoTexto}`;
+      sheet.getCell('A3').value = `Generado: ${fechaGeneracion}`;
+      sheet.getCell('A3').font = { italic: true };
+      sheet.addRow([]);
+
       // Cabecera visible y con estilos
       const headerRow = sheet.addRow(columnasDetalle.map((c) => c.header));
       headerRow.eachCell((cell) => {
@@ -613,7 +678,7 @@ const ReportesRRHHPage = () => {
     {
       key: 'documento',
       label: 'Documento',
-      minWidth: '160px',
+      minWidth: '120px',
     },
     {
       key: 'porcentajeAsistencia',
@@ -636,19 +701,19 @@ const ReportesRRHHPage = () => {
     {
       key: 'tardanzas',
       label: 'Tardanzas',
-      minWidth: '110px',
+      minWidth: '100px',
       render: (row) => <span className="text-orange-700 font-semibold">{row.tardanzas || 0}</span>,
     },
     {
       key: 'permisos',
       label: 'Permisos',
-      minWidth: '110px',
+      minWidth: '90px',
       render: (row) => <span className="text-blue-700 font-semibold">{row.permisos || 0}</span>,
     },
     {
       key: 'ausencias',
       label: 'Ausencias',
-      minWidth: '110px',
+      minWidth: '90px',
       render: (row) => <span className="text-red-700 font-semibold">{row.ausencias || 0}</span>,
     },
     {
@@ -674,16 +739,15 @@ const ReportesRRHHPage = () => {
     {
       key: 'acciones',
       label: 'Exportar',
-      minWidth: '140px',
+      minWidth: '100px',
       render: (row) => (
-        <div className="flex justify-center">
+        <div className="flex justify-start">
           <button
             onClick={() => exportarDetallePersonal(row)}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+            className="p-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors"
             title="Exportar detalle individual"
           >
             <FileSpreadsheet className="h-4 w-4" />
-            Excel
           </button>
         </div>
       ),
@@ -703,14 +767,6 @@ const ReportesRRHHPage = () => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('Historial de visitas');
 
-      sheet.mergeCells('A1:H1');
-      sheet.getCell('A1').value = `Historial de Visitas - ${row.nombre}`;
-      sheet.getCell('A1').font = { size: 16, bold: true };
-      sheet.mergeCells('A2:H2');
-      sheet.getCell('A2').value = `Documento: ${row.tipoDocumento} ${row.numeroDocumento}`;
-      sheet.mergeCells('A3:H3');
-      sheet.getCell('A3').value = `Periodo: ${rango.rangoTexto}`;
-
       const cols = [
         { header: 'Fecha', key: 'fecha', width: 14 },
         { header: 'Hora ingreso', key: 'ingreso', width: 16 },
@@ -721,7 +777,18 @@ const ReportesRRHHPage = () => {
         { header: 'Motivo', key: 'motivo', width: 20 },
         { header: 'Estado', key: 'estado', width: 16 },
       ];
-      sheet.columns = cols;
+
+      // Define columns first WITHOUT headers to avoid overwriting row 1
+      sheet.columns = cols.map(c => ({ key: c.key, width: c.width }));
+
+      sheet.mergeCells('A1:H1');
+      sheet.getCell('A1').value = `Historial de Visitas - ${row.nombre}`;
+      sheet.getCell('A1').font = { size: 16, bold: true };
+      sheet.mergeCells('A2:H2');
+      sheet.getCell('A2').value = `Documento: ${row.tipoDocumento} ${row.numeroDocumento}`;
+      sheet.mergeCells('A3:H3');
+      sheet.getCell('A3').value = `Periodo: ${rango.rangoTexto}`;
+      
       const head = sheet.addRow(cols.map((c) => c.header));
       head.eachCell((cell) => {
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -825,7 +892,7 @@ const ReportesRRHHPage = () => {
           { header: 'Promedio tiempo visita', key: 'promedio', width: 20 },
         ];
         detalleSheet.columns = cols;
-        const head = detalleSheet.addRow(cols.map((c) => c.header));
+        const head = detalleSheet.getRow(1);
         head.eachCell((cell) => {
           cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
@@ -984,7 +1051,7 @@ const ReportesRRHHPage = () => {
           { header: 'Horas promedio', key: 'horas', width: 14 },
         ];
         detalleSheet.columns = detalleCols;
-        const headerDetalle = detalleSheet.addRow(detalleCols.map((c) => c.header));
+        const headerDetalle = detalleSheet.getRow(1);
         headerDetalle.eachCell((cell) => {
           cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
@@ -1102,81 +1169,98 @@ const ReportesRRHHPage = () => {
             <Calendar className="h-4 w-4 text-gray-500" />
             <span className="text-sm font-semibold text-gray-700">Periodo</span>
           </div>
-          <div className="flex gap-2">
-            {periodos.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => setPeriodo(p.value)}
-                className={`px-3 py-2 rounded-full text-sm font-semibold border transition-all ${
-                  periodo === p.value ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="w-px h-8 bg-gray-200" />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700">Año</span>
+          <div className="w-28">
             <SelectCustom
-              options={anios}
-              value={anios.find((a) => a.value === anio)}
-              onChange={(val) => setAnio(val?.value || anioActual)}
+              options={periodos}
+              value={periodos.find((p) => p.value === periodo)}
+              onChange={(val) => setPeriodo(val?.value || 'mes')}
               minMenuWidth="140px"
               menuWidth="auto"
               hideLabel
             />
           </div>
-          {periodo !== 'anio' && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-700">Mes</span>
+
+          <div className="w-px h-8 bg-gray-200" />
+          
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">Año</span>
+            <div className="w-28">
               <SelectCustom
-                options={meses}
-                value={meses.find((m) => m.value === mes)}
-                onChange={(val) => setMes(val?.value || mes)}
-                minMenuWidth="150px"
+                options={anios}
+                value={anios.find((a) => a.value === anio)}
+                onChange={(val) => setAnio(val?.value || anioActual)}
+                minMenuWidth="120px"
                 menuWidth="auto"
                 hideLabel
               />
             </div>
+          </div>
+          
+          {periodo !== 'anio' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Mes</span>
+              <div className="w-40">
+                <SelectCustom
+                  options={meses}
+                  value={meses.find((m) => m.value === mes)}
+                  onChange={(val) => setMes(val?.value || mes)}
+                  minMenuWidth="160px"
+                  menuWidth="auto"
+                  hideLabel
+                />
+              </div>
+            </div>
           )}
+          
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-700">Área</span>
-            <SelectCustom
-              options={areasOptions}
-              value={area}
-              onChange={setArea}
-              placeholder="Todas"
-              minMenuWidth="200px"
-              menuWidth="auto"
-              hideLabel
-              isClearable
-            />
+            <div className="min-w-[200px]">
+              <SelectCustom
+                options={areasOptions}
+                value={area}
+                onChange={setArea}
+                placeholder="Todas"
+                minMenuWidth="200px"
+                menuWidth="auto"
+                hideLabel
+                isClearable
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700">Motivo visita</span>
-            <SelectCustom
-              options={motivosOptions}
-              value={motivoVisita}
-              onChange={setMotivoVisita}
-              placeholder="Todos"
-              minMenuWidth="200px"
-              menuWidth="auto"
-              hideLabel
-              isClearable
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700">Estado</span>
-            <SelectCustom
-              options={estados}
-              value={estado}
-              onChange={setEstado}
-              minMenuWidth="160px"
-              menuWidth="auto"
-              hideLabel
-            />
-          </div>
+
+          {tabActiva === 'visitas' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Motivo visita</span>
+              <div className="min-w-[200px]">
+                <SelectCustom
+                  options={motivosOptions}
+                  value={motivoVisita}
+                  onChange={setMotivoVisita}
+                  placeholder="Todos"
+                  minMenuWidth="200px"
+                  menuWidth="auto"
+                  hideLabel
+                  isClearable
+                />
+              </div>
+            </div>
+          )}
+          
+          {tabActiva === 'personal' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Estado</span>
+              <div className="w-28">
+                <SelectCustom
+                  options={estados}
+                  value={estado}
+                  onChange={setEstado}
+                  minMenuWidth="120px"
+                  menuWidth="auto"
+                  hideLabel
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1300,20 +1384,10 @@ const ReportesRRHHPage = () => {
           <p className="text-sm text-gray-500">Filtro activo: {rango.rangoTexto}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => exportarTabla('excel')}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Exportar Excel
-          </button>
-          <button
-            onClick={() => exportarTabla('pdf')}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
-          >
-            <FileDown className="h-4 w-4" />
-            Exportar PDF
-          </button>
+          <ExportButton 
+            onExportExcel={() => exportarTabla('excel')}
+            onExportPdf={() => exportarTabla('pdf')}
+          />
         </div>
       </div>
       <TableGenerica
@@ -1338,20 +1412,10 @@ const ReportesRRHHPage = () => {
           <p className="text-sm text-gray-500">Filtro activo: {rango.rangoTexto}</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => exportarVisitasGlobal('excel')}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm"
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            Exportar Excel
-          </button>
-          <button
-            onClick={() => exportarVisitasGlobal('pdf')}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors text-sm"
-          >
-            <FileDown className="h-4 w-4" />
-            Exportar PDF
-          </button>
+          <ExportButton 
+            onExportExcel={() => exportarVisitasGlobal('excel')}
+            onExportPdf={() => exportarVisitasGlobal('pdf')}
+          />
         </div>
       </div>
       <TableGenerica
@@ -1487,7 +1551,7 @@ const visitasMetricas = useMemo(() => {
     {
       key: 'total',
       label: 'Total visitas',
-      minWidth: '140px',
+      minWidth: '100px',
       render: (row) => (
         <span className={`px-3 py-1 rounded-full border text-sm font-semibold ${colorFrecuencia(row.total)}`}>
           {row.total} visita{row.total !== 1 ? 's' : ''}
@@ -1508,35 +1572,34 @@ const visitasMetricas = useMemo(() => {
     {
       key: 'promedioMin',
       label: 'Promedio tiempo visita',
-      minWidth: '170px',
+      minWidth: '150px',
       render: (row) => formatHoursFromMinutes(row.promedioMin || 0),
     },
     
     {
       key: 'rechazadas',
       label: 'Rechazadas',
-      minWidth: '110px',
+      minWidth: '100px',
       render: (row) => <span className="text-red-700 font-semibold">{row.rechazadas || 0}</span>,
     },
     {
       key: 'delegadas',
       label: 'Delegadas',
-      minWidth: '110px',
+      minWidth: '100px',
       render: (row) => <span className="text-blue-700 font-semibold">{row.delegadas || 0}</span>,
     },
     {
       key: 'acciones',
       label: 'Exportar',
-      minWidth: '140px',
+      minWidth: '100px',
       render: (row) => (
-        <div className="flex justify-center">
+        <div className="flex justify-start">
           <button
             onClick={() => exportarVisitaIndividual(row)}
-            className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+            className="p-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-colors"
             title="Exportar historial individual"
           >
             <FileSpreadsheet className="h-4 w-4" />
-            Excel
           </button>
         </div>
       ),
