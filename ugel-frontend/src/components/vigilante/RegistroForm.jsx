@@ -26,6 +26,7 @@ import {
   papeletasSalidaService,
 } from '../../services/api';
 import { getPendingIngresosPersonal } from '../../utils/offlineDB';
+import { getCachedData, setCachedData } from '../../utils/referenceCache';
 
 const RegistroForm = forwardRef(
   (
@@ -103,6 +104,13 @@ const RegistroForm = forwardRef(
     const previousWaitingCount = useRef(visitantesEnEspera?.length || 0);
     const socketRef = useRef(null);
     const tiposDocumentoRef = useRef([]);
+    const CACHE_KEYS = useRef({
+      tipos: 'cache_tipos_documento',
+      motivos: 'cache_motivos_visita',
+      empleados: 'cache_personal',
+      areas: 'cache_areas',
+      papeletas: 'cache_papeletas_externas',
+    });
 
     useImperativeHandle(ref, () => ({
       getCurrentFormData: () => {
@@ -281,6 +289,46 @@ const RegistroForm = forwardRef(
 
     const cargarDatosIniciales = async () => {
       setLoadingData(true);
+
+      // 1) Intentar usar datos cacheados (fallback inmediato para offline)
+      const cachedTipos = getCachedData(CACHE_KEYS.current.tipos);
+      if (cachedTipos?.length) {
+        setTiposDocumento(cachedTipos);
+        const tipoDNI = cachedTipos.find(
+          (tipo) =>
+            tipo.label?.toLowerCase().includes('dni') ||
+            tipo.label?.toLowerCase().includes('documento nacional')
+        );
+        if (tipoDNI && !formVisitante.tipoDocumentoId) {
+          setFormVisitante((prev) => ({
+            ...prev,
+            tipoDocumentoId: tipoDNI.value,
+          }));
+        }
+      }
+
+      const cachedMotivos = getCachedData(CACHE_KEYS.current.motivos);
+      if (cachedMotivos?.length) {
+        setMotivos(cachedMotivos);
+        setMotivosActivos(cachedMotivos);
+        setMotivosHistorial([{ value: '', label: 'Todos los motivos' }, ...cachedMotivos]);
+      }
+
+      const cachedEmpleados = getCachedData(CACHE_KEYS.current.empleados);
+      if (cachedEmpleados?.length) {
+        setEmpleados(cachedEmpleados);
+        setEmpleadosActivos(cachedEmpleados);
+        setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...cachedEmpleados]);
+      }
+
+      const cachedAreas = getCachedData(CACHE_KEYS.current.areas);
+      if (cachedAreas?.length) {
+        setLugares(cachedAreas);
+        setLugaresActivos(cachedAreas);
+        setLugaresHistorial([{ value: '', label: 'Todos los lugares' }, ...cachedAreas]);
+      }
+
+      // 2) Intentar refrescar desde el backend (si hay conexión)
       try {
         const [
           tiposResponse,
@@ -288,29 +336,28 @@ const RegistroForm = forwardRef(
           empleadosResponse,
           areasResponse,
           papeletasResponse,
-          ingresosOffline
-        ] = await Promise.all([
+          ingresosOfflineResult,
+        ] = await Promise.allSettled([
           tiposDocumentoService.getAll(),
           motivosVisitaService.getAll(),
           personalService.getAll(),
           areasService.getAll(),
           papeletasSalidaService.getExternas(),
-          getPendingIngresosPersonal()
+          getPendingIngresosPersonal(),
         ]);
 
-        if (tiposResponse.data.success) {
-          const tiposData = tiposResponse.data.data.map((tipo) => ({
+        if (tiposResponse.status === 'fulfilled' && tiposResponse.value.data.success) {
+          const tiposData = tiposResponse.value.data.data.map((tipo) => ({
             value: tipo.id.toString(),
             label: tipo.nombre_completo || tipo.nombre,
           }));
           setTiposDocumento(tiposData);
+          setCachedData(CACHE_KEYS.current.tipos, tiposData);
 
           const tipoDNI = tiposData.find(
             (tipo) =>
               tipo.label?.toLowerCase().includes('dni') ||
-              tipo.label
-                ?.toLowerCase()
-                .includes('documento nacional')
+              tipo.label?.toLowerCase().includes('documento nacional')
           );
           if (tipoDNI && !formVisitante.tipoDocumentoId) {
             setFormVisitante((prev) => ({
@@ -320,122 +367,104 @@ const RegistroForm = forwardRef(
           }
         }
 
-        if (motivosResponse.data.success) {
-          const motivosData = motivosResponse.data.data.map(
-            (motivo) => ({
-              value: motivo.id.toString(),
-              label: motivo.nombre_motivo || motivo.nombre,
-            })
-          );
+        if (motivosResponse.status === 'fulfilled' && motivosResponse.value.data.success) {
+          const motivosData = motivosResponse.value.data.data.map((motivo) => ({
+            value: motivo.id.toString(),
+            label: motivo.nombre_motivo || motivo.nombre,
+          }));
           setMotivos(motivosData);
           setMotivosActivos(motivosData);
-          setMotivosHistorial([
-            { value: '', label: 'Todos los motivos' },
-            ...motivosData,
-          ]);
+          setMotivosHistorial([{ value: '', label: 'Todos los motivos' }, ...motivosData]);
+          setCachedData(CACHE_KEYS.current.motivos, motivosData);
         }
 
-        if (empleadosResponse.data.success) {
-          // Procesar papeletas externas para cruzar información
-          const papeletasExternasData = papeletasResponse?.data?.data || [];
-          setPapeletasExternas(papeletasExternasData);
-          const papeletasActivasMap = new Map();
+        const papeletasExternasData =
+          papeletasResponse.status === 'fulfilled' ? papeletasResponse.value?.data?.data || [] : [];
+        setPapeletasExternas(papeletasExternasData);
+        const papeletasActivasMap = new Map();
 
-          papeletasExternasData.forEach(p => {
-            if (p.estado === 'EN_CURSO') {
-              // Usar DNI como clave principal si existe, sino nombre completo
-              if (p.solicitante_numero_documento) {
-                papeletasActivasMap.set(p.solicitante_numero_documento, p);
-              }
-              // También mapear por nombre completo para fallback
-              const nombreCompleto = `${p.solicitante_nombres} ${p.solicitante_apellidos}`.trim().toLowerCase();
-              papeletasActivasMap.set(nombreCompleto, p);
+        papeletasExternasData.forEach((p) => {
+          if (p.estado === 'EN_CURSO') {
+            if (p.solicitante_numero_documento) {
+              papeletasActivasMap.set(p.solicitante_numero_documento, p);
             }
+            const nombreCompleto = `${p.solicitante_nombres} ${p.solicitante_apellidos}`
+              .trim()
+              .toLowerCase();
+            papeletasActivasMap.set(nombreCompleto, p);
+          }
+        });
+
+        const ingresosOffline =
+          ingresosOfflineResult?.status === 'fulfilled'
+            ? ingresosOfflineResult.value
+            : await getPendingIngresosPersonal();
+        const ingresosOfflineIds = new Set((ingresosOffline || []).map((ing) => ing.personalId?.toString()));
+
+        if (empleadosResponse.status === 'fulfilled' && empleadosResponse.value.data.success) {
+          const empleadosData = empleadosResponse.value.data.data.map((empleado) => {
+            const estadoBruto = (empleado.estado_presencia || '').toString().trim().toLowerCase();
+
+            let estado = 'disponible';
+            let codigoPapeleta = empleado.codigo_papeleta_activa || null;
+
+            const nombreCompletoEmpleado = `${empleado.nombres} ${empleado.apellidos}`.trim().toLowerCase();
+            const papeletaExterna =
+              papeletasActivasMap.get(empleado.numero_documento) ||
+              papeletasActivasMap.get(nombreCompletoEmpleado);
+
+            if (papeletaExterna) {
+              estado = 'permiso';
+              codigoPapeleta = papeletaExterna.codigo_papeleta;
+            } else if (!empleado.estado_presencia) {
+              estado = 'ausente';
+            } else if (
+              estadoBruto === 'ausente' ||
+              estadoBruto === 'falta' ||
+              estadoBruto === 'faltó' ||
+              estadoBruto === 'falto' ||
+              estadoBruto === 'sin marca' ||
+              estadoBruto === 'sin_marca'
+            ) {
+              estado = 'ausente';
+            } else if (
+              estadoBruto === 'permiso' ||
+              estadoBruto === 'comisión' ||
+              estadoBruto === 'comision' ||
+              empleado.tiene_papeleta_activa
+            ) {
+              estado = 'permiso';
+            }
+
+            if (ingresosOfflineIds.has(empleado.id?.toString())) {
+              estado = 'disponible';
+            }
+
+            return {
+              value: empleado.id.toString(),
+              label: `${empleado.nombres} ${empleado.apellidos}`,
+              areaId: empleado.area_destino_id,
+              areaNombre: empleado.area_nombre || 'Sin área',
+              cargo: empleado.cargo_nombre || 'Sin cargo',
+              estado,
+              detallePapeleta: codigoPapeleta,
+            };
           });
-
-          const ingresosOfflineIds = new Set(
-            (ingresosOffline || []).map((ing) => ing.personalId?.toString())
-          );
-
-          const empleadosData = empleadosResponse.data.data.map(
-            (empleado) => {
-              const estadoBruto = (empleado.estado_presencia || '')
-                .toString()
-                .trim()
-                .toLowerCase();
-
-              let estado = 'disponible';
-              let codigoPapeleta = empleado.codigo_papeleta_activa || null;
-
-              // Verificar si tiene papeleta externa activa (MongoDB)
-              const nombreCompletoEmpleado = `${empleado.nombres} ${empleado.apellidos}`.trim().toLowerCase();
-              const papeletaExterna = 
-                papeletasActivasMap.get(empleado.numero_documento) || 
-                papeletasActivasMap.get(nombreCompletoEmpleado);
-
-              if (papeletaExterna) {
-                estado = 'permiso';
-                codigoPapeleta = papeletaExterna.codigo_papeleta;
-              }
-              // Si no hay registro de asistencia, lo consideramos ausente
-              else if (!empleado.estado_presencia) {
-                estado = 'ausente';
-              }
-              // Ausente explícito
-              else if (
-                estadoBruto === 'ausente' ||
-                estadoBruto === 'falta' ||
-                estadoBruto === 'faltó' ||
-                estadoBruto === 'falto' ||
-                estadoBruto === 'sin marca' ||
-                estadoBruto === 'sin_marca'
-              ) {
-                estado = 'ausente';
-              }
-              // Permiso / comisión o papeleta activa (Legacy Postgres)
-              else if (
-                estadoBruto === 'permiso' ||
-                estadoBruto === 'comisión' ||
-                estadoBruto === 'comision' ||
-                empleado.tiene_papeleta_activa
-              ) {
-                estado = 'permiso';
-              }
-
-              if (ingresosOfflineIds.has(empleado.id?.toString())) {
-                estado = 'disponible';
-              }
-
-              return {
-                value: empleado.id.toString(),
-                label: `${empleado.nombres} ${empleado.apellidos}`,
-                areaId: empleado.area_destino_id,
-                areaNombre: empleado.area_nombre || 'Sin área',
-                cargo: empleado.cargo_nombre || 'Sin cargo',
-                estado,
-                detallePapeleta: codigoPapeleta,
-              };
-            }
-          );
           setEmpleados(empleadosData);
           setEmpleadosActivos(empleadosData);
-          setEmpleadosHistorial([
-            { value: '', label: 'Todos los empleados' },
-            ...empleadosData,
-          ]);
+          setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...empleadosData]);
+          setCachedData(CACHE_KEYS.current.empleados, empleadosData);
         }
 
-        if (areasResponse.data.success) {
-          const lugaresData = areasResponse.data.data.map((area) => ({
+        if (areasResponse.status === 'fulfilled' && areasResponse.value.data.success) {
+          const lugaresData = areasResponse.value.data.data.map((area) => ({
             value: area.id.toString(),
             label: area.nombre_area || area.nombre,
           }));
           setLugares(lugaresData);
           setLugaresActivos(lugaresData);
-          setLugaresHistorial([
-            { value: '', label: 'Todos los lugares' },
-            ...lugaresData,
-          ]);
+          setLugaresHistorial([{ value: '', label: 'Todos los lugares' }, ...lugaresData]);
+          setCachedData(CACHE_KEYS.current.areas, lugaresData);
         }
       } catch (error) {
         console.error('Error al cargar datos iniciales:', error);
