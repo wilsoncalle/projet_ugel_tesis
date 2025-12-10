@@ -29,7 +29,14 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
       fecha_nacimiento: personal.fecha_nacimiento
     });
 
-    const fechaNacStr = toLimaDateYYYYMMDD(personal.fecha_nacimiento);
+    // Forzar extracción de la fecha en UTC puro para evitar desfase horario (AWS UTC vs Local)
+    // Esto evita que "2000-01-01T00:00:00.000Z" se convierta en "1999-12-31" por la zona horaria.
+    let fechaNacStr;
+    if (personal.fecha_nacimiento instanceof Date) {
+      fechaNacStr = personal.fecha_nacimiento.toISOString().split('T')[0];
+    } else {
+      fechaNacStr = String(personal.fecha_nacimiento).split('T')[0];
+    }
     logger.debug(`[ensureUsuarioParaPersonal] Fecha normalizada: ${fechaNacStr}`);
     
     const tieneDatosMinimos =
@@ -63,6 +70,7 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
       logger.info(`[ensureUsuarioParaPersonal] No se encontró usuario existente para personal ID ${personal.id}`);
     }
 
+    // Asegurar que la fecha se interprete tal cual viene (YYYY-MM-DD) sin UTC/Local shift
     const [year, month, day] = fechaNacStr.split('-');
     const password = `${day}${month}${year}`; // DDMMYYYY
     
@@ -203,7 +211,13 @@ const sincronizarUsuariosPersonal = async (userId) => {
 
     for (const p of personal) {
       try {
-        const fechaNacStr = toLimaDateYYYYMMDD(p.fecha_nacimiento);
+        // Forzar extracción de la fecha en UTC puro para evitar desfase horario (AWS UTC vs Local)
+        let fechaNacStr;
+        if (p.fecha_nacimiento instanceof Date) {
+          fechaNacStr = p.fecha_nacimiento.toISOString().split('T')[0];
+        } else {
+          fechaNacStr = String(p.fecha_nacimiento).split('T')[0];
+        }
         const tieneDatosMinimos =
           fechaNacStr &&
           p.numero_documento &&

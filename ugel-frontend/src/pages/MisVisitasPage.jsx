@@ -168,7 +168,7 @@ const MisVisitasPage = () => {
     const initializeSocket = async () => {
       try {
         const { io } = await import('socket.io-client');
-        const socketURL = import.meta.env.VITE_SOCKET_URL || (window.location.origin.includes(':5173') ? 'http://localhost:3000' : window.location.origin);
+        const socketURL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
         
         const token = localStorage.getItem('token');
         
