@@ -36,6 +36,7 @@ const PersonalPage = lazy(() => import('./pages/PersonalPage'));
 const CrearPersonalPage = lazy(() => import('./pages/CrearPersonalPage'));
 const PapeletasPage = lazy(() => import('./pages/PapeletasPage'));
 const GestionJustificacionesPage = lazy(() => import('./pages/GestionJustificacionesPage'));
+const ReportesRRHHPage = lazy(() => import('./pages/ReportesRRHHPage'));
 
 // Protected Pages - Vigilante
 const DashboardVigilantePage = lazy(() => import('./pages/DashboardVigilantePage'));
@@ -147,6 +148,7 @@ function App() {
             {/* RRHH Routes */}
             <Route path="/rrhh">
               <Route index element={<ProtectedRoute allowedRoles={['rrhh']} element={<DashboardRRHHPage />} />} />
+              <Route path="reportes" element={<ProtectedRoute allowedRoles={['rrhh']} element={<ReportesRRHHPage />} />} />
               <Route path="personal" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PersonalPage />} />} />
               <Route path="personal/crear" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
               <Route path="personal/editar/:id" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />

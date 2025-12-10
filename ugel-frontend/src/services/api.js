@@ -210,6 +210,7 @@ export const asistenciaPersonalService = {
     if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
     if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
     if (filters.personalId) params.append('personalId', filters.personalId);
+    if (filters.areaId) params.append('areaId', filters.areaId);
     if (filters.estadoPresencia) params.append('estadoPresencia', filters.estadoPresencia);
     return api.get(`/asistencia-personal?${params.toString()}`);
   },
