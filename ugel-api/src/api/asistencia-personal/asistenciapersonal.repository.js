@@ -94,7 +94,6 @@ const findAll = async (options = {}) => {
           ca.hora_salida,
           CASE
             WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
-            WHEN ps.id IS NOT NULL THEN 'Permiso'
             WHEN ds.fecha_serie < $3::date THEN 'Ausente'
             ELSE NULL
           END as estado_presencia,
@@ -109,11 +108,7 @@ const findAll = async (options = {}) => {
         LEFT JOIN Cargos c ON p.cargo_id = c.id
         LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
           AND ca.fecha = ds.fecha_serie
-        LEFT JOIN PapeletasSalida ps ON ps.personal_solicitante_id = p.id
-          AND ps.estado IN ('APROBADO', 'EN_CURSO')
-          AND DATE(ps.fecha_hora_salida_programada) <= ds.fecha_serie
-          AND DATE(ps.fecha_hora_retorno_programada) >= ds.fecha_serie
-          AND ps.fecha_hora_retorno_real IS NULL
+
         LEFT JOIN Usuarios u ON ca.usuario_registro_id = u.id
       `;
       
@@ -150,7 +145,6 @@ const findAll = async (options = {}) => {
         whereConditions.push(`
           CASE
             WHEN ca.estado_presencia IS NOT NULL THEN ca.estado_presencia
-            WHEN ps.id IS NOT NULL THEN 'Permiso'
             WHEN ds.fecha_serie < $3::date THEN 'Ausente'
             ELSE NULL
           END = $${paramCounter}
@@ -172,11 +166,7 @@ const findAll = async (options = {}) => {
         CROSS JOIN Personal p
         LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
           AND ca.fecha = ds.fecha_serie
-        LEFT JOIN PapeletasSalida ps ON ps.personal_solicitante_id = p.id
-          AND ps.estado IN ('APROBADO', 'EN_CURSO')
-          AND DATE(ps.fecha_hora_salida_programada) <= ds.fecha_serie
-          AND DATE(ps.fecha_hora_retorno_programada) >= ds.fecha_serie
-          AND ps.fecha_hora_retorno_real IS NULL
+
         WHERE ($3::text IS NOT NULL OR true) AND ${whereConditions.join(' AND ')}
       `;
       

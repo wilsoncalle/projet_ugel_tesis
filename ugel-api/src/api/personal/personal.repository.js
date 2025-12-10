@@ -59,45 +59,7 @@ const findAll = async (options = {}) => {
         p.activo,
         
         -- Estado de asistencia de hoy
-        ca.estado_presencia,
-        
-        -- Verificar si tiene papeleta activa
-        CASE
-          WHEN EXISTS (
-            SELECT 1
-            FROM PapeletasSalida ps
-            WHERE ps.personal_solicitante_id = p.id
-              AND ps.estado IN ('APROBADO', 'EN_CURSO')
-              AND ps.fecha_hora_retorno_real IS NULL
-              AND (
-                -- Papeleta aprobada con salida programada que ya pasó
-                (ps.estado = 'APROBADO' AND ps.fecha_hora_salida_programada <= NOW())
-                OR
-                -- Papeleta en curso (salida real ya registrada, esperando retorno)
-                (ps.estado = 'EN_CURSO' AND ps.fecha_hora_salida_real IS NOT NULL)
-              )
-          )
-          THEN TRUE
-          ELSE FALSE
-        END AS tiene_papeleta_activa,
-        
-        -- Código de la papeleta activa (si existe)
-        (
-          SELECT ps.codigo_papeleta
-          FROM PapeletasSalida ps
-          WHERE ps.personal_solicitante_id = p.id
-            AND ps.estado IN ('APROBADO', 'EN_CURSO')
-            AND ps.fecha_hora_retorno_real IS NULL
-            AND (
-              -- Papeleta aprobada con salida programada que ya pasó
-              (ps.estado = 'APROBADO' AND ps.fecha_hora_salida_programada <= NOW())
-              OR
-              -- Papeleta en curso (salida real ya registrada, esperando retorno)
-              (ps.estado = 'EN_CURSO' AND ps.fecha_hora_salida_real IS NOT NULL)
-            )
-          ORDER BY ps.fecha_solicitud DESC
-          LIMIT 1
-        ) AS codigo_papeleta_activa
+        ca.estado_presencia
         
       FROM Personal p
       LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
