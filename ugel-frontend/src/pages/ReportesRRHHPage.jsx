@@ -1565,7 +1565,6 @@ const visitasMetricas = useMemo(() => {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-blue-600 font-semibold mb-1">RR.HH</p>
           <h1 className="text-2xl font-bold text-gray-900">Reportes de personal y visitas</h1>
           <p className="text-sm text-gray-500">Revisa el rendimiento por estado, exporta tablas y descarga el detalle individual.</p>
         </div>
