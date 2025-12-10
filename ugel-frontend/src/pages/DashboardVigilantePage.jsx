@@ -916,13 +916,40 @@ const DashboardVigilantePage = () => {
         if (visitasConSalida.length > 0) {
           console.log('[Offline] Visitas con salida encontradas (se mostrarán en historial):', visitasConSalida.length);
         }
-        // Intentar cache si existe
+
+        // Usar caché solo como complemento/fallback sin pisar las visitas offline recién guardadas
         try {
           const cached = localStorage.getItem('cache_visitas_activas');
           if (cached) {
             const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed.data)) {
-              activosData = parsed.data;
+            const cachedData = Array.isArray(parsed?.data) ? parsed.data : [];
+
+            if (cachedData.length > 0) {
+              // Clave compuesta para evitar duplicados (doc + personal + fecha + hora)
+              const offlineKeys = new Set(
+                activosData.map((v) => {
+                  const doc = v.numero_documento || '';
+                  const personalId = v.personal_visitado_id || v.personalVisitadoId || '';
+                  const fecha = (v.fecha_ingreso || '').split('T')[0] || '';
+                  const hora = formatHora(v.hora_ingreso || v.fecha_ingreso || '');
+                  return `${doc}|${personalId}|${fecha}|${hora}`;
+                })
+              );
+
+              const extrasFromCache = cachedData.filter((v) => {
+                const doc = v.numero_documento || '';
+                const personalId = v.personal_visitado_id || v.personalVisitadoId || '';
+                const fecha = (v.fecha_ingreso || '').split('T')[0] || '';
+                const hora = formatHora(v.hora_ingreso || v.fecha_ingreso || '');
+                const key = `${doc}|${personalId}|${fecha}|${hora}`;
+                return !offlineKeys.has(key);
+              });
+
+              if (activosData.length === 0) {
+                activosData = cachedData;
+              } else if (extrasFromCache.length > 0) {
+                activosData = [...activosData, ...extrasFromCache];
+              }
             }
           }
         } catch (e) {

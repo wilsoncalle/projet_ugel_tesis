@@ -1,7 +1,56 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
-import OfflineIndicator from './components/OfflineIndicator';
+
+// ============================================
+// SOLO IMPORTACIONES CRÍTICAS (NO LAZY)
+// ============================================
+// Public Pages (mínimo necesario para login móvil)
+import MobileLoginPage from './pages/MobileLoginPage';
+
+// ============================================
+// LAZY LOADING - TODO LO DEMÁS
+// ============================================
+// Layout (solo se carga cuando se necesita)
+const MainLayout = lazy(() => import('./components/MainLayout'));
+const OfflineIndicator = lazy(() => import('./components/OfflineIndicator'));
+
+// Public Pages
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+
+// Protected Pages - Admin
+const DashboardAdminPage = lazy(() => import('./pages/DashboardAdminPage'));
+const AreasPage = lazy(() => import('./pages/AreasPage'));
+const TiposDocumentoPage = lazy(() => import('./pages/TiposDocumentoPage'));
+const MotivosVisitaPage = lazy(() => import('./pages/MotivosVisitaPage'));
+const TiposContratoPage = lazy(() => import('./pages/TiposContratoPage'));
+const CargosPage = lazy(() => import('./pages/CargosPage'));
+const UsuariosPage = lazy(() => import('./pages/UsuariosPage'));
+const AdminCatalogosPage = lazy(() => import('./pages/AdminCatalogosPage'));
+const ConfigAsistenciaPage = lazy(() => import('./pages/ConfigAsistenciaPage'));
+const ReniecProvidersPage = lazy(() => import('./pages/ReniecProvidersPage'));
+
+// Protected Pages - RRHH
+const DashboardRRHHPage = lazy(() => import('./pages/DashboardRRHHPage'));
+const PersonalPage = lazy(() => import('./pages/PersonalPage'));
+const CrearPersonalPage = lazy(() => import('./pages/CrearPersonalPage'));
+const PapeletasPage = lazy(() => import('./pages/PapeletasPage'));
+const GestionJustificacionesPage = lazy(() => import('./pages/GestionJustificacionesPage'));
+
+// Protected Pages - Vigilante
+const DashboardVigilantePage = lazy(() => import('./pages/DashboardVigilantePage'));
+const VigilantePapeletasPage = lazy(() => import('./pages/VigilantePapeletasPage'));
+
+// Protected Pages - Personal
+const MisVisitasPage = lazy(() => import('./pages/MisVisitasPage'));
+const MiAsistenciaPersonalPage = lazy(() => import('./pages/MiAsistenciaPersonalPage'));
+
+// Protected Pages - Shared
+const PersonalAsistenciaPage = lazy(() => import('./pages/PersonalAsistenciaPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+
+// Mobile Scanner
+const MobileScannerPage = lazy(() => import('./pages/MobileScannerPage'));
 
 // Default Redirect Component
 const DefaultRedirect = () => {
@@ -13,47 +62,22 @@ const DefaultRedirect = () => {
   if (role.includes('vigilante')) return <Navigate to="/vigilante" replace />;
   if (role.includes('personal')) return <Navigate to="/mis-visitas" replace />;
   
-  // Fallback to login if role is unknown
   return <Navigate to="/login" replace />;
 };
 
-// Layout
-import MainLayout from './components/MainLayout';
-
-// Public Pages
-import LoginPage from './pages/LoginPage';
-import MobileLoginPage from './pages/MobileLoginPage';
-
-// Protected Pages
-import DashboardAdminPage from './pages/DashboardAdminPage';
-import DashboardRRHHPage from './pages/DashboardRRHHPage';
-import DashboardVigilantePage from './pages/DashboardVigilantePage';
-import PersonalAsistenciaPage from './pages/PersonalAsistenciaPage';
-import ProfilePage from './pages/ProfilePage';
-import AreasPage from './pages/AreasPage';
-import TiposDocumentoPage from './pages/TiposDocumentoPage';
-import MisVisitasPage from './pages/MisVisitasPage';
-import MiAsistenciaPersonalPage from './pages/MiAsistenciaPersonalPage';
-import MotivosVisitaPage from './pages/MotivosVisitaPage';
-import TiposContratoPage from './pages/TiposContratoPage';
-import CargosPage from './pages/CargosPage';
-import PersonalPage from './pages/PersonalPage';
-import UsuariosPage from './pages/UsuariosPage';
-import CrearPersonalPage from './pages/CrearPersonalPage';
-import PapeletasPage from './pages/PapeletasPage';
-import VigilantePapeletasPage from './pages/VigilantePapeletasPage';
-import AdminCatalogosPage from './pages/AdminCatalogosPage';
-import ConfigAsistenciaPage from './pages/ConfigAsistenciaPage';
-import GestionJustificacionesPage from './pages/GestionJustificacionesPage';
-import ReniecProvidersPage from './pages/ReniecProvidersPage';
-
-// Lazy load mobile scanner for better performance
-const MobileScannerPage = lazy(() => import('./pages/MobileScannerPage'));
-
 // Routes Configuration
 import ProtectedRoute from './routes/ProtectedRoute';
-
 import { useSystemNotifications } from './hooks/useSystemNotifications';
+
+// Loading fallback component
+const LoadingFallback = ({ text = "Cargando..." }) => (
+  <div className="h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+      <p className="text-gray-600">{text}</p>
+    </div>
+  </div>
+);
 
 function App() {
   const { isAuthenticated, checkAuth } = useAuth();
@@ -69,9 +93,16 @@ function App() {
     <>
       <Routes>
         {/* Public Routes */}
-        <Route path="/login" element={!isAuthenticated ? <LoginPage /> : <Navigate to="/" />} />
+        <Route 
+          path="/login" 
+          element={!isAuthenticated ? (
+            <Suspense fallback={<LoadingFallback />}>
+              <LoginPage />
+            </Suspense>
+          ) : <Navigate to="/" />} 
+        />
         
-        {/* Mobile-optimized Login (lightweight) */}
+        {/* Mobile-optimized Login (lightweight - NO lazy, carga inmediato) */}
         <Route path="/m/login" element={!isAuthenticated ? <MobileLoginPage /> : <Navigate to="/escaner-movil" />} />
         
         {/* Protected Routes */}
@@ -80,38 +111,34 @@ function App() {
           <Route 
             path="/escaner-movil" 
             element={
-              <ProtectedRoute 
-                element={
-                  <Suspense 
-                    fallback={
-                      <div className="h-screen bg-black flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
-                          <p className="text-white text-sm">Cargando escáner...</p>
-                        </div>
-                      </div>
-                    }
-                  >
-                    <MobileScannerPage />
-                  </Suspense>
-                } 
-              />
+              <Suspense fallback={
+                <div className="h-screen bg-black flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-white text-sm">Cargando escáner...</p>
+                  </div>
+                </div>
+              }>
+                <MobileScannerPage />
+              </Suspense>
             } 
           />
-          <Route element={<MainLayout />}>
+          
+          {/* All other routes wrapped in MainLayout */}
+          <Route element={
+            <Suspense fallback={<LoadingFallback />}>
+              <MainLayout />
+            </Suspense>
+          }>
             {/* Admin Routes */}
             <Route path="/admin">
               <Route index element={<ProtectedRoute allowedRoles={['admin']} element={<DashboardAdminPage />} />} />
-              
-              {/* Catalog Routes */}
               <Route path="areas" element={<ProtectedRoute allowedRoles={['admin']} element={<AreasPage />} />} />
               <Route path="tipos-documento" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposDocumentoPage />} />} />
               <Route path="motivos-visita" element={<ProtectedRoute allowedRoles={['admin']} element={<MotivosVisitaPage />} />} />
               <Route path="tipos-contrato" element={<ProtectedRoute allowedRoles={['admin']} element={<TiposContratoPage />} />} />
-
               <Route path="cargos" element={<ProtectedRoute allowedRoles={['admin']} element={<CargosPage />} />} />
               <Route path="catalogos" element={<ProtectedRoute allowedRoles={['admin']} element={<AdminCatalogosPage />} />} />
-              
               <Route path="usuarios" element={<ProtectedRoute allowedRoles={['admin']} element={<UsuariosPage />} />} />
               <Route path="config-asistencia" element={<ProtectedRoute allowedRoles={['admin']} element={<ConfigAsistenciaPage />} />} />
               <Route path="reniec-proveedores" element={<ProtectedRoute allowedRoles={['admin']} element={<ReniecProvidersPage />} />} />
@@ -125,23 +152,25 @@ function App() {
               <Route path="personal/editar/:id" element={<ProtectedRoute allowedRoles={['rrhh']} element={<CrearPersonalPage />} />} />
               <Route path="papeletas" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PapeletasPage />} />} />
               <Route path="justificaciones" element={<ProtectedRoute allowedRoles={['rrhh']} element={<GestionJustificacionesPage />} />} />
-              {/* Usuarios es solo para Admin; no registrar aquí */}
+              <Route path="asistencia-personal" element={<ProtectedRoute allowedRoles={['rrhh']} element={<PersonalAsistenciaPage />} />} />
             </Route>
-
+            
             {/* Vigilante Routes */}
             <Route path="/vigilante">
               <Route index element={<ProtectedRoute allowedRoles={['vigilante']} element={<DashboardVigilantePage />} />} />
-              <Route path="asistencia" element={<ProtectedRoute allowedRoles={['vigilante']} element={<PersonalAsistenciaPage />} />} />
+              <Route path="asistencia-personal" element={<ProtectedRoute allowedRoles={['vigilante']} element={<PersonalAsistenciaPage />} />} />
               <Route path="papeletas" element={<ProtectedRoute allowedRoles={['vigilante']} element={<VigilantePapeletasPage />} />} />
             </Route>
             
-            {/* Ruta de Perfil - Accesible para todos los roles autenticados */}
-            <Route path="/perfil" element={<ProtectedRoute element={<ProfilePage />} />} />
-            <Route path="/mis-visitas" element={<ProtectedRoute element={<MisVisitasPage />} />} />
-            <Route path="/mi-asistencia" element={<ProtectedRoute element={<MiAsistenciaPersonalPage />} />} />
+            {/* Personal Routes */}
+            <Route path="/mis-visitas" element={<ProtectedRoute allowedRoles={['personal', 'admin']} element={<MisVisitasPage />} />} />
+            <Route path="/mi-asistencia" element={<ProtectedRoute allowedRoles={['personal']} element={<MiAsistenciaPersonalPage />} />} />
             
-            {/* Default Redirect Based on Role */}
-            <Route path="/" element={<ProtectedRoute element={<DefaultRedirect />} />} />
+            {/* Shared Routes */}
+            <Route path="/perfil" element={<ProtectedRoute element={<ProfilePage />} />} />
+            
+            {/* Root redirect */}
+            <Route path="/" element={<DefaultRedirect />} />
           </Route>
         </Route>
         
@@ -149,8 +178,10 @@ function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       
-      {/* Indicador de estado offline/online */}
-      {isAuthenticated && <OfflineIndicator />}
+      {/* Lazy load OfflineIndicator */}
+      <Suspense fallback={null}>
+        <OfflineIndicator />
+      </Suspense>
     </>
   );
 }
