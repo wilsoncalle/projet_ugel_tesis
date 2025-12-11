@@ -31,6 +31,13 @@ function toLimaDayjs(dateInput) {
 
 function toLimaDateYYYYMMDD(dateInput) {
   if (!dateInput) return null;
+
+  // CORRECCIÓN: Si viene como ISO string marcando la medianoche UTC (común en datepickers), 
+  // devolver la fecha tal cual para evitar que se reste un día al convertir a Lima (UTC-5).
+  if (typeof dateInput === 'string' && (dateInput.endsWith('T00:00:00.000Z') || dateInput.endsWith('T00:00:00Z'))) {
+    return dateInput.substring(0, 10);
+  }
+
   return toLimaDayjs(dateInput).format('YYYY-MM-DD');
 }
 
