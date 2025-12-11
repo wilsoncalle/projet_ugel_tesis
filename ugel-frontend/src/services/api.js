@@ -203,22 +203,12 @@ export const papeletasSalidaService = {
 export const asistenciaPersonalService = {
   getAll: (filters = {}) => {
     const params = new URLSearchParams();
-    
-    // Helper para limpiar fechas
-    const cleanDate = (date) => {
-      if (!date) return '';
-      if (typeof date === 'string' && date.includes('T')) {
-        return date.split('T')[0];
-      }
-      return date;
-    };
-
     if (filters.q) params.append('q', filters.q);
     if (filters.page) params.append('page', filters.page);
     if (filters.limit) params.append('limit', filters.limit);
-    if (filters.fecha) params.append('fecha', cleanDate(filters.fecha));
-    if (filters.fechaInicio) params.append('fechaInicio', cleanDate(filters.fechaInicio));
-    if (filters.fechaFin) params.append('fechaFin', cleanDate(filters.fechaFin));
+    if (filters.fecha) params.append('fecha', filters.fecha);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
     if (filters.personalId) params.append('personalId', filters.personalId);
     if (filters.areaId) params.append('areaId', filters.areaId);
     if (filters.estadoPresencia) params.append('estadoPresencia', filters.estadoPresencia);

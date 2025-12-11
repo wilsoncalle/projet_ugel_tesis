@@ -897,21 +897,12 @@ const PersonalAsistenciaPage = () => {
         width: getColumnWidths('110px', '110px'),
         render: (row) => {
           if (!row || !row.fecha) return <div>-</div>;
-        render: (row) => {
-          if (!row || !row.fecha) return <div>-</div>;
           try {
-            // CORRECCIÓN: Si viene como string ISO (YYYY-MM-DD...), cortar para evitar conversión de zona horaria
-            if (typeof row.fecha === 'string' && row.fecha.length >= 10) {
-              const [anio, mes, dia] = row.fecha.substring(0, 10).split('-');
-              return <div className="text-sm text-gray-900 px-1">{`${dia}/${mes}/${anio}`}</div>;
-            }
-            // Fallback para objetos Date reales
             const fecha = new Date(row.fecha);
-            return <div className="text-sm text-gray-900 px-1">{fecha.toLocaleDateString('es-PE', { timeZone: 'UTC' })}</div>;
+            return <div className="text-sm text-gray-900 px-1">{fecha.toLocaleDateString('es-PE')}</div>;
           } catch {
             return <div className="text-sm text-gray-900 px-1">{row.fecha}</div>;
           }
-        }
         }
       });
 
