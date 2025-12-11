@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { toast } from 'react-hot-toast';
 import Card from '../Card';
 import Badge from '../Badge';
 import Button from '../Button';
@@ -79,6 +80,69 @@ const VisitantesTabla = ({
     }, 300);
   }, []);
 
+  // Estado para forzar actualización cada minuto (para lógica de tiempo "No Show")
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Actualizar cada minuto
+    return () => clearInterval(timer);
+  }, []);
+
+  // Notificación de visitantes no presentados (> 10 min) - SOLO PARA VIGILANTE
+  const notifiedRef = useRef(new Set());
+
+  useEffect(() => {
+    if (activeTab === 'activos' && visitantesActivos) {
+      visitantesActivos.forEach(v => {
+        // Solo para pendientes y que tengan fecha de ingreso
+        if (v.fecha_ingreso && (v.estado_visita === 'PENDIENTE' || !v.estado_visita)) {
+           try {
+             // Asegurar fecha válida
+             const fechaIngreso = new Date(v.fecha_ingreso);
+             if (!isNaN(fechaIngreso.getTime())) {
+               const diff = (currentTime - fechaIngreso) / 60000;
+               
+               if (diff > 10 && !notifiedRef.current.has(v.id)) {
+                 toast.error(
+                   (t) => (
+                     <div 
+                       className="flex flex-col relative pr-4 cursor-pointer hover:bg-red-50 transition-colors rounded p-1"
+                       onClick={() => handleOpenModal(v)}
+                     >
+                       <button 
+                         onClick={(e) => { e.stopPropagation(); toast.dismiss(t.id); }}
+                         className="absolute -top-1 -right-2 p-1 text-gray-400 hover:text-gray-600 focus:outline-none z-10"
+                         title="Cerrar notificación"
+                       >
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                         </svg>
+                       </button>
+                       <span className="font-bold pr-2">¡Alerta de Visitante!</span>
+                       <span>El visitante {v.visitante_nombres} {v.visitante_apellidos} no se ha presentado.</span>
+                       <span className="text-xs mt-1">Han pasado más de 10 minutos.</span>
+                       <span className="text-xs text-blue-600 mt-1 underline">Ver detalles</span>
+                     </div>
+                   ),
+                   { 
+                     duration: 8000, 
+                     position: 'top-right', 
+                     style: { border: '2px solid #ef4444' } 
+                   }
+                 );
+                 notifiedRef.current.add(v.id);
+               }
+             }
+           } catch (e) {
+             console.error("Error checking date for notification", e);
+           }
+        }
+      });
+    }
+  }, [visitantesActivos, activeTab, currentTime, handleOpenModal]);
+
   const getTabData = useCallback(() => {
     switch (activeTab) {
       case 'activos': {
@@ -101,13 +165,46 @@ const VisitantesTabla = ({
             personal_cargo: vistaPreviaVisita?.empleado?.cargo || '',
             nombre_motivo: vistaPreviaVisita?.motivo?.label || '',
             nombre_area: vistaPreviaVisita?.lugar || '',
-            fecha_ingreso: new Date().toLocaleDateString(),
+            fecha_ingreso: new Date().toISOString(), // Use ISO for consistency
             hora_ingreso: formatHora(new Date()),
-            isPreview: true
+            isPreview: true,
+            estado_visita: 'PENDIENTE'
           };
 
           data = [previewData, ...data];
         }
+
+        // --- LÓGICA DE NO PRESENTADO (10 MIN) ---
+        const now = currentTime;
+        data = data.map(item => {
+           let isNoShow = false;
+           // Solo aplicar a visitas reales (con ID numérico y fecha_ingreso) y pendientes
+           if (item.fecha_ingreso && (item.estado_visita === 'PENDIENTE' || !item.estado_visita) && !item.isPreview) {
+               try {
+                   const ingreso = new Date(item.fecha_ingreso);
+                   const diffMins = (now - ingreso) / 60000;
+                   if (diffMins > 10) {
+                       isNoShow = true;
+                   }
+               } catch (e) { console.error("Error parsing date", e); }
+           }
+           return { ...item, isNoShow };
+        });
+
+        // Ordenar: Primero los No Presentó, luego el resto (manteniendo orden temporal inverso o por defecto)
+        data.sort((a, b) => {
+            if (a.isPreview) return -1; // Preview siempre primero visualmente antes que nada? O después de alertas? 
+            // Mejor: Preview primero, luego Advertencias "No Show", luego normales.
+            if (a.isPreview) return -1;
+            if (b.isPreview) return 1;
+
+            if (a.isNoShow && !b.isNoShow) return -1;
+            if (!a.isNoShow && b.isNoShow) return 1;
+            
+            // Default sort by ID desc or Date desc if needed, assuming API sends them sorted.
+            // If API sends sorted, this stable sort keeps relative order of rest.
+            return 0; 
+        });
 
         return data;
       }
@@ -122,7 +219,8 @@ const VisitantesTabla = ({
     visitantesEnEspera,
     historialVisitas,
     vistaPreviaVisitante,
-    vistaPreviaVisita
+    vistaPreviaVisita,
+    currentTime
   ]);
 
   const getPaginationProps = useCallback(() => {
@@ -495,30 +593,35 @@ const VisitantesTabla = ({
           let badgeColor = 'bg-gray-100 text-gray-800';
           let label = 'Pendiente';
 
-          switch (estado) {
-            case 'ACEPTADO':
-              badgeColor = 'bg-green-100 text-green-800';
-              label = 'Aceptado';
-              break;
-            case 'RECHAZADO':
-              badgeColor = 'bg-red-100 text-red-800';
-              label = 'Rechazado';
-              break;
-            case 'DELEGADO':
-              badgeColor = 'bg-blue-100 text-blue-800';
-              label = 'Delegado';
-              break;
-            case 'FINALIZADO':
-              badgeColor = 'bg-gray-100 text-gray-800';
-              label = 'Finalizado';
-              break;
-            case 'PENDIENTE':
-            default:
-              badgeColor = 'bg-yellow-100 text-yellow-800';
-              label = 'Pendiente';
-              break;
+          if (row.isNoShow) {
+             badgeColor = 'bg-red-600 text-white animate-pulse'; // Rojo intenso y pulsante
+             label = 'No Presentado';
+          } else {
+             switch (estado) {
+                case 'ACEPTADO':
+                  badgeColor = 'bg-green-100 text-green-800';
+                  label = 'Aceptado';
+                  break;
+                case 'RECHAZADO':
+                  badgeColor = 'bg-red-100 text-red-800';
+                  label = 'Rechazado';
+                  break;
+                case 'DELEGADO':
+                  badgeColor = 'bg-blue-100 text-blue-800';
+                  label = 'Delegado';
+                  break;
+                case 'FINALIZADO':
+                  badgeColor = 'bg-gray-100 text-gray-800';
+                  label = 'Finalizado';
+                  break;
+                case 'PENDIENTE':
+                default:
+                  badgeColor = 'bg-yellow-100 text-yellow-800';
+                  label = 'Pendiente';
+                  break;
+             }
           }
-
+          
           return (
             <span
               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}`}
@@ -1011,9 +1114,59 @@ const VisitantesTabla = ({
             }
           },
           {
-            key: 'usuario_ingreso',
             label: 'Registrado por',
             render: (value) => value || 'No especificado'
+          },
+          {
+            key: 'fecha_aceptacion',
+            label: 'Fecha de Aceptación',
+            render: (value) => {
+              if (!value) return '-';
+              try {
+                return new Date(value).toLocaleString('es-PE');
+              } catch { return value; }
+            }
+          },
+          {
+            key: 'fecha_rechazo',
+            label: 'Fecha de Rechazo',
+            render: (value) => {
+              if (!value) return '-';
+              try {
+                return new Date(value).toLocaleString('es-PE');
+              } catch { return value; }
+            }
+          },
+          {
+            key: 'delegado_por_nombres',
+            label: 'Delegado Por',
+            render: (value, data) => {
+              if (!data.delegado_por_id && !value) return '-';
+              const nombre = data.delegado_por_nombres || '';
+              const apellido = data.delegado_por_apellidos || '';
+              const full = `${nombre} ${apellido}`.trim();
+              return full || 'ID: ' + (data.delegado_por_id || '-');
+            }
+          },
+          {
+            key: 'fecha_delegacion',
+            label: 'Fecha de Delegación',
+            render: (value) => {
+              if (!value) return '-';
+              try {
+                return new Date(value).toLocaleString('es-PE');
+              } catch { return value; }
+            }
+          },
+          {
+            key: 'fecha_fin_atencion',
+            label: 'Fin de Atención',
+            render: (value) => {
+              if (!value) return '-';
+              try {
+                return new Date(value).toLocaleString('es-PE');
+              } catch { return value; }
+            }
           }
         ]}
       />

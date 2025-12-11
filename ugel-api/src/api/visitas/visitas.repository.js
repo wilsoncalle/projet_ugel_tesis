@@ -54,7 +54,13 @@ const findAll = async (options = {}, usePagination = true) => {
         rv.estado_visita,
         rv.usuario_salida_id,
         u2.nombre_usuario as usuario_salida,
-        rv.fecha_fin_atencion
+        rv.fecha_fin_atencion,
+        rv.fecha_aceptacion,
+        rv.fecha_rechazo,
+        rv.fecha_delegacion,
+        rv.delegado_por_id,
+        pd.nombres as delegado_por_nombres,
+        pd.apellidos as delegado_por_apellidos
       FROM RegistrosVisitas rv
       JOIN Visitantes v ON rv.visitante_id = v.id
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
@@ -64,6 +70,7 @@ const findAll = async (options = {}, usePagination = true) => {
       JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
       JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
       LEFT JOIN Usuarios u2 ON rv.usuario_salida_id = u2.id
+      LEFT JOIN Personal pd ON rv.delegado_por_id = pd.id
     `;
     
     // Construir la cláusula WHERE
@@ -205,7 +212,14 @@ const findActivas = async (options = {}) => {
         rv.fecha_salida,
         rv.usuario_ingreso_id,
         u1.nombre_usuario as usuario_ingreso,
-        rv.estado_visita
+        rv.estado_visita,
+        rv.fecha_fin_atencion,
+        rv.fecha_aceptacion,
+        rv.fecha_rechazo,
+        rv.fecha_delegacion,
+        rv.delegado_por_id,
+        pd.nombres as delegado_por_nombres,
+        pd.apellidos as delegado_por_apellidos
       FROM RegistrosVisitas rv
       JOIN Visitantes v ON rv.visitante_id = v.id
       JOIN TiposDocumento td ON v.tipo_documento_id = td.id
@@ -214,6 +228,7 @@ const findActivas = async (options = {}) => {
       LEFT JOIN Cargos c ON p.cargo_id = c.id
       JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
       JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
+      LEFT JOIN Personal pd ON rv.delegado_por_id = pd.id
       WHERE rv.fecha_salida IS NULL
     `;
     

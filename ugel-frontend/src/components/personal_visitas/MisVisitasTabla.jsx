@@ -385,6 +385,8 @@ const MisVisitasTabla = ({
     setDetailsModalOpen(true);
   };
 
+
+
   const getColumns = () => {
     const baseColumns = [
       {
@@ -443,18 +445,36 @@ const MisVisitasTabla = ({
             RECHAZADO: 'bg-red-100 text-red-800',
             DELEGADO: 'bg-blue-100 text-blue-800',
             FINALIZADO: 'bg-gray-100 text-gray-800',
-            NO_PRESENTADO: 'bg-gray-100 text-gray-800'
+            NO_PRESENTADO: 'bg-red-600 text-white animate-pulse' // Update style
           };
+          
+          let estadoDisplay = row.estado_visita;
+          let colorClass = colors[estadoDisplay] || 'bg-gray-100 text-gray-700';
+          
+          // Check for No Show condition
+          if (row.estado_visita === 'PENDIENTE') {
+             const diff = differenceInMinutes(currentTime, new Date(row.fecha_ingreso));
+             if (diff > 10) {
+                 estadoDisplay = 'NO_PRESENTADO';
+                 colorClass = colors.NO_PRESENTADO;
+             }
+          }
+
           const isDelegado = row.estado_visita === 'DELEGADO';
+          
+          // Map internal ID to readable label
+          const label = estadoDisplay === 'NO_PRESENTADO' ? 'No se presentó' : estadoDisplay;
+          
           return (
            <span
               className={`
                 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold shadow-sm border border-transparent
-                ${colors[row.estado_visita] || 'bg-gray-100 text-gray-700'}
+                ${colorClass}
                 ${isDelegado ? 'cursor-pointer hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-200 select-none ring-1 ring-inset ring-black/5' : ''}
               `}
               onClick={(e) => {
                 if (!isDelegado) return;
+                // ... legacy delegate click handler ...
                 e.stopPropagation();
                 if (row.delegado_por_nombres) {
                   toast.success(
@@ -484,7 +504,7 @@ const MisVisitasTabla = ({
               }}
               title={isDelegado ? 'Ver detalles de la delegación' : ''}
             >
-              {row.estado_visita}
+              {label}
             </span>
           );
         }

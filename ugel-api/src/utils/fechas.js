@@ -83,9 +83,45 @@ function toLimaTime(fechaHora) {
   return limaTime.toTimeString().split(' ')[0]; // HH:MM:SS
 }
 
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+dayjs.extend(utc);
+
+/**
+ * Convierte una fecha a un objeto Dayjs en zona horaria de Lima (UTC-5)
+ * Ajustando el tiempo para que coincida con la hora local de Lima
+ * @param {string|Date|null} input - Fecha de entrada. Si es null, usa fecha actual.
+ * @returns {Object} Instancia de Dayjs ajustada a Lima (Fake UTC)
+ */
+function toLimaDayjs(input) {
+  // Si no hay input, usar la hora actual de Lima
+  if (!input) {
+    const { fechaHora } = nowLima();
+    return dayjs(fechaHora);
+  }
+
+  // Si es string y parece formato local (sin Z ni offset), asumir que YA ES hora Lima
+  // y lo queremos como UTC (Fake UTC) para persistencia consistente
+  if (typeof input === 'string' && !input.includes('Z') && !input.includes('+')) {
+    return dayjs.utc(input); // Interpretar como UTC directamente (preservando hora)
+  }
+
+  // Para otros casos (Date object, ISO string con Z), aplicar shift
+  const date = input instanceof Date ? input : new Date(input);
+  
+  if (isNaN(date.getTime())) return dayjs(); // Fallback si es inválida
+
+  const limaOffset = -5 * 60; // -5 horas en minutos
+  const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const limaTime = new Date(utcTime + (limaOffset * 60000));
+  
+  return dayjs(limaTime);
+}
+
 module.exports = { 
   toLimaDateYYYYMMDD,
   nowLima,
-  toLimaTime
+  toLimaTime,
+  toLimaDayjs
 };
 
