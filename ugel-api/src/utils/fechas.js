@@ -118,10 +118,46 @@ function toLimaDayjs(input) {
   return dayjs(limaTime);
 }
 
+/**
+ * Parsea un rango de fechas string (YYYY-MM-DD) a objetos Dayjs
+ * Ajusta start al inicio del día y end al final del día.
+ * @param {string} startStr - Fecha inicio YYYY-MM-DD
+ * @param {string} endStr - Fecha fin YYYY-MM-DD
+ * @returns {Object} { start, end } como objetos Dayjs
+ */
+function parseDateRangeInclusive(startStr, endStr) {
+  const start = startStr ? toLimaDayjs(startStr).startOf('day') : null;
+  const end = endStr ? toLimaDayjs(endStr).endOf('day') : null;
+  return { start, end };
+}
+
+/**
+ * Verifica si una fecha está dentro de un rango inclusivo
+ * @param {Object} date - Objeto Dayjs a verificar
+ * @param {Object} start - Objeto Dayjs inicio
+ * @param {Object} end - Objeto Dayjs fin
+ * @param {string} unit - Unidad de comparación (ej: 'day')
+ * @returns {boolean}
+ */
+function isDateBetweenInclusive(date, start, end, unit = 'day') {
+  if (!date || !date.isValid()) return false;
+  
+  // Si no hay límites, está dentro
+  if (!start && !end) return true;
+  
+  // Comprobación manual inclusiva
+  const isAfterStart = start ? (date.isAfter(start, unit) || date.isSame(start, unit)) : true;
+  const isBeforeEnd = end ? (date.isBefore(end, unit) || date.isSame(end, unit)) : true;
+  
+  return isAfterStart && isBeforeEnd;
+}
+
 module.exports = { 
   toLimaDateYYYYMMDD,
   nowLima,
   toLimaTime,
-  toLimaDayjs
+  toLimaDayjs,
+  parseDateRangeInclusive,
+  isDateBetweenInclusive
 };
 
