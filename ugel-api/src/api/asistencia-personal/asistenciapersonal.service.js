@@ -483,12 +483,23 @@ const getEstadisticasTotales = async (opt) => await repository.getEstadisticasTo
 const getEstadisticasPuntualidad = async (opt) => await repository.getEstadisticasPuntualidad(opt.fechaInicio, opt.fechaFin);
 const getEstadisticasAusencias = async (opt) => {
   try {
-    // 1. Obtener estadísticas locales (Postgres)
+    // 1. Obtener estadísticas locales (Postgres) - Prioridad alta
     const statsLocal = await repository.getEstadisticasAusencias(opt.fechaInicio, opt.fechaFin);
     
-    // 2. Obtener estadísticas externas (Mongo)
-    const statsMotivosMongo = await mongoService.getEstadisticasMotivosExternas({ fechaInicio: opt.fechaInicio, fechaFin: opt.fechaFin });
-    const statsHorasMongo = await mongoService.getEstadisticasHorasExternas({ fechaInicio: opt.fechaInicio, fechaFin: opt.fechaFin });
+    // 2. Obtener estadísticas externas (Mongo) - Fallback silencioso
+    let statsMotivosMongo = { por_motivo: [] };
+    let statsHorasMongo = { por_persona: [] };
+    
+    try {
+      if (mongoService) {
+        [statsMotivosMongo, statsHorasMongo] = await Promise.all([
+          mongoService.getEstadisticasMotivosExternas({ fechaInicio: opt.fechaInicio, fechaFin: opt.fechaFin }),
+          mongoService.getEstadisticasHorasExternas({ fechaInicio: opt.fechaInicio, fechaFin: opt.fechaFin })
+        ]);
+      }
+    } catch (externError) {
+      logger.warn('Advertencia: No se pudieron obtener estadísticas externas (Mongo). Se mostrarán solo datos locales.', externError.message);
+    }
 
     // 3. Combinar Motivos (tipo_ausencia)
     const motivosMap = {};
@@ -501,7 +512,7 @@ const getEstadisticasAusencias = async (opt) => {
     }
     
     // Agregar externos
-    if (statsMotivosMongo.por_motivo) {
+    if (statsMotivosMongo && statsMotivosMongo.por_motivo) {
       statsMotivosMongo.por_motivo.forEach(item => {
         const nombre = item.nombre_motivo || 'Otros';
         motivosMap[nombre] = (motivosMap[nombre] || 0) + item.total;
@@ -522,7 +533,7 @@ const getEstadisticasAusencias = async (opt) => {
       });
     }
     
-    if (statsHorasMongo.por_persona) {
+    if (statsHorasMongo && statsHorasMongo.por_persona) {
       statsHorasMongo.por_persona.forEach(item => {
         personalMap[item.personal] = (personalMap[item.personal] || 0) + item.total_papeletas;
       });
@@ -541,7 +552,7 @@ const getEstadisticasAusencias = async (opt) => {
     };
   } catch (error) {
     logger.error('Error combinando estadísticas de ausencias:', error);
-    // Fallback a local si falla algo
+    // Fallback a local si falla algo crítico
     return await repository.getEstadisticasAusencias(opt.fechaInicio, opt.fechaFin);
   }
 };
@@ -582,7 +593,7 @@ const exportarAExcel = async (filtros = {}, themeName = 'corporate') => {
         numero: index + 1,
         personal: `${asistencia.personal_nombres} ${asistencia.personal_apellidos}`,
         area: asistencia.area_nombre || 'N/A',
-        cargo: asistencia.cargo_nombre || 'N/A',
+        cargo: asistencia.personal_cargo_nombre || 'N/A',
         fecha: asistencia.fecha ? new Date(asistencia.fecha).toLocaleDateString('es-PE') : 'N/A',
         horaIngreso: asistencia.hora_ingreso || 'N/A',
         horaSalida: asistencia.hora_salida || 'Sin registro',

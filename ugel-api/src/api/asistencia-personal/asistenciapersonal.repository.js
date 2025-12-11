@@ -35,12 +35,6 @@ const findAll = async (options = {}) => {
   const offset = (page - 1) * limit;
   
   try {
-    // Si hay filtro de fecha específica o fechaInicio, incluir TODOS los personal activos
-    // para mostrar ausentes (personal sin registro de asistencia)
-    // Incluir ausentes cuando hay fecha específica o cuando hay fechaInicio (para historial)
-    const incluirAusentes = (fecha && typeof fecha === 'string' && fecha.trim() !== '') || 
-                            (fechaInicio && typeof fechaInicio === 'string' && fechaInicio.trim() !== '');
-    
     // Si se proporciona rango (inicio/fin), ignorar fecha exacta para evitar duplicar condiciones
     // Pero guardar fecha original si existe para usar en el LEFT JOIN
     const fechaOriginal = fecha;
@@ -48,6 +42,13 @@ const findAll = async (options = {}) => {
       fecha = null;
     }
     
+    // CORRECCIÓN: Solo activar lógica de "Ausentes Fantasmas" (Cross Join) si se solicita explícitamente.
+    // El usuario prefiere ver solo lo que está en DB.
+    const incluirAusentes = options.includeAbsent === true && (
+      (fechaOriginal && typeof fechaOriginal === 'string' && fechaOriginal.trim() !== '') || 
+      (fechaInicio && typeof fechaInicio === 'string' && fechaInicio.trim() !== '')
+    );
+
     if (incluirAusentes) {
       // Construir la consulta con LEFT JOIN para incluir personal sin registro
       // Ahora soportando RANGOS de fechas usando generate_series y CROSS JOIN
@@ -587,42 +588,12 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId, crearSiNoExi
       throw new AppError('Fecha inválida para marcar ausentes', 400);
     }
     
-    // PASO 1: Crear registros con estado "Permiso" para personal con papeleta activa
-    const queryCrearPermisos = `
-      INSERT INTO ControlAsistenciaPersonal (
-        personal_id,
-        fecha,
-        hora_ingreso,
-        hora_salida,
-        estado_presencia,
-        usuario_registro_id
-      )
-      SELECT 
-        p.id,
-        $1::date,
-        NULL,
-        NULL,
-        'Permiso',
-        $2
-      FROM Personal p
-      WHERE p.activo = true
-        AND p.id NOT IN (
-          SELECT DISTINCT personal_id 
-          FROM ControlAsistenciaPersonal 
-          WHERE fecha = $1::date
-        )
-        AND p.id IN (
-          SELECT DISTINCT ps.personal_solicitante_id
-          FROM PapeletasSalida ps
-          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
-            AND DATE(ps.fecha_hora_salida_programada) <= $1::date
-            AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
-            AND ps.fecha_hora_retorno_real IS NULL
-        )
-      RETURNING id
-    `;
+    // PASO 1 (MIGRADO): Crear registros con estado "Permiso" ya se maneja vía sincronización (Mongo->Postgres)
+    // por lo que eliminamos la lectura directa a la tabla obsoleta PapeletasSalida.
     
-    // PASO 2: Crear registros con estado "Ausente" para el resto sin papeleta
+    // PASO 2: Crear registros con estado "Ausente" para el resto SIN registro previo
+    // Si tenían permiso, ya tendrán un registro creado por la sincronización,
+    // así que el filtro "NOT IN ControlAsistenciaPersonal" es suficiente.
     const queryCrearAusentes = `
       INSERT INTO ControlAsistenciaPersonal (
         personal_id,
@@ -646,19 +617,11 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId, crearSiNoExi
           FROM ControlAsistenciaPersonal 
           WHERE fecha = $1::date
         )
-        AND p.id NOT IN (
-          SELECT DISTINCT ps.personal_solicitante_id
-          FROM PapeletasSalida ps
-          WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
-            AND DATE(ps.fecha_hora_salida_programada) <= $1::date
-            AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
-            AND ps.fecha_hora_retorno_real IS NULL
-        )
       RETURNING id
     `;
     
-    // PASO 3: Actualizar registros existentes que no tienen horaIngreso
-    // NO sobrescribir Permisos existentes ni personal con papeletas activas
+    // PASO 3: Actualizar registros existentes que no tienen horaIngreso y quedaron en limbo
+    // Respetando 'Permiso', 'Comisión', 'Justificada', etc.
     const queryActualizarRegistros = `
     UPDATE ControlAsistenciaPersonal ca
     SET 
@@ -666,37 +629,26 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId, crearSiNoExi
       usuario_registro_id = $2
     WHERE ca.fecha = $1::date
       AND ca.hora_ingreso IS NULL
-      AND ca.estado_presencia != 'Ausente'
-      AND ca.estado_presencia != 'Permiso'
-      AND ca.personal_id NOT IN (
-        SELECT DISTINCT ps.personal_solicitante_id
-        FROM PapeletasSalida ps
-        WHERE ps.estado IN ('APROBADO', 'EN_CURSO')
-          AND DATE(ps.fecha_hora_salida_programada) <= $1::date
-          AND DATE(ps.fecha_hora_retorno_programada) >= $1::date
-          AND ps.fecha_hora_retorno_real IS NULL
-      )
+      AND ca.estado_presencia NOT IN ('Ausente', 'Permiso', 'Comisión', 'Justificada', 'En Permiso')
     RETURNING id
-  `;
+    `;
     
     // Ejecutar consultas según el parámetro crearSiNoExiste
-    let creadosPermiso = 0;
+    let creadosPermiso = 0; // Ya no se crean aquí
     let creadosAusente = 0;
     let actualizados = 0;
     
     if (crearSiNoExiste) {
-      // Modo completo: crear registros nuevos (Permiso + Ausente) Y actualizar existentes
-      const [permisoResult, ausenteResult, actualizarResult] = await Promise.all([
-        db.query(queryCrearPermisos, [fecha, usuarioSistemaId]),
+      // Modo completo: crear registros nuevos (Ausente) Y actualizar existentes
+      const [ausenteResult, actualizarResult] = await Promise.all([
         db.query(queryCrearAusentes, [fecha, usuarioSistemaId]),
         db.query(queryActualizarRegistros, [fecha, usuarioSistemaId])
       ]);
       
-      creadosPermiso = permisoResult.rows.length;
       creadosAusente = ausenteResult.rows.length;
       actualizados = actualizarResult.rows.length;
     } else {
-      // Modo solo actualización: NO crear registros nuevos, solo actualizar existentes
+      // Modo solo actualización
       const actualizarResult = await db.query(queryActualizarRegistros, [fecha, usuarioSistemaId]);
       actualizados = actualizarResult.rows.length;
     }
@@ -1129,43 +1081,40 @@ const getEstadisticasAusencias = async (fechaInicio, fechaFin) => {
     let paramCounter = 1;
     
     if (fechaInicio) {
-      whereCondition.push(`DATE(ps.fecha_hora_salida_real) >= $${paramCounter}::date`);
+      whereCondition.push(`DATE(ps.fecha_hora_salida) >= $${paramCounter}::date`);
       params.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
-      whereCondition.push(`DATE(ps.fecha_hora_salida_real) < ($${paramCounter}::date + INTERVAL '1 day')`);
+      whereCondition.push(`DATE(ps.fecha_hora_salida) < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
       paramCounter++;
     }
     
-    // Condiciones para estadísticas de motivos
-    const motivosConditions = [...whereCondition];
-    motivosConditions.push(`ps.estado IN ('EN_CURSO', 'FINALIZADO')`);
-    motivosConditions.push(`ps.fecha_hora_salida_real IS NOT NULL`);
-    const motivosWhereClause = `WHERE ${motivosConditions.join(' AND ')}`;
+    const whereClause = whereCondition.length > 0 ? `WHERE ${whereCondition.join(' AND ')}` : '';
     
-    // Distribución por motivo de salida
+    // Distribución por motivo de salida (Locales)
+    // Usando RegistrosSalidaPersonal en lugar de PapeletasSalida
     const motivosSalidaQuery = `
       SELECT
         m.nombre_motivo AS tipo_ausencia,
         COUNT(*) AS total
-      FROM PapeletasSalida ps
+      FROM RegistrosSalidaPersonal ps
       JOIN MotivosSalidaPersonal m ON ps.motivo_salida_id = m.id
-      ${motivosWhereClause}
+      ${whereClause}
       GROUP BY m.nombre_motivo
       ORDER BY total DESC
     `;
     
-    // Top 10 personal con más salidas
+    // Top 10 personal con más salidas (Locales)
     const topSalidasQuery = `
       SELECT
         CONCAT(p.nombres, ' ', p.apellidos) AS personal,
         COUNT(*) AS faltas
-      FROM PapeletasSalida ps
-      JOIN Personal p ON ps.personal_solicitante_id = p.id
-      ${motivosWhereClause}
+      FROM RegistrosSalidaPersonal ps
+      JOIN Personal p ON ps.personal_id = p.id
+      ${whereClause}
       GROUP BY personal
       ORDER BY faltas DESC
       LIMIT 10

@@ -14,7 +14,7 @@ const useAsistenciasAusencias = () => {
 
         const token = localStorage.getItem('token');
         const response = await fetch(
-          `/api/asistencia-personal/estadisticas/ausencias?periodo=${periodo}`,
+          `/api/papeletas-salida/estadisticas/motivos?periodo=${periodo}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -30,10 +30,11 @@ const useAsistenciasAusencias = () => {
         const result = await response.json();
 
         if (result.success && result.data) {
-          const porTipo = result.data.por_tipo || result.data.resumen || [];
+          // Adaptar respuesta del endpoint de papeletas (por_motivo)
+          const porTipo = result.data.por_motivo || result.data.por_tipo || [];
           
           // Formatear datos para el gráfico de pie
-          const labels = porTipo.map(item => item.tipo_ausencia);
+          const labels = porTipo.map(item => item.nombre_motivo || item.tipo_ausencia);
           const values = porTipo.map(item => parseInt(item.total || item.cantidad, 10));
 
           setData({
