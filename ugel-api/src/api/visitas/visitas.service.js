@@ -238,15 +238,26 @@ const createVisita = async (visitaData) => {
     // Construir fecha de ingreso (usar fecha/hora originales si están disponibles)
     let fechaIngresoFinal;
     if (fechaIngreso && horaIngreso) {
-      // Combinar fecha y hora originales del evento offline en zona Lima
-      const fechaHora = toLimaDayjs(`${fechaIngreso}T${horaIngreso}`);
-      fechaIngresoFinal = fechaHora.toDate();
-      logger.info(`Usando fecha/hora originales: ${fechaIngreso} ${horaIngreso} -> ${fechaHora.toISOString()}`);
+      // Combinar fecha y hora originales del evento offline (asumimos que vienen en Hora Lima)
+      // y convertirlos a UTC para almacenamiento (Lima = UTC-5, por tanto UTC = Lima + 5h)
+      // Nota: new Date("yyyy-mm-ddTHH:MM:ss") en servidor lo interpreta como local o UTC según config,
+      // pero para estar seguros construimos y ajustamos.
+      
+      const [year, month, day] = fechaIngreso.split('-').map(Number);
+      const [hours, minutes, seconds] = horaIngreso.split(':').map(Number);
+      
+      // Crear fecha asumiendo que los componentes son UTC por ahora
+      const dateInLimaAsUTC = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds || 0));
+      
+      // Ajustar: Si la hora era 10:00 Lima, dateInLimaAsUTC es 10:00 UTC.
+      // Queremos que sea 15:00 UTC. Por lo tanto sumamos 5 horas.
+      fechaIngresoFinal = new Date(dateInLimaAsUTC.getTime() + (5 * 60 * 60 * 1000));
+      
+      logger.info(`Visitante Offline: Recibido Lima ${fechaIngreso} ${horaIngreso} -> Guardado UTC ${fechaIngresoFinal.toISOString()}`);
     } else {
-      // Usar fecha/hora actual (comportamiento normal) en Lima
-      const ahora = toLimaDayjs();
-      fechaIngresoFinal = ahora.toDate();
-      logger.info(`Usando fecha/hora actual: ${ahora.toISOString()}`);
+      // Usar fecha/hora actual del sistema (UTC)
+      fechaIngresoFinal = new Date();
+      logger.info(`Visitante Online: Usando fecha/hora actual UTC: ${fechaIngresoFinal.toISOString()}`);
     }
 
     // Crear la visita

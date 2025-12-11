@@ -57,7 +57,10 @@ const calcularEstadoVirtual = (fechaInicio, fechaFin, estadoOriginal) => {
     const fin = toLimaDayjs(fechaFin);
 
     if (ahora.isBefore(inicio)) return 'APROBADO';
-    if (ahora.isBetween(inicio, fin, 'millisecond', '[]')) return 'EN_CURSO';
+    // Manual implementation of isBetween [Start, End] inclusive
+    if ((ahora.isAfter(inicio) || ahora.isSame(inicio)) && (ahora.isBefore(fin) || ahora.isSame(fin))) {
+      return 'EN_CURSO';
+    }
     return 'FINALIZADO';
 };
 

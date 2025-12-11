@@ -1457,6 +1457,29 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
     area: ''
   });
 
+  // Filtrar personal que ya tiene asistencia registrada (Presente, Tarde/Tardanza)
+  const personalOptionsFiltrados = useMemo(() => {
+    return personalOptions.filter(p => {
+      // Buscar si el personal tiene asistencia hoy
+      const asistencia = asistenciasHoy.find(a => String(a.personal_id) === String(p.value));
+      
+      // Si no tiene asistencia, mostrarlo
+      if (!asistencia) return true;
+      
+      // Si tiene asistencia, verificar su estado
+      // Excluir si ya registró ingreso o tiene estado Presente/Tarde/Tardanza
+      const tieneIngreso = !!asistencia.hora_ingreso;
+      const estadoExcluido = ['Presente', 'Tarde', 'Tardanza'].includes(asistencia.estado_presencia);
+      
+      if (tieneIngreso || estadoExcluido) {
+        return false;
+      }
+      
+      // Si está como Ausente o sin ingreso registrado, permitir seleccionarlo
+      return true;
+    });
+  }, [personalOptions, asistenciasHoy]);
+
   // Seleccionar DNI por defecto cuando se cargan los tipos
   useEffect(() => {
     if (tiposDocumento.length > 0 && !formData.tipoDocumento) {
@@ -1774,7 +1797,7 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
                       label="Seleccionar Personal *"
                       value={formData.personalSeleccionado}
                       onChange={(selectedOption) => handleFormChange('personalSeleccionado', selectedOption)}
-                      options={personalOptions}
+                      options={personalOptionsFiltrados}
                       placeholder="Buscar personal..."
                       isSearchable={true}
                       menuWidth="auto"
