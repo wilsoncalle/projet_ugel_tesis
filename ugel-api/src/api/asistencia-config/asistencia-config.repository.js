@@ -52,7 +52,7 @@ const getConfigGlobalActiva = async () => {
 };
 
 // Config específica de un personal
-const getConfigPersonalActiva = async (personalId) => {
+const getConfigpersonalActiva = async (personalId) => {
   const query = `
     SELECT *
     FROM config_asistencia_personal
@@ -90,6 +90,6 @@ module.exports = {
   createConfig,
   updateConfig,
   getConfigGlobalActiva,
-  getConfigPersonalActiva,
+  getConfigpersonalActiva,
   listConfigs
 };

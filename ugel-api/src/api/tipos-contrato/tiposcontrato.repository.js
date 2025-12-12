@@ -23,7 +23,7 @@ const findAll = async (options = {}) => {
         id,
         nombre_tipo,
         activo
-      FROM TiposContrato
+      FROM tipocontrato
     `;
     
     // Construir la cláusula WHERE
@@ -58,7 +58,7 @@ const findAll = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM TiposContrato
+      FROM tipocontrato
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -100,7 +100,7 @@ const findById = async (id) => {
         id,
         nombre_tipo,
         activo
-      FROM TiposContrato 
+      FROM tipocontrato 
       WHERE id = $1
     `;
     
@@ -125,7 +125,7 @@ const findByName = async (nombre) => {
         id,
         nombre_tipo,
         activo
-      FROM TiposContrato 
+      FROM tipocontrato 
       WHERE LOWER(nombre_tipo) = LOWER($1)
     `;
     
@@ -148,7 +148,7 @@ const create = async (tipoContratoData) => {
     const { nombre_tipo, activo = true } = tipoContratoData;
     
     const query = `
-      INSERT INTO TiposContrato (nombre_tipo, activo)
+      INSERT INTO tipocontrato (nombre_tipo, activo)
       VALUES ($1, $2)
       RETURNING 
         id,
@@ -206,7 +206,7 @@ const update = async (id, tipoContratoData) => {
     }
     
     const query = `
-      UPDATE TiposContrato 
+      UPDATE tipocontrato 
       SET ${updateFields.join(', ')}
       WHERE id = $1
       RETURNING 
@@ -242,7 +242,7 @@ const update = async (id, tipoContratoData) => {
 const softDelete = async (id) => {
   try {
     const query = `
-      UPDATE TiposContrato 
+      UPDATE tipocontrato 
       SET activo = false
       WHERE id = $1
       RETURNING id
@@ -271,7 +271,7 @@ const checkTipoContratoInUse = async (id) => {
   try {
     const query = `
       SELECT COUNT(*) as count
-      FROM Personal
+      FROM personal
       WHERE tipo_contrato_id = $1 AND activo = true
     `;
     
@@ -288,13 +288,13 @@ const checkTipoContratoInUse = async (id) => {
  * Obtener listado simple de tipos de contrato activos
  * @returns {Array} Lista de tipos de contrato activos
  */
-const getActiveTiposContratoList = async () => {
+const getActivetipocontratoList = async () => {
   try {
     const query = `
       SELECT 
         id,
         nombre_tipo
-      FROM TiposContrato 
+      FROM tipocontrato 
       WHERE activo = true
       ORDER BY nombre_tipo ASC
     `;
@@ -330,7 +330,7 @@ const findDeleted = async (options = {}) => {
     
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM TiposContrato
+      FROM tipocontrato
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -339,7 +339,7 @@ const findDeleted = async (options = {}) => {
         id,
         nombre_tipo,
         activo
-      FROM TiposContrato
+      FROM tipocontrato
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY nombre_tipo ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
@@ -375,7 +375,7 @@ const findByIdIncludingDeleted = async (id) => {
         id,
         nombre_tipo,
         activo
-      FROM TiposContrato 
+      FROM tipocontrato 
       WHERE id = $1
     `;
     
@@ -396,7 +396,7 @@ const findByIdIncludingDeleted = async (id) => {
 const restore = async (id) => {
   try {
     const query = `
-      UPDATE TiposContrato 
+      UPDATE tipocontrato 
       SET activo = true
       WHERE id = $1
       RETURNING id
@@ -424,7 +424,7 @@ module.exports = {
   update,
   softDelete,
   checkTipoContratoInUse,
-  getActiveTiposContratoList,
+  getActivetipocontratoList,
   findDeleted,
   findByIdIncludingDeleted,
   restore

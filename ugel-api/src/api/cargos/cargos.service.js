@@ -11,9 +11,9 @@ const logger = require('../../utils/logger');
 /**
  * Obtener todos los cargos con paginación y filtros
  * @param {Object} options - Opciones de filtrado y paginación
- * @returns {Object} Cargos y datos de paginación
+ * @returns {Object} cargo y datos de paginación
  */
-const getAllCargos = async (options = {}) => {
+const getAllcargo = async (options = {}) => {
   const { page = 1, limit = 20, q = '', activo } = options;
   
   try {
@@ -196,9 +196,9 @@ const deleteCargo = async (id, userId) => {
 /**
  * Obtener cargos eliminados (soft delete)
  * @param {Object} options - Opciones de filtrado y paginación
- * @returns {Object} Cargos eliminados y datos de paginación
+ * @returns {Object} cargo eliminados y datos de paginación
  */
-const getDeletedCargos = async (options = {}) => {
+const getDeletedcargo = async (options = {}) => {
   const { page = 1, limit = 20, q = '' } = options;
   
   try {
@@ -254,11 +254,11 @@ const restoreCargo = async (id, userId) => {
 };
 
 module.exports = {
-  getAllCargos,
+  getAllcargo,
   getCargoById,
   createCargo,
   updateCargo,
   deleteCargo,
-  getDeletedCargos,
+  getDeletedcargo,
   restoreCargo
 };

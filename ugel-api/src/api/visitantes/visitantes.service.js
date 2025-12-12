@@ -13,9 +13,9 @@ const reniecProvidersService = require('../reniec-proveedores/reniec-proveedores
 /**
  * Obtener todos los visitantes con paginación y filtros
  * @param {Object} options - Opciones de filtrado y paginación
- * @returns {Object} Visitantes y datos de paginación
+ * @returns {Object} visitante y datos de paginación
  */
-const getAllVisitantes = async (options = {}) => {
+const getAllvisitante = async (options = {}) => {
   const { page = 1, limit = 15, q = '' } = options;
   
   try {
@@ -391,7 +391,7 @@ const createVisitanteFromDNI = async (visitanteData, userId) => {
 };
 
 module.exports = {
-  getAllVisitantes,
+  getAllvisitante,
   getVisitanteById,
   getVisitanteByDocumento,
   getHistorialVisitas,

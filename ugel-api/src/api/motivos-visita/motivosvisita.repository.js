@@ -23,7 +23,7 @@ const findAll = async (options = {}) => {
         id,
         nombre_motivo,
         activo
-      FROM MotivosVisita
+      FROM motivovisita
     `;
     
     // Construir la cláusula WHERE
@@ -58,7 +58,7 @@ const findAll = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM MotivosVisita
+      FROM motivovisita
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -100,7 +100,7 @@ const findById = async (id) => {
         id,
         nombre_motivo,
         activo
-      FROM MotivosVisita 
+      FROM motivovisita 
       WHERE id = $1
     `;
     
@@ -125,7 +125,7 @@ const findByName = async (nombre) => {
         id,
         nombre_motivo,
         activo
-      FROM MotivosVisita 
+      FROM motivovisita 
       WHERE LOWER(nombre_motivo) = LOWER($1)
     `;
     
@@ -148,7 +148,7 @@ const create = async (motivoVisitaData) => {
     const { nombre_motivo, activo = true } = motivoVisitaData;
     
     const query = `
-      INSERT INTO MotivosVisita (nombre_motivo, activo)
+      INSERT INTO motivovisita (nombre_motivo, activo)
       VALUES ($1, $2)
       RETURNING 
         id,
@@ -206,7 +206,7 @@ const update = async (id, motivoVisitaData) => {
     }
     
     const query = `
-      UPDATE MotivosVisita 
+      UPDATE motivovisita 
       SET ${updateFields.join(', ')}
       WHERE id = $1
       RETURNING 
@@ -242,7 +242,7 @@ const update = async (id, motivoVisitaData) => {
 const softDelete = async (id) => {
   try {
     const query = `
-      UPDATE MotivosVisita 
+      UPDATE motivovisita 
       SET activo = false
       WHERE id = $1
       RETURNING id
@@ -271,7 +271,7 @@ const checkMotivoVisitaInUse = async (id) => {
   try {
     const query = `
       SELECT COUNT(*) as count
-      FROM RegistrosVisitas
+      FROM registrovisita
       WHERE motivo_visita_id = $1
     `;
     
@@ -288,13 +288,13 @@ const checkMotivoVisitaInUse = async (id) => {
  * Obtener listado simple de motivos de visita activos
  * @returns {Array} Lista de motivos de visita activos
  */
-const getActiveMotivosVisitaList = async () => {
+const getActivemotivovisitaList = async () => {
   try {
     const query = `
       SELECT 
         id,
         nombre_motivo
-      FROM MotivosVisita 
+      FROM motivovisita 
       WHERE activo = true
       ORDER BY nombre_motivo ASC
     `;
@@ -330,7 +330,7 @@ const findDeleted = async (options = {}) => {
     
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM MotivosVisita
+      FROM motivovisita
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -339,7 +339,7 @@ const findDeleted = async (options = {}) => {
         id,
         nombre_motivo,
         activo
-      FROM MotivosVisita
+      FROM motivovisita
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY nombre_motivo ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
@@ -375,7 +375,7 @@ const findByIdIncludingDeleted = async (id) => {
         id,
         nombre_motivo,
         activo
-      FROM MotivosVisita 
+      FROM motivovisita 
       WHERE id = $1
     `;
     
@@ -396,7 +396,7 @@ const findByIdIncludingDeleted = async (id) => {
 const restore = async (id) => {
   try {
     const query = `
-      UPDATE MotivosVisita 
+      UPDATE motivovisita 
       SET activo = true
       WHERE id = $1
       RETURNING id
@@ -424,7 +424,7 @@ module.exports = {
   update,
   softDelete,
   checkMotivoVisitaInUse,
-  getActiveMotivosVisitaList,
+  getActivemotivovisitaList,
   findDeleted,
   findByIdIncludingDeleted,
   restore

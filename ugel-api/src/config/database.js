@@ -17,6 +17,9 @@ const poolConfig = {
   max: 20, // Máximo número de conexiones en el pool
   idleTimeoutMillis: 30000, // Tiempo antes de cerrar conexiones inactivas
   connectionTimeoutMillis: 2000, // Tiempo máximo para obtener una conexión
+  // Forzar la sesión a usar la zona horaria de Lima para que los TIMESTAMPTZ
+  // se interpreten y formateen correctamente (UTC-5)
+  options: '-c timezone=America/Lima' 
 };
 
 // Crear el pool de conexiones

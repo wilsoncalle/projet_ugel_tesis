@@ -57,7 +57,7 @@ router.post('/sincronizar-usuarios',
   authenticateToken,
   requireActiveUser,
   requireAdminOrRRHH,
-  controller.sincronizarUsuarios
+  controller.sincronizarusuario
 );
 
 /**
@@ -81,7 +81,7 @@ router.post('/',
   authenticateToken,
   requireActiveUser,
   requireAdminOrRRHH,
-  validationMiddleware.validateCreatePersonal,
+  validationMiddleware.validateCreatepersonal,
   controller.create
 );
 
@@ -95,7 +95,7 @@ router.put('/:id',
   requireActiveUser,
   requireAdminOrRRHH,
   validationMiddleware.validateId,
-  validationMiddleware.validateUpdatePersonal,
+  validationMiddleware.validateUpdatepersonal,
   controller.update
 );
 

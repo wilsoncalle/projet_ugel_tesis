@@ -133,7 +133,7 @@ const loginUser = async (loginData) => {
           personalId = personal.id;
           personalNombres = personal.nombres;
           personalApellidos = personal.apellidos;
-          logger.info(`Personal encontrado para usuario ${nombreUsuario}: ID ${personalId}`);
+          logger.info(`personal encontrado para usuario ${nombreUsuario}: ID ${personalId}`);
         }
       }
     } catch (error) {
@@ -153,7 +153,7 @@ const loginUser = async (loginData) => {
   }
   
   // Agregar personalId y datos de personal al objeto user para incluirlo en el token
-  const userWithPersonal = {
+  const userWithpersonal = {
     ...user,
     personal_id: personalId,
     personal_nombres: personalNombres,
@@ -161,12 +161,12 @@ const loginUser = async (loginData) => {
   };
   
   // Generar token
-  const token = generateToken(userWithPersonal);
+  const token = generateToken(userWithpersonal);
   
   // Remover datos sensibles pero incluir datos de personal en la respuesta
-  const { hash_contrasena, ...userWithoutPassword } = userWithPersonal;
+  const { hash_contrasena, ...userWithoutPassword } = userWithpersonal;
   
-  logger.info(`Login exitoso para usuario: ${user.nombre_usuario}${personalId ? ` (Personal ID: ${personalId})` : ''}`);
+  logger.info(`Login exitoso para usuario: ${user.nombre_usuario}${personalId ? ` (personal ID: ${personalId})` : ''}`);
   
   return {
     usuario: userWithoutPassword,
@@ -196,8 +196,31 @@ const refreshToken = async (token) => {
     throw new AppError('Usuario no encontrado o inactivo', 401);
   }
   
+  // Buscar personal asociado al usuario para incluir sus datos
+  let personalId = user.personal_id;
+  let personalNombres = null;
+  let personalApellidos = null;
+
+  if (personalId) {
+    try {
+      const personal = await personalRepository.findById(personalId);
+      if (personal) {
+        personalNombres = personal.nombres;
+        personalApellidos = personal.apellidos;
+      }
+    } catch (error) {
+      logger.warn(`No se pudieron obtener datos del personal ID ${personalId} durante refresh: ${error.message}`);
+    }
+  }
+
+  const userWithpersonal = {
+    ...user,
+    personal_nombres: personalNombres,
+    personal_apellidos: personalApellidos
+  };
+  
   // Generar nuevo token
-  const newToken = generateToken(user);
+  const newToken = generateToken(userWithpersonal);
   
   logger.info(`Token renovado para usuario: ${user.nombre_usuario}`);
   

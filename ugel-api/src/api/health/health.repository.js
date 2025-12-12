@@ -68,23 +68,23 @@ const getTablesStats = async () => {
   try {
     const queries = [
       // Conteo de usuarios
-      "SELECT COUNT(*) as total FROM Usuarios",
-      "SELECT COUNT(*) as active FROM Usuarios WHERE activo = true",
+      "SELECT COUNT(*) as total FROM usuario",
+      "SELECT COUNT(*) as active FROM usuario WHERE activo = true",
       
       // Conteo de personal
-      "SELECT COUNT(*) as total FROM Personal",
-      "SELECT COUNT(*) as active FROM Personal WHERE activo = true",
+      "SELECT COUNT(*) as total FROM personal",
+      "SELECT COUNT(*) as active FROM personal WHERE activo = true",
       
       // Conteo de visitantes
-      "SELECT COUNT(*) as total FROM Visitantes",
+      "SELECT COUNT(*) as total FROM visitante",
       
       // Conteo de visitas (último mes)
       `SELECT COUNT(*) as recent_visits 
-       FROM RegistrosVisitas 
+       FROM registrovisita 
        WHERE fecha_ingreso >= CURRENT_DATE - INTERVAL '30 days'`,
       
       // Conteo de áreas
-      "SELECT COUNT(*) as total FROM AreasDestino WHERE activa = true"
+      "SELECT COUNT(*) as total FROM areadestino WHERE activa = true"
     ];
     
     const results = await Promise.all(
@@ -126,16 +126,16 @@ const getTablesStats = async () => {
 const checkTablesIntegrity = async () => {
   try {
     const requiredTables = [
-      'Usuarios',
-      'AreasDestino',
-      'TiposContrato',
-      'TiposDocumento',
-      'MotivosVisita',
-      'Personal',
-      'Visitantes',
-      'RegistrosVisitas',
-      'RegistrosSalidaPersonal',
-      'ControlAsistenciaPersonal'
+      'usuario',
+      'areadestino',
+      'tipocontrato',
+      'tipodocumento',
+      'motivovisita',
+      'personal',
+      'visitante',
+      'registrovisita',
+      'registrosalidapersonal',
+      'controlasistenciapersonal'
     ];
     
     const query = `

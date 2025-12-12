@@ -3,8 +3,8 @@ const { AppError } = require('../../middleware/errorHandler');
 
 const getConfigEfectiva = async (personalId) => {
   // 1. Intentar config específica
-  const configPersonal = await repository.getConfigPersonalActiva(personalId);
-  if (configPersonal) return configPersonal;
+  const configpersonal = await repository.getConfigpersonalActiva(personalId);
+  if (configpersonal) return configpersonal;
 
   // 2. Si no hay, usar global
   const configGlobal = await repository.getConfigGlobalActiva();
@@ -42,8 +42,8 @@ const setConfigGlobal = async ({ minutos, dias, aplicaDesde, horaEntrada }) => {
   }
 };
 
-const setConfigPersonal = async ({ personalId, minutos, dias, aplicaDesde, horaEntrada }) => {
-  const existing = await repository.getConfigPersonalActiva(personalId);
+const setConfigpersonal = async ({ personalId, minutos, dias, aplicaDesde, horaEntrada }) => {
+  const existing = await repository.getConfigpersonalActiva(personalId);
   if (existing) {
     return await repository.updateConfig(existing.id, {
       minutos,
@@ -67,5 +67,5 @@ const setConfigPersonal = async ({ personalId, minutos, dias, aplicaDesde, horaE
 module.exports = {
   getConfigEfectiva,
   setConfigGlobal,
-  setConfigPersonal,
+  setConfigpersonal,
 };

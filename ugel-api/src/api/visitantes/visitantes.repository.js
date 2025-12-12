@@ -10,7 +10,7 @@ const logger = require('../../utils/logger');
 /**
  * Buscar todos los visitantes con filtros y paginación
  * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Visitantes encontrados y total
+ * @returns {Object} visitante encontrados y total
  */
 const findAll = async (options = {}) => {
   const { page = 1, limit = 15, search = '' } = options;
@@ -28,8 +28,8 @@ const findAll = async (options = {}) => {
         v.nombres,
         v.apellidos,
         v.fecha_ultima_actualizacion_api
-      FROM Visitantes v
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+      FROM visitante v
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
     `;
     
     // Construir la cláusula WHERE
@@ -56,7 +56,7 @@ const findAll = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM Visitantes v
+      FROM visitante v
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -103,8 +103,8 @@ const findById = async (id) => {
         v.nombres,
         v.apellidos,
         v.fecha_ultima_actualizacion_api
-      FROM Visitantes v
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+      FROM visitante v
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
       WHERE v.id = $1
     `;
     
@@ -135,8 +135,8 @@ const findByDocumento = async (tipoDocumentoId, numeroDocumento) => {
         v.nombres,
         v.apellidos,
         v.fecha_ultima_actualizacion_api
-      FROM Visitantes v
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+      FROM visitante v
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
       WHERE v.tipo_documento_id = $1 AND v.numero_documento = $2
     `;
     
@@ -165,7 +165,7 @@ const create = async (visitanteData) => {
     } = visitanteData;
     
     const query = `
-      INSERT INTO Visitantes (
+      INSERT INTO visitante (
         tipo_documento_id, 
         numero_documento, 
         nombres, 
@@ -250,7 +250,7 @@ const update = async (id, visitanteData) => {
     }
     
     const query = `
-      UPDATE Visitantes 
+      UPDATE visitante 
       SET ${updateFields.join(', ')}
       WHERE id = $1
       RETURNING id
@@ -299,10 +299,10 @@ const getHistorialVisitas = async (id, options = {}) => {
         a.nombre_area,
         mv.nombre_motivo,
         CASE WHEN p.id IS NOT NULL THEN CONCAT(p.nombres, ' ', p.apellidos) ELSE NULL END as personal_visitado
-      FROM RegistrosVisitas rv
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
-      JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
-      LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
+      FROM registrovisita rv
+      JOIN areadestino a ON rv.area_destino_id = a.id
+      JOIN motivovisita mv ON rv.motivo_visita_id = mv.id
+      LEFT JOIN personal p ON rv.personal_visitado_id = p.id
       WHERE rv.visitante_id = $1
       ORDER BY rv.fecha_ingreso DESC
       LIMIT $2 OFFSET $3
@@ -310,7 +310,7 @@ const getHistorialVisitas = async (id, options = {}) => {
     
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM RegistrosVisitas
+      FROM registrovisita
       WHERE visitante_id = $1
     `;
     
@@ -350,8 +350,8 @@ const findByDNI = async (dni) => {
         v.nombres,
         v.apellidos,
         v.fecha_ultima_actualizacion_api
-      FROM Visitantes v
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+      FROM visitante v
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
       WHERE v.numero_documento = $1 AND td.codigo = 'DNI'
     `;
     

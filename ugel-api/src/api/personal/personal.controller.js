@@ -14,14 +14,14 @@ const logger = require('../../utils/logger');
 const getAll = asyncHandler(async (req, res) => {
   logger.info('Solicitud de listado de personal');
   
-  const result = await service.getAllPersonal(req.query);
+  const result = await service.getAllpersonal(req.query);
   
   // Aseguramos que la respuesta siempre tenga un array, aunque esté vacío
   const personalData = result.personal || [];
   
   res.json({
     success: true,
-    message: 'Personal obtenido exitosamente',
+    message: 'personal obtenido exitosamente',
     data: personalData,
     pagination: result.pagination
   });
@@ -35,11 +35,11 @@ const getById = asyncHandler(async (req, res) => {
   const { id } = req.params;
   logger.info(`Solicitud de personal por ID: ${id}`);
   
-  const personal = await service.getPersonalById(id);
+  const personal = await service.getpersonalById(id);
   
   res.json({
     success: true,
-    message: 'Personal obtenido exitosamente',
+    message: 'personal obtenido exitosamente',
     data: personal
   });
 });
@@ -52,11 +52,11 @@ const getByDocumento = asyncHandler(async (req, res) => {
   const { tipo, numero } = req.params;
   logger.info(`Solicitud de personal por documento: ${tipo} - ${numero}`);
   
-  const personal = await service.getPersonalByDocumento(tipo, numero);
+  const personal = await service.getpersonalByDocumento(tipo, numero);
   
   res.json({
     success: true,
-    message: 'Personal obtenido exitosamente',
+    message: 'personal obtenido exitosamente',
     data: personal
   });
 });
@@ -68,13 +68,13 @@ const getByDocumento = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res) => {
   logger.info(`Creando nuevo personal: ${req.body.nombres} ${req.body.apellidos}`);
   
-  const personal = await service.createPersonal(req.body, req.user.id);
+  const personal = await service.createpersonal(req.body, req.user.id);
   
-  logger.info(`Personal creado exitosamente: ${personal.nombres} ${personal.apellidos}`);
+  logger.info(`personal creado exitosamente: ${personal.nombres} ${personal.apellidos}`);
   
   res.status(201).json({
     success: true,
-    message: 'Personal creado exitosamente',
+    message: 'personal creado exitosamente',
     data: personal
   });
 });
@@ -87,13 +87,13 @@ const update = asyncHandler(async (req, res) => {
   const { id } = req.params;
   logger.info(`Actualizando personal ID: ${id}`);
   
-  const personal = await service.updatePersonal(id, req.body, req.user.id);
+  const personal = await service.updatepersonal(id, req.body, req.user.id);
   
-  logger.info(`Personal actualizado exitosamente: ${personal.nombres} ${personal.apellidos}`);
+  logger.info(`personal actualizado exitosamente: ${personal.nombres} ${personal.apellidos}`);
   
   res.json({
     success: true,
-    message: 'Personal actualizado exitosamente',
+    message: 'personal actualizado exitosamente',
     data: personal
   });
 });
@@ -106,13 +106,13 @@ const softDelete = asyncHandler(async (req, res) => {
   const { id } = req.params;
   logger.info(`Eliminando personal ID: ${id}`);
   
-  await service.deletePersonal(id, req.user.id);
+  await service.deletepersonal(id, req.user.id);
   
-  logger.info(`Personal eliminado exitosamente ID: ${id}`);
+  logger.info(`personal eliminado exitosamente ID: ${id}`);
   
   res.json({
     success: true,
-    message: 'Personal eliminado exitosamente'
+    message: 'personal eliminado exitosamente'
   });
 });
 
@@ -123,11 +123,11 @@ const softDelete = asyncHandler(async (req, res) => {
 const getDeleted = asyncHandler(async (req, res) => {
   logger.info('Solicitud de personal eliminado');
   
-  const result = await service.getDeletedPersonal(req.query);
+  const result = await service.getDeletedpersonal(req.query);
   
   res.json({
     success: true,
-    message: 'Personal eliminado obtenido exitosamente',
+    message: 'personal eliminado obtenido exitosamente',
     data: result.personal || [],
     pagination: result.pagination
   });
@@ -141,13 +141,13 @@ const restore = asyncHandler(async (req, res) => {
   const { id } = req.params;
   logger.info(`Restaurando personal ID: ${id}`);
   
-  const personal = await service.restorePersonal(id, req.user.id);
+  const personal = await service.restorepersonal(id, req.user.id);
   
-  logger.info(`Personal restaurado exitosamente: ${personal.nombres} ${personal.apellidos}`);
+  logger.info(`personal restaurado exitosamente: ${personal.nombres} ${personal.apellidos}`);
   
   res.json({
     success: true,
-    message: 'Personal restaurado exitosamente',
+    message: 'personal restaurado exitosamente',
     data: personal
   });
 });
@@ -156,10 +156,10 @@ const restore = asyncHandler(async (req, res) => {
  * Sincronizar usuarios para personal existente
  * @route POST /api/personal/sincronizar-usuarios
  */
-const sincronizarUsuarios = asyncHandler(async (req, res) => {
+const sincronizarusuario = asyncHandler(async (req, res) => {
   logger.info('Iniciando sincronización de usuarios para personal');
 
-  const resultado = await service.sincronizarUsuariosPersonal(req.user.id);
+  const resultado = await service.sincronizarusuariopersonal(req.user.id);
 
   res.json({
     success: true,
@@ -177,5 +177,5 @@ module.exports = {
   softDelete,
   getDeleted,
   restore,
-  sincronizarUsuarios
+  sincronizarusuario
 };

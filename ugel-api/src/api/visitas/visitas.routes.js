@@ -87,7 +87,7 @@ router.get('/por-motivo',
 router.get('/por-personal',
   authenticateToken,
   requireActiveUser,
-  controller.getVisitasPorPersonal
+  controller.getVisitasPorpersonal
 );
 
 /**
@@ -98,7 +98,7 @@ router.get('/por-personal',
 router.get('/visitantes-frecuentes',
   authenticateToken,
   requireActiveUser,
-  controller.getVisitantesFrecuentes
+  controller.getvisitanteFrecuentes
 );
 
 /**
@@ -125,7 +125,7 @@ router.get('/totales',
 
 /**
  * @route   GET /api/visitas/mis-visitas
- * @desc    Obtener mis visitas (Personal)
+ * @desc    Obtener mis visitas (personal)
  * @access  Private
  */
 router.get('/mis-visitas',

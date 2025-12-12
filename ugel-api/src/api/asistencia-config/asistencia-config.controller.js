@@ -26,10 +26,10 @@ const updateConfigGlobal = asyncHandler(async (req, res) => {
   });
 });
 
-const updateConfigPersonal = asyncHandler(async (req, res) => {
+const updateConfigpersonal = asyncHandler(async (req, res) => {
   const { personalId, minutos_tolerancia_por_dia, dias_tolerancia_por_mes, aplica_desde, hora_entrada } = req.body;
 
-  const config = await service.setConfigPersonal({
+  const config = await service.setConfigpersonal({
     personalId: Number(personalId),
     minutos: Number(minutos_tolerancia_por_dia),
     dias: Number(dias_tolerancia_por_mes),
@@ -47,5 +47,5 @@ const updateConfigPersonal = asyncHandler(async (req, res) => {
 module.exports = {
   getConfigGlobal,
   updateConfigGlobal,
-  updateConfigPersonal
+  updateConfigpersonal
 };

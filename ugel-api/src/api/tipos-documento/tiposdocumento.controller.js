@@ -14,7 +14,7 @@ const logger = require('../../utils/logger');
 const getAll = asyncHandler(async (req, res) => {
   logger.info('Solicitud de listado de tipos de documento');
   
-  const result = await service.getAllTiposDocumento(req.query);
+  const result = await service.getAlltipodocumento(req.query);
   
   res.json({
     success: true,
@@ -103,7 +103,7 @@ const softDelete = asyncHandler(async (req, res) => {
 const getDeleted = asyncHandler(async (req, res) => {
   logger.info('Solicitud de tipos de documento eliminados');
   
-  const result = await service.getDeletedTiposDocumento(req.query);
+  const result = await service.getDeletedtipodocumento(req.query);
   
   res.json({
     success: true,

@@ -12,7 +12,7 @@ const logger = require('../../utils/logger');
  * @param {Object} options - Opciones de filtrado y paginación
  * @returns {Object} Motivos de visita y datos de paginación
  */
-const getAllMotivosVisita = async (options = {}) => {
+const getAllmotivovisita = async (options = {}) => {
   const { page = 1, limit = 20, q = '', activo } = options;
   
   try {
@@ -188,7 +188,7 @@ const deleteMotivoVisita = async (id, userId) => {
  * @param {Object} options - Opciones de filtrado y paginación
  * @returns {Object} Motivos de visita eliminados y datos de paginación
  */
-const getDeletedMotivosVisita = async (options = {}) => {
+const getDeletedmotivovisita = async (options = {}) => {
   const { page = 1, limit = 20, q = '' } = options;
   
   try {
@@ -244,11 +244,11 @@ const restoreMotivoVisita = async (id, userId) => {
 };
 
 module.exports = {
-  getAllMotivosVisita,
+  getAllmotivovisita,
   getMotivoVisitaById,
   createMotivoVisita,
   updateMotivoVisita,
   deleteMotivoVisita,
-  getDeletedMotivosVisita,
+  getDeletedmotivovisita,
   restoreMotivoVisita
 };

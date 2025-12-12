@@ -209,10 +209,10 @@ const createVisita = async (visitaData) => {
     if (personalVisitadoId) {
       const personal = await personalRepository.findById(personalVisitadoId);
       if (!personal) {
-        throw new AppError('Personal visitado no encontrado', 404);
+        throw new AppError('personal visitado no encontrado', 404);
       }
       if (!personal.activo) {
-        throw new AppError('Personal visitado inactivo', 400);
+        throw new AppError('personal visitado inactivo', 400);
       }
     }
     
@@ -796,14 +796,14 @@ const getVisitasTotales = async (periodo = 'mes') => {
  * @param {string} periodo - Periodo de consulta (hoy, semana, mes, anio, todo)
  * @returns {Array} Estadísticas de visitas por personal visitado
  */
-const getVisitasPorPersonal = async (periodo = 'mes') => {
+const getVisitasPorpersonal = async (periodo = 'mes') => {
   try {
     logger.info(`Obteniendo estadísticas por personal para periodo: ${periodo}`);
     
     const { fechaInicio, fechaFin } = getPeriodoRangoLima(periodo);
     
     // Obtener estadísticas del repositorio
-    const estadisticas = await repository.getVisitasPorPersonal(fechaInicio, fechaFin);
+    const estadisticas = await repository.getVisitasPorpersonal(fechaInicio, fechaFin);
     
     logger.info(`Estadísticas obtenidas: ${estadisticas.length} personal`);
     
@@ -818,18 +818,18 @@ const getVisitasPorPersonal = async (periodo = 'mes') => {
 /**
  * Obtener visitantes frecuentes con filtro de período
  * @param {string} periodo - Periodo de consulta (hoy, semana, mes, anio, todo)
- * @returns {Array} Visitantes frecuentes
+ * @returns {Array} visitante frecuentes
  */
-const getVisitantesFrecuentes = async (periodo = 'mes') => {
+const getvisitanteFrecuentes = async (periodo = 'mes') => {
   try {
     logger.info(`Obteniendo visitantes frecuentes para periodo: ${periodo}`);
     
     const { fechaInicio, fechaFin } = getPeriodoRangoLima(periodo);
     
     // Obtener visitantes frecuentes del repositorio
-    const visitantes = await repository.getVisitantesFrecuentes(fechaInicio, fechaFin);
+    const visitantes = await repository.getvisitanteFrecuentes(fechaInicio, fechaFin);
     
-    logger.info(`Visitantes frecuentes obtenidos: ${visitantes.length} registros`);
+    logger.info(`visitante frecuentes obtenidos: ${visitantes.length} registros`);
     
     return visitantes;
     
@@ -931,10 +931,10 @@ const rejectVisita = async (id, personalId, motivo) => {
  * Delegar visita
  * @param {number} id - ID de la visita
  * @param {number} personalId - ID del personal que delega
- * @param {number} nuevoPersonalId - ID del nuevo personal
+ * @param {number} nuevopersonalId - ID del nuevo personal
  * @returns {Object} Visita actualizada
  */
-const delegateVisita = async (id, personalId, nuevoPersonalId) => {
+const delegateVisita = async (id, personalId, nuevopersonalId) => {
   try {
     const visita = await repository.findById(id);
     if (!visita) throw new AppError('Visita no encontrada', 404);
@@ -943,10 +943,10 @@ const delegateVisita = async (id, personalId, nuevoPersonalId) => {
       throw new AppError('No tiene permiso para delegar esta visita', 403);
     }
     
-    const nuevoPersonal = await personalRepository.findById(nuevoPersonalId);
-    if (!nuevoPersonal) throw new AppError('Nuevo personal no encontrado', 404);
+    const nuevopersonal = await personalRepository.findById(nuevopersonalId);
+    if (!nuevopersonal) throw new AppError('Nuevo personal no encontrado', 404);
     
-    return await repository.delegar(id, nuevoPersonalId, nuevoPersonal.area_destino_id, personalId);
+    return await repository.delegar(id, nuevopersonalId, nuevopersonal.area_destino_id, personalId);
   } catch (error) {
     logger.error(`Error delegando visita ${id}:`, error);
     throw error;
@@ -959,9 +959,9 @@ const delegateVisita = async (id, personalId, nuevoPersonalId) => {
  * @param {Object} options - Opciones de búsqueda
  * @returns {Object} Visitas encontradas y total
  */
-const findByPersonalVisitado = async (personalId, options = {}) => {
+const findBypersonalVisitado = async (personalId, options = {}) => {
   try {
-    return await repository.findByPersonalVisitado(personalId, options);
+    return await repository.findBypersonalVisitado(personalId, options);
   } catch (error) {
     logger.error(`Error obteniendo visitas para personal ${personalId}:`, error);
     throw error;
@@ -1011,12 +1011,12 @@ module.exports = {
   getVisitasPorArea,
   getVisitasPorMotivo,
   getVisitasTotales, // Kept from original, assuming it's a service function
-  getVisitasPorPersonal,
-  getVisitantesFrecuentes,
+  getVisitasPorpersonal,
+  getvisitanteFrecuentes,
   getVisitanteDetalle,
   acceptVisita,
   rejectVisita,
   delegateVisita,
-  findByPersonalVisitado,
+  findBypersonalVisitado,
   finalizarAtencion
 };

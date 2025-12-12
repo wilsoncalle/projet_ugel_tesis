@@ -15,12 +15,12 @@ const logger = require('../../utils/logger');
 const { toLimaDateYYYYMMDD } = require('../../utils/fechas');
 
 // Crea o reactiva usuario automáticamente cuando el personal tiene datos mínimos
-const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
+const ensureUsuarioParapersonal = async (personal, userId, origen = 'auto') => {
   try {
-    logger.info(`[ensureUsuarioParaPersonal] Iniciando verificación para personal ID ${personal.id} (${origen})`);
+    logger.info(`[ensureUsuarioParapersonal] Iniciando verificación para personal ID ${personal.id} (${origen})`);
     
     // Log de datos recibidos
-    logger.debug(`[ensureUsuarioParaPersonal] Datos del personal:`, {
+    logger.debug(`[ensureUsuarioParapersonal] Datos del personal:`, {
       id: personal.id,
       nombres: personal.nombres,
       apellidos: personal.apellidos,
@@ -37,7 +37,7 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
     } else {
       fechaNacStr = String(personal.fecha_nacimiento).split('T')[0];
     }
-    logger.debug(`[ensureUsuarioParaPersonal] Fecha normalizada: ${fechaNacStr}`);
+    logger.debug(`[ensureUsuarioParapersonal] Fecha normalizada: ${fechaNacStr}`);
     
     const tieneDatosMinimos =
       fechaNacStr &&
@@ -46,7 +46,7 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
 
     if (!tieneDatosMinimos) {
       logger.warn(
-        `[ensureUsuarioParaPersonal] No se creó usuario automático para personal ID ${personal.id} por datos incompletos:`,
+        `[ensureUsuarioParapersonal] No se creó usuario automático para personal ID ${personal.id} por datos incompletos:`,
         {
           tiene_fecha: !!fechaNacStr,
           tiene_documento: !!personal.numero_documento,
@@ -56,28 +56,28 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
       return { created: false, reason: 'datos_incompletos' };
     }
 
-    logger.info(`[ensureUsuarioParaPersonal] Personal ID ${personal.id} tiene datos completos, verificando usuario existente...`);
+    logger.info(`[ensureUsuarioParapersonal] personal ID ${personal.id} tiene datos completos, verificando usuario existente...`);
 
-    const existingUser = await usuariosService.getUsuarioByPersonalId(personal.id);
+    const existingUser = await usuariosService.getUsuarioBypersonalId(personal.id);
     
     if (existingUser) {
-      logger.info(`[ensureUsuarioParaPersonal] Usuario existente encontrado:`, {
+      logger.info(`[ensureUsuarioParapersonal] Usuario existente encontrado:`, {
         usuario_id: existingUser.id,
         activo: existingUser.activo,
         nombre_usuario: existingUser.nombre_usuario
       });
     } else {
-      logger.info(`[ensureUsuarioParaPersonal] No se encontró usuario existente para personal ID ${personal.id}`);
+      logger.info(`[ensureUsuarioParapersonal] No se encontró usuario existente para personal ID ${personal.id}`);
     }
 
     // Asegurar que la fecha se interprete tal cual viene (YYYY-MM-DD) sin UTC/Local shift
     const [year, month, day] = fechaNacStr.split('-');
     const password = `${day}${month}${year}`; // DDMMYYYY
     
-    logger.debug(`[ensureUsuarioParaPersonal] Contraseña generada (formato DDMMYYYY): ${password}`);
+    logger.debug(`[ensureUsuarioParapersonal] Contraseña generada (formato DDMMYYYY): ${password}`);
 
     if (existingUser && existingUser.activo === false) {
-      logger.info(`[ensureUsuarioParaPersonal] Reactivando usuario inactivo ID ${existingUser.id}...`);
+      logger.info(`[ensureUsuarioParapersonal] Reactivando usuario inactivo ID ${existingUser.id}...`);
       
       await usuariosService.updateUsuario(
         existingUser.id,
@@ -85,7 +85,7 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
           nombreUsuario: personal.numero_documento,
           email: personal.email,
           contrasena: password,
-          rol: existingUser.rol || 'Personal',
+          rol: existingUser.rol || 'personal',
           activo: true,
           personalId: personal.id,
         },
@@ -93,14 +93,14 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
       );
 
       logger.info(
-        `[ensureUsuarioParaPersonal] Usuario reactivado automáticamente (${origen}) para personal ID: ${personal.id}`
+        `[ensureUsuarioParapersonal] Usuario reactivado automáticamente (${origen}) para personal ID: ${personal.id}`
       );
       return { created: false, reactivated: true, userId: existingUser.id };
     }
 
     if (existingUser && existingUser.activo === true) {
       logger.info(
-        `[ensureUsuarioParaPersonal] Personal ID ${personal.id} ya tiene usuario asociado activo (ID ${existingUser.id}), verificando si necesita actualización...`
+        `[ensureUsuarioParapersonal] personal ID ${personal.id} ya tiene usuario asociado activo (ID ${existingUser.id}), verificando si necesita actualización...`
       );
       
       // Verificar si hay cambios en los datos críticos
@@ -109,7 +109,7 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
         existingUser.email !== personal.email;
       
       if (needsUpdate || origen === 'actualización') {
-        logger.info(`[ensureUsuarioParaPersonal] Actualizando usuario existente con nuevos datos del personal...`);
+        logger.info(`[ensureUsuarioParapersonal] Actualizando usuario existente con nuevos datos del personal...`);
         
         await usuariosService.updateUsuario(
           existingUser.id,
@@ -117,7 +117,7 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
             nombreUsuario: personal.numero_documento,
             email: personal.email,
             contrasena: password, // Nueva contraseña basada en fecha de nacimiento actualizada
-            rol: existingUser.rol || 'Personal',
+            rol: existingUser.rol || 'personal',
             activo: true,
             personalId: personal.id,
           },
@@ -125,38 +125,38 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
         );
         
         logger.info(
-          `[ensureUsuarioParaPersonal] Usuario ID ${existingUser.id} actualizado con datos de personal ID ${personal.id}`
+          `[ensureUsuarioParapersonal] Usuario ID ${existingUser.id} actualizado con datos de personal ID ${personal.id}`
         );
         return { created: false, updated: true, userId: existingUser.id };
       }
       
-      logger.info(`[ensureUsuarioParaPersonal] Usuario ya está actualizado, no se requieren cambios`);
+      logger.info(`[ensureUsuarioParapersonal] Usuario ya está actualizado, no se requieren cambios`);
       return { created: false, reason: 'ya_existe_activo', userId: existingUser.id };
     }
 
     // No existe usuario - crear uno nuevo
-    logger.info(`[ensureUsuarioParaPersonal] Creando nuevo usuario para personal ID ${personal.id}...`);
+    logger.info(`[ensureUsuarioParapersonal] Creando nuevo usuario para personal ID ${personal.id}...`);
     
     const nuevoUsuario = await usuariosService.createUsuario(
       {
         nombreUsuario: personal.numero_documento,
         email: personal.email,
         contrasena: password,
-        rol: 'Personal',
+        rol: 'personal',
         personalId: personal.id,
       },
       userId
     );
 
     logger.info(
-      `[ensureUsuarioParaPersonal] Usuario creado automáticamente (${origen}) para personal ID: ${personal.id}, Usuario ID: ${nuevoUsuario.id}`
+      `[ensureUsuarioParapersonal] Usuario creado automáticamente (${origen}) para personal ID: ${personal.id}, Usuario ID: ${nuevoUsuario.id}`
     );
     
     return { created: true, userId: nuevoUsuario.id };
 
   } catch (error) {
     logger.error(
-      `[ensureUsuarioParaPersonal] Error creando/reactivando usuario automático para personal ID ${personal.id} (${origen}):`,
+      `[ensureUsuarioParapersonal] Error creando/reactivando usuario automático para personal ID ${personal.id} (${origen}):`,
       {
         error: error.message,
         stack: error.stack
@@ -173,21 +173,21 @@ const ensureUsuarioParaPersonal = async (personal, userId, origen = 'auto') => {
  * @param {number} userId - ID del usuario que ejecuta la sincronización
  * @returns {Object} Resultado de la sincronización
  */
-const sincronizarUsuariosPersonal = async (userId) => {
+const sincronizarusuariopersonal = async (userId) => {
   try {
     // PASO 1: Limpiar vínculos incorrectos primero
     logger.info('Limpiando vinculos incorrectos de usuarios...');
     
-    // Obtener usuarios que NO son Personal pero tienen personal_id
+    // Obtener usuarios que NO son personal pero tienen personal_id
     const usuariosIncorrectos = await db.query(`
       SELECT id, nombre_usuario, rol, personal_id 
-      FROM Usuarios 
-      WHERE rol != 'Personal' AND personal_id IS NOT NULL
+      FROM usuario 
+      WHERE rol != 'personal' AND personal_id IS NOT NULL
     `);
     
     let vinculosCorregidos = 0;
     for (const u of usuariosIncorrectos.rows) {
-      await db.query('UPDATE Usuarios SET personal_id = NULL WHERE id = $1', [u.id]);
+      await db.query('UPDATE usuario SET personal_id = NULL WHERE id = $1', [u.id]);
       vinculosCorregidos++;
       logger.info(`Vinculo incorrecto eliminado: Usuario ${u.nombre_usuario} (${u.rol}) ya no apunta a personal_id ${u.personal_id}`);
     }
@@ -225,12 +225,12 @@ const sincronizarUsuariosPersonal = async (userId) => {
 
         if (!tieneDatosMinimos) {
           omitidos++;
-          logger.debug(`Personal ID ${p.id} omitido: falta email (${p.email}), fecha_nacimiento (${fechaNacStr}) o numero_documento (${p.numero_documento})`);
+          logger.debug(`personal ID ${p.id} omitido: falta email (${p.email}), fecha_nacimiento (${fechaNacStr}) o numero_documento (${p.numero_documento})`);
           continue;
         }
 
         // Buscar usuario vinculado a este personal
-        const existingUser = await usuariosService.getUsuarioByPersonalId(p.id);
+        const existingUser = await usuariosService.getUsuarioBypersonalId(p.id);
         const [year, month, day] = fechaNacStr.split('-');
         const password = `${day}${month}${year}`; // DDMMYYYY
 
@@ -242,7 +242,7 @@ const sincronizarUsuariosPersonal = async (userId) => {
               nombreUsuario: p.numero_documento,
               email: p.email,
               contrasena: password,
-              rol: 'Personal', // Asegurar que sea rol Personal
+              rol: 'personal', // Asegurar que sea rol personal
               activo: true,
               personalId: p.id,
             },
@@ -258,8 +258,8 @@ const sincronizarUsuariosPersonal = async (userId) => {
           // Validar que el usuario tenga los datos correctos
           if (existingUser.nombre_usuario !== p.numero_documento || 
               existingUser.email !== p.email ||
-              existingUser.rol !== 'Personal') {
-            logger.warn(`Personal ID ${p.id} tiene usuario activo pero con datos inconsistentes. Actualizando...`);
+              existingUser.rol !== 'personal') {
+            logger.warn(`personal ID ${p.id} tiene usuario activo pero con datos inconsistentes. Actualizando...`);
             
             await usuariosService.updateUsuario(
               existingUser.id,
@@ -267,7 +267,7 @@ const sincronizarUsuariosPersonal = async (userId) => {
                 nombreUsuario: p.numero_documento,
                 email: p.email,
                 contrasena: password,
-                rol: 'Personal',
+                rol: 'personal',
                 activo: true,
                 personalId: p.id,
               },
@@ -275,14 +275,14 @@ const sincronizarUsuariosPersonal = async (userId) => {
             );
             logger.info(`Usuario actualizado para consistencia: ${p.nombres} ${p.apellidos}`);
           } else {
-            logger.debug(`Personal ID ${p.id} ya tiene usuario activo correcto (ID ${existingUser.id})`);
+            logger.debug(`personal ID ${p.id} ya tiene usuario activo correcto (ID ${existingUser.id})`);
           }
           
         } else if (!existingUser) {
           // NO tiene usuario - verificar que no haya un usuario con ese DNI sin vínculo
           const usuarioExistentePorDNI = await db.query(`
             SELECT id, rol, personal_id 
-            FROM Usuarios 
+            FROM usuario 
             WHERE nombre_usuario = $1
           `, [p.numero_documento]);
           
@@ -297,7 +297,7 @@ const sincronizarUsuariosPersonal = async (userId) => {
                   nombreUsuario: p.numero_documento,
                   email: p.email,
                   contrasena: password,
-                  rol: 'Personal',
+                  rol: 'personal',
                   activo: true,
                   personalId: p.id,
                 },
@@ -321,7 +321,7 @@ const sincronizarUsuariosPersonal = async (userId) => {
                 nombreUsuario: p.numero_documento,
                 email: p.email,
                 contrasena: password,
-                rol: 'Personal',
+                rol: 'personal',
                 personalId: p.id,
               },
               userId
@@ -355,8 +355,8 @@ const sincronizarUsuariosPersonal = async (userId) => {
     logger.info('========================================');
     logger.info('Sincronizacion completada:');
     logger.info(`  Total personal: ${resultado.total}`);
-    logger.info(`  Usuarios creados: ${resultado.creados}`);
-    logger.info(`  Usuarios reactivados: ${resultado.reactivados}`);
+    logger.info(`  usuario creados: ${resultado.creados}`);
+    logger.info(`  usuario reactivados: ${resultado.reactivados}`);
     logger.info(`  Ya existentes: ${resultado.yaExistentes}`);
     logger.info(`  Omitidos (datos incompletos): ${resultado.omitidos}`);
     logger.info(`  Vinculos incorrectos corregidos: ${resultado.vinculosCorregidos}`);
@@ -376,30 +376,37 @@ const sincronizarUsuariosPersonal = async (userId) => {
 /**
  * Obtener todo el personal con paginación y filtros
  * @param {Object} options - Opciones de filtrado y paginación
- * @returns {Object} Personal y datos de paginación
+ * @returns {Object} personal y datos de paginación
  */
-const getAllPersonal = async (options = {}) => {
+const getAllpersonal = async (options = {}) => {
   const { page = 1, limit = 20, q = '', activo, areaId, tipoContratoId } = options;
   
   try {
+    // Obtener la fecha actual de Lima para pasarla explícitamente al repositorio
+    const { fecha: fechaHoyLima } = require('../../utils/fechas').nowLima();
+
     // Obtener personal con paginación
     const result = await repository.findAll({
       page,
       limit,
       search: q,
+      fecha: fechaHoyLima, // Aseguramos que se use fecha de Lima para el join de asistencia
       activo: activo !== undefined ? activo === 'true' : undefined,
       areaId: areaId ? parseInt(areaId) : undefined,
       tipoContratoId: tipoContratoId ? parseInt(tipoContratoId) : undefined
     });
     
     // Formatear respuesta - asegurar que personal siempre sea un array
+    const personalList = Array.isArray(result?.personal) ? result.personal : [];
+    const totalCount = result?.total || 0;
+
     return {
-      personal: Array.isArray(result.personal) ? result.personal : [],
+      personal: personalList,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: result.total || 0,
-        totalPages: Math.ceil((result.total || 0) / limit)
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit) || 1
       }
     };
     
@@ -412,14 +419,14 @@ const getAllPersonal = async (options = {}) => {
 /**
  * Obtener personal por ID
  * @param {number} id - ID del personal
- * @returns {Object} Personal encontrado
+ * @returns {Object} personal encontrado
  */
-const getPersonalById = async (id) => {
+const getpersonalById = async (id) => {
   try {
     const personal = await repository.findById(id);
     
     if (!personal) {
-      throw new AppError('Personal no encontrado', 404);
+      throw new AppError('personal no encontrado', 404);
     }
     
     return personal;
@@ -434,14 +441,14 @@ const getPersonalById = async (id) => {
  * Obtener personal por tipo y número de documento
  * @param {string} tipoDocumento - Tipo de documento
  * @param {string} numeroDocumento - Número de documento
- * @returns {Object} Personal encontrado
+ * @returns {Object} personal encontrado
  */
-const getPersonalByDocumento = async (tipoDocumento, numeroDocumento) => {
+const getpersonalByDocumento = async (tipoDocumento, numeroDocumento) => {
   try {
     const personal = await repository.findByDocumento(tipoDocumento, numeroDocumento);
     
     if (!personal) {
-      throw new AppError('Personal no encontrado', 404);
+      throw new AppError('personal no encontrado', 404);
     }
     
     return personal;
@@ -456,9 +463,9 @@ const getPersonalByDocumento = async (tipoDocumento, numeroDocumento) => {
  * Crear nuevo personal
  * @param {Object} personalData - Datos del personal
  * @param {number} userId - ID del usuario que crea
- * @returns {Object} Personal creado
+ * @returns {Object} personal creado
  */
-const createPersonal = async (personalData, userId) => {
+const createpersonal = async (personalData, userId) => {
   try {
     const { 
       tipoDocumento, 
@@ -494,8 +501,8 @@ const createPersonal = async (personalData, userId) => {
     }
     
     // Verificar si ya existe personal con el mismo documento
-    const existingPersonal = await repository.findByDocumento(tipoDocumento, numeroDocumento);
-    if (existingPersonal) {
+    const existingpersonal = await repository.findByDocumento(tipoDocumento, numeroDocumento);
+    if (existingpersonal) {
       throw new AppError('Ya existe personal registrado con este documento', 409);
     }
     
@@ -527,7 +534,7 @@ const createPersonal = async (personalData, userId) => {
     }
     
     // Crear el personal
-    const newPersonal = await repository.create({
+    const newpersonal = await repository.create({
       tipo_documento: tipoDocumento,
       numero_documento: numeroDocumento,
       nombres,
@@ -540,12 +547,12 @@ const createPersonal = async (personalData, userId) => {
       activo: true
     });
     
-    logger.info(`Personal creado: ${nombres} ${apellidos} por usuario ID: ${userId}`);
+    logger.info(`personal creado: ${nombres} ${apellidos} por usuario ID: ${userId}`);
 
     // Crear usuario automático
-    await ensureUsuarioParaPersonal(newPersonal, userId, 'creación');
+    await ensureUsuarioParapersonal(newpersonal, userId, 'creación');
     
-    return newPersonal;
+    return newpersonal;
     
   } catch (error) {
     logger.error('Error creando personal:', error);
@@ -558,21 +565,21 @@ const createPersonal = async (personalData, userId) => {
  * @param {number} id - ID del personal
  * @param {Object} personalData - Datos a actualizar
  * @param {number} userId - ID del usuario que actualiza
- * @returns {Object} Personal actualizado
+ * @returns {Object} personal actualizado
  */
 /**
  * Actualizar personal existente
  * @param {number} id - ID del personal
  * @param {Object} personalData - Datos a actualizar
  * @param {number} userId - ID del usuario que actualiza
- * @returns {Object} Personal actualizado
+ * @returns {Object} personal actualizado
  */
-const updatePersonal = async (id, personalData, userId) => {
+const updatepersonal = async (id, personalData, userId) => {
   try {
     // Verificar si el personal existe
-    const existingPersonal = await repository.findById(id);
-    if (!existingPersonal) {
-      throw new AppError('Personal no encontrado', 404);
+    const existingpersonal = await repository.findById(id);
+    if (!existingpersonal) {
+      throw new AppError('personal no encontrado', 404);
     }
     
     const { 
@@ -607,12 +614,12 @@ const updatePersonal = async (id, personalData, userId) => {
     
     if (numeroDocumento !== undefined) {
       // Si se cambia el documento, verificar que no exista otro personal con ese documento
-      if (tipoDocumento !== existingPersonal.tipo_documento || numeroDocumento !== existingPersonal.numero_documento) {
-        const duplicatePersonal = await repository.findByDocumento(
-          tipoDocumento || existingPersonal.tipo_documento, 
+      if (tipoDocumento !== existingpersonal.tipo_documento || numeroDocumento !== existingpersonal.numero_documento) {
+        const duplicatepersonal = await repository.findByDocumento(
+          tipoDocumento || existingpersonal.tipo_documento, 
           numeroDocumento
         );
-        if (duplicatePersonal && duplicatePersonal.id !== parseInt(id)) {
+        if (duplicatepersonal && duplicatepersonal.id !== parseInt(id)) {
           throw new AppError('Ya existe otro personal con este documento', 409);
         }
       }
@@ -696,15 +703,15 @@ const updatePersonal = async (id, personalData, userId) => {
     
     // Si no hay datos para actualizar
     if (Object.keys(updateData).length === 0) {
-      return existingPersonal;
+      return existingpersonal;
     }
     
-    logger.info(`[updatePersonal] Actualizando personal ID ${id} con datos:`, updateData);
+    logger.info(`[updatepersonal] Actualizando personal ID ${id} con datos:`, updateData);
     
     // Actualizar personal
-    const updatedPersonal = await repository.update(id, updateData);
+    const updatedpersonal = await repository.update(id, updateData);
 
-    logger.info(`[updatePersonal] Personal ID ${id} actualizado por usuario ID: ${userId}`);
+    logger.info(`[updatepersonal] personal ID ${id} actualizado por usuario ID: ${userId}`);
 
     // IMPORTANTE: Verificar si se actualizaron campos críticos para usuario
     const camposCriticosActualizados = 
@@ -713,32 +720,32 @@ const updatePersonal = async (id, personalData, userId) => {
       updateData.numero_documento !== undefined;
 
     if (camposCriticosActualizados) {
-      logger.info(`[updatePersonal] Se actualizaron campos críticos (email/fecha_nacimiento/numero_documento), verificando creación de usuario...`);
+      logger.info(`[updatepersonal] Se actualizaron campos críticos (email/fecha_nacimiento/numero_documento), verificando creación de usuario...`);
       
       // Si ahora tiene datos completos, crear o reactivar usuario automáticamente
-      const resultado = await ensureUsuarioParaPersonal(updatedPersonal, userId, 'actualización');
+      const resultado = await ensureUsuarioParapersonal(updatedpersonal, userId, 'actualización');
       
       if (resultado.created) {
-        logger.info(`[updatePersonal] Usuario creado exitosamente para personal ID ${id}`);
+        logger.info(`[updatepersonal] Usuario creado exitosamente para personal ID ${id}`);
       } else if (resultado.reactivated) {
-        logger.info(`[updatePersonal] Usuario reactivado para personal ID ${id}`);
+        logger.info(`[updatepersonal] Usuario reactivado para personal ID ${id}`);
       } else if (resultado.updated) {
-        logger.info(`[updatePersonal] Usuario actualizado exitosamente con nuevos datos de personal ID ${id}`);
+        logger.info(`[updatepersonal] Usuario actualizado exitosamente con nuevos datos de personal ID ${id}`);
       } else if (resultado.reason === 'ya_existe_activo') {
-        logger.info(`[updatePersonal] Personal ID ${id} ya tiene usuario activo (sin cambios necesarios)`);
+        logger.info(`[updatepersonal] personal ID ${id} ya tiene usuario activo (sin cambios necesarios)`);
       } else if (resultado.reason === 'datos_incompletos') {
-        logger.warn(`[updatePersonal] Personal ID ${id} aún no tiene datos completos para crear usuario`);
+        logger.warn(`[updatepersonal] personal ID ${id} aún no tiene datos completos para crear usuario`);
       } else if (resultado.error) {
-        logger.error(`[updatePersonal] Error al intentar crear usuario para personal ID ${id}: ${resultado.error}`);
+        logger.error(`[updatepersonal] Error al intentar crear usuario para personal ID ${id}: ${resultado.error}`);
       }
     } else {
-      logger.debug(`[updatePersonal] No se actualizaron campos críticos, omitiendo verificación de usuario`);
+      logger.debug(`[updatepersonal] No se actualizaron campos críticos, omitiendo verificación de usuario`);
     }
 
-    return updatedPersonal;
+    return updatedpersonal;
     
   } catch (error) {
-    logger.error(`[updatePersonal] Error actualizando personal ID ${id}:`, error);
+    logger.error(`[updatepersonal] Error actualizando personal ID ${id}:`, error);
     throw error;
   }
 };
@@ -749,23 +756,23 @@ const updatePersonal = async (id, personalData, userId) => {
  * @param {number} userId - ID del usuario que elimina
  * @returns {boolean} True si se eliminó correctamente
  */
-const deletePersonal = async (id, userId) => {
+const deletepersonal = async (id, userId) => {
   try {
     // Verificar si el personal existe
-    const existingPersonal = await repository.findById(id);
-    if (!existingPersonal) {
-      throw new AppError('Personal no encontrado', 404);
+    const existingpersonal = await repository.findById(id);
+    if (!existingpersonal) {
+      throw new AppError('personal no encontrado', 404);
     }
     
     // Verificar si ya está inactivo
-    if (!existingPersonal.activo) {
+    if (!existingpersonal.activo) {
       throw new AppError('El personal ya está inactivo', 400);
     }
     
     // Soft delete (marcar como inactivo)
     await repository.softDelete(id);
     
-    logger.info(`Personal ID ${id} eliminado (soft delete) por usuario ID: ${userId}`);
+    logger.info(`personal ID ${id} eliminado (soft delete) por usuario ID: ${userId}`);
     
     return true;
     
@@ -778,9 +785,9 @@ const deletePersonal = async (id, userId) => {
 /**
  * Obtener personal eliminado (soft delete)
  * @param {Object} options - Opciones de filtrado y paginación
- * @returns {Object} Personal eliminado y datos de paginación
+ * @returns {Object} personal eliminado y datos de paginación
  */
-const getDeletedPersonal = async (options = {}) => {
+const getDeletedpersonal = async (options = {}) => {
   const { page = 1, limit = 20, q = '' } = options;
   
   try {
@@ -812,27 +819,27 @@ const getDeletedPersonal = async (options = {}) => {
  * Restaurar personal eliminado
  * @param {number} id - ID del personal
  * @param {number} userId - ID del usuario que restaura
- * @returns {Object} Personal restaurado
+ * @returns {Object} personal restaurado
  */
-const restorePersonal = async (id, userId) => {
+const restorepersonal = async (id, userId) => {
   try {
     // Verificar si el personal existe (incluyendo eliminados)
-    const existingPersonal = await repository.findByIdIncludingDeleted(id);
-    if (!existingPersonal) {
-      throw new AppError('Personal no encontrado', 404);
+    const existingpersonal = await repository.findByIdIncludingDeleted(id);
+    if (!existingpersonal) {
+      throw new AppError('personal no encontrado', 404);
     }
     
     // Verificar si ya está activo
-    if (existingPersonal.activo) {
+    if (existingpersonal.activo) {
       throw new AppError('El personal ya está activo', 400);
     }
     
     // Restaurar personal (marcar como activo)
-    const restoredPersonal = await repository.restore(id);
+    const restoredpersonal = await repository.restore(id);
     
-    logger.info(`Personal ID ${id} restaurado por usuario ID: ${userId}`);
+    logger.info(`personal ID ${id} restaurado por usuario ID: ${userId}`);
     
-    return restoredPersonal;
+    return restoredpersonal;
     
   } catch (error) {
     logger.error(`Error restaurando personal ID ${id}:`, error);
@@ -841,13 +848,13 @@ const restorePersonal = async (id, userId) => {
 };
 
 module.exports = {
-  getAllPersonal,
-  getPersonalById,
-  getPersonalByDocumento,
-  createPersonal,
-  updatePersonal,
-  deletePersonal,
-  getDeletedPersonal,
-  restorePersonal,
-  sincronizarUsuariosPersonal
+  getAllpersonal,
+  getpersonalById,
+  getpersonalByDocumento,
+  createpersonal,
+  updatepersonal,
+  deletepersonal,
+  getDeletedpersonal,
+  restorepersonal,
+  sincronizarusuariopersonal
 };

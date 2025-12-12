@@ -10,7 +10,7 @@ const logger = require('../../utils/logger');
 /**
  * Buscar todos los cargos con filtros y paginación
  * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Cargos encontrados y total
+ * @returns {Object} cargo encontrados y total
  */
 const findAll = async (options = {}) => {
   const { page = 1, limit = 20, search = '', activo, areaDestinoId } = options;
@@ -25,7 +25,7 @@ const findAll = async (options = {}) => {
         c.descripcion,
         c.activo,
         c.fecha_creacion
-      FROM Cargos c
+      FROM cargo c
     `;
     
     // Construir la cláusula WHERE
@@ -65,7 +65,7 @@ const findAll = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM Cargos c
+      FROM cargo c
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -109,7 +109,7 @@ const findById = async (id) => {
         c.descripcion,
         c.activo,
         c.fecha_creacion
-      FROM Cargos c
+      FROM cargo c
       WHERE c.id = $1
     `;
     
@@ -136,7 +136,7 @@ const findByName = async (nombre) => {
         c.descripcion,
         c.activo,
         c.fecha_creacion
-      FROM Cargos c
+      FROM cargo c
       WHERE LOWER(c.nombre_cargo) = LOWER($1)
       AND c.activo = true
     `;
@@ -160,7 +160,7 @@ const create = async (cargoData) => {
     const { nombre_cargo, descripcion, activo = true } = cargoData;
     
     const query = `
-      INSERT INTO Cargos (nombre_cargo, descripcion, activo)
+      INSERT INTO cargo (nombre_cargo, descripcion, activo)
       VALUES ($1, $2, $3)
       RETURNING 
         id,
@@ -234,7 +234,7 @@ const update = async (id, cargoData) => {
     }
     
     const query = `
-      UPDATE Cargos 
+      UPDATE cargo 
       SET ${updateFields.join(', ')}
       WHERE id = $1
       RETURNING 
@@ -274,7 +274,7 @@ const update = async (id, cargoData) => {
 const softDelete = async (id) => {
   try {
     const query = `
-      UPDATE Cargos 
+      UPDATE cargo 
       SET activo = false
       WHERE id = $1
       RETURNING id
@@ -303,7 +303,7 @@ const checkCargoInUse = async (id) => {
   try {
     const query = `
       SELECT COUNT(*) as count
-      FROM Personal
+      FROM personal
       WHERE cargo_id = $1 AND activo = true
     `;
     
@@ -320,13 +320,13 @@ const checkCargoInUse = async (id) => {
  * Obtener listado simple de cargos activos
  * @returns {Array} Lista de cargos activos
  */
-const getActiveCargosList = async () => {
+const getActivecargoList = async () => {
   try {
     const query = `
       SELECT 
         c.id,
         c.nombre_cargo
-      FROM Cargos c
+      FROM cargo c
       WHERE c.activo = true
       ORDER BY c.nombre_cargo ASC
     `;
@@ -345,7 +345,7 @@ const getActiveCargosList = async () => {
 /**
  * Buscar cargos eliminados (soft delete)
  * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Cargos eliminados y total
+ * @returns {Object} cargo eliminados y total
  */
 const findDeleted = async (options = {}) => {
   const { page = 1, limit = 20, search = '' } = options;
@@ -367,7 +367,7 @@ const findDeleted = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM Cargos c
+      FROM cargo c
 
       WHERE ${whereConditions.join(' AND ')}
     `;
@@ -380,7 +380,7 @@ const findDeleted = async (options = {}) => {
         c.descripcion,
         c.activo,
         c.fecha_creacion
-      FROM Cargos c
+      FROM cargo c
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY c.nombre_cargo ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
@@ -420,7 +420,7 @@ const findByIdIncludingDeleted = async (id) => {
         c.descripcion,
         c.activo,
         c.fecha_creacion
-      FROM Cargos c
+      FROM cargo c
       WHERE c.id = $1
     `;
     
@@ -441,7 +441,7 @@ const findByIdIncludingDeleted = async (id) => {
 const restore = async (id) => {
   try {
     const query = `
-      UPDATE Cargos 
+      UPDATE cargo 
       SET activo = true
       WHERE id = $1
       RETURNING id
@@ -470,7 +470,7 @@ module.exports = {
   update,
   softDelete,
   checkCargoInUse,
-  getActiveCargosList,
+  getActivecargoList,
 
   findDeleted,
   findByIdIncludingDeleted,

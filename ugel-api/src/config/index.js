@@ -38,7 +38,7 @@ const config = {
     // Tipos de documento válidos
     validDocumentTypes: ['DNI', 'CE', 'PASS', 'RUC'],
     // Roles de usuario válidos
-    validRoles: ['Vigilante', 'Administrador', 'RRHH', 'Personal'],
+    validRoles: ['Vigilante', 'Administrador', 'RRHH', 'personal'],
     // Estados de presencia válidos
     validPresenceStates: ['Presente', 'Ausente', 'Tardanza', 'Falta', 'En Permiso']
   },

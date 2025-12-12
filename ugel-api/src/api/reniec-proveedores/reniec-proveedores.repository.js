@@ -12,8 +12,8 @@ const mapRow = (row) => ({
 const findAll = async () => {
   const query = `
     SELECT rp.*, u.nombre_usuario AS creado_por
-    FROM ReniecProveedores rp
-    LEFT JOIN usuarios u ON u.id = rp.usuario_creador_id
+    FROM reniecproveedor rp
+    LEFT JOIN usuario u ON u.id = rp.usuario_creador_id
     ORDER BY rp.activo DESC, rp.fecha_actualizacion DESC, rp.id DESC
   `;
   const result = await db.query(query);
@@ -24,8 +24,8 @@ const findById = async (id) => {
   const result = await db.query(
     `
       SELECT rp.*, u.nombre_usuario AS creado_por
-      FROM ReniecProveedores rp
-      LEFT JOIN usuarios u ON u.id = rp.usuario_creador_id
+      FROM reniecproveedor rp
+      LEFT JOIN usuario u ON u.id = rp.usuario_creador_id
       WHERE rp.id = $1
     `,
     [id]
@@ -37,8 +37,8 @@ const findActive = async () => {
   const result = await db.query(
     `
       SELECT rp.*, u.nombre_usuario AS creado_por
-      FROM ReniecProveedores rp
-      LEFT JOIN usuarios u ON u.id = rp.usuario_creador_id
+      FROM reniecproveedor rp
+      LEFT JOIN usuario u ON u.id = rp.usuario_creador_id
       WHERE rp.activo = true
       ORDER BY rp.fecha_activacion DESC NULLS LAST, rp.fecha_actualizacion DESC
       LIMIT 1
@@ -50,7 +50,7 @@ const findActive = async () => {
 const create = async ({ nombre, baseUrl, token, notas, activo = false, usuarioCreadorId }) => {
   const result = await db.query(
     `
-      INSERT INTO ReniecProveedores (
+      INSERT INTO reniecproveedor (
         nombre,
         base_url,
         token,
@@ -106,7 +106,7 @@ const update = async (id, { nombre, baseUrl, token, notas, activo }) => {
   fields.push(`fecha_actualizacion = NOW()`);
 
   const query = `
-    UPDATE ReniecProveedores
+    UPDATE reniecproveedor
     SET ${fields.join(', ')}
     WHERE id = $${idx}
     RETURNING *;
@@ -123,7 +123,7 @@ const setActive = async (id, usuarioId) => {
     await client.query('BEGIN');
 
     const target = await client.query(
-      'SELECT * FROM ReniecProveedores WHERE id = $1 FOR UPDATE',
+      'SELECT * FROM reniecproveedor WHERE id = $1 FOR UPDATE',
       [id]
     );
     if (!target.rows.length) {
@@ -132,7 +132,7 @@ const setActive = async (id, usuarioId) => {
 
     await client.query(
       `
-        UPDATE ReniecProveedores
+        UPDATE reniecproveedor
         SET activo = false, fecha_desactivacion = NOW()
         WHERE activo = true AND id <> $1
       `,
@@ -141,7 +141,7 @@ const setActive = async (id, usuarioId) => {
 
     const updated = await client.query(
       `
-        UPDATE ReniecProveedores
+        UPDATE reniecproveedor
         SET 
           activo = true,
           fecha_activacion = COALESCE(fecha_activacion, NOW()),
@@ -166,7 +166,7 @@ const setActive = async (id, usuarioId) => {
 
 const deleteById = async (id) => {
   const result = await db.query(
-    'DELETE FROM ReniecProveedores WHERE id = $1 RETURNING *',
+    'DELETE FROM reniecproveedor WHERE id = $1 RETURNING *',
     [id]
   );
   return result.rows[0] ? mapRow(result.rows[0]) : null;

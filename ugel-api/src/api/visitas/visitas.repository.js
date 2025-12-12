@@ -61,16 +61,16 @@ const findAll = async (options = {}, usePagination = true) => {
         rv.delegado_por_id,
         pd.nombres as delegado_por_nombres,
         pd.apellidos as delegado_por_apellidos
-      FROM RegistrosVisitas rv
-      JOIN Visitantes v ON rv.visitante_id = v.id
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
-      LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
-      JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
-      JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
-      LEFT JOIN Usuarios u2 ON rv.usuario_salida_id = u2.id
-      LEFT JOIN Personal pd ON rv.delegado_por_id = pd.id
+      FROM registrovisita rv
+      JOIN visitante v ON rv.visitante_id = v.id
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
+      JOIN areadestino a ON rv.area_destino_id = a.id
+      LEFT JOIN personal p ON rv.personal_visitado_id = p.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
+      JOIN motivovisita mv ON rv.motivo_visita_id = mv.id
+      JOIN usuario u1 ON rv.usuario_ingreso_id = u1.id
+      LEFT JOIN usuario u2 ON rv.usuario_salida_id = u2.id
+      LEFT JOIN personal pd ON rv.delegado_por_id = pd.id
     `;
     
     // Construir la cláusula WHERE
@@ -145,10 +145,10 @@ const findAll = async (options = {}, usePagination = true) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM RegistrosVisitas rv
-      JOIN Visitantes v ON rv.visitante_id = v.id
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
-      LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
+      FROM registrovisita rv
+      JOIN visitante v ON rv.visitante_id = v.id
+      JOIN areadestino a ON rv.area_destino_id = a.id
+      LEFT JOIN personal p ON rv.personal_visitado_id = p.id
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -220,15 +220,15 @@ const findActivas = async (options = {}) => {
         rv.delegado_por_id,
         pd.nombres as delegado_por_nombres,
         pd.apellidos as delegado_por_apellidos
-      FROM RegistrosVisitas rv
-      JOIN Visitantes v ON rv.visitante_id = v.id
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
-      LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
-      JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
-      JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
-      LEFT JOIN Personal pd ON rv.delegado_por_id = pd.id
+      FROM registrovisita rv
+      JOIN visitante v ON rv.visitante_id = v.id
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
+      JOIN areadestino a ON rv.area_destino_id = a.id
+      LEFT JOIN personal p ON rv.personal_visitado_id = p.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
+      JOIN motivovisita mv ON rv.motivo_visita_id = mv.id
+      JOIN usuario u1 ON rv.usuario_ingreso_id = u1.id
+      LEFT JOIN personal pd ON rv.delegado_por_id = pd.id
       WHERE rv.fecha_salida IS NULL
     `;
     
@@ -252,9 +252,9 @@ const findActivas = async (options = {}) => {
     // Solo contar visitas del día actual
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM RegistrosVisitas rv
-      JOIN Visitantes v ON rv.visitante_id = v.id
-      LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
+      FROM registrovisita rv
+      JOIN visitante v ON rv.visitante_id = v.id
+      LEFT JOIN personal p ON rv.personal_visitado_id = p.id
       WHERE rv.fecha_salida IS NULL
       ${search ? `AND (
         v.nombres ILIKE $1 OR 
@@ -326,16 +326,16 @@ const findById = async (id) => {
         rv.delegado_por_id,
         pd.nombres as delegado_por_nombres,
         pd.apellidos as delegado_por_apellidos
-      FROM RegistrosVisitas rv
-      JOIN Visitantes v ON rv.visitante_id = v.id
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
-      LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
-      JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
-      JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
-      LEFT JOIN Usuarios u2 ON rv.usuario_salida_id = u2.id
-      LEFT JOIN Personal pd ON rv.delegado_por_id = pd.id
+      FROM registrovisita rv
+      JOIN visitante v ON rv.visitante_id = v.id
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
+      JOIN areadestino a ON rv.area_destino_id = a.id
+      LEFT JOIN personal p ON rv.personal_visitado_id = p.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
+      JOIN motivovisita mv ON rv.motivo_visita_id = mv.id
+      JOIN usuario u1 ON rv.usuario_ingreso_id = u1.id
+      LEFT JOIN usuario u2 ON rv.usuario_salida_id = u2.id
+      LEFT JOIN personal pd ON rv.delegado_por_id = pd.id
       WHERE rv.id = $1
     `;
     
@@ -365,7 +365,7 @@ const create = async (visitaData) => {
     } = visitaData;
     
     const query = `
-      INSERT INTO RegistrosVisitas (
+      INSERT INTO registrovisita (
         visitante_id, 
         area_destino_id, 
         personal_visitado_id, 
@@ -403,7 +403,7 @@ const create = async (visitaData) => {
         throw new AppError('Área de destino no encontrada', 404);
       }
       if (error.constraint && error.constraint.includes('personal_visitado_id')) {
-        throw new AppError('Personal visitado no encontrado', 404);
+        throw new AppError('personal visitado no encontrado', 404);
       }
       if (error.constraint && error.constraint.includes('motivo_visita_id')) {
         throw new AppError('Motivo de visita no encontrado', 404);
@@ -429,7 +429,7 @@ const registrarSalida = async (id, usuarioSalidaId) => {
     logger.info(`Repositorio: Iniciando registro de salida para visita ID: ${id}, usuario: ${usuarioSalidaId}`);
     
     const query = `
-      UPDATE RegistrosVisitas 
+      UPDATE registrovisita 
       SET 
         fecha_salida = CURRENT_TIMESTAMP,
         usuario_salida_id = $1
@@ -510,7 +510,7 @@ const registrarSalidaConFechaHora = async (id, usuarioSalidaId, fechaSalida, hor
     });
     
     const query = `
-      UPDATE RegistrosVisitas 
+      UPDATE registrovisita 
       SET 
         fecha_salida = $3::timestamp,
         usuario_salida_id = $1
@@ -581,7 +581,7 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
     // Estadísticas totales
     const totalQuery = `
       SELECT COUNT(*) as total_visitas
-      FROM RegistrosVisitas
+      FROM registrovisita
       ${whereClause}
     `;
     
@@ -591,8 +591,8 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
         a.id,
         a.nombre_area,
         COUNT(*) as total
-      FROM RegistrosVisitas rv
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
+      FROM registrovisita rv
+      JOIN areadestino a ON rv.area_destino_id = a.id
       ${whereClause}
       GROUP BY a.id, a.nombre_area
       ORDER BY total DESC
@@ -604,8 +604,8 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
         m.id,
         m.nombre_motivo,
         COUNT(*) as total
-      FROM RegistrosVisitas rv
-      JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
+      FROM registrovisita rv
+      JOIN motivovisita m ON rv.motivo_visita_id = m.id
       ${whereClause}
       GROUP BY m.id, m.nombre_motivo
       ORDER BY total DESC
@@ -616,7 +616,7 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
       SELECT 
         DATE(fecha_ingreso) as fecha,
         COUNT(*) as total
-      FROM RegistrosVisitas
+      FROM registrovisita
       ${whereClause}
       GROUP BY DATE(fecha_ingreso)
       ORDER BY fecha
@@ -659,8 +659,8 @@ const findVisitaActivaPorVisitante = async (visitanteId) => {
         a.nombre_area,
         rv.fecha_ingreso,
         rv.fecha_salida
-      FROM RegistrosVisitas rv
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
+      FROM registrovisita rv
+      JOIN areadestino a ON rv.area_destino_id = a.id
       WHERE rv.visitante_id = $1 
         AND rv.fecha_salida IS NULL
       ORDER BY rv.fecha_ingreso DESC
@@ -688,8 +688,8 @@ const getVisitasPorArea = async (fechaInicio = null, fechaFin = null) => {
       SELECT 
         a.nombre_area,
         COUNT(*) AS visitas
-      FROM RegistrosVisitas rv
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
+      FROM registrovisita rv
+      JOIN areadestino a ON rv.area_destino_id = a.id
     `;
     
     const params = [];
@@ -735,11 +735,11 @@ const getVisitasPorMotivo = async (fechaInicio = null, fechaFin = null) => {
         COUNT(*) AS count,
         (COUNT(*) * 100.0 / (
           SELECT COUNT(*) 
-          FROM RegistrosVisitas rv2
+          FROM registrovisita rv2
             WHERE rv2.fecha_ingreso BETWEEN $1 AND $2
         )) AS porcentaje
-      FROM RegistrosVisitas rv
-      JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
+      FROM registrovisita rv
+      JOIN motivovisita m ON rv.motivo_visita_id = m.id
         WHERE rv.fecha_ingreso BETWEEN $1 AND $2
         GROUP BY rv.motivo_visita_id, m.nombre_motivo
         ORDER BY count DESC
@@ -753,10 +753,10 @@ const getVisitasPorMotivo = async (fechaInicio = null, fechaFin = null) => {
           COUNT(*) AS count,
           (COUNT(*) * 100.0 / (
             SELECT COUNT(*) 
-            FROM RegistrosVisitas rv2
+            FROM registrovisita rv2
           )) AS porcentaje
-        FROM RegistrosVisitas rv
-        JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
+        FROM registrovisita rv
+        JOIN motivovisita m ON rv.motivo_visita_id = m.id
         GROUP BY rv.motivo_visita_id, m.nombre_motivo
         ORDER BY count DESC
       `;
@@ -785,7 +785,7 @@ const getVisitasPorMotivo = async (fechaInicio = null, fechaFin = null) => {
  */
 const getTotalVisitas = async (fechaInicio = null, fechaFin = null) => {
   try {
-    let query = `SELECT COUNT(*) AS total FROM RegistrosVisitas`;
+    let query = `SELECT COUNT(*) AS total FROM registrovisita`;
     const params = [];
     
     if (fechaInicio && fechaFin) {
@@ -821,7 +821,7 @@ const getFlujoDiario = async (fechaInicio = null, fechaFin = null) => {
       SELECT 
         DATE(fecha_ingreso) AS dia,
         COUNT(*) AS visitas
-      FROM RegistrosVisitas
+      FROM registrovisita
     `;
     
     const params = [];
@@ -857,14 +857,14 @@ const getFlujoDiario = async (fechaInicio = null, fechaFin = null) => {
  * @param {Date|null} fechaFin - Fecha de fin del filtro
  * @returns {Array} Array de objetos con nombre_personal y visitas
  */
-const getVisitasPorPersonal = async (fechaInicio = null, fechaFin = null) => {
+const getVisitasPorpersonal = async (fechaInicio = null, fechaFin = null) => {
   try {
     let query = `
       SELECT 
         CONCAT(p.nombres, ' ', p.apellidos) AS nombre_personal,
         COUNT(*) AS visitas
-      FROM RegistrosVisitas rv
-      JOIN Personal p ON rv.personal_visitado_id = p.id
+      FROM registrovisita rv
+      JOIN personal p ON rv.personal_visitado_id = p.id
     `;
     
     const params = [];
@@ -903,7 +903,7 @@ const getVisitasPorPersonal = async (fechaInicio = null, fechaFin = null) => {
  * @param {Date|null} fechaFin - Fecha de fin del filtro
  * @returns {Array} Array de objetos con visitante, num_visitas y ultima_visita
  */
-const getVisitantesFrecuentes = async (fechaInicio = null, fechaFin = null) => {
+const getvisitanteFrecuentes = async (fechaInicio = null, fechaFin = null) => {
   try {
     let query = `
       SELECT 
@@ -913,9 +913,9 @@ const getVisitantesFrecuentes = async (fechaInicio = null, fechaFin = null) => {
         td.codigo AS tipo_documento,
         COUNT(rv.id) AS num_visitas,
         MAX(rv.fecha_ingreso) AS ultima_visita
-      FROM RegistrosVisitas rv
-      JOIN Visitantes v ON rv.visitante_id = v.id
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
+      FROM registrovisita rv
+      JOIN visitante v ON rv.visitante_id = v.id
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
     `;
     
     const params = [];
@@ -936,7 +936,7 @@ const getVisitantesFrecuentes = async (fechaInicio = null, fechaFin = null) => {
     
     const result = await db.query(query, params);
     
-    logger.info(`Visitantes frecuentes obtenidos: ${result.rows.length} registros`);
+    logger.info(`visitante frecuentes obtenidos: ${result.rows.length} registros`);
     
     return result.rows;
     
@@ -965,9 +965,9 @@ const getVisitanteDetalle = async (visitanteId, fechaInicio = null, fechaFin = n
         td.codigo AS tipo_documento,
         COUNT(rv.id) AS total_visitas,
         MAX(rv.fecha_ingreso) AS ultima_visita
-      FROM Visitantes v
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
-      LEFT JOIN RegistrosVisitas rv ON v.id = rv.visitante_id
+      FROM visitante v
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
+      LEFT JOIN registrovisita rv ON v.id = rv.visitante_id
     `;
     
     const paramsVisitante = [visitanteId];
@@ -1003,10 +1003,10 @@ const getVisitanteDetalle = async (visitanteId, fechaInicio = null, fechaFin = n
           )
           ORDER BY rv.fecha_ingreso
         ) AS detalles
-      FROM RegistrosVisitas rv
-      LEFT JOIN MotivosVisita m ON rv.motivo_visita_id = m.id
-      LEFT JOIN AreasDestino a ON rv.area_destino_id = a.id
-      LEFT JOIN Personal p ON rv.personal_visitado_id = p.id
+      FROM registrovisita rv
+      LEFT JOIN motivovisita m ON rv.motivo_visita_id = m.id
+      LEFT JOIN areadestino a ON rv.area_destino_id = a.id
+      LEFT JOIN personal p ON rv.personal_visitado_id = p.id
       WHERE rv.visitante_id = $1
     `;
     
@@ -1091,7 +1091,7 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
         DATE(fecha_ingreso) as fecha_ingreso_fecha,
         EXTRACT(HOUR FROM fecha_ingreso) as hora_ingreso,
         EXTRACT(MINUTE FROM fecha_ingreso) as minuto_ingreso
-      FROM RegistrosVisitas
+      FROM registrovisita
       WHERE fecha_salida IS NULL
         AND DATE(fecha_ingreso) < CURRENT_DATE
       ORDER BY fecha_ingreso ASC
@@ -1125,7 +1125,7 @@ const cerrarVisitasAutomaticamente = async (usuarioSistemaId) => {
         logger.info(`Cerrando visita ID ${visita.id} con fechaHoraSalida = ${fechaHoraSalida}`);
 
         const updateQuery = `
-          UPDATE RegistrosVisitas 
+          UPDATE registrovisita 
           SET 
             fecha_salida = $1::timestamp,
             usuario_salida_id = $2
@@ -1168,7 +1168,7 @@ const updateEstado = async (id, estado, motivoRechazo = null) => {
   const motivoFinal = motivoRechazo === undefined ? null : motivoRechazo;
   try {
     let query = `
-      UPDATE RegistrosVisitas
+      UPDATE registrovisita
       SET 
         estado_visita = $1,
         fecha_aceptacion = CASE WHEN $1::varchar = 'ACEPTADO' THEN CURRENT_TIMESTAMP ELSE fecha_aceptacion END,
@@ -1194,15 +1194,15 @@ const updateEstado = async (id, estado, motivoRechazo = null) => {
 /**
  * Delegar visita a otro personal
  * @param {number} id - ID de la visita
- * @param {number} nuevoPersonalId - ID del nuevo personal
+ * @param {number} nuevopersonalId - ID del nuevo personal
  * @param {number} nuevoAreaId - ID del área del nuevo personal
  * @param {number} delegadoPorId - ID del personal que delega
  * @returns {Object} Visita actualizada
  */
-const delegar = async (id, nuevoPersonalId, nuevoAreaId, delegadoPorId) => {
+const delegar = async (id, nuevopersonalId, nuevoAreaId, delegadoPorId) => {
   try {
     const query = `
-      UPDATE RegistrosVisitas
+      UPDATE registrovisita
       SET
         personal_visitado_id = $1,
         area_destino_id = $2,
@@ -1213,7 +1213,7 @@ const delegar = async (id, nuevoPersonalId, nuevoAreaId, delegadoPorId) => {
       RETURNING id
     `;
     
-    const result = await db.query(query, [nuevoPersonalId, nuevoAreaId, delegadoPorId, id]);
+    const result = await db.query(query, [nuevopersonalId, nuevoAreaId, delegadoPorId, id]);
     
     if (result.rows.length === 0) {
       throw new AppError('Visita no encontrada', 404);
@@ -1234,7 +1234,7 @@ const delegar = async (id, nuevoPersonalId, nuevoAreaId, delegadoPorId) => {
 const updateFinAtencion = async (id) => {
   try {
     const query = `
-      UPDATE RegistrosVisitas
+      UPDATE registrovisita
       SET
         fecha_fin_atencion = CURRENT_TIMESTAMP,
         estado_visita = 'FINALIZADO'
@@ -1262,7 +1262,7 @@ const updateFinAtencion = async (id) => {
  * @param {Object} options - Opciones de búsqueda
  * @returns {Object} Visitas encontradas y total
  */
-const findByPersonalVisitado = async (personalId, options = {}) => {
+const findBypersonalVisitado = async (personalId, options = {}) => {
   const { 
     page = 1, 
     limit = 10, 
@@ -1304,15 +1304,15 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
         rv.delegado_por_id,
         pd.nombres as delegado_por_nombres,
         pd.apellidos as delegado_por_apellidos
-      FROM RegistrosVisitas rv
-      JOIN Visitantes v ON rv.visitante_id = v.id
-      JOIN TiposDocumento td ON v.tipo_documento_id = td.id
-      JOIN AreasDestino a ON rv.area_destino_id = a.id
-      JOIN Personal p ON rv.personal_visitado_id = p.id
-      JOIN Cargos c ON p.cargo_id = c.id
-      JOIN MotivosVisita mv ON rv.motivo_visita_id = mv.id
-      JOIN Usuarios u1 ON rv.usuario_ingreso_id = u1.id
-      LEFT JOIN Personal pd ON rv.delegado_por_id = pd.id
+      FROM registrovisita rv
+      JOIN visitante v ON rv.visitante_id = v.id
+      JOIN tipodocumento td ON v.tipo_documento_id = td.id
+      JOIN areadestino a ON rv.area_destino_id = a.id
+      JOIN personal p ON rv.personal_visitado_id = p.id
+      JOIN cargo c ON p.cargo_id = c.id
+      JOIN motivovisita mv ON rv.motivo_visita_id = mv.id
+      JOIN usuario u1 ON rv.usuario_ingreso_id = u1.id
+      LEFT JOIN personal pd ON rv.delegado_por_id = pd.id
       WHERE rv.personal_visitado_id = $1
     `;
     
@@ -1364,7 +1364,7 @@ const findByPersonalVisitado = async (personalId, options = {}) => {
     // Consulta para contar el total
     let countQuery = `
       SELECT COUNT(*) as total
-      FROM RegistrosVisitas rv
+      FROM registrovisita rv
       WHERE rv.personal_visitado_id = $1
     `;
     
@@ -1439,12 +1439,12 @@ module.exports = {
   getVisitasPorMotivo,
   getTotalVisitas,
   getFlujoDiario,
-  getVisitasPorPersonal,
-  getVisitantesFrecuentes,
+  getVisitasPorpersonal,
+  getvisitanteFrecuentes,
   getVisitanteDetalle,
   cerrarVisitasAutomaticamente,
   updateEstado,
   delegar,
   updateFinAtencion,
-  findByPersonalVisitado
+  findBypersonalVisitado
 };

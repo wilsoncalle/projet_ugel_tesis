@@ -75,7 +75,7 @@ const findAll = async (options = {}) => {
       
       // Construir la consulta base
       // 1. Generar serie de fechas
-      // 2. CROSS JOIN con Personal (todos los empleados x todos los días)
+      // 2. CROSS JOIN con personal (todos los empleados x todos los días)
       // 3. LEFT JOIN con Asistencias y Papeletas
       let query = `
         WITH DateSeries AS (
@@ -84,7 +84,7 @@ const findAll = async (options = {}) => {
         SELECT 
           COALESCE(ca.id, NULL) as id,
           p.id as personal_id,
-          p.tipo_documento as personal_tipo_documento,
+          td.codigo as personal_tipo_documento,
           p.numero_documento as personal_numero_documento,
           p.nombres as personal_nombres,
           p.apellidos as personal_apellidos,
@@ -102,15 +102,16 @@ const findAll = async (options = {}) => {
           u.nombre_usuario as usuario_registro,
           ca.minutos_tardanza,
           ca.fecha_registro,
-          (SELECT estado FROM justificaciones WHERE control_asistencia_id = ca.id ORDER BY fecha_solicitud DESC LIMIT 1) as justificacion_estado
+          (SELECT estado FROM justificacion WHERE control_asistencia_id = ca.id ORDER BY fecha_solicitud DESC LIMIT 1) as justificacion_estado
         FROM DateSeries ds
-        CROSS JOIN Personal p
-        LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
-        LEFT JOIN Cargos c ON p.cargo_id = c.id
-        LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
+        CROSS JOIN personal p
+        JOIN tipodocumento td ON p.tipo_documento_id = td.id
+        LEFT JOIN areadestino a ON p.area_destino_id = a.id
+        LEFT JOIN cargo c ON p.cargo_id = c.id
+        LEFT JOIN controlasistenciapersonal ca ON ca.personal_id = p.id  
           AND ca.fecha = ds.fecha_serie
 
-        LEFT JOIN Usuarios u ON ca.usuario_registro_id = u.id
+        LEFT JOIN usuario u ON ca.usuario_registro_id = u.id
       `;
       
       // Construir condiciones WHERE
@@ -164,8 +165,8 @@ const findAll = async (options = {}) => {
         )
         SELECT COUNT(*) as total
         FROM DateSeries ds
-        CROSS JOIN Personal p
-        LEFT JOIN ControlAsistenciaPersonal ca ON ca.personal_id = p.id 
+        CROSS JOIN personal p
+        LEFT JOIN controlasistenciapersonal ca ON ca.personal_id = p.id 
           AND ca.fecha = ds.fecha_serie
 
         WHERE ($3::text IS NOT NULL OR true) AND ${whereConditions.join(' AND ')}
@@ -199,25 +200,26 @@ const findAll = async (options = {}) => {
         SELECT 
           ca.id,
           ca.personal_id,
-          p.tipo_documento as personal_tipo_documento,
+          td.codigo as personal_tipo_documento,
           p.numero_documento as personal_numero_documento,
           p.nombres as personal_nombres,
           p.apellidos as personal_apellidos,
           c.nombre_cargo as personal_cargo_nombre,
           a.nombre_area as area_nombre,
-          ca.fecha,
-          ca.hora_ingreso,
-          ca.hora_salida,
+          ca.ingreso::date as fecha,
+          ca.ingreso::time as hora_ingreso,
+          ca.salida::time as hora_salida,
           ca.estado_presencia,
           ca.usuario_registro_id,
           u.nombre_usuario as usuario_registro,
           ca.minutos_tardanza,
           ca.fecha_registro
-        FROM ControlAsistenciaPersonal ca
-        JOIN Personal p ON ca.personal_id = p.id
-        JOIN AreasDestino a ON p.area_destino_id = a.id
-        LEFT JOIN Cargos c ON p.cargo_id = c.id
-        JOIN Usuarios u ON ca.usuario_registro_id = u.id
+        FROM controlasistenciapersonal ca
+        JOIN personal p ON ca.personal_id = p.id
+        JOIN tipodocumento td ON p.tipo_documento_id = td.id
+        JOIN areadestino a ON p.area_destino_id = a.id
+        LEFT JOIN cargo c ON p.cargo_id = c.id
+        JOIN usuario u ON ca.usuario_registro_id = u.id
       `;
     
       // Construir la cláusula WHERE
@@ -238,21 +240,21 @@ const findAll = async (options = {}) => {
       
       // Filtro por fecha específica
       if (fecha) {
-        whereConditions.push(`ca.fecha = $${paramCounter}::date`);
+        whereConditions.push(`ca.ingreso::date = $${paramCounter}::date`);
         queryParams.push(fecha);
         paramCounter++;
       }
       
       // Filtro por rango de fechas (inclusivo, usando < fechaFin + 1 día para incluir todo el día final)
       if (fechaInicio) {
-        whereConditions.push(`ca.fecha >= $${paramCounter}::date`);
+        whereConditions.push(`ca.ingreso::date >= $${paramCounter}::date`);
         queryParams.push(fechaInicio);
         paramCounter++;
       }
       
       if (fechaFin) {
         // Fin exclusivo = día siguiente → incluye TODO el día fin
-        whereConditions.push(`ca.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+        whereConditions.push(`ca.ingreso::date < ($${paramCounter}::date + INTERVAL '1 day')`);
         queryParams.push(fechaFin);
         paramCounter++;
       }
@@ -289,7 +291,7 @@ const findAll = async (options = {}) => {
       
       // Agregar ordenamiento y paginación
       query += `
-        ORDER BY ca.fecha DESC, p.apellidos ASC, p.nombres ASC
+        ORDER BY ca.ingreso DESC, p.apellidos ASC, p.nombres ASC
         LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
       `;
       
@@ -299,8 +301,8 @@ const findAll = async (options = {}) => {
       // Construir countQuery con los parámetros correctos (sin limit/offset)
       const countQuery = `
         SELECT COUNT(*) as total
-        FROM ControlAsistenciaPersonal ca
-        JOIN Personal p ON ca.personal_id = p.id
+        FROM controlasistenciapersonal ca
+        JOIN personal p ON ca.personal_id = p.id
         ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
       `;
       
@@ -342,24 +344,25 @@ const findById = async (id) => {
       SELECT 
         ca.id,
         ca.personal_id,
-        p.tipo_documento as personal_tipo_documento,
+        td.codigo as personal_tipo_documento,
         p.numero_documento as personal_numero_documento,
         p.nombres as personal_nombres,
         p.apellidos as personal_apellidos,
         c.nombre_cargo as personal_cargo_nombre,
         a.nombre_area as area_nombre,
-        ca.fecha,
-        ca.hora_ingreso,
-        ca.hora_salida,
+        ca.ingreso::date as fecha,
+        ca.ingreso::time as hora_ingreso,
+        ca.salida::time as hora_salida,
         ca.estado_presencia,
         ca.usuario_registro_id,
         u.nombre_usuario as usuario_registro,
         ca.fecha_registro
-      FROM ControlAsistenciaPersonal ca
-      JOIN Personal p ON ca.personal_id = p.id
-      JOIN AreasDestino a ON p.area_destino_id = a.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
-      JOIN Usuarios u ON ca.usuario_registro_id = u.id
+      FROM controlasistenciapersonal ca
+      JOIN personal p ON ca.personal_id = p.id
+      JOIN tipodocumento td ON p.tipo_documento_id = td.id
+      JOIN areadestino a ON p.area_destino_id = a.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
+      JOIN usuario u ON ca.usuario_registro_id = u.id
       WHERE ca.id = $1
     `;
     
@@ -378,20 +381,20 @@ const findById = async (id) => {
  * @param {string} fecha - Fecha en formato YYYY-MM-DD
  * @returns {Object|null} Registro de asistencia encontrado o null
  */
-const findByPersonalAndFecha = async (personalId, fecha) => {
+const findBypersonalAndFecha = async (personalId, fecha) => {
   try {
     const query = `
       SELECT 
         id,
         personal_id,
-        fecha,
-        hora_ingreso,
-        hora_salida,
+        ingreso::date as fecha,
+        ingreso::time as hora_ingreso,
+        salida::time as hora_salida,
         estado_presencia,
         usuario_registro_id,
         fecha_registro
-      FROM ControlAsistenciaPersonal
-      WHERE personal_id = $1 AND fecha = $2
+      FROM controlasistenciapersonal
+      WHERE personal_id = $1 AND ingreso::date = $2
     `;
     
     const result = await db.query(query, [personalId, fecha]);
@@ -420,25 +423,26 @@ const create = async (asistenciaData) => {
       minutos_tardanza
     } = asistenciaData;
     
+    const ingresoTimestamp = hora_ingreso ? `${fecha} ${hora_ingreso}` : `${fecha} 00:00:00`;
+    const salidaTimestamp = hora_salida ? `${fecha} ${hora_salida}` : null;
+
     const query = `
-      INSERT INTO ControlAsistenciaPersonal (
+      INSERT INTO controlasistenciapersonal (
         personal_id, 
-        fecha, 
-        hora_ingreso,
-        hora_salida,
+        ingreso, 
+        salida,
         estado_presencia,
         usuario_registro_id,
         minutos_tardanza
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
     `;
     
     const result = await db.query(query, [
       personal_id, 
-      fecha, 
-      hora_ingreso,
-      hora_salida,
+      ingresoTimestamp, 
+      salidaTimestamp,
       estado_presencia,
       usuario_registro_id,
       minutos_tardanza || 0
@@ -460,7 +464,7 @@ const create = async (asistenciaData) => {
     if (error.code === '23503') {
       // Violación de clave foránea
       if (error.constraint && error.constraint.includes('personal_id')) {
-        throw new AppError('Personal no encontrado', 404);
+        throw new AppError('personal no encontrado', 404);
       }
       if (error.constraint && error.constraint.includes('usuario_registro_id')) {
         throw new AppError('Usuario de registro no encontrado', 404);
@@ -483,9 +487,9 @@ const create = async (asistenciaData) => {
 const updateIngreso = async (id, horaIngreso, estadoPresencia, usuarioId, minutosTardanza = 0) => {
   try {
     const query = `
-      UPDATE ControlAsistenciaPersonal 
+      UPDATE controlasistenciapersonal 
       SET 
-        hora_ingreso = $1,
+        ingreso = (date_trunc('day', ingreso) + $1::time),
         estado_presencia = $2,
         usuario_registro_id = $3,
         minutos_tardanza = $4
@@ -517,8 +521,8 @@ const updateIngreso = async (id, horaIngreso, estadoPresencia, usuarioId, minuto
 const updateSalida = async (id, horaSalida) => {
   try {
     const query = `
-      UPDATE ControlAsistenciaPersonal 
-      SET hora_salida = $1
+      UPDATE controlasistenciapersonal 
+      SET salida = (date_trunc('day', ingreso) + $1::time)
       WHERE id = $2
       RETURNING id
     `;
@@ -548,7 +552,7 @@ const updateSalida = async (id, horaSalida) => {
 const updateEstadoPresencia = async (id, estadoPresencia, usuarioId) => {
   try {
     const query = `
-      UPDATE ControlAsistenciaPersonal 
+      UPDATE controlasistenciapersonal 
       SET 
         estado_presencia = $1,
         usuario_registro_id = $2
@@ -593,29 +597,27 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId, crearSiNoExi
     
     // PASO 2: Crear registros con estado "Ausente" para el resto SIN registro previo
     // Si tenían permiso, ya tendrán un registro creado por la sincronización,
-    // así que el filtro "NOT IN ControlAsistenciaPersonal" es suficiente.
+    // así que el filtro "NOT IN controlasistenciapersonal" es suficiente.
     const queryCrearAusentes = `
-      INSERT INTO ControlAsistenciaPersonal (
+      INSERT INTO controlasistenciapersonal (
         personal_id,
-        fecha,
-        hora_ingreso,
-        hora_salida,
+        ingreso,
+        salida,
         estado_presencia,
         usuario_registro_id
       )
       SELECT 
         p.id,
-        $1::date,
-        NULL,
+        ($1::date + '00:00:00'::time)::timestamp,
         NULL,
         'Ausente',
         $2
-      FROM Personal p
+      FROM personal p
       WHERE p.activo = true
         AND p.id NOT IN (
           SELECT DISTINCT personal_id 
-          FROM ControlAsistenciaPersonal 
-          WHERE fecha = $1::date
+          FROM controlasistenciapersonal 
+          WHERE ingreso::date = $1::date
         )
       RETURNING id
     `;
@@ -623,12 +625,12 @@ const marcarAusentesAlFinalDelDia = async (fecha, usuarioSistemaId, crearSiNoExi
     // PASO 3: Actualizar registros existentes que no tienen horaIngreso y quedaron en limbo
     // Respetando 'Permiso', 'Comisión', 'Justificada', etc.
     const queryActualizarRegistros = `
-    UPDATE ControlAsistenciaPersonal ca
+    UPDATE controlasistenciapersonal ca
     SET 
       estado_presencia = 'Ausente',
       usuario_registro_id = $2
-    WHERE ca.fecha = $1::date
-      AND ca.hora_ingreso IS NULL
+    WHERE ca.ingreso::date = $1::date
+      AND ca.ingreso::time = '00:00:00'::time
       AND ca.estado_presencia NOT IN ('Ausente', 'Permiso', 'Comisión', 'Justificada', 'En Permiso')
     RETURNING id
     `;
@@ -689,32 +691,32 @@ const verificarRegistrosDelDia = async (fecha) => {
     }
     
     // Contar total de personal activo
-    const queryPersonalActivo = `
+    const querypersonalActivo = `
       SELECT COUNT(*) as total
-      FROM Personal
+      FROM personal
       WHERE activo = true
     `;
     
     // Contar registros de asistencia para la fecha
     const queryRegistrosExistentes = `
       SELECT COUNT(*) as total
-      FROM ControlAsistenciaPersonal
-      WHERE fecha = $1::date
+      FROM controlasistenciapersonal
+      WHERE ingreso::date = $1::date
     `;
     
     const [personalResult, registrosResult] = await Promise.all([
-      db.query(queryPersonalActivo),
+      db.query(querypersonalActivo),
       db.query(queryRegistrosExistentes, [fecha])
     ]);
     
-    const totalPersonalActivo = parseInt(personalResult.rows[0].total);
+    const totalpersonalActivo = parseInt(personalResult.rows[0].total);
     const totalRegistros = parseInt(registrosResult.rows[0].total);
-    const porcentaje = totalPersonalActivo > 0 ? Math.round((totalRegistros / totalPersonalActivo) * 100) : 0;
+    const porcentaje = totalpersonalActivo > 0 ? Math.round((totalRegistros / totalpersonalActivo) * 100) : 0;
     const necesitaCreacion = totalRegistros === 0;
     
     return {
       fecha,
-      totalPersonalActivo,
+      totalpersonalActivo,
       totalRegistros,
       porcentaje,
       necesitaCreacion
@@ -740,13 +742,13 @@ const verificarRegistrosDelDia = async (fecha) => {
 const actualizarEstadoPorPeriodo = async (personalId, fechaInicio, fechaFin, estadoAnterior, estadoNuevo, usuarioId) => {
   try {
     const query = `
-      UPDATE ControlAsistenciaPersonal
+      UPDATE controlasistenciapersonal
       SET 
         estado_presencia = $1,
         usuario_registro_id = $2
       WHERE personal_id = $3
-        AND fecha >= $4::date
-        AND fecha <= $5::date
+        AND ingreso::date >= $4::date
+        AND ingreso::date <= $5::date
         AND estado_presencia = $6
       RETURNING id
     `;
@@ -790,14 +792,14 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
     let paramCounter = 1;
     
     if (fechaInicio) {
-      whereCondition.push(`fecha >= $${paramCounter}::date`);
+      whereCondition.push(`ingreso::date >= $${paramCounter}::date`);
       params.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
       // Fin exclusivo = día siguiente → incluye TODO el día fin
-      whereCondition.push(`fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+      whereCondition.push(`ingreso::date < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
       paramCounter++;
     }
@@ -809,7 +811,7 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
       SELECT 
         estado_presencia,
         COUNT(*) as total
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
       GROUP BY estado_presencia
       ORDER BY total DESC
@@ -818,15 +820,15 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
     // Estadísticas por día
     const diaQuery = `
       SELECT 
-        fecha,
+        ingreso::date as fecha,
         COUNT(*) as total,
         COUNT(CASE WHEN estado_presencia = 'Presente' THEN 1 END) as presentes,
         COUNT(CASE WHEN estado_presencia = 'Ausente' THEN 1 END) as ausentes,
         COUNT(CASE WHEN estado_presencia = 'Tardanza' THEN 1 END) as tardanzas,
         COUNT(CASE WHEN estado_presencia = 'Falta' THEN 1 END) as faltas
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
-      GROUP BY fecha
+      GROUP BY ingreso::date
       ORDER BY fecha DESC
     `;
     
@@ -839,9 +841,9 @@ const getEstadisticas = async (fechaInicio, fechaFin) => {
         COUNT(CASE WHEN ca.estado_presencia = 'Ausente' THEN 1 END) as ausentes,
         COUNT(CASE WHEN ca.estado_presencia = 'Tardanza' THEN 1 END) as tardanzas,
         COUNT(CASE WHEN ca.estado_presencia = 'Falta' THEN 1 END) as faltas
-      FROM ControlAsistenciaPersonal ca
-      JOIN Personal p ON ca.personal_id = p.id
-      JOIN AreasDestino a ON p.area_destino_id = a.id
+      FROM controlasistenciapersonal ca
+      JOIN personal p ON ca.personal_id = p.id
+      JOIN areadestino a ON p.area_destino_id = a.id
       ${whereClause}
       GROUP BY a.nombre_area
       ORDER BY total DESC
@@ -882,13 +884,13 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
     let paramCounter = 1;
     
     if (fechaInicio) {
-      whereCondition.push(`fecha >= $${paramCounter}::date`);
+      whereCondition.push(`ingreso::date >= $${paramCounter}::date`);
       params.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
-      whereCondition.push(`fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+      whereCondition.push(`ingreso::date < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
       paramCounter++;
     }
@@ -898,7 +900,7 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
     // Total de asistencias (Presente + Tardanza)
     const totalAsistenciasQuery = `
       SELECT COUNT(*) as total
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
       ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Presente', 'Tardanza')
     `;
@@ -906,7 +908,7 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
     // Total de inasistencias (Ausente + Falta)
     const totalInasistenciasQuery = `
       SELECT COUNT(*) as total
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
       ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Ausente', 'Falta')
     `;
@@ -914,7 +916,7 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
     // Total de permisos (Permiso + En Permiso + Comisión)
     const totalPermisosQuery = `
       SELECT COUNT(*) as total
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
       ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Permiso', 'En Permiso', 'Comisión')
     `;
@@ -922,9 +924,9 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
     // Flujo diario de asistencias
     const flujoDiarioAsistenciasQuery = `
       SELECT 
-        DATE(fecha) AS dia,
+        DATE(ingreso) AS dia,
         COUNT(*) AS asistencias
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
       ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Presente', 'Tardanza')
       GROUP BY dia
@@ -934,9 +936,9 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
     // Flujo diario de inasistencias
     const flujoDiarioInasistenciasQuery = `
       SELECT 
-        DATE(fecha) AS dia,
+        DATE(ingreso) AS dia,
         COUNT(*) AS inasistencias
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
       ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Ausente', 'Falta')
       GROUP BY dia
@@ -946,9 +948,9 @@ const getEstadisticasTotales = async (fechaInicio, fechaFin) => {
     // Flujo diario de permisos
     const flujoDiarioPermisosQuery = `
       SELECT 
-        DATE(fecha) AS dia,
+        DATE(ingreso) AS dia,
         COUNT(*) AS permisos
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
       ${whereCondition.length > 0 ? 'AND' : 'WHERE'} estado_presencia IN ('Permiso', 'En Permiso', 'Comisión')
       GROUP BY dia
@@ -1007,13 +1009,13 @@ const getEstadisticasPuntualidad = async (fechaInicio, fechaFin) => {
     let paramCounter = 1;
     
     if (fechaInicio) {
-      whereCondition.push(`fecha >= $${paramCounter}::date`);
+      whereCondition.push(`ingreso::date >= $${paramCounter}::date`);
       params.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
-      whereCondition.push(`fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+      whereCondition.push(`ingreso::date < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
       paramCounter++;
     }
@@ -1023,10 +1025,10 @@ const getEstadisticasPuntualidad = async (fechaInicio, fechaFin) => {
     // Distribución por estado
     const distribucionQuery = `
       SELECT
-        DATE(fecha) AS dia,
+        DATE(ingreso) AS dia,
         estado_presencia,
         COUNT(*) AS cantidad
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${whereClause}
       GROUP BY dia, estado_presencia
       ORDER BY dia
@@ -1035,16 +1037,16 @@ const getEstadisticasPuntualidad = async (fechaInicio, fechaFin) => {
     // Condiciones para hora de llegada
     const horaLlegadaConditions = [...whereCondition];
     horaLlegadaConditions.push(`estado_presencia IN ('Presente', 'Tardanza')`);
-    horaLlegadaConditions.push(`hora_ingreso IS NOT NULL`);
+    horaLlegadaConditions.push(`ingreso IS NOT NULL`);
     const horaLlegadaWhereClause = `WHERE ${horaLlegadaConditions.join(' AND ')}`;
     
     // Distribución de hora de llegada
     const horaLlegadaQuery = `
       SELECT
-        DATE_TRUNC('hour', hora_ingreso::time) AS hora,
+        DATE_TRUNC('hour', ingreso::time) AS hora,
         COUNT(*) AS cantidad,
         SUM(CASE WHEN estado_presencia = 'Tardanza' THEN 1 ELSE 0 END) AS tardanzas
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       ${horaLlegadaWhereClause}
       GROUP BY hora
       ORDER BY hora
@@ -1095,30 +1097,11 @@ const getEstadisticasAusencias = async (fechaInicio, fechaFin) => {
     const whereClause = whereCondition.length > 0 ? `WHERE ${whereCondition.join(' AND ')}` : '';
     
     // Distribución por motivo de salida (Locales)
-    // Usando RegistrosSalidaPersonal en lugar de PapeletasSalida
-    const motivosSalidaQuery = `
-      SELECT
-        m.nombre_motivo AS tipo_ausencia,
-        COUNT(*) AS total
-      FROM RegistrosSalidaPersonal ps
-      JOIN MotivosSalidaPersonal m ON ps.motivo_salida_id = m.id
-      ${whereClause}
-      GROUP BY m.nombre_motivo
-      ORDER BY total DESC
-    `;
+    // NOTA: La tabla registrosalidapersonal fue eliminada. Retornando datos vacíos temporalmente.
+    const motivosSalidaQuery = `SELECT 'N/A' as tipo_ausencia, 0 as total WHERE 1=0`;
     
     // Top 10 personal con más salidas (Locales)
-    const topSalidasQuery = `
-      SELECT
-        CONCAT(p.nombres, ' ', p.apellidos) AS personal,
-        COUNT(*) AS faltas
-      FROM RegistrosSalidaPersonal ps
-      JOIN Personal p ON ps.personal_id = p.id
-      ${whereClause}
-      GROUP BY personal
-      ORDER BY faltas DESC
-      LIMIT 10
-    `;
+    const topSalidasQuery = `SELECT '' as personal, 0 as faltas WHERE 1=0`;
     
     const [motivosResult, topSalidasResult] = await Promise.all([
       db.query(motivosSalidaQuery, params),
@@ -1151,13 +1134,13 @@ const getEstadisticasAreas = async (fechaInicio, fechaFin) => {
     let paramCounter = 1;
     
     if (fechaInicio) {
-      whereCondition.push(`ca.fecha >= $${paramCounter}::date`);
+      whereCondition.push(`ca.ingreso::date >= $${paramCounter}::date`);
       params.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
-      whereCondition.push(`ca.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+      whereCondition.push(`ca.ingreso::date < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
       paramCounter++;
     }
@@ -1172,9 +1155,9 @@ const getEstadisticasAreas = async (fechaInicio, fechaFin) => {
         COUNT(CASE WHEN ca.estado_presencia = 'Presente' THEN 1 END) AS presentes,
         COUNT(CASE WHEN ca.estado_presencia = 'Tardanza' THEN 1 END) AS tardanzas,
         COUNT(CASE WHEN ca.estado_presencia = 'Ausente' THEN 1 END) AS ausentes
-      FROM ControlAsistenciaPersonal ca
-      JOIN Personal p ON ca.personal_id = p.id
-      JOIN AreasDestino a ON p.area_destino_id = a.id
+      FROM controlasistenciapersonal ca
+      JOIN personal p ON ca.personal_id = p.id
+      JOIN areadestino a ON p.area_destino_id = a.id
       ${whereClause}
       GROUP BY a.nombre_area
       ORDER BY asistencias DESC
@@ -1198,7 +1181,7 @@ const getEstadisticasAreas = async (fechaInicio, fechaFin) => {
  * @param {number} personalId - ID del personal (opcional)
  * @returns {Object} Estadísticas por personal
  */
-const getEstadisticasPersonal = async (fechaInicio, fechaFin, personalId = null) => {
+const getEstadisticaspersonal = async (fechaInicio, fechaFin, personalId = null) => {
   try {
     fechaInicio = toLimaDateYYYYMMDD(fechaInicio);
     fechaFin = toLimaDateYYYYMMDD(fechaFin);
@@ -1208,13 +1191,13 @@ const getEstadisticasPersonal = async (fechaInicio, fechaFin, personalId = null)
     let paramCounter = 1;
     
     if (fechaInicio) {
-      whereCondition.push(`ca.fecha >= $${paramCounter}::date`);
+      whereCondition.push(`ca.ingreso::date >= $${paramCounter}::date`);
       params.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
-      whereCondition.push(`ca.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+      whereCondition.push(`ca.ingreso::date < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
       paramCounter++;
     }
@@ -1236,8 +1219,8 @@ const getEstadisticasPersonal = async (fechaInicio, fechaFin, personalId = null)
         COUNT(CASE WHEN ca.estado_presencia = 'Presente' THEN 1 END) AS dias_puntuales,
         COUNT(CASE WHEN ca.estado_presencia = 'Tardanza' THEN 1 END) AS dias_tarde,
         COUNT(CASE WHEN ca.estado_presencia = 'Ausente' THEN 1 END) AS dias_ausente
-      FROM ControlAsistenciaPersonal ca
-      JOIN Personal p ON ca.personal_id = p.id
+      FROM controlasistenciapersonal ca
+      JOIN personal p ON ca.personal_id = p.id
       ${whereClause}
       GROUP BY personal, p.id
       ORDER BY dias_asistidos DESC
@@ -1245,7 +1228,7 @@ const getEstadisticasPersonal = async (fechaInicio, fechaFin, personalId = null)
     `;
     
     // Si se especifica un personal, obtener su ficha detallada
-    let fichaPersonalResult = null;
+    let fichapersonalResult = null;
     if (personalId) {
       const fichaQuery = `
         SELECT
@@ -1253,19 +1236,19 @@ const getEstadisticasPersonal = async (fechaInicio, fechaFin, personalId = null)
           SUM(CASE WHEN estado_presencia = 'Tardanza' THEN 1 ELSE 0 END) AS dias_tarde,
           SUM(CASE WHEN estado_presencia = 'Ausente' THEN 1 ELSE 0 END) AS dias_falta,
           COUNT(*) AS total_registros,
-          MAX(fecha) AS ultima_asistencia
-        FROM ControlAsistenciaPersonal
+          MAX(ingreso) AS ultima_asistencia
+        FROM controlasistenciapersonal
         ${whereClause}
       `;
       
-      fichaPersonalResult = await db.query(fichaQuery, params);
+      fichapersonalResult = await db.query(fichaQuery, params);
     }
     
     const topResult = await db.query(topAsistenciaQuery, params);
     
     return {
       top_asistencia: topResult.rows,
-      ficha_personal: fichaPersonalResult ? fichaPersonalResult.rows[0] : null
+      ficha_personal: fichapersonalResult ? fichapersonalResult.rows[0] : null
     };
   } catch (error) {
     logger.error('Error obteniendo estadísticas por personal:', error);
@@ -1280,7 +1263,7 @@ const getEstadisticasPersonal = async (fechaInicio, fechaFin, personalId = null)
  * @param {string} fechaFin - Fecha de fin
  * @returns {Object} Detalle completo del personal
  */
-const getPersonalDetalle = async (personalId, fechaInicio, fechaFin) => {
+const getpersonalDetalle = async (personalId, fechaInicio, fechaFin) => {
   try {
     fechaInicio = toLimaDateYYYYMMDD(fechaInicio);
     fechaFin = toLimaDateYYYYMMDD(fechaFin);
@@ -1292,13 +1275,13 @@ const getPersonalDetalle = async (personalId, fechaInicio, fechaFin) => {
     whereCondition.push(`ca.personal_id = $1`);
     
     if (fechaInicio) {
-      whereCondition.push(`ca.fecha >= $${paramCounter}::date`);
+      whereCondition.push(`ca.ingreso::date >= $${paramCounter}::date`);
       params.push(fechaInicio);
       paramCounter++;
     }
     
     if (fechaFin) {
-      whereCondition.push(`ca.fecha < ($${paramCounter}::date + INTERVAL '1 day')`);
+      whereCondition.push(`ca.ingreso::date < ($${paramCounter}::date + INTERVAL '1 day')`);
       params.push(fechaFin);
       paramCounter++;
     }
@@ -1312,46 +1295,46 @@ const getPersonalDetalle = async (personalId, fechaInicio, fechaFin) => {
         COUNT(CASE WHEN estado_presencia = 'Presente' THEN 1 END) AS dias_puntuales,
         COUNT(CASE WHEN estado_presencia = 'Tardanza' THEN 1 END) AS dias_tarde,
         COUNT(CASE WHEN estado_presencia = 'Ausente' THEN 1 END) AS dias_ausente,
-        MAX(fecha) AS ultima_asistencia
-      FROM ControlAsistenciaPersonal ca
+        MAX(ingreso) AS ultima_asistencia
+      FROM controlasistenciapersonal ca
       ${whereClause}
     `;
     
     // Asistencias por fecha (para calendario)
     const asistenciasPorFechaQuery = `
       SELECT
-        DATE(ca.fecha) AS fecha,
+        DATE(ca.ingreso) AS fecha,
         COUNT(*) AS asistencias_dia,
         json_agg(
           json_build_object(
             'estado_presencia', ca.estado_presencia,
-            'hora_ingreso', TO_CHAR(ca.hora_ingreso, 'HH24:MI'),
-            'hora_salida', TO_CHAR(ca.hora_salida, 'HH24:MI'),
+            'hora_ingreso', TO_CHAR(ca.ingreso, 'HH24:MI'),
+            'hora_salida', TO_CHAR(ca.salida, 'HH24:MI'),
             'personal', CONCAT(p.nombres, ' ', p.apellidos),
             'area', a.nombre_area
-          ) ORDER BY ca.hora_ingreso
+          ) ORDER BY ca.ingreso
         ) AS detalles
-      FROM ControlAsistenciaPersonal ca
-      JOIN Personal p ON ca.personal_id = p.id
-      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
+      FROM controlasistenciapersonal ca
+      JOIN personal p ON ca.personal_id = p.id
+      LEFT JOIN areadestino a ON p.area_destino_id = a.id
       ${whereClause}
-      GROUP BY DATE(ca.fecha)
+      GROUP BY DATE(ca.ingreso)
       ORDER BY fecha DESC
     `;
     
     // Historial detallado
     const historialQuery = `
       SELECT
-        ca.fecha,
+        ca.ingreso::date as fecha,
         ca.estado_presencia,
-        TO_CHAR(ca.hora_ingreso, 'HH24:MI') AS hora_ingreso,
-        TO_CHAR(ca.hora_salida, 'HH24:MI') AS hora_salida,
+        TO_CHAR(ca.ingreso, 'HH24:MI') AS hora_ingreso,
+        TO_CHAR(ca.salida, 'HH24:MI') AS hora_salida,
         a.nombre_area AS area
-      FROM ControlAsistenciaPersonal ca
-      JOIN Personal p ON ca.personal_id = p.id
-      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
+      FROM controlasistenciapersonal ca
+      JOIN personal p ON ca.personal_id = p.id
+      LEFT JOIN areadestino a ON p.area_destino_id = a.id
       ${whereClause}
-      ORDER BY ca.fecha DESC
+      ORDER BY ca.ingreso DESC
       LIMIT 100
     `;
     
@@ -1430,13 +1413,13 @@ const countDiasToleranciaUsados = async (personalId, mes, anio, horaEntradaRef =
   try {
     const query = `
       SELECT COUNT(*) as total
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       WHERE personal_id = $1
-        AND EXTRACT(MONTH FROM fecha) = $2
-        AND EXTRACT(YEAR FROM fecha) = $3
-        AND hora_ingreso::time > $4::time
+        AND EXTRACT(MONTH FROM ingreso) = $2
+        AND EXTRACT(YEAR FROM ingreso) = $3
+        AND ingreso::time > $4::time
         AND estado_presencia IN ('Presente', 'Tardanza')
-        AND ($5::date IS NULL OR fecha >= $5::date)
+        AND ($5::date IS NULL OR ingreso::date >= $5::date)
     `;
     
     const result = await db.query(query, [personalId, mes, anio, horaEntradaRef, fechaInicioConfig]);
@@ -1455,7 +1438,7 @@ const countDiasToleranciaUsados = async (personalId, mes, anio, horaEntradaRef =
  * @param {number} mes
  * @returns {Object}
  */
-const getResumenMensualPersonal = async (personalId, anio, mes) => {
+const getResumenMensualpersonal = async (personalId, anio, mes) => {
   try {
     const query = `
       SELECT
@@ -1467,10 +1450,10 @@ const getResumenMensualPersonal = async (personalId, anio, mes) => {
         ), 0) AS permisos,
         COALESCE(SUM(CASE WHEN estado_presencia = 'Justificada' THEN 1 END), 0) AS justificadas,
         COALESCE(SUM(minutos_tardanza), 0) AS minutos_tardanza_total
-      FROM ControlAsistenciaPersonal
+      FROM controlasistenciapersonal
       WHERE personal_id = $1
-        AND EXTRACT(YEAR FROM fecha) = $2
-        AND EXTRACT(MONTH FROM fecha) = $3
+        AND EXTRACT(YEAR FROM ingreso) = $2
+        AND EXTRACT(MONTH FROM ingreso) = $3
     `;
 
     const result = await db.query(query, [personalId, anio, mes]);
@@ -1500,7 +1483,7 @@ const createJustificacion = async (data) => {
     } = data;
 
     const query = `
-      INSERT INTO justificaciones (
+      INSERT INTO justificacion (
         control_asistencia_id,
         motivo,
         evidencia_url,
@@ -1539,31 +1522,31 @@ const updatePorPapeletaExterna = async (personalId, fecha, nuevoEstado, observac
   try {
     // Intentar actualizar si existe registro susceptible de ser sobrescrito
     const updateQuery = `
-      UPDATE ControlAsistenciaPersonal
+      UPDATE controlasistenciapersonal
       SET 
         estado_presencia = $1,
         observacion = $2,
         usuario_registro_id = $3,
         updated_at = CURRENT_TIMESTAMP
       WHERE personal_id = $4 
-        AND fecha = $5::date
+        AND ingreso::date = $5::date
         AND (estado_presencia IN ('Ausente', 'Falta', 'Sin marca') OR estado_presencia IS NULL)
-        AND hora_ingreso IS NULL
+        AND ingreso::time = '00:00:00'::time
       RETURNING id
     `;
     const result = await db.query(updateQuery, [nuevoEstado, observacion, usuarioId, personalId, fecha]);
     if (result.rows.length > 0) return result.rows[0];
 
     // Si no se actualizó, revisar si hay registro protegido (Presente/Tardanza)
-    const checkQuery = `SELECT id FROM ControlAsistenciaPersonal WHERE personal_id = $1 AND fecha = $2::date`;
+    const checkQuery = `SELECT id FROM controlasistenciapersonal WHERE personal_id = $1 AND ingreso::date = $2::date`;
     const checkResult = await db.query(checkQuery, [personalId, fecha]);
 
     // Si no existe registro, crear uno nuevo
     if (checkResult.rows.length === 0) {
       const insertQuery = `
-        INSERT INTO ControlAsistenciaPersonal (
-          personal_id, fecha, estado_presencia, observacion, usuario_registro_id
-        ) VALUES ($1, $2::date, $3, $4, $5)
+        INSERT INTO controlasistenciapersonal (
+          personal_id, ingreso, estado_presencia, observacion, usuario_registro_id
+        ) VALUES ($1, ($2::date + '00:00:00'::time)::timestamp, $3, $4, $5)
         RETURNING id
       `;
       const insertResult = await db.query(insertQuery, [personalId, fecha, nuevoEstado, observacion, usuarioId]);
@@ -1580,7 +1563,7 @@ const updatePorPapeletaExterna = async (personalId, fecha, nuevoEstado, observac
 module.exports = {
   findAll,
   findById,
-  findByPersonalAndFecha,
+  findBypersonalAndFecha,
   create,
   updateIngreso,
   updateSalida,
@@ -1593,11 +1576,11 @@ module.exports = {
   getEstadisticasPuntualidad,
   getEstadisticasAusencias,
   getEstadisticasAreas,
-  getEstadisticasPersonal,
-  getPersonalDetalle,
+  getEstadisticaspersonal,
+  getpersonalDetalle,
   getConfiguracion,
   countDiasToleranciaUsados,
-  getResumenMensualPersonal,
+  getResumenMensualpersonal,
   createJustificacion,
   findAllJustificaciones,
   updateJustificacionEstado,
@@ -1642,12 +1625,12 @@ async function findAllJustificaciones(options = {}) {
       p.nombres, 
       p.apellidos, 
       p.numero_documento,
-      ca.fecha, 
+      ca.ingreso::date as fecha, 
       ca.estado_presencia as estado_original, 
-      ca.hora_ingreso
-    FROM justificaciones j
-    INNER JOIN ControlAsistenciaPersonal ca ON j.control_asistencia_id = ca.id
-    INNER JOIN Personal p ON ca.personal_id = p.id
+      ca.ingreso::time as hora_ingreso
+    FROM justificacion j
+    INNER JOIN controlasistenciapersonal ca ON j.control_asistencia_id = ca.id
+    INNER JOIN personal p ON ca.personal_id = p.id
     ${whereString}
     ORDER BY j.fecha_solicitud DESC
   `;
@@ -1671,7 +1654,7 @@ async function findAllJustificaciones(options = {}) {
  */
 async function updateJustificacionEstado(id, estado, observacion, usuarioRespuestaId) {
   const query = `
-    UPDATE justificaciones
+    UPDATE justificacion
     SET 
       estado = $1, 
       observacion_respuesta = $2, 

@@ -14,11 +14,11 @@ const logger = require('../../utils/logger');
 const getAll = asyncHandler(async (req, res) => {
   logger.info('Solicitud de listado de cargos');
   
-  const result = await service.getAllCargos(req.query);
+  const result = await service.getAllcargo(req.query);
   
   res.json({
     success: true,
-    message: 'Cargos obtenidos exitosamente',
+    message: 'cargo obtenidos exitosamente',
     data: result.cargos,
     pagination: result.pagination
   });
@@ -103,11 +103,11 @@ const softDelete = asyncHandler(async (req, res) => {
 const getDeleted = asyncHandler(async (req, res) => {
   logger.info('Solicitud de cargos eliminados');
   
-  const result = await service.getDeletedCargos(req.query);
+  const result = await service.getDeletedcargo(req.query);
   
   res.json({
     success: true,
-    message: 'Cargos eliminados obtenidos exitosamente',
+    message: 'cargo eliminados obtenidos exitosamente',
     data: result.cargos || [],
     pagination: result.pagination
   });

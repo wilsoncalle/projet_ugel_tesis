@@ -10,7 +10,7 @@ const logger = require('../../utils/logger');
 /**
  * Buscar todo el personal con filtros y paginación
  * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Personal encontrado y total
+ * @returns {Object} personal encontrado y total
  */
 const findAll = async (options = {}) => {
   const { page = 1, limit = 20, search = '', activo, areaId, tipoContratoId, fecha } = options;
@@ -44,7 +44,7 @@ const findAll = async (options = {}) => {
     let query = `
       SELECT 
         p.id,
-        p.tipo_documento,
+        td.codigo as tipo_documento,
         p.numero_documento,
         p.nombres,
         p.apellidos,
@@ -61,13 +61,14 @@ const findAll = async (options = {}) => {
         -- Estado de asistencia de hoy
         ca.estado_presencia
         
-      FROM Personal p
-      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
-      LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
-      LEFT JOIN ControlAsistenciaPersonal ca 
+      FROM personal p
+      LEFT JOIN tipodocumento td ON p.tipo_documento_id = td.id
+      LEFT JOIN areadestino a ON p.area_destino_id = a.id
+      LEFT JOIN tipocontrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
+      LEFT JOIN controlasistenciapersonal ca 
         ON ca.personal_id = p.id 
-        AND ca.fecha = ${fechaJoinClause}
+        AND ca.ingreso::date = ${fechaJoinClause}
     `;
     
     // Construir la cláusula WHERE
@@ -118,10 +119,10 @@ const findAll = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM Personal p
-      LEFT JOIN ControlAsistenciaPersonal ca 
+      FROM personal p
+      LEFT JOIN controlasistenciapersonal ca 
         ON ca.personal_id = p.id 
-        AND ca.fecha = ${fechaJoinClause}
+        AND ca.ingreso::date = ${fechaJoinClause}
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -156,14 +157,14 @@ const findAll = async (options = {}) => {
 /**
  * Buscar personal por ID
  * @param {number} id - ID del personal
- * @returns {Object|null} Personal encontrado o null
+ * @returns {Object|null} personal encontrado o null
  */
 const findById = async (id) => {
   try {
     const query = `
       SELECT 
         p.id,
-        p.tipo_documento,
+        td.codigo as tipo_documento,
         p.numero_documento,
         p.nombres,
         p.apellidos,
@@ -176,10 +177,11 @@ const findById = async (id) => {
         p.tipo_contrato_id,
         tc.nombre_tipo as tipo_contrato_nombre,
         p.activo
-      FROM Personal p
-      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
-      LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
+      FROM personal p
+      LEFT JOIN tipodocumento td ON p.tipo_documento_id = td.id
+      LEFT JOIN areadestino a ON p.area_destino_id = a.id
+      LEFT JOIN tipocontrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
       WHERE p.id = $1
     `;
     
@@ -196,14 +198,14 @@ const findById = async (id) => {
  * Buscar personal por tipo y número de documento
  * @param {string} tipoDocumento - Tipo de documento
  * @param {string} numeroDocumento - Número de documento
- * @returns {Object|null} Personal encontrado o null
+ * @returns {Object|null} personal encontrado o null
  */
 const findByDocumento = async (tipoDocumento, numeroDocumento) => {
   try {
     const query = `
       SELECT 
         p.id,
-        p.tipo_documento,
+        td.codigo as tipo_documento,
         p.numero_documento,
         p.nombres,
         p.apellidos,
@@ -216,11 +218,12 @@ const findByDocumento = async (tipoDocumento, numeroDocumento) => {
         p.tipo_contrato_id,
         tc.nombre_tipo as tipo_contrato_nombre,
         p.activo
-      FROM Personal p
-      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
-      LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
-      WHERE p.tipo_documento = $1 AND p.numero_documento = $2
+      FROM personal p
+      LEFT JOIN tipodocumento td ON p.tipo_documento_id = td.id
+      LEFT JOIN areadestino a ON p.area_destino_id = a.id
+      LEFT JOIN tipocontrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
+      WHERE td.codigo = $1 AND p.numero_documento = $2
     `;
     
     const result = await db.query(query, [tipoDocumento, numeroDocumento]);
@@ -235,12 +238,12 @@ const findByDocumento = async (tipoDocumento, numeroDocumento) => {
 /**
  * Crear nuevo personal
  * @param {Object} personalData - Datos del personal
- * @returns {Object} Personal creado
+ * @returns {Object} personal creado
  */
 const create = async (personalData) => {
   try {
     const { 
-      tipo_documento, 
+      tipo_documento_id, 
       numero_documento, 
       nombres, 
       apellidos,
@@ -253,8 +256,8 @@ const create = async (personalData) => {
     } = personalData;
     
     const query = `
-      INSERT INTO Personal (
-        tipo_documento, 
+      INSERT INTO personal (
+        tipo_documento_id, 
         numero_documento, 
         nombres, 
         apellidos,
@@ -270,7 +273,7 @@ const create = async (personalData) => {
     `;
     
     const result = await db.query(query, [
-      tipo_documento, 
+      tipo_documento_id, 
       numero_documento, 
       nombres, 
       apellidos,
@@ -314,7 +317,7 @@ const create = async (personalData) => {
  * Actualizar personal existente
  * @param {number} id - ID del personal
  * @param {Object} personalData - Datos a actualizar
- * @returns {Object} Personal actualizado
+ * @returns {Object} personal actualizado
  */
 const update = async (id, personalData) => {
   try {
@@ -324,9 +327,9 @@ const update = async (id, personalData) => {
     let paramCounter = 2;
     
     // Agregar campos a actualizar
-    if (personalData.tipo_documento !== undefined) {
-      updateFields.push(`tipo_documento = $${paramCounter++}`);
-      queryParams.push(personalData.tipo_documento);
+    if (personalData.tipo_documento_id !== undefined) {
+      updateFields.push(`tipo_documento_id = $${paramCounter++}`);
+      queryParams.push(personalData.tipo_documento_id);
     }
     
     if (personalData.numero_documento !== undefined) {
@@ -376,12 +379,12 @@ const update = async (id, personalData) => {
     
     // Si no hay campos para actualizar
     if (updateFields.length === 0) {
-      const currentPersonal = await findById(id);
-      return currentPersonal;
+      const currentpersonal = await findById(id);
+      return currentpersonal;
     }
     
     const query = `
-      UPDATE Personal 
+      UPDATE personal 
       SET ${updateFields.join(', ')}
       WHERE id = $1
       RETURNING id
@@ -390,7 +393,7 @@ const update = async (id, personalData) => {
     const result = await db.query(query, queryParams);
     
     if (result.rows.length === 0) {
-      throw new AppError('Personal no encontrado', 404);
+      throw new AppError('personal no encontrado', 404);
     }
     
     // Obtener el personal actualizado completo con los datos de área y tipo de contrato
@@ -425,7 +428,7 @@ const update = async (id, personalData) => {
 const softDelete = async (id) => {
   try {
     const query = `
-      UPDATE Personal 
+      UPDATE personal 
       SET activo = false
       WHERE id = $1
       RETURNING id
@@ -434,7 +437,7 @@ const softDelete = async (id) => {
     const result = await db.query(query, [id]);
     
     if (result.rows.length === 0) {
-      throw new AppError('Personal no encontrado', 404);
+      throw new AppError('personal no encontrado', 404);
     }
     
     return true;
@@ -448,14 +451,14 @@ const softDelete = async (id) => {
 /**
  * Buscar personal por área
  * @param {number} areaId - ID del área
- * @returns {Array} Personal encontrado
+ * @returns {Array} personal encontrado
  */
 const findByArea = async (areaId) => {
   try {
     const query = `
       SELECT 
         p.id,
-        p.tipo_documento,
+        td.codigo as tipo_documento,
         p.numero_documento,
         p.nombres,
         p.apellidos,
@@ -464,8 +467,9 @@ const findByArea = async (areaId) => {
         p.cargo_id,
         c.nombre_cargo as cargo_nombre,
         p.activo
-      FROM Personal p
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
+      FROM personal p
+      LEFT JOIN tipodocumento td ON p.tipo_documento_id = td.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
       WHERE p.area_destino_id = $1 AND p.activo = true
       ORDER BY p.apellidos ASC, p.nombres ASC
     `;
@@ -483,11 +487,11 @@ const findByArea = async (areaId) => {
  * Contar personal activo
  * @returns {number} Cantidad de personal activo
  */
-const countActivePersonal = async () => {
+const countActivepersonal = async () => {
   try {
     const query = `
       SELECT COUNT(*) as count
-      FROM Personal
+      FROM personal
       WHERE activo = true
     `;
     
@@ -503,7 +507,7 @@ const countActivePersonal = async () => {
 /**
  * Buscar personal eliminado (soft delete)
  * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Personal eliminado y total
+ * @returns {Object} personal eliminado y total
  */
 const findDeleted = async (options = {}) => {
   const { page = 1, limit = 20, search = '' } = options;
@@ -514,7 +518,7 @@ const findDeleted = async (options = {}) => {
     let query = `
       SELECT 
         p.id,
-        p.tipo_documento,
+        td.codigo as tipo_documento,
         p.numero_documento,
         p.nombres,
         p.apellidos,
@@ -527,10 +531,11 @@ const findDeleted = async (options = {}) => {
         p.tipo_contrato_id,
         tc.nombre_tipo as tipo_contrato_nombre,
         p.activo
-      FROM Personal p
-      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
-      LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
+      FROM personal p
+      LEFT JOIN tipodocumento td ON p.tipo_documento_id = td.id
+      LEFT JOIN areadestino a ON p.area_destino_id = a.id
+      LEFT JOIN tipocontrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
       WHERE p.activo = false
     `;
     
@@ -553,7 +558,7 @@ const findDeleted = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM Personal p
+      FROM personal p
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -586,14 +591,14 @@ const findDeleted = async (options = {}) => {
 /**
  * Buscar personal por ID incluyendo eliminados
  * @param {number} id - ID del personal
- * @returns {Object|null} Personal encontrado o null
+ * @returns {Object|null} personal encontrado o null
  */
 const findByIdIncludingDeleted = async (id) => {
   try {
     const query = `
       SELECT 
         p.id,
-        p.tipo_documento,
+        td.codigo as tipo_documento,
         p.numero_documento,
         p.nombres,
         p.apellidos,
@@ -606,10 +611,11 @@ const findByIdIncludingDeleted = async (id) => {
         p.tipo_contrato_id,
         tc.nombre_tipo as tipo_contrato_nombre,
         p.activo
-      FROM Personal p
-      LEFT JOIN AreasDestino a ON p.area_destino_id = a.id
-      LEFT JOIN TiposContrato tc ON p.tipo_contrato_id = tc.id
-      LEFT JOIN Cargos c ON p.cargo_id = c.id
+      FROM personal p
+      LEFT JOIN tipodocumento td ON p.tipo_documento_id = td.id
+      LEFT JOIN areadestino a ON p.area_destino_id = a.id
+      LEFT JOIN tipocontrato tc ON p.tipo_contrato_id = tc.id
+      LEFT JOIN cargo c ON p.cargo_id = c.id
       WHERE p.id = $1
     `;
     
@@ -625,12 +631,12 @@ const findByIdIncludingDeleted = async (id) => {
 /**
  * Restaurar personal eliminado
  * @param {number} id - ID del personal
- * @returns {Object} Personal restaurado
+ * @returns {Object} personal restaurado
  */
 const restore = async (id) => {
   try {
     const query = `
-      UPDATE Personal 
+      UPDATE personal 
       SET activo = true
       WHERE id = $1
       RETURNING id
@@ -639,7 +645,7 @@ const restore = async (id) => {
     const result = await db.query(query, [id]);
     
     if (result.rows.length === 0) {
-      throw new AppError('Personal no encontrado', 404);
+      throw new AppError('personal no encontrado', 404);
     }
     
     // Obtener el personal restaurado completo con los datos de área y tipo de contrato
@@ -659,7 +665,7 @@ module.exports = {
   update,
   softDelete,
   findByArea,
-  countActivePersonal,
+  countActivepersonal,
   findDeleted,
   findByIdIncludingDeleted,
   restore

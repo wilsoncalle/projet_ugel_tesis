@@ -341,13 +341,13 @@ const getEstadisticasAreas = asyncHandler(async (req, res) => {
  * Obtener estadísticas por personal
  * @route GET /api/asistencia-personal/estadisticas/personal
  */
-const getEstadisticasPersonal = asyncHandler(async (req, res) => {
+const getEstadisticaspersonal = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas por personal');
   
   const { periodo, personalId } = req.query;
   const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
   
-  const stats = await service.getEstadisticasPersonal({ fechaInicio, fechaFin, personalId });
+  const stats = await service.getEstadisticaspersonal({ fechaInicio, fechaFin, personalId });
   
   res.json({
     success: true,
@@ -360,14 +360,14 @@ const getEstadisticasPersonal = asyncHandler(async (req, res) => {
  * Obtener detalle completo de un personal
  * @route GET /api/asistencia-personal/estadisticas/personal-detalle/:personalId
  */
-const getPersonalDetalle = asyncHandler(async (req, res) => {
+const getpersonalDetalle = asyncHandler(async (req, res) => {
   logger.info('Solicitud de detalle de personal');
   
   const { personalId } = req.params;
   const { periodo } = req.query;
   const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
   
-  const detalle = await service.getPersonalDetalle(personalId, { fechaInicio, fechaFin });
+  const detalle = await service.getpersonalDetalle(personalId, { fechaInicio, fechaFin });
   
   res.json({
     success: true,
@@ -483,8 +483,8 @@ module.exports = {
   getEstadisticasPuntualidad,
   getEstadisticasAusencias,
   getEstadisticasAreas,
-  getEstadisticasPersonal,
-  getPersonalDetalle,
+  getEstadisticaspersonal,
+  getpersonalDetalle,
   exportarAExcel,
   exportarAPDF,
   getMiResumen,

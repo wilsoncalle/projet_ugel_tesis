@@ -138,7 +138,7 @@ const schemas = {
     }),
   },
 
-  // Usuarios
+  // usuario
   usuarios: {
     create: Joi.object({
       nombreUsuario: Joi.string().alphanum().min(3).max(100).required(),
@@ -183,7 +183,7 @@ const schemas = {
     }),
   },
 
-  // Personal
+  // personal
   personal: {
     create: Joi.object({
       tipoDocumento: Joi.string()
@@ -255,7 +255,7 @@ const schemas = {
     }).min(1),
   },
 
-  // Visitantes
+  // visitante
   visitantes: {
     create: Joi.object({
       tipoDocumentoId: Joi.number().integer().positive().required(),
@@ -457,7 +457,7 @@ const schemas = {
   },
 
   // Asistencia de personal
-  asistenciaPersonal: {
+  asistenciapersonal: {
     registrarIngreso: Joi.object({
       personalId: Joi.number().integer().positive().required(),
     }),
@@ -489,7 +489,7 @@ const schemas = {
     }).min(1),
   },
 
-  // Cargos específicos
+  // cargo específicos
   cargos: {
     create: Joi.object({
       nombre_cargo: Joi.string().min(2).max(150).required().messages({
@@ -568,17 +568,17 @@ const validationMiddleware = {
   validateLogin: validate(schemas.auth.login),
   validateChangePassword: validate(schemas.auth.changePassword),
 
-  // Usuarios
+  // usuario
   validateCreateUser: validate(schemas.usuarios.create),
   validateUpdateUser: validate(schemas.usuarios.update),
   validateUpdateProfile: validate(schemas.usuarios.updateProfile),
   validateUpdatePassword: validate(schemas.usuarios.updatePassword),
 
-  // Personal
-  validateCreatePersonal: validate(schemas.personal.create),
-  validateUpdatePersonal: validate(schemas.personal.update),
+  // personal
+  validateCreatepersonal: validate(schemas.personal.create),
+  validateUpdatepersonal: validate(schemas.personal.update),
 
-  // Visitantes
+  // visitante
   validateCreateVisitante: validate(schemas.visitantes.create),
   validateUpdateVisitante: validate(schemas.visitantes.update),
   validateConsultarDNI: validate(schemas.visitantes.consultarDNI),
@@ -597,16 +597,16 @@ const validationMiddleware = {
 
   // Asistencia de personal
   validateRegistrarIngreso: validate(
-    schemas.asistenciaPersonal.registrarIngreso,
+    schemas.asistenciapersonal.registrarIngreso,
   ),
-  validateRegistrarSalida: validate(schemas.asistenciaPersonal.registrarSalida),
-  validateRegistrarEstado: validate(schemas.asistenciaPersonal.registrarEstado),
+  validateRegistrarSalida: validate(schemas.asistenciapersonal.registrarSalida),
+  validateRegistrarEstado: validate(schemas.asistenciapersonal.registrarEstado),
 
   // Catálogos
   validateCreateCatalogo: validate(schemas.catalogo.create),
   validateUpdateCatalogo: validate(schemas.catalogo.update),
 
-  // Cargos
+  // cargo
   validateCreateCargo: validate(schemas.cargos.create),
   validateUpdateCargo: validate(schemas.cargos.update),
 

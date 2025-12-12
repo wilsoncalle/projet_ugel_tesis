@@ -10,7 +10,7 @@ const logger = require('../../utils/logger');
 /**
  * Buscar todos los usuarios con filtros y paginación
  * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Usuarios encontrados y total
+ * @returns {Object} usuario encontrados y total
  */
 const findAll = async (options = {}) => {
   const { page = 1, limit = 20, search = '', activo, rol } = options;
@@ -30,8 +30,8 @@ const findAll = async (options = {}) => {
         p.nombres AS personal_nombres,
         p.apellidos AS personal_apellidos,
         p.numero_documento AS personal_documento
-      FROM Usuarios u
-      LEFT JOIN Personal p ON u.personal_id = p.id
+      FROM usuario u
+      LEFT JOIN personal p ON u.personal_id = p.id
     `;
     
     // Construir la cláusula WHERE
@@ -73,8 +73,8 @@ const findAll = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(u.*) as total
-      FROM Usuarios u
-      LEFT JOIN Personal p ON u.personal_id = p.id
+      FROM usuario u
+      LEFT JOIN personal p ON u.personal_id = p.id
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -124,8 +124,8 @@ const findById = async (id) => {
         p.nombres AS personal_nombres,
         p.apellidos AS personal_apellidos,
         p.numero_documento AS personal_documento
-      FROM Usuarios u
-      LEFT JOIN Personal p ON u.personal_id = p.id
+      FROM usuario u
+      LEFT JOIN personal p ON u.personal_id = p.id
       WHERE u.id = $1
     `;
     
@@ -158,8 +158,8 @@ const findByUsername = async (nombreUsuario) => {
         p.nombres AS personal_nombres,
         p.apellidos AS personal_apellidos,
         p.numero_documento AS personal_documento
-      FROM Usuarios u
-      LEFT JOIN Personal p ON u.personal_id = p.id
+      FROM usuario u
+      LEFT JOIN personal p ON u.personal_id = p.id
       WHERE LOWER(u.nombre_usuario) = LOWER($1)
     `;
     
@@ -192,8 +192,8 @@ const findByEmail = async (email) => {
         p.nombres AS personal_nombres,
         p.apellidos AS personal_apellidos,
         p.numero_documento AS personal_documento
-      FROM Usuarios u
-      LEFT JOIN Personal p ON u.personal_id = p.id
+      FROM usuario u
+      LEFT JOIN personal p ON u.personal_id = p.id
       WHERE LOWER(u.email) = LOWER($1)
     `;
     
@@ -226,8 +226,8 @@ const findByUsernameOrEmail = async (nombreUsuario, email) => {
         p.nombres AS personal_nombres,
         p.apellidos AS personal_apellidos,
         p.numero_documento AS personal_documento
-      FROM Usuarios u
-      LEFT JOIN Personal p ON u.personal_id = p.id
+      FROM usuario u
+      LEFT JOIN personal p ON u.personal_id = p.id
       WHERE LOWER(u.nombre_usuario) = LOWER($1) OR LOWER(u.email) = LOWER($2)
     `;
     
@@ -250,7 +250,7 @@ const create = async (usuarioData) => {
     const { nombre_usuario, hash_contrasena, email, rol, activo = true, personal_id = null } = usuarioData;
     
     const query = `
-      INSERT INTO Usuarios (nombre_usuario, hash_contrasena, email, rol, activo, personal_id)
+      INSERT INTO usuario (nombre_usuario, hash_contrasena, email, rol, activo, personal_id)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING 
         id,
@@ -349,7 +349,7 @@ const update = async (id, usuarioData) => {
     }
     
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET ${updateFields.join(', ')}
       WHERE id = $1
       RETURNING 
@@ -405,7 +405,7 @@ const update = async (id, usuarioData) => {
 const updatePassword = async (id, hashedPassword) => {
   try {
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET hash_contrasena = $1
       WHERE id = $2
       RETURNING id
@@ -433,7 +433,7 @@ const updatePassword = async (id, hashedPassword) => {
 const softDelete = async (id) => {
   try {
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET activo = false
       WHERE id = $1
       RETURNING id
@@ -462,7 +462,7 @@ const countByRole = async (rol) => {
   try {
     const query = `
       SELECT COUNT(*) as count
-      FROM Usuarios
+      FROM usuario
       WHERE rol = $1 AND activo = true
     `;
     
@@ -478,7 +478,7 @@ const countByRole = async (rol) => {
 /**
  * Buscar usuarios eliminados (soft delete)
  * @param {Object} options - Opciones de búsqueda
- * @returns {Object} Usuarios eliminados y total
+ * @returns {Object} usuario eliminados y total
  */
 const findDeleted = async (options = {}) => {
   const { page = 1, limit = 20, search = '' } = options;
@@ -497,7 +497,7 @@ const findDeleted = async (options = {}) => {
     
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM Usuarios
+      FROM usuario
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -509,7 +509,7 @@ const findDeleted = async (options = {}) => {
         rol,
         activo,
         fecha_creacion
-      FROM Usuarios
+      FROM usuario
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY nombre_usuario ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
@@ -538,7 +538,7 @@ const findDeleted = async (options = {}) => {
  * @param {number} personalId - ID del personal
  * @returns {Object|null} Usuario encontrado o null
  */
-const findByPersonalId = async (personalId) => {
+const findBypersonalId = async (personalId) => {
   try {
     const query = `
       SELECT 
@@ -552,8 +552,8 @@ const findByPersonalId = async (personalId) => {
         p.nombres AS personal_nombres,
         p.apellidos AS personal_apellidos,
         p.numero_documento AS personal_documento
-      FROM Usuarios u
-      LEFT JOIN Personal p ON u.personal_id = p.id
+      FROM usuario u
+      LEFT JOIN personal p ON u.personal_id = p.id
       WHERE u.personal_id = $1
     `;
     
@@ -585,8 +585,8 @@ const findByIdIncludingDeleted = async (id) => {
         p.nombres AS personal_nombres,
         p.apellidos AS personal_apellidos,
         p.numero_documento AS personal_documento
-      FROM Usuarios u
-      LEFT JOIN Personal p ON u.personal_id = p.id
+      FROM usuario u
+      LEFT JOIN personal p ON u.personal_id = p.id
       WHERE u.id = $1
     `;
     
@@ -607,7 +607,7 @@ const findByIdIncludingDeleted = async (id) => {
 const restore = async (id) => {
   try {
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET activo = true
       WHERE id = $1
       RETURNING id
@@ -638,7 +638,7 @@ const updateProfile = async (id, profileData) => {
     const { nombre_usuario, email } = profileData;
     
     const query = `
-      UPDATE Usuarios
+      UPDATE usuario
       SET 
         nombre_usuario = $1,
         email = $2
@@ -666,7 +666,7 @@ module.exports = {
   findByUsername,
   findByEmail,
   findByUsernameOrEmail,
-  findByPersonalId,
+  findBypersonalId,
   create,
   update,
   updatePassword,

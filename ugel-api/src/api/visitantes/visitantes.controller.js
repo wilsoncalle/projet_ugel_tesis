@@ -1,10 +1,10 @@
 const visitantesService = require('./visitantes.service');
 const { AppError } = require('../../middleware/errorHandler');
 
-const getAllVisitantes = async (req, res, next) => {
+const getAllvisitante = async (req, res, next) => {
   try {
     const { page = 1, limit = 10, search = '', activo = true } = req.query;
-    const result = await visitantesService.getAllVisitantes({
+    const result = await visitantesService.getAllvisitante({
       page: parseInt(page),
       limit: parseInt(limit),
       search,
@@ -13,7 +13,7 @@ const getAllVisitantes = async (req, res, next) => {
     
     res.json({
       success: true,
-      message: 'Visitantes obtenidos exitosamente',
+      message: 'visitante obtenidos exitosamente',
       data: result.visitantes,
       pagination: {
         currentPage: result.currentPage,
@@ -236,7 +236,7 @@ const consultarDNI = async (req, res, next) => {
 };
 
 module.exports = {
-  getAll: getAllVisitantes,
+  getAll: getAllvisitante,
   getById: getVisitanteById,
   getByDocumento: getVisitanteByDocumento,
   getHistorial: getHistorialVisitas,
