@@ -17,7 +17,7 @@ const getEstadisticasHoras = async ({ fechaInicio, fechaFin }) =>
 const getEstadisticasAreas = async ({ fechaInicio, fechaFin }) =>
   mongoService.getEstadisticasAreasExternas({ fechaInicio, fechaFin });
 
-const getPapeletasExternas = async ({ fechaInicio, fechaFin }) =>
+const getpapeletaexterna = async ({ fechaInicio, fechaFin }) =>
   mongoService.getPapeletasAprobadasExternas({ fechaInicio, fechaFin });
 
 module.exports = {
@@ -25,5 +25,5 @@ module.exports = {
   getEstadisticasMotivos,
   getEstadisticasHoras,
   getEstadisticasAreas,
-  getPapeletasExternas,
+  getpapeletaexterna,
 };

@@ -14,7 +14,7 @@ const logger = require('../../utils/logger');
 const getAll = asyncHandler(async (req, res) => {
   logger.info('Solicitud de listado de tipos de contrato');
   
-  const result = await service.getAllTiposContrato(req.query);
+  const result = await service.getAlltipocontrato(req.query);
   
   res.json({
     success: true,
@@ -103,7 +103,7 @@ const softDelete = asyncHandler(async (req, res) => {
 const getDeleted = asyncHandler(async (req, res) => {
   logger.info('Solicitud de tipos de contrato eliminados');
   
-  const result = await service.getDeletedTiposContrato(req.query);
+  const result = await service.getDeletedtipocontrato(req.query);
   
   res.json({
     success: true,

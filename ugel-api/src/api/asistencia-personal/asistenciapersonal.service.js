@@ -75,23 +75,23 @@ const integrarPapeletasEnAsistencias = async (asistencias, fechaInicio, fechaFin
         
         const papeletaActiva = papeletas.find(p => {
             // 1. Verificar Identidad
-            let esMismoPersonal = false;
+            let esMismopersonal = false;
             
             // Prioridad: DNI
             if (asistencia.personal_numero_documento && p.solicitante_numero_documento) {
-                esMismoPersonal = p.solicitante_numero_documento === asistencia.personal_numero_documento;
+                esMismopersonal = p.solicitante_numero_documento === asistencia.personal_numero_documento;
             } 
             
             // Fallback: Nombre (si DNI falla o no existe)
-            if (!esMismoPersonal) {
+            if (!esMismopersonal) {
                 const nombreMongo = `${p.solicitante_nombres || ''} ${p.solicitante_apellidos || ''}`
                   .toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
                 
                 // Coincidencia parcial robusta
-                esMismoPersonal = nombreSQL.includes(nombreMongo) || nombreMongo.includes(nombreSQL);
+                esMismopersonal = nombreSQL.includes(nombreMongo) || nombreMongo.includes(nombreSQL);
             }
             
-            if (!esMismoPersonal) return false;
+            if (!esMismopersonal) return false;
 
             // 2. Verificar Fechas
             const inicioStr = getFechaLocalISO(p.fecha_hora_salida_programada);
@@ -173,7 +173,7 @@ const getMiResumen = async (personalId, { anio, mes }) => {
 
     const diasToleranciaUsados = await repository.countDiasToleranciaUsados(personalId, month, year, horaEntradaRef, fechaInicioConfig);
     const diasToleranciaRestantes = Math.max(diasToleranciaTotal - diasToleranciaUsados, 0);
-    const resumenDB = await repository.getResumenMensualPersonal(personalId, year, month);
+    const resumenDB = await repository.getResumenMensualpersonal(personalId, year, month);
 
     return {
       diasToleranciaTotal, diasToleranciaUsados, diasToleranciaRestantes,
@@ -237,8 +237,8 @@ const getAsistenciaById = async (id) => {
 const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
   try {
     const personal = await personalRepository.findById(personalId);
-    if (!personal) throw new AppError('Personal no encontrado', 404);
-    if (!personal.activo) throw new AppError('Personal inactivo', 400);
+    if (!personal) throw new AppError('personal no encontrado', 404);
+    if (!personal.activo) throw new AppError('personal inactivo', 400);
     
     const { fecha: fechaActual, hora: horaActual } = nowLima();
     const fechaOffline = offlineData?._isOfflineSync ? offlineData.fecha : null;
@@ -262,7 +262,7 @@ const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
     const tieneSaldoTolerancia = diasUsados < diasToleranciaMes;
 
     const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaEvento);
-    const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaEvento);
+    const registroExistente = await repository.findBypersonalAndFecha(personalId, fechaEvento);
     
     let minutosTardanzaCalculados = 0;
 
@@ -317,7 +317,7 @@ const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
 const registrarSalida = async (personalId, usuarioId, offlineData = {}) => {
   try {
     const personal = await personalRepository.findById(personalId);
-    if (!personal) throw new AppError('Personal no encontrado', 404);
+    if (!personal) throw new AppError('personal no encontrado', 404);
     
     const { fecha: fechaActual, hora: horaActual } = nowLima();
     const fechaOffline = offlineData?._isOfflineSync ? offlineData.fecha : null;
@@ -325,7 +325,7 @@ const registrarSalida = async (personalId, usuarioId, offlineData = {}) => {
     const fechaEvento = fechaOffline || fechaActual;
     const horaEvento = horaOffline || horaActual;
 
-    const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaEvento);
+    const registroExistente = await repository.findBypersonalAndFecha(personalId, fechaEvento);
     
     if (!registroExistente) throw new AppError('No hay registro de ingreso para hoy', 400);
     if (registroExistente.hora_salida) throw new AppError('Ya tiene salida registrada', 400);
@@ -340,11 +340,11 @@ const registrarSalida = async (personalId, usuarioId, offlineData = {}) => {
 const registrarEstadoPresencia = async (personalId, estadoPresencia, usuarioId) => {
   try {
     const personal = await personalRepository.findById(personalId);
-    if (!personal) throw new AppError('Personal no encontrado', 404);
+    if (!personal) throw new AppError('personal no encontrado', 404);
     if (!VALID_PRESENCE_STATES.includes(estadoPresencia)) throw new AppError('Estado inválido', 400);
     
     const { fecha: fechaActual } = nowLima();
-    const registroExistente = await repository.findByPersonalAndFecha(personalId, fechaActual);
+    const registroExistente = await repository.findBypersonalAndFecha(personalId, fechaActual);
     
     if (registroExistente) {
       return await repository.updateEstadoPresencia(registroExistente.id, estadoPresencia, usuarioId);
@@ -393,7 +393,7 @@ const marcarAusentesProgresivo = async (usuarioSistemaId = config.systemUserId) 
 
     if (minutosAhora < minutosEntrada + minutosTolerancia) continue;
 
-    const registroHoy = await repository.findByPersonalAndFecha(p.id, hoy);
+    const registroHoy = await repository.findBypersonalAndFecha(p.id, hoy);
     if (registroHoy && registroHoy.estado_presencia && registroHoy.estado_presencia !== 'Ausente') {
       procesados++; continue;
     }
@@ -428,7 +428,7 @@ const sincronizarPapeletas = async (fechaInicio, fechaFin, usuarioId = config.sy
       return { procesados: 0 };
     }
 
-    const { personal: listaPersonal = [] } = await personalRepository.findAll({
+    const { personal: listapersonal = [] } = await personalRepository.findAll({
       page: 1,
       limit: 10000,
       activo: true
@@ -437,7 +437,7 @@ const sincronizarPapeletas = async (fechaInicio, fechaFin, usuarioId = config.sy
     let procesados = 0;
 
     for (const p of papeletas) {
-      const persona = listaPersonal.find((per) => {
+      const persona = listapersonal.find((per) => {
         if (per.numero_documento && p.solicitante_numero_documento) {
           return per.numero_documento === p.solicitante_numero_documento;
         }
@@ -557,8 +557,8 @@ const getEstadisticasAusencias = async (opt) => {
   }
 };
 const getEstadisticasAreas = async (opt) => await repository.getEstadisticasAreas(opt.fechaInicio, opt.fechaFin);
-const getEstadisticasPersonal = async (opt) => await repository.getEstadisticasPersonal(opt.fechaInicio, opt.fechaFin, opt.personalId);
-const getPersonalDetalle = async (id, opt) => await repository.getPersonalDetalle(id, opt.fechaInicio, opt.fechaFin);
+const getEstadisticaspersonal = async (opt) => await repository.getEstadisticaspersonal(opt.fechaInicio, opt.fechaFin, opt.personalId);
+const getpersonalDetalle = async (id, opt) => await repository.getpersonalDetalle(id, opt.fechaInicio, opt.fechaFin);
 
 const exportarAExcel = async (filtros = {}, themeName = 'corporate') => {
   try {
@@ -578,7 +578,7 @@ const exportarAExcel = async (filtros = {}, themeName = 'corporate') => {
 
     worksheet.columns = [
       { header: 'N°', key: 'numero', width: 5 },
-      { header: 'Personal', key: 'personal', width: 30 },
+      { header: 'personal', key: 'personal', width: 30 },
       { header: 'Área', key: 'area', width: 20 },
       { header: 'Cargo', key: 'cargo', width: 20 },
       { header: 'Fecha', key: 'fecha', width: 15 },
@@ -627,7 +627,7 @@ const exportarAPDF = async (filtros = {}) => {
         doc.fontSize(18).text('HISTORIAL DE ASISTENCIAS', { align: 'center' });
         
         const table = {
-          headers: ['N°', 'Personal', 'Área', 'Fecha', 'Ingreso', 'Salida', 'Estado'],
+          headers: ['N°', 'personal', 'Área', 'Fecha', 'Ingreso', 'Salida', 'Estado'],
           rows: asistencias.map((a, i) => [
             i + 1,
             `${a.personal_nombres} ${a.personal_apellidos}`,
@@ -697,7 +697,7 @@ const evaluarAsistenciasAutomaticas = async (usuarioSistemaId) => {
 
   for (const p of personal) {
     // Verificar si ya tiene registro hoy (Ingreso, Falta, Permiso, etc.)
-    const registroExistente = await repository.findByPersonalAndFecha(p.id, fechaHoy);
+    const registroExistente = await repository.findBypersonalAndFecha(p.id, fechaHoy);
     if (registroExistente) {
       continue; // Ya tiene estado, pasamos al siguiente
     }
@@ -770,8 +770,8 @@ module.exports = {
   getEstadisticasPuntualidad,
   getEstadisticasAusencias,
   getEstadisticasAreas,
-  getEstadisticasPersonal,
-  getPersonalDetalle,
+  getEstadisticaspersonal,
+  getpersonalDetalle,
   exportarAExcel,
   exportarAPDF,
   getMiResumen,

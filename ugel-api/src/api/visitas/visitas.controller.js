@@ -177,16 +177,16 @@ const getVisitasTotales = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Estadísticas totales obtenidas exitosamente', data: result });
 });
 
-const getVisitasPorPersonal = asyncHandler(async (req, res) => {
+const getVisitasPorpersonal = asyncHandler(async (req, res) => {
   const { periodo = 'mes' } = req.query;
-  const result = await service.getVisitasPorPersonal(periodo);
+  const result = await service.getVisitasPorpersonal(periodo);
   res.json({ success: true, message: 'Estadísticas por personal obtenidas exitosamente', data: result });
 });
 
-const getVisitantesFrecuentes = asyncHandler(async (req, res) => {
+const getvisitanteFrecuentes = asyncHandler(async (req, res) => {
   const { periodo = 'mes' } = req.query;
-  const result = await service.getVisitantesFrecuentes(periodo);
-  res.json({ success: true, message: 'Visitantes frecuentes obtenidos exitosamente', data: result });
+  const result = await service.getvisitanteFrecuentes(periodo);
+  res.json({ success: true, message: 'visitante frecuentes obtenidos exitosamente', data: result });
 });
 
 const getVisitanteDetalle = asyncHandler(async (req, res) => {
@@ -261,12 +261,12 @@ const reject = asyncHandler(async (req, res) => {
 
 const delegate = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { nuevoPersonalId } = req.body;
+  const { nuevopersonalId } = req.body;
   const personalId = req.user.personalId;
   
   if (!personalId) throw new AppError('Usuario no asociado a personal', 400);
   
-  const visita = await service.delegateVisita(id, personalId, nuevoPersonalId);
+  const visita = await service.delegateVisita(id, personalId, nuevopersonalId);
   
   try {
     const io = req.app.get('socketio');
@@ -336,7 +336,7 @@ const getMisVisitas = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, estados = '', anio, mes } = req.query;
     const estadosArray = estados ? estados.split(',').map(e => e.trim()) : [];
     
-    const { visitas, total } = await service.findByPersonalVisitado(
+    const { visitas, total } = await service.findBypersonalVisitado(
       personalId,
       { page: parseInt(page), limit: parseInt(limit), estados: estadosArray, anio: anio ? parseInt(anio) : undefined, mes: mes ? parseInt(mes) : undefined }
     );
@@ -351,6 +351,6 @@ const getMisVisitas = asyncHandler(async (req, res) => {
 module.exports = {
   getAll, getActivas, getById, create, registrarSalida, cerrarVisitasAutomaticamente,
   exportarAExcel, exportarAPDF, getVisitasPorArea, getVisitasPorMotivo, getVisitasTotales,
-  getVisitasPorPersonal, getVisitantesFrecuentes, getVisitanteDetalle,
+  getVisitasPorpersonal, getvisitanteFrecuentes, getVisitanteDetalle,
   accept, reject, delegate, getMisVisitas, finalizarAtencion
 };

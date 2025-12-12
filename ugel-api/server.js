@@ -215,6 +215,8 @@ server.listen(PORT, () => {
     }
   });
 
+const { sincronizarPapeletas: mirrorPapeletas } = require('./src/jobs/syncPapeletas');
+
   /**
    * TAREA 3: Sincronización de Papeletas Diarias (Mantenimiento)
    * Horario: 6:00 AM
@@ -225,6 +227,16 @@ server.listen(PORT, () => {
       // Sincroniza desde el inicio del mes hasta hoy por si hubo cambios retroactivos aprobados
       const inicioMes = `${hoy.slice(0, 7)}-01`;
       await asistenciaPersonalService.sincronizarPapeletas(inicioMes, hoy, SYSTEM_USER_ID);
+  });
+
+  /**
+   * TAREA 4: Espejo de Papeletas Externas (Caché Local)
+   * Objetivo: Guardar copia local de papeletas de Mongo para consultas rápidas.
+   * Horario: 2:00 AM
+   */
+  cron.schedule('0 2 * * *', async () => {
+     logger.info('CRON: Iniciando espejo de papeletas externas (caché)...');
+     await mirrorPapeletas();
   });
 });
 

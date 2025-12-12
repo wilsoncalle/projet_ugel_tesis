@@ -24,7 +24,7 @@ const findAll = async (options = {}) => {
         codigo,
         nombre_completo,
         activo
-      FROM TiposDocumento
+      FROM tipodocumento
     `;
     
     // Construir la cláusula WHERE
@@ -59,7 +59,7 @@ const findAll = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM TiposDocumento
+      FROM tipodocumento
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -102,7 +102,7 @@ const findById = async (id) => {
         codigo,
         nombre_completo,
         activo
-      FROM TiposDocumento 
+      FROM tipodocumento 
       WHERE id = $1
     `;
     
@@ -128,7 +128,7 @@ const findByCode = async (codigo) => {
         codigo,
         nombre_completo,
         activo
-      FROM TiposDocumento 
+      FROM tipodocumento 
       WHERE LOWER(codigo) = LOWER($1)
     `;
     
@@ -151,7 +151,7 @@ const create = async (tipoDocumentoData) => {
     const { codigo, nombre_completo, activo = true } = tipoDocumentoData;
     
     const query = `
-      INSERT INTO TiposDocumento (codigo, nombre_completo, activo)
+      INSERT INTO tipodocumento (codigo, nombre_completo, activo)
       VALUES ($1, $2, $3)
       RETURNING 
         id,
@@ -215,7 +215,7 @@ const update = async (id, tipoDocumentoData) => {
     }
     
     const query = `
-      UPDATE TiposDocumento 
+      UPDATE tipodocumento 
       SET ${updateFields.join(', ')}
       WHERE id = $1
       RETURNING 
@@ -252,7 +252,7 @@ const update = async (id, tipoDocumentoData) => {
 const softDelete = async (id) => {
   try {
     const query = `
-      UPDATE TiposDocumento 
+      UPDATE tipodocumento 
       SET activo = false
       WHERE id = $1
       RETURNING id
@@ -282,15 +282,15 @@ const checkTipoDocumentoInUse = async (id) => {
     // Verificar uso en visitantes
     const visitantesQuery = `
       SELECT COUNT(*) as count
-      FROM Visitantes
+      FROM visitante
       WHERE tipo_documento_id = $1
     `;
     
     // Verificar uso en personal
     const personalQuery = `
       SELECT COUNT(*) as count
-      FROM Personal
-      WHERE tipo_documento = (SELECT codigo FROM TiposDocumento WHERE id = $1)
+      FROM personal
+      WHERE tipo_documento = (SELECT codigo FROM tipodocumento WHERE id = $1)
     `;
     
     const [visitantesResult, personalResult] = await Promise.all([
@@ -313,14 +313,14 @@ const checkTipoDocumentoInUse = async (id) => {
  * Obtener listado simple de tipos de documento activos
  * @returns {Array} Lista de tipos de documento activos
  */
-const getActiveTiposDocumentoList = async () => {
+const getActivetipodocumentoList = async () => {
   try {
     const query = `
       SELECT 
         id,
         codigo,
         nombre_completo
-      FROM TiposDocumento 
+      FROM tipodocumento 
       WHERE activo = true
       ORDER BY codigo ASC
     `;
@@ -356,7 +356,7 @@ const findDeleted = async (options = {}) => {
     
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM TiposDocumento
+      FROM tipodocumento
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -366,7 +366,7 @@ const findDeleted = async (options = {}) => {
         codigo,
         nombre_completo,
         activo
-      FROM TiposDocumento
+      FROM tipodocumento
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY codigo ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
@@ -403,7 +403,7 @@ const findByIdIncludingDeleted = async (id) => {
         codigo,
         nombre_completo,
         activo
-      FROM TiposDocumento 
+      FROM tipodocumento 
       WHERE id = $1
     `;
     
@@ -424,7 +424,7 @@ const findByIdIncludingDeleted = async (id) => {
 const restore = async (id) => {
   try {
     const query = `
-      UPDATE TiposDocumento 
+      UPDATE tipodocumento 
       SET activo = true
       WHERE id = $1
       RETURNING id
@@ -452,7 +452,7 @@ module.exports = {
   update,
   softDelete,
   checkTipoDocumentoInUse,
-  getActiveTiposDocumentoList,
+  getActivetipodocumentoList,
   findDeleted,
   findByIdIncludingDeleted,
   restore

@@ -23,7 +23,7 @@ const findAll = async (options = {}) => {
         id,
         nombre_area,
         activa
-      FROM AreasDestino
+      FROM areadestino
     `;
     
     // Construir la cláusula WHERE
@@ -58,7 +58,7 @@ const findAll = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM AreasDestino
+      FROM areadestino
       ${whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : ''}
     `;
     
@@ -100,7 +100,7 @@ const findById = async (id) => {
         id,
         nombre_area,
         activa
-      FROM AreasDestino 
+      FROM areadestino 
       WHERE id = $1
     `;
     
@@ -125,7 +125,7 @@ const findByName = async (nombre) => {
         id,
         nombre_area,
         activa
-      FROM AreasDestino 
+      FROM areadestino 
       WHERE LOWER(nombre_area) = LOWER($1)
       AND activa = true
     `;
@@ -149,7 +149,7 @@ const create = async (areaData) => {
     const { nombre_area, activa = true } = areaData;
     
     const query = `
-      INSERT INTO AreasDestino (nombre_area, activa)
+      INSERT INTO areadestino (nombre_area, activa)
       VALUES ($1, $2)
       RETURNING 
         id,
@@ -207,7 +207,7 @@ const update = async (id, areaData) => {
     }
     
     const query = `
-      UPDATE AreasDestino 
+      UPDATE areadestino 
       SET ${updateFields.join(', ')}
       WHERE id = $1
       RETURNING 
@@ -243,7 +243,7 @@ const update = async (id, areaData) => {
 const softDelete = async (id) => {
   try {
     const query = `
-      UPDATE AreasDestino 
+      UPDATE areadestino 
       SET activa = false
       WHERE id = $1
       RETURNING id
@@ -272,7 +272,7 @@ const checkAreaInUse = async (id) => {
   try {
     const query = `
       SELECT COUNT(*) as count
-      FROM Personal
+      FROM personal
       WHERE area_destino_id = $1 AND activo = true
     `;
     
@@ -295,7 +295,7 @@ const getActiveAreasList = async () => {
       SELECT 
         id,
         nombre_area
-      FROM AreasDestino 
+      FROM areadestino 
       WHERE activa = true
       ORDER BY nombre_area ASC
     `;
@@ -325,7 +325,7 @@ const findDeleted = async (options = {}) => {
         id,
         nombre_area,
         activa
-      FROM AreasDestino
+      FROM areadestino
       WHERE activa = false
     `;
     
@@ -344,7 +344,7 @@ const findDeleted = async (options = {}) => {
     // Consulta para contar el total
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM AreasDestino
+      FROM areadestino
       WHERE ${whereConditions.join(' AND ')}
     `;
     
@@ -354,7 +354,7 @@ const findDeleted = async (options = {}) => {
         id,
         nombre_area,
         activa
-      FROM AreasDestino
+      FROM areadestino
       WHERE ${whereConditions.join(' AND ')}
       ORDER BY nombre_area ASC
       LIMIT $${paramCounter} OFFSET $${paramCounter + 1}
@@ -392,7 +392,7 @@ const findByIdIncludingDeleted = async (id) => {
         id,
         nombre_area,
         activa
-      FROM AreasDestino 
+      FROM areadestino 
       WHERE id = $1
     `;
     
@@ -413,7 +413,7 @@ const findByIdIncludingDeleted = async (id) => {
 const restore = async (id) => {
   try {
     const query = `
-      UPDATE AreasDestino 
+      UPDATE areadestino 
       SET activa = true
       WHERE id = $1
       RETURNING id

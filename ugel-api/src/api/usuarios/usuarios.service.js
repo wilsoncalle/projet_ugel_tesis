@@ -13,9 +13,9 @@ const logger = require('../../utils/logger');
 /**
  * Obtener todos los usuarios con paginación y filtros
  * @param {Object} options - Opciones de filtrado y paginación
- * @returns {Object} Usuarios y datos de paginación
+ * @returns {Object} usuario y datos de paginación
  */
-const getAllUsuarios = async (options = {}) => {
+const getAllusuario = async (options = {}) => {
   const { page = 1, limit = 20, q = '', activo, rol } = options;
   
   try {
@@ -73,11 +73,11 @@ const getUsuarioById = async (id) => {
  * @param {number} personalId - ID del personal
  * @returns {Object|null} Usuario encontrado sin contraseña
  */
-const getUsuarioByPersonalId = async (personalId) => {
+const getUsuarioBypersonalId = async (personalId) => {
   try {
     if (!personalId) return null;
 
-    const usuario = await repository.findByPersonalId(personalId);
+    const usuario = await repository.findBypersonalId(personalId);
     if (!usuario) return null;
 
     const { hash_contrasena, ...usuarioSinContrasena } = usuario;
@@ -118,7 +118,7 @@ const createUsuario = async (usuarioData, creatorId) => {
     // Validar personalId si se proporciona
     if (personalId) {
       // Verificar que el personal no esté ya vinculado a otro usuario
-      const existingLink = await repository.findByPersonalId(personalId);
+      const existingLink = await repository.findBypersonalId(personalId);
       if (existingLink) {
         throw new AppError('Esta persona ya está vinculada a otro usuario', 409);
       }
@@ -227,7 +227,7 @@ const updateUsuario = async (id, usuarioData, updaterId) => {
       // Validar personalId si se proporciona (no es null)
       if (personalId !== null) {
         // Verificar que el personal no esté ya vinculado a otro usuario
-        const existingLink = await repository.findByPersonalId(personalId);
+        const existingLink = await repository.findBypersonalId(personalId);
         if (existingLink && existingLink.id !== parseInt(id)) {
           throw new AppError('Esta persona ya está vinculada a otro usuario', 409);
         }
@@ -354,9 +354,9 @@ const deleteUsuario = async (id, deleterId) => {
 /**
  * Obtener usuarios eliminados (soft delete)
  * @param {Object} options - Opciones de filtrado y paginación
- * @returns {Object} Usuarios eliminados y datos de paginación
+ * @returns {Object} usuario eliminados y datos de paginación
  */
-const getDeletedUsuarios = async (options = {}) => {
+const getDeletedusuario = async (options = {}) => {
   const { page = 1, limit = 20, q = '' } = options;
   
   try {
@@ -511,15 +511,15 @@ const updatePassword = async (userId, passwordData) => {
 };
 
 module.exports = {
-  getAllUsuarios,
+  getAllusuario,
   getUsuarioById,
   createUsuario,
   updateUsuario,
   changePassword,
   deleteUsuario,
-  getDeletedUsuarios,
+  getDeletedusuario,
   restoreUsuario,
   updateProfile,
   updatePassword,
-  getUsuarioByPersonalId
+  getUsuarioBypersonalId
 };

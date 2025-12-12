@@ -14,7 +14,7 @@ const logger = require('../../utils/logger');
 const getAll = asyncHandler(async (req, res) => {
   logger.info('Solicitud de listado de motivos de visita');
   
-  const result = await service.getAllMotivosVisita(req.query);
+  const result = await service.getAllmotivovisita(req.query);
   
   res.json({
     success: true,
@@ -103,7 +103,7 @@ const softDelete = asyncHandler(async (req, res) => {
 const getDeleted = asyncHandler(async (req, res) => {
   logger.info('Solicitud de motivos de visita eliminados');
   
-  const result = await service.getDeletedMotivosVisita(req.query);
+  const result = await service.getDeletedmotivovisita(req.query);
   
   res.json({
     success: true,

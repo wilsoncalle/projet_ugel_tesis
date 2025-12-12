@@ -207,7 +207,7 @@ router.get(
   authenticateToken,
   requireActiveUser,
   validationMiddleware.validateDateRange,
-  controller.getEstadisticasPersonal
+  controller.getEstadisticaspersonal
 );
 
 /**
@@ -219,7 +219,7 @@ router.get(
   '/estadisticas/personal-detalle/:personalId',
   authenticateToken,
   requireActiveUser,
-  controller.getPersonalDetalle
+  controller.getpersonalDetalle
 );
 
 /**

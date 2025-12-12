@@ -12,7 +12,7 @@ const logger = require('../../utils/logger');
  * @param {Object} options - Opciones de filtrado y paginación
  * @returns {Object} Tipos de contrato y datos de paginación
  */
-const getAllTiposContrato = async (options = {}) => {
+const getAlltipocontrato = async (options = {}) => {
   const { page = 1, limit = 20, q = '', activo } = options;
   
   try {
@@ -188,7 +188,7 @@ const deleteTipoContrato = async (id, userId) => {
  * @param {Object} options - Opciones de filtrado y paginación
  * @returns {Object} Tipos de contrato eliminados y datos de paginación
  */
-const getDeletedTiposContrato = async (options = {}) => {
+const getDeletedtipocontrato = async (options = {}) => {
   const { page = 1, limit = 20, q = '' } = options;
   
   try {
@@ -244,11 +244,11 @@ const restoreTipoContrato = async (id, userId) => {
 };
 
 module.exports = {
-  getAllTiposContrato,
+  getAlltipocontrato,
   getTipoContratoById,
   createTipoContrato,
   updateTipoContrato,
   deleteTipoContrato,
-  getDeletedTiposContrato,
+  getDeletedtipocontrato,
   restoreTipoContrato
 };

@@ -60,14 +60,14 @@ async function seed() {
 
       // Verificar si ya existe
       const check = await pool.query(
-        'SELECT id FROM usuarios WHERE email = $1',
+        'SELECT id FROM usuario WHERE email = $1',
         [user.email]
       );
 
       if (check.rows.length === 0) {
         // Insertar y devolver el ID
         const result = await pool.query(
-          `INSERT INTO usuarios (nombre_usuario, hash_contrasena, email, rol, es_sistema, activo)
+          `INSERT INTO usuario (nombre_usuario, hash_contrasena, email, rol, es_sistema, activo)
            VALUES ($1, $2, $3, $4, $5, true)
            RETURNING id`,
           [user.nombre, hash, user.email, user.rol, user.es_sistema]

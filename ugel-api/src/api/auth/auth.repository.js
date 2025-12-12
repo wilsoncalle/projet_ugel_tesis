@@ -27,7 +27,7 @@ const findByUsername = async (nombreUsuario) => {
         u.bloqueado_hasta,
         u.personal_id,
         u.ultimo_intento_fallido
-      FROM Usuarios u
+      FROM usuario u
       WHERE u.nombre_usuario = $1
     `;
     
@@ -58,7 +58,7 @@ const findById = async (id) => {
         u.activo,
         u.fecha_creacion,
         u.personal_id
-      FROM Usuarios u
+      FROM usuario u
       WHERE u.id = $1
     `;
     
@@ -88,7 +88,7 @@ const findByUsernameOrEmail = async (nombreUsuario, email) => {
         u.activo,
         u.fecha_creacion,
         u.personal_id
-      FROM Usuarios u
+      FROM usuario u
       WHERE u.nombre_usuario = $1 OR u.email = $2
     `;
     
@@ -111,7 +111,7 @@ const create = async (userData) => {
     const { nombre_usuario, hash_contrasena, email, rol } = userData;
     
     const query = `
-      INSERT INTO Usuarios (nombre_usuario, hash_contrasena, email, rol)
+      INSERT INTO usuario (nombre_usuario, hash_contrasena, email, rol)
       VALUES ($1, $2, $3, $4)
       RETURNING 
         id,
@@ -156,7 +156,7 @@ const create = async (userData) => {
 const updatePassword = async (userId, hashedPassword) => {
   try {
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET hash_contrasena = $1
       WHERE id = $2 AND activo = true
     `;
@@ -183,7 +183,7 @@ const updatePassword = async (userId, hashedPassword) => {
 const updateLastLogin = async (userId) => {
   try {
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET ultimo_login = CURRENT_TIMESTAMP
       WHERE id = $1
     `;
@@ -207,7 +207,7 @@ const countByRole = async (rol) => {
   try {
     const query = `
       SELECT COUNT(*) as count
-      FROM Usuarios 
+      FROM usuario 
       WHERE rol = $1 AND activo = true
     `;
     
@@ -228,7 +228,7 @@ const countByRole = async (rol) => {
 const incrementFailedAttempts = async (userId) => {
   try {
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET intentos_fallidos = intentos_fallidos + 1, ultimo_intento_fallido = CURRENT_TIMESTAMP
       WHERE id = $1
       RETURNING intentos_fallidos
@@ -260,7 +260,7 @@ const incrementFailedAttempts = async (userId) => {
 const resetFailedAttempts = async (userId) => {
   try {
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET intentos_fallidos = 0, bloqueado_hasta = NULL
       WHERE id = $1
     `;
@@ -284,7 +284,7 @@ const resetFailedAttempts = async (userId) => {
 const lockUser = async (userId, lockoutUntil) => {
   try {
     const query = `
-      UPDATE Usuarios 
+      UPDATE usuario 
       SET bloqueado_hasta = $1
       WHERE id = $2
     `;

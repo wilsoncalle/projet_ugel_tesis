@@ -5,16 +5,16 @@
 
 const { asyncHandler } = require("../../middleware/errorHandler");
 const logger = require("../../utils/logger");
-const mongoService = require("../external/mongoService");
+const repository = require("./papeletassalida.repository");
 
 /**
  * GET /api/papeletas-salida/estadisticas/estado
- * Distribución y flujo por estado (datos Mongo)
+ * Distribución y flujo por estado (datos locales Postgres)
  */
 const getStatsEstado = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de estadísticas de estado de papeletas (Mongo)");
+  logger.info("Solicitud de estadísticas de estado de papeletas (Local)");
 
-  const stats = await mongoService.getEstadisticasEstadoExternas({
+  const stats = await repository.getEstadisticasEstado({
     fechaInicio: req.query.fechaInicio,
     fechaFin: req.query.fechaFin,
   });
@@ -28,12 +28,12 @@ const getStatsEstado = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/papeletas-salida/estadisticas/motivos
- * Distribución por motivo (datos Mongo)
+ * Distribución por motivo (datos locales Postgres)
  */
 const getStatsMotivos = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de estadísticas de motivos de papeletas (Mongo)");
+  logger.info("Solicitud de estadísticas de motivos de papeletas (Local)");
 
-  const stats = await mongoService.getEstadisticasMotivosExternas({
+  const stats = await repository.getEstadisticasMotivos({
     fechaInicio: req.query.fechaInicio,
     fechaFin: req.query.fechaFin,
   });
@@ -47,12 +47,12 @@ const getStatsMotivos = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/papeletas-salida/estadisticas/horas
- * Ranking por persona y resumen (datos Mongo)
+ * Ranking por persona y resumen (datos locales Postgres)
  */
 const getStatsHoras = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de estadísticas de horas/empleados (Mongo)");
+  logger.info("Solicitud de estadísticas de horas/empleados (Local)");
 
-  const stats = await mongoService.getEstadisticasHorasExternas({
+  const stats = await repository.getEstadisticasHoras({
     fechaInicio: req.query.fechaInicio,
     fechaFin: req.query.fechaFin,
   });
@@ -66,12 +66,12 @@ const getStatsHoras = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/papeletas-salida/estadisticas/areas
- * Estadísticas por área (datos Mongo)
+ * Estadísticas por área (datos locales Postgres)
  */
 const getStatsAreas = asyncHandler(async (req, res) => {
-  logger.info("Solicitud de estadísticas de áreas (Mongo)");
+  logger.info("Solicitud de estadísticas de áreas (Local)");
 
-  const stats = await mongoService.getEstadisticasAreasExternas({
+  const stats = await repository.getEstadisticasAreas({
     fechaInicio: req.query.fechaInicio,
     fechaFin: req.query.fechaFin,
   });
@@ -85,16 +85,18 @@ const getStatsAreas = asyncHandler(async (req, res) => {
 
 /**
  * GET /api/papeletas-salida/externas
- * Listado de papeletas aprobadas desde Mongo (solo lectura)
+ * Listado de papeletas aprobadas desde Postgres Local
  */
 const getExternas = asyncHandler(async (req, res) => {
   const { fechaInicio, fechaFin } = req.query;
-  const data = await mongoService.getPapeletasAprobadasExternas({
+  // Limit alto para mantener compatibilidad con frontend que filtra en cliente
+  const result = await repository.findAll({
     fechaInicio: fechaInicio || null,
     fechaFin: fechaFin || null,
+    limit: 10000 
   });
 
-  res.json({ success: true, data });
+  res.json({ success: true, data: result.papeletas });
 });
 
 module.exports = {

@@ -14,11 +14,11 @@ const logger = require('../../utils/logger');
 const getAll = asyncHandler(async (req, res) => {
   logger.info('Solicitud de listado de usuarios');
   
-  const result = await service.getAllUsuarios(req.query);
+  const result = await service.getAllusuario(req.query);
   
   res.json({
     success: true,
-    message: 'Usuarios obtenidos exitosamente',
+    message: 'usuario obtenidos exitosamente',
     data: result.usuarios,
     pagination: result.pagination
   });
@@ -142,11 +142,11 @@ const softDelete = asyncHandler(async (req, res) => {
 const getDeleted = asyncHandler(async (req, res) => {
   logger.info('Solicitud de usuarios eliminados');
   
-  const result = await service.getDeletedUsuarios(req.query);
+  const result = await service.getDeletedusuario(req.query);
   
   res.json({
     success: true,
-    message: 'Usuarios eliminados obtenidos exitosamente',
+    message: 'usuario eliminados obtenidos exitosamente',
     data: result.usuarios || [],
     pagination: result.pagination
   });

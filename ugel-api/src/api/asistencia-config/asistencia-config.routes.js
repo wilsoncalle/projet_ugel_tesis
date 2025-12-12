@@ -25,7 +25,7 @@ router.put(
   authenticateToken,
   requireActiveUser,
   requireRoles('Administrador'),
-  controller.updateConfigPersonal
+  controller.updateConfigpersonal
 );
 
 module.exports = router;
