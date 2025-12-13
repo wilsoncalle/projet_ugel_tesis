@@ -222,8 +222,14 @@ export const asistenciaPersonalService = {
     return api.get(`/asistencia-personal/hoy?${params.toString()}`);
   },
   getById: (id) => api.get(`/asistencia-personal/${id}`),
-  registrarIngreso: (personalId) => api.post('/asistencia-personal/ingreso', { personalId }),
-  registrarSalida: (personalId) => api.put('/asistencia-personal/salida', { personalId }),
+  registrarIngreso: (data) => {
+    const body = typeof data === 'object' && data.personalId ? data : { personalId: data };
+    return api.post('/asistencia-personal/ingreso', body);
+  },
+  registrarSalida: (data) => {
+    const body = typeof data === 'object' && data.personalId ? data : { personalId: data };
+    return api.put('/asistencia-personal/salida', body);
+  },
   registrarEstado: (personalId, estadoPresencia) => api.post('/asistencia-personal/estado', { personalId, estadoPresencia }),
   
   // Métodos para "Mi Asistencia"
