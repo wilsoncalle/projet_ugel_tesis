@@ -102,11 +102,58 @@ const useDashboardData = () => {
   /**
    * Fetch datos de Personal/Asistencias
    */
+  // Helper para obtener fechas del período anterior
+  const getPreviousPeriodDates = (periodoActual) => {
+    const now = new Date();
+    const formatDate = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    let start, end;
+
+    switch (periodoActual) {
+      case 'hoy':
+        start = new Date(now);
+        start.setDate(now.getDate() - 1);
+        end = new Date(start);
+        break;
+      case 'semana':
+        // Semana anterior
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Lunes actual
+        const lunesActual = new Date(now.setDate(diff));
+        start = new Date(lunesActual);
+        start.setDate(lunesActual.getDate() - 7);
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        break;
+      case 'mes':
+        // Mes anterior
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case 'anio':
+        // Año anterior
+        start = new Date(now.getFullYear() - 1, 0, 1);
+        end = new Date(now.getFullYear() - 1, 11, 31);
+        break;
+      default: // 'todo' u otros
+        return null;
+    }
+    return { start: formatDate(start), end: formatDate(end) };
+  };
+
+  /**
+   * Fetch datos de Personal/Asistencias
+   */
   const fetchDatosPersonal = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       
-      // Fetch paralelo de todas las estadísticas de personal
+      // 1. Fetch de datos Actuales
       const [totalesRes, ausenciasRes, puntualidadRes, areasRes, historialRes] = await Promise.all([
         fetch(`/api/asistencia-personal/estadisticas/totales?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -132,7 +179,7 @@ const useDashboardData = () => {
       const areas = await areasRes.json();
       const historial = historialRes.data;
 
-      // Procesar datos - Nueva estructura con asistencias/inasistencias/permisos
+      // Procesar datos actuales
       const asistenciasData = totales.data?.asistencias || {};
       const inasistenciasData = totales.data?.inasistencias || {};
       const permisosData = totales.data?.permisos || {};
@@ -141,7 +188,6 @@ const useDashboardData = () => {
       const flujoDiarioInasistencias = inasistenciasData.flujo_diario || [];
       const flujoDiarioPermisos = permisosData.flujo_diario || [];
       
-      // Combinar todos los flujos diarios por fecha
       const flujoDiarioCompleto = combinarFlujosDiarios(
         flujoDiario,
         flujoDiarioInasistencias,
@@ -151,15 +197,31 @@ const useDashboardData = () => {
       const estadosPuntualidad = puntualidad.data?.labels || [];
       const valoresPuntualidad = puntualidad.data?.datasets?.[0]?.data || [];
       
-      // Calcular puntualidad y tardanzas
-      const indexPuntual = estadosPuntualidad.findIndex(e => e.toLowerCase().includes('puntual'));
-      const indexTardanza = estadosPuntualidad.findIndex(e => e.toLowerCase().includes('tardanza'));
+      const distribucionPorDia = puntualidad.data?.distribucion_por_dia || [];
       
-      const totalPuntual = indexPuntual >= 0 ? valoresPuntualidad[indexPuntual] : 0;
-      const totalTardanza = indexTardanza >= 0 ? valoresPuntualidad[indexTardanza] : 0;
+      let totalPuntual = 0;
+      let totalTardanza = 0;
+
+      // Intentar calcular desde distribucion_por_dia (Estructura actual del backend)
+      if (distribucionPorDia.length > 0) {
+        distribucionPorDia.forEach(item => {
+          const estado = (item.estado_presencia || '').toLowerCase();
+          const cantidad = parseInt(item.cantidad || 0);
+          if (estado === 'presente') totalPuntual += cantidad;
+          if (estado === 'tardanza') totalTardanza += cantidad;
+        });
+      } else {
+        // Fallback estructura antigua (Chart.js)
+        const indexPuntual = estadosPuntualidad.findIndex(e => e.toLowerCase().includes('puntual') || e.toLowerCase().includes('presente'));
+        const indexTardanza = estadosPuntualidad.findIndex(e => e.toLowerCase().includes('tardanza'));
+        totalPuntual = indexPuntual >= 0 ? valoresPuntualidad[indexPuntual] : 0;
+        totalTardanza = indexTardanza >= 0 ? valoresPuntualidad[indexTardanza] : 0;
+      }
+
+      const currentTotalAsistencias = asistenciasData.total || 0;
 
       setDatosPersonal({
-        totalAsistencias: asistenciasData.total || 0,
+        totalAsistencias: currentTotalAsistencias,
         totalAusencias: inasistenciasData.total || 0,
         puntualidad: totalPuntual,
         tardanzas: totalTardanza,
@@ -172,16 +234,64 @@ const useDashboardData = () => {
         })),
       });
 
-      // Preview de historial de asistencias (primeras 10 filas según backend)
+      // Preview de historial
       if (historial && historial.success) {
-        const items = historial.data || [];
-        setHistorialAsistenciasPreview({
-          items,
-          total: historial.pagination?.total || items.length || 0,
+         setHistorialAsistenciasPreview({
+          items: historial.data || [],
+          total: historial.pagination?.total || (historial.data || []).length || 0,
           pagination: historial.pagination || null,
         });
       } else {
         setHistorialAsistenciasPreview({ items: [], total: 0, pagination: null });
+      }
+
+      // 2. Fetch de datos Anteriores para Comparación (Solo si no es 'todo')
+      const prevDates = getPreviousPeriodDates(periodo);
+      if (prevDates) {
+        const [prevTotalesRes, prevPuntualidadRes] = await Promise.all([
+          fetch(`/api/asistencia-personal/estadisticas/totales?fechaInicio=${prevDates.start}&fechaFin=${prevDates.end}`, { 
+             headers: { 'Authorization': `Bearer ${token}` } 
+          }),
+          fetch(`/api/asistencia-personal/estadisticas/puntualidad?fechaInicio=${prevDates.start}&fechaFin=${prevDates.end}`, { 
+             headers: { 'Authorization': `Bearer ${token}` } 
+          })
+        ]);
+
+        const prevTotales = await prevTotalesRes.json();
+        const prevPuntualidad = await prevPuntualidadRes.json();
+
+        // Calcular variaciones
+        const prevTotalAsistencias = prevTotales.data?.asistencias?.total || 0;
+        
+        const prevDistribucion = prevPuntualidad.data?.distribucion_por_dia || [];
+        
+        let prevTotalPuntual = 0;
+        
+        if (prevDistribucion.length > 0) {
+           prevDistribucion.forEach(item => {
+              const estado = (item.estado_presencia || '').toLowerCase();
+              const cantidad = parseInt(item.cantidad || 0);
+              if (estado === 'presente') prevTotalPuntual += cantidad;
+           });
+        } else {
+           const prevLabels = prevPuntualidad.data?.labels || [];
+           const prevValues = prevPuntualidad.data?.datasets?.[0]?.data || [];
+           const prevIndexPuntual = prevLabels.findIndex(e => e.toLowerCase().includes('puntual') || e.toLowerCase().includes('presente'));
+           prevTotalPuntual = prevIndexPuntual >= 0 ? prevValues[prevIndexPuntual] : 0;
+        }
+
+        const calcChange = (curr, prev) => {
+          if (prev === 0) return curr > 0 ? 100 : 0;
+          return ((curr - prev) / prev) * 100;
+        };
+
+        setComparacion(prev => ({
+          ...prev,
+          asistenciasCambio: parseFloat(calcChange(currentTotalAsistencias, prevTotalAsistencias).toFixed(1)),
+          puntualidadCambio: parseFloat(calcChange(totalPuntual, prevTotalPuntual).toFixed(1)),
+        }));
+      } else {
+         setComparacion(prev => ({ ...prev, asistenciasCambio: 0, puntualidadCambio: 0 }));
       }
 
     } catch (err) {
@@ -197,7 +307,6 @@ const useDashboardData = () => {
     try {
       const token = localStorage.getItem('token');
       
-      // Fetch paralelo de todas las estadísticas de visitas
       const [totalesRes, motivoRes, areaRes, frecuentesRes, historialRes] = await Promise.all([
         fetch(`/api/visitas/totales?periodo=${periodo}`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -224,32 +333,40 @@ const useDashboardData = () => {
       const historial = historialRes.data;
 
       const flujoDiario = totales.data?.flujoDiario || [];
-      
-      // Calcular visitas de hoy del flujo diario
       const hoy = new Date().toISOString().split('T')[0];
       const visitasHoy = flujoDiario.find(item => item.dia?.startsWith(hoy))?.visitas || 0;
+      const currentTotalVisitas = totales.data?.total || 0;
+      const currentVisitantesFrecuentes = frecuentes.data?.length || 0;
 
       setDatosVisitas({
-        totalVisitas: totales.data?.total || 0,
-        visitantesFrecuentes: frecuentes.data?.length || 0,
+        totalVisitas: currentTotalVisitas,
+        visitantesFrecuentes: currentVisitantesFrecuentes,
         visitasHoy: visitasHoy,
-        visitasSinSalida: 0, // Este dato no está disponible en el endpoint actual
+        visitasSinSalida: 0, 
         flujoDiario: flujoDiario,
         porMotivo: motivo.data || [],
         porArea: area.data || [],
       });
 
-      // Preview de historial de visitas (primeras 10 filas según backend)
       if (historial && historial.success) {
-        const items = historial.data || [];
-        setHistorialVisitasPreview({
-          items,
-          total: historial.pagination?.total || items.length || 0,
+         setHistorialVisitasPreview({
+          items: historial.data || [],
+          total: historial.pagination?.total || (historial.data || []).length || 0,
           pagination: historial.pagination || null,
         });
       } else {
         setHistorialVisitasPreview({ items: [], total: 0, pagination: null });
       }
+
+       // Simular comparación visitas (falta endpoint custom fechas para visitas)
+       // Se mantiene la simulación SOLO para visitas por ahora a menos que se desee implementar similar
+       const randomChange = () => (Math.random() * 20 - 10).toFixed(1);
+       setComparacion(prev => ({
+          ...prev,
+          visitasCambio: parseFloat(randomChange()),
+          visitantesCambio: parseFloat(randomChange()),
+       }));
+
 
     } catch (err) {
       console.error('Error al obtener datos de visitas:', err);
@@ -257,21 +374,8 @@ const useDashboardData = () => {
     }
   }, [periodo]);
 
-  /**
-   * Calcular comparación con período anterior
-   */
-  const calcularComparacion = useCallback(() => {
-    // Simulación de comparación (en producción, esto vendría del backend)
-    // Por ahora, generamos cambios aleatorios para demostración
-    const randomChange = () => (Math.random() * 20 - 10).toFixed(1);
-    
-    setComparacion({
-      asistenciasCambio: parseFloat(randomChange()),
-      visitasCambio: parseFloat(randomChange()),
-      puntualidadCambio: parseFloat(randomChange()),
-      visitantesCambio: parseFloat(randomChange()),
-    });
-  }, []);
+  // Se elimina calcularComparacion ya que se integra en los fetch
+  const calcularComparacion = useCallback(() => {}, []);
 
   /**
    * Fetch todos los datos

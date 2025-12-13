@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Users, ClipboardCheck, FileText, Pin } from 'lucide-react';
+import { Users, ClipboardCheck, FileText, Pin, BarChart3 } from 'lucide-react';
 import { papeletasSalidaService } from '../services/api';
 import { Toaster } from 'react-hot-toast';
 
@@ -277,14 +277,7 @@ const RRHHSidebar = ({ papeletasActivasCount = 0, isExpanded }) => (
           to="/rrhh/reportes" 
           isExpanded={isExpanded}
           icon={
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 17v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V7a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
-            </svg>
+            <BarChart3 className="h-5 w-5" />
           } 
           label="Reportes"
         />

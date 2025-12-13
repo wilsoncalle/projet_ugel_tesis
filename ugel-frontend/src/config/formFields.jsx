@@ -354,10 +354,9 @@ export const transformPersonal = (data) => {
     console.log('transformPersonal - Datos transformados (array):', transformed);
     return transformed;
   } else if (data && typeof data === 'object') {
-    // Manejar objeto individual (para edición)
     const transformed = {
       id: data.id,
-      tipoDocumento: data.tipo_documento,
+      tipoDocumento: data.tipo_documento || data.tipoDocumento, 
       numeroDocumento: data.numero_documento,
       nombres: data.nombres,
       apellidos: data.apellidos,
@@ -383,7 +382,7 @@ export const transformPersonal = (data) => {
 export const transformPersonalToBackend = (data) => {
   console.log('transformPersonalToBackend - Datos de entrada:', data);
   const transformed = {
-    tipoDocumento: data.tipoDocumento,
+    tipoDocumento: data.tipoDocumento, // Fix: Ensure this matches the select value
     numeroDocumento: data.numeroDocumento,
     nombres: data.nombres,
     apellidos: data.apellidos,

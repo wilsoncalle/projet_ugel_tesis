@@ -1,7 +1,7 @@
 const db = require('../../config/database');
 const { AppError } = require('../../middleware/errorHandler');
 
-const createConfig = async ({ personalId, minutos, dias, aplicaDesde, horaEntrada, activo = true }) => {
+const createConfig = async ({ personalId, minutos, dias, aplicaDesde, horaEntrada, horaEntradaTarde, activo = true }) => {
   const query = `
     INSERT INTO config_asistencia_personal (
       personal_id,
@@ -9,17 +9,18 @@ const createConfig = async ({ personalId, minutos, dias, aplicaDesde, horaEntrad
       dias_tolerancia_por_mes,
       aplica_desde,
       hora_entrada,
+      hora_entrada_tarde,
       activo
     )
-    VALUES ($1, $2, $3, $4, $5, $6)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *;
   `;
-  const values = [personalId || null, minutos, dias, aplicaDesde, horaEntrada, activo];
+  const values = [personalId || null, minutos, dias, aplicaDesde, horaEntrada, horaEntradaTarde, activo];
   const result = await db.query(query, values);
   return result.rows[0];
 };
 
-const updateConfig = async (id, { minutos, dias, aplicaDesde, horaEntrada, activo }) => {
+const updateConfig = async (id, { minutos, dias, aplicaDesde, horaEntrada, horaEntradaTarde, activo }) => {
   const query = `
     UPDATE config_asistencia_personal
     SET 
@@ -27,11 +28,12 @@ const updateConfig = async (id, { minutos, dias, aplicaDesde, horaEntrada, activ
       dias_tolerancia_por_mes = $2,
       aplica_desde = $3,
       hora_entrada = $4,
-      activo = $5
-    WHERE id = $6
+      hora_entrada_tarde = $5,
+      activo = $6
+    WHERE id = $7
     RETURNING *;
   `;
-  const values = [minutos, dias, aplicaDesde, horaEntrada, activo, id];
+  const values = [minutos, dias, aplicaDesde, horaEntrada, horaEntradaTarde, activo, id];
   const result = await db.query(query, values);
   if (!result.rows.length) throw new AppError('Configuración no encontrada', 404);
   return result.rows[0];

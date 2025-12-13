@@ -268,8 +268,17 @@ const registrarEstado = asyncHandler(async (req, res) => {
 const getEstadisticasTotales = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas totales de asistencia');
   
-  const { periodo } = req.query;
-  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  const { periodo, fechaInicio: queryInicio, fechaFin: queryFin } = req.query;
+  let fechaInicio, fechaFin;
+
+  if (queryInicio && queryFin) {
+    fechaInicio = queryInicio;
+    fechaFin = queryFin;
+  } else {
+    const fechas = convertirPeriodoAFechas(periodo || 'mes');
+    fechaInicio = fechas.fechaInicio;
+    fechaFin = fechas.fechaFin;
+  }
   
   const stats = await service.getEstadisticasTotales({ fechaInicio, fechaFin });
   
@@ -287,8 +296,17 @@ const getEstadisticasTotales = asyncHandler(async (req, res) => {
 const getEstadisticasPuntualidad = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas de puntualidad');
   
-  const { periodo } = req.query;
-  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  const { periodo, fechaInicio: queryInicio, fechaFin: queryFin } = req.query;
+  let fechaInicio, fechaFin;
+
+  if (queryInicio && queryFin) {
+    fechaInicio = queryInicio;
+    fechaFin = queryFin;
+  } else {
+    const fechas = convertirPeriodoAFechas(periodo || 'mes');
+    fechaInicio = fechas.fechaInicio;
+    fechaFin = fechas.fechaFin;
+  }
   
   const stats = await service.getEstadisticasPuntualidad({ fechaInicio, fechaFin });
   
@@ -306,8 +324,17 @@ const getEstadisticasPuntualidad = asyncHandler(async (req, res) => {
 const getEstadisticasAusencias = asyncHandler(async (req, res) => {
   logger.info('Solicitud de estadísticas de ausencias');
   
-  const { periodo } = req.query;
-  const { fechaInicio, fechaFin } = convertirPeriodoAFechas(periodo || 'mes');
+  const { periodo, fechaInicio: queryInicio, fechaFin: queryFin } = req.query;
+  let fechaInicio, fechaFin;
+
+  if (queryInicio && queryFin) {
+    fechaInicio = queryInicio;
+    fechaFin = queryFin;
+  } else {
+    const fechas = convertirPeriodoAFechas(periodo || 'mes');
+    fechaInicio = fechas.fechaInicio;
+    fechaFin = fechas.fechaFin;
+  }
   
   const stats = await service.getEstadisticasAusencias({ fechaInicio, fechaFin });
   
@@ -472,6 +499,19 @@ const evaluarJustificacion = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Obtener movimientos de una asistencia
+ * @route GET /api/asistencia-personal/:id/movimientos
+ */
+const getMovimientos = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const movimientos = await service.getMovimientos(id);
+  res.json({
+    success: true,
+    data: movimientos
+  });
+});
+
 module.exports = {
   getAll,
   getHoy,
@@ -491,5 +531,6 @@ module.exports = {
   getMiAsistencia,
   justificar,
   getJustificaciones,
-  evaluarJustificacion
+  evaluarJustificacion,
+  getMovimientos
 };

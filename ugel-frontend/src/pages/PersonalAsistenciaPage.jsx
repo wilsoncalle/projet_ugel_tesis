@@ -98,6 +98,8 @@ const PersonalAsistenciaPage = () => {
     fechaDesde: null,
     fechaHasta: null
   });
+
+  const [movimientos, setMovimientos] = useState([]);
   
   // Estado para la semana seleccionada
   const [semanaUI, setSemanaUI] = useState(null);
@@ -232,6 +234,40 @@ const PersonalAsistenciaPage = () => {
       }
     } catch (error) {
       console.warn('No se pudo cachear la configuración de asistencia', error);
+    }
+  };
+
+  const handleRetornoRapido = async (row) => {
+    try {
+      // Usamos la misma lógica de registro de ingreso
+      // Necesitamos ID y hora actual
+      const now = new Date();
+      const horaActual = now.toLocaleTimeString('en-US', { hour12: false });
+      
+      const registroData = {
+        personalId: row.personal_id,
+        hora: horaActual, 
+        fecha: now.toISOString().slice(0, 10),
+        esRetorno: true // Flag opcional para UI
+      };
+
+      setLoading(true);
+      await asistenciaPersonalService.registrarIngreso(registroData);
+      
+      // Recargar datos
+      await cargarAsistenciasHoy();
+      
+      // Feedback visual (opcional)
+      // setError('Retorno registrado correctamente'); // Usar un toast mejor si existiera
+    } catch (err) {
+      console.error('Error al registrar retorno rápido:', err);
+      if (err.response?.data?.message) {
+         setError(err.response.data.message);
+      } else {
+         setError('Error al registrar retorno');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -722,17 +758,37 @@ const PersonalAsistenciaPage = () => {
   };
 
   // Funciones para manejar el modal de detalles
+  // Fetch Movimientos helper
+  const fetchMovimientos = async (id) => {
+    try {
+      if (!id) return;
+      console.log('Fetching movimientos for:', id);
+      const response = await asistenciaPersonalService.getMovimientos(id);
+      if (response.data.success) {
+        setMovimientos(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching movimientos:', error);
+      setMovimientos([]);
+    }
+  };
+
   const handleOpenModal = (item) => {
     setSelectedItem(item);
+    setMovimientos([]); // Clear previous
+    if (item && item.id) {
+       // Si es historial o tiene ID de asistencia, buscar movimientos
+       fetchMovimientos(item.id);
+    }
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    // Limpiar selectedItem después de un delay para que la animación termine
     setTimeout(() => {
       setSelectedItem(null);
-    }, 300); // 300ms coincide con la duración de la animación
+      setMovimientos([]);
+    }, 300);
   };
 
   // Obtener estadísticas según el tab activo
@@ -944,29 +1000,83 @@ const PersonalAsistenciaPage = () => {
           const tieneIngreso = row.hora_ingreso;
           const esAusente = row.estado_presencia === 'Ausente';
           
-          // Solo mostrar botón de salida si tiene ingreso, no es ausente y no tiene salida
-          const puedeRegistrarSalida = tieneIngreso && !esAusente && !tieneSalida;
+          // Lógica Mejorada:
+          // 1. Si no tiene ingreso -> Mostrar NADA en la tabla (se registra arriba)
+          // 2. Si tiene ingreso SIN salida -> Mostrar Botón SALIDA (puede ser Salida Refrigerio o Salida Final)
+          // 3. Si tiene ingreso Y salida (refrigerio) -> Mostrar Botón "Re-Ingreso" en Tabla? NO, mejor ocultar salida.
+          //    El re-ingreso se hace desde el formulario principal arriba.
+          //    Pero el usuario pide "cambiar boton de salida a entrada".
+          //    En la tabla, normalmente solo mostramos "Salida".
+          
+          // Nueva lógica solicitada:
+          // "aparecer solo dos veces, SALIDA_REFRIGERIO y SALIDA"
+          // "cuando salgo del regigerio, debe de cambiar el boton de salida a entrada"
+          
+          // Determinamos el estado actual:
+          // Si hora_salida está seteadas, significa que está "AFUERA".
+          // Si hora_salida es NULL, significa que está "ADENTRO".
+          
+          const estaAdentro = tieneIngreso && !tieneSalida;
+          const estaAfuera = tieneIngreso && tieneSalida; // Ya marcó una salida (ej. refrigerio)
+          
+          // Si está ADENTRO, puede marcar SALIDA.
+          // Si está AFUERA, debería poder marcar INGRESO (Retorno).
+          // ¿Cómo marcamos ingreso desde la fila? 
+          // Opción A: Botón "Retorno" que abre modal o hace acción directa.
+          // Opción B: El usuario dijo "cambiar boton de salida a entrada".
           
           return (
             <div className="flex justify-center space-x-1">
-              {/* Botón Ver Detalles - siempre visible */}
+              {/* Botón Ver Detalles */}
               <button
                 onClick={() => handleOpenModal(row)}
                 className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-                title="Ver Detalles"
+                title="Ver Movimientos"
               >
                 <EyeIcon className="h-4 w-4" />
               </button>
               
-              {/* Botón Registrar Salida - solo si tiene ingreso, no es ausente y no tiene salida */}
-              {puedeRegistrarSalida && (
-                <button
-                  onClick={() => registrarSalida(row.personal_id)}
-                  className="p-2 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors"
-                  title="Registrar Salida"
-                >
-                  <ArrowRightOnRectangleIcon className="h-4 w-4" />
-                </button>
+              {/* Botón Acción (Salida o Retorno) */}
+              {!esAusente && (
+                <>
+                  {estaAdentro && (
+                    <button
+                      onClick={() => registrarSalida(row.personal_id)}
+                      className="p-2 bg-amber-600 text-white rounded-full hover:bg-amber-700 transition-colors"
+                      title="Registrar Salida"
+                    >
+                      <ArrowRightOnRectangleIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                  
+                  {estaAfuera && (
+                    <button
+                      onClick={() => {
+                         // Pre-llenar formulario de entrada con este personal
+                         // Esto requiere pasar una función desde el padre o usar un contexto
+                         // Hack rápido: Usar ref o evento, pero mejor simple: llamamos a registrarIngreso directo?
+                         // registrarIngreso requiere parametros. 
+                         // Mejor: Habilitamos el re-ingreso desde el formulario superior (como ya hicimos)
+                         // Y aquí mostramos un indicador o botón que suba al form?
+                         // El usuario pidio "cambiar boton de salida a entrada".
+                         // Vamos a asumir que quiere un botón rápido de "Retorno".
+                         // Reutilizamos la función onRegistrarIngreso pasándole directo el ID y fecha/hora actual
+                         // Pero necesitamos numero de documento... row tiene personal_numero_documento?
+                         // row tiene: personal_id, personal_nombres, personal_apellidos, personal_numero_documento
+                         
+                         // Simulamos selección en formulario
+                         // Esto es complejo sin refatorizar todo.
+                         // SIMPLIFICACION: Mostramos un botón verde que diga "Marcar Retorno" 
+                         // y al clickear llame a una funcion handleRetorno(row)
+                         handleRetornoRapido(row);
+                      }}
+                      className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors"
+                      title="Registrar Retorno"
+                    >
+                      <ArrowRightOnRectangleIcon className="h-4 w-4 transform rotate-180" />
+                    </button>
+                  )}
+                </>
               )}
             </div>
           );
@@ -1443,7 +1553,45 @@ const PersonalAsistenciaPage = () => {
             render: (value) => value || 'No especificado'
           }
         ]}
-      />
+      >
+        {movimientos.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-md font-medium text-gray-900 mb-2">Movimientos del Día</h4>
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Hora</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Observación</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reg. Por</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {movimientos.map((mov, idx) => (
+                    <tr key={idx}>
+                      <td className="px-4 py-2 text-sm text-gray-900">
+                        {new Date(mov.fecha_hora).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-4 py-2 text-sm">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          mov.tipo.includes('INGRESO') || mov.tipo.includes('RETORNO') 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {mov.tipo}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-500">{mov.observacion || '-'}</td>
+                       <td className="px-4 py-2 text-sm text-gray-500">{mov.usuario_registro || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </ModalDetalles>
     </div>
   );
 };
@@ -1458,25 +1606,31 @@ const FormularioRegistroIngreso = ({ personalOptions, personalSeleccionado, onPe
   });
 
   // Filtrar personal que ya tiene asistencia registrada (Presente, Tarde/Tardanza)
+  // Filtrar personal que ya tiene asistencia registrada (Presente, Tarde/Tardanza)
   const personalOptionsFiltrados = useMemo(() => {
+    // Filtrar:
+    // 1. Mostrar los que NO tienen asistencia (para primer ingreso)
+    // 2. Mostrar los que TIENEN SALIDA marcada (para retorno refrigerio)
+    // 3. Ocultar los que están ADENTRO (tienen ingreso sin salida), porque ellos deben marcar salida en la tabla
+    
     return personalOptions.filter(p => {
-      // Buscar si el personal tiene asistencia hoy
-      const asistencia = asistenciasHoy.find(a => String(a.personal_id) === String(p.value));
-      
-      // Si no tiene asistencia, mostrarlo
-      if (!asistencia) return true;
-      
-      // Si tiene asistencia, verificar su estado
-      // Excluir si ya registró ingreso o tiene estado Presente/Tarde/Tardanza
-      const tieneIngreso = !!asistencia.hora_ingreso;
-      const estadoExcluido = ['Presente', 'Tarde', 'Tardanza'].includes(asistencia.estado_presencia);
-      
-      if (tieneIngreso || estadoExcluido) {
-        return false;
-      }
-      
-      // Si está como Ausente o sin ingreso registrado, permitir seleccionarlo
-      return true;
+       const asistencia = asistenciasHoy.find(a => String(a.personal_id) === String(p.value));
+       
+       if (!asistencia) return true; // Sin registro -> Mostrar
+       
+       const tieneIngreso = !!asistencia.hora_ingreso;
+       const tieneSalida = !!asistencia.hora_salida;
+       const esAusente = asistencia.estado_presencia === 'Ausente';
+       
+       if (esAusente) return true; // Si está marcado ausente, permitir corregir/ingresar?
+       
+       // Si está ADENTRO (Ingreso SI, Salida NO) -> Ocultar (debe marcar salida)
+       if (tieneIngreso && !tieneSalida) return false;
+       
+       // Si está AFUERA (Ingreso SI, Salida SI) -> Mostrar (para Retorno)
+       if (tieneIngreso && tieneSalida) return true;
+       
+       return true;
     });
   }, [personalOptions, asistenciasHoy]);
 
