@@ -227,6 +227,13 @@ const registrarSalida = asyncHandler(async (req, res) => {
   }
   
   const asistencia = await service.registrarSalida(personalId, req.user.id, { fecha, hora, _isOfflineSync });
+
+  if (asistencia.alreadyRegistered) {
+    return res.status(200).json({
+      success: false,
+      message: asistencia.message
+    });
+  }
   
   logger.info(`Salida registrada exitosamente para personal ID: ${personalId}`);
   

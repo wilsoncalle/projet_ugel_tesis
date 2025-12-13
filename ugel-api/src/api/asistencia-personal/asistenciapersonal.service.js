@@ -239,7 +239,7 @@ const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
     const personal = await personalRepository.findById(personalId);
     if (!personal) throw new AppError('personal no encontrado', 404);
     if (!personal.activo) throw new AppError('personal inactivo', 400);
-    
+
     const { fecha: fechaActual, hora: horaActual } = nowLima();
     const fechaOffline = offlineData?._isOfflineSync ? offlineData.fecha : null;
     const horaOffline = offlineData?._isOfflineSync ? offlineData.hora : null;
@@ -248,134 +248,138 @@ const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
 
     const configAsistencia = await asistenciaConfigService.getConfigEfectiva(personalId);
     
-    const minutosToleranciaDia = Number(configAsistencia?.minutos_tolerancia_por_dia ?? configAsistencia?.minutos_tolerancia_dia ?? 10);
-    const diasToleranciaMes = Number(configAsistencia?.dias_tolerancia_por_mes ?? configAsistencia?.dias_tolerancia_mes ?? 10);
-    const horaEntradaConfig = configAsistencia?.hora_entrada || '09:00:00';
-    const horaEntradaTardeConfig = configAsistencia?.hora_entrada_tarde; // Nueva config
-    const fechaInicioConfig = configAsistencia?.aplica_desde || null;
+    // Configuración de Horarios
+    const horaEntradaManana = configAsistencia?.hora_entrada || '09:00:00';
+    const horaEntradaTarde = configAsistencia?.hora_entrada_tarde || '14:00:00';
+    // Tolerancias
+    const minutosTolerancia = Number(configAsistencia?.minutos_tolerancia_por_dia || 10);
+    const diasToleranciaTotales = Number(configAsistencia?.dias_tolerancia_por_mes || 0);
 
-    const minutosLlegada = timeToMinutes(horaEvento);
-    
-    // Determinar si es turno mañana o tarde
-    // Heurística simple: Si la hora es después de las 13:00 (o si config tarde existe y estamos cerca), usar tarde
-    let esTurnoTarde = false;
-    let horaReferencia = horaEntradaConfig;
-    
-    if (horaEntradaTardeConfig) {
-      const minutosTarde = timeToMinutes(horaEntradaTardeConfig);
-      // Si la hora actual es mayor a la hora de entrada tarde - 2 horas (ej. 13:00 para entrada 15:00), asumimos tarde
-      // O simplemente si es despues de las 13:00 PM (780 min)
-      if (minutosLlegada > 780) { 
-        esTurnoTarde = true;
-        horaReferencia = horaEntradaTardeConfig;
-      }
-    }
+    // Convertir a minutos para comparaciones
+    const minEvento = timeToMinutes(horaEvento);
+    const minEntradaManana = timeToMinutes(horaEntradaManana);
+    const minEntradaTarde = timeToMinutes(horaEntradaTarde);
 
-    const minutosEntrada = timeToMinutes(horaReferencia);
-    const diferenciaMinutos = minutosLlegada - minutosEntrada;
-
-    const fechaObj = new Date(fechaEvento);
-    const diasUsados = await repository.countDiasToleranciaUsados(personalId, fechaObj.getMonth() + 1, fechaObj.getFullYear(), horaEntradaConfig, fechaInicioConfig);
-    const tieneSaldoTolerancia = diasUsados < diasToleranciaMes;
-
-    const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaEvento);
     const registroExistente = await repository.findBypersonalAndFecha(personalId, fechaEvento);
     
-    // 1. Siempre registrar movimiento
     let controlId = registroExistente?.id;
     let tipoMovimiento = 'INGRESO';
-    
-    // Si no existe control, lo creamos primero (INGRESO MAÑANA)
+    let observacion = '';
+    let nuevoEstado = registroExistente ? registroExistente.estado_presencia : 'Presente';
+    let minutosTardanzaCalculados = 0;
+
+    // Lógica clasificación REFINADA
     if (!registroExistente) {
+      // 1. PRIMER MARKING -> SIEMPRE INGRESO (Mañana)
+      // Incluso si es tarde (ej. 11am), cuenta como ingreso principal con tardanza
+      tipoMovimiento = 'INGRESO';
+      observacion = 'Ingreso Mañana';
+      
+      // Crear registro
       const nuevoControl = await repository.create({
           personal_id: personalId, fecha: fechaEvento, hora_ingreso: horaEvento, hora_salida: null,
-          estado_presencia: 'Presente', usuario_registro_id: usuarioId, minutos_tardanza: 0
+          estado_presencia: nuevoEstado, usuario_registro_id: usuarioId, minutos_tardanza: 0
       });
       controlId = nuevoControl.id;
-      tipoMovimiento = 'INGRESO';
+
     } else {
-      // Si ya existe, es un RETORNO de refrigerio (Turno Tarde)
-      tipoMovimiento = 'RETORNO_REFRIGERIO';
+      // 2. YA EXISTE REGISTRO -> RETORNO
+      // Verificar cuál fue el último movimiento para saber si es Retorno Refrigerio o Entrada Intermitente
+      const movimientosPrevios = await repository.getMovimientosByControlId(controlId);
+      const ultimoMovimiento = movimientosPrevios[movimientosPrevios.length - 1];
+      
+      if (ultimoMovimiento && ultimoMovimiento.tipo === 'SALIDA_REFRIGERIO') {
+          tipoMovimiento = 'RETORNO_REFRIGERIO';
+          observacion = 'Ingreso Tarde / Retorno Refrigerio';
+      } else if (ultimoMovimiento && (ultimoMovimiento.tipo.includes('SALIDA'))) {
+          // Si salió (final, intermitente, etc.) y vuelve
+          tipoMovimiento = 'INGRESO_INTERMITENTE';
+          observacion = 'Entrada Intermitente';
+      } else {
+          // El último movimiento FUE un ingreso (INGRESO, RETORNO_REFRIGERIO, etc.)
+          // No permitir dos ingresos seguidos
+          return { alreadyRegistered: true, message: 'El personal ya se encuentra dentro de la institución.' };
+      }
     }
     
-    // Validar si es turno tarde según config para observación
-    esTurnoTarde = (tipoMovimiento === 'RETORNO_REFRIGERIO'); 
-    
-    // Registrar el movimiento en historial detallado
-    await repository.createMovimiento({
-      control_asistencia_id: controlId,
-      tipo: tipoMovimiento,
-      fecha_hora: `${fechaEvento} ${horaEvento}`,
-      usuario_registro_id: usuarioId,
-      observacion: esTurnoTarde ? 'Ingreso Tarde / Retorno Refrigerio' : 'Ingreso Mañana'
-    });
+    // Cálculo de Tardanza y Tolerancia
+    const diasUsados = await repository.countDiasToleranciaUsados(personalId, new Date(fechaEvento).getMonth() + 1, new Date(fechaEvento).getFullYear(), horaEntradaManana, configAsistencia?.aplica_desde);
+    const tieneSaldo = diasUsados < diasToleranciaTotales;
 
-    // 2. Lógica de Actualización de Estado / Tardanza
-    let minutosTardanzaCalculados = 0;
+    // CASO 1: Ingreso Mañana
+    if (observacion === 'Ingreso Mañana') {
+        if (minEvento > minEntradaManana) {
+            const diff = minEvento - minEntradaManana;
+            
+            // "usar los minutos de tolerancia" -> Entiendo que se descuentan si hay saldo.
+            if (tieneSaldo) {
+                if (diff <= minutosTolerancia) {
+                    // Cubierto por tolerancia
+                } else {
+                    // Excede tolerancia
+                    // Asumiendo que se cobra la diferencia (perdonamos tolerancia)
+                    minutosTardanzaCalculados = diff - minutosTolerancia;
+                    nuevoEstado = 'Tardanza';
+                }
+            } else {
+                // Sin saldo -> Se cobra todo
+                minutosTardanzaCalculados = diff;
+                nuevoEstado = 'Tardanza';
+            }
+        }
+    } 
+    // CASO 2: Retorno Refrigerio (Turno Tarde logic)
+    else if (observacion === 'Ingreso Tarde / Retorno Refrigerio') {
+         // Aplicar misma lógica de tolerancia para la tarde
+         // Usar horaEntradaTarde como base
+         if (minEvento > minEntradaTarde) {
+             const diff = minEvento - minEntradaTarde;
+             
+             if (tieneSaldo) {
+                 if (diff <= minutosTolerancia) {
+                      // Cubierto
+                 } else {
+                      minutosTardanzaCalculados = diff - minutosTolerancia;
+                      nuevoEstado = 'Tardanza';
+                 }
+             } else {
+                 minutosTardanzaCalculados = diff;
+                 nuevoEstado = 'Tardanza';
+             }
+         }
+    }
     
+    // Papeletas (Lógica existente)
+    const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaEvento);
     if (papeletaActiva && papeletaActiva.estado === 'EN_CURSO') {
-        // Lógica de retorno de papeleta
         const retornoProg = new Date(papeletaActiva.fecha_hora_retorno_programada);
         const minProg = retornoProg.getHours() * 60 + retornoProg.getMinutes();
-        const diff = minutosLlegada - minProg;
-        if (diff > 0) minutosTardanzaCalculados = diff;
+        const diff = minEvento - minProg;
+        if (diff > 0) minutosTardanzaCalculados += diff;
         
         await papeletasRepository.registrarRetorno(papeletaActiva.id, usuarioId);
-        const totalMinutosTardanza = (registroExistente?.minutos_tardanza || 0) + minutosTardanzaCalculados;
-        const nuevoEstado = totalMinutosTardanza > 0 ? 'Tardanza' : (registroExistente?.estado_presencia || 'Presente');
-        
-        return await repository.updateIngreso(controlId, registroExistente ? registroExistente.hora_ingreso : horaEvento, nuevoEstado, usuarioId, totalMinutosTardanza);
-    }
-    
-    // Calcular tardanza del turno actual
-    let minutosAImputar = 0;
-    let nuevoEstado = registroExistente ? registroExistente.estado_presencia : 'Presente';
-
-    // Si es Retorno Refrigerio, verificamos tolerancia de tarde si existe, o usamos la estándar
-    // Si hay config tarde, usamos esa hora. Si no, quizas deberíamos usar 14:00 o 15:00?
-    // Por ahora usamos la lógica previa de diferenciaMinutos basada en horaReferencia
-    
-    if (diferenciaMinutos > 0) {
-      if (tieneSaldoTolerancia) {
-        if (diferenciaMinutos > minutosToleranciaDia) {
-          nuevoEstado = 'Tardanza';
-          minutosAImputar = diferenciaMinutos - minutosToleranciaDia;
-        }
-      } else {
-        nuevoEstado = 'Tardanza';
-        minutosAImputar = diferenciaMinutos;
-      }
-    }
-    
-    // Si ya existía y tenía tardanza, sumamos (si es un nuevo turno que genera tardanza)
-    // Para evitar duplicar tardanza en re-conexiones o doble click, verificaríamos si ya se cobró.
-    // Pero como "registrarIngreso" se puede llamar N veces, simplificamos:
-    // Si es el PRIMER ingreso del día (creación), asignamos minutosAImputar.
-    // Si es un ingreso POSTERIOR (actualización), sumamos SOLO si es turno tarde y no se había sumado antes.
-    
-    let totalMinutos = (registroExistente?.minutos_tardanza || 0);
-    
-    if (!registroExistente) {
-      // Primer ingreso del día
-      totalMinutos = minutosAImputar;
-    } else {
-      // Ingreso posterior (ej. regreso de almuerzo)
-      // Solo sumamos si hay tardanza calculada para ESTE evento específico
-      // Y idealmente si no hemos procesado ya este turno. 
-      // Por simplicidad: Sumamos siempre que haya tardanza (asumimos que el usuario no marca 2 veces seguidas en < 1 min)
-      if (minutosAImputar > 0) {
-         totalMinutos += minutosAImputar;
-         nuevoEstado = 'Tardanza';
-      }
-      
-      // Si el estado actual ya era Tardanza, se mantiene, si no, se actualiza a Tardanza si corresponde
-      if (registroExistente.estado_presencia === 'Tardanza') nuevoEstado = 'Tardanza';
+        observacion += ' (Retorno Papeleta)'; 
+        if (minutosTardanzaCalculados > 0) nuevoEstado = 'Tardanza';
     }
 
-    // Actualizamos el registro principal
-    // Si ya existía, guardamos la hora de ingreso ORIGINAL (primer ingreso), NO sobrescribimos con la de la tarde
+    await repository.createMovimiento({
+      control_asistencia_id: controlId,
+      tipo: tipoMovimiento, 
+      fecha_hora: `${fechaEvento} ${horaEvento}`,
+      usuario_registro_id: usuarioId,
+      observacion: observacion
+    });
+
+    const totalMinutos = (registroExistente?.minutos_tardanza || 0) + minutosTardanzaCalculados;
+    // Hora ingreso padre: Se mantiene la original si existe
     const horaIngresoFinal = registroExistente ? registroExistente.hora_ingreso : horaEvento;
     
+    // IMPORTANTE: Si ya estaba en Tardanza, se queda en Tardanza, salvo que queramos ser muy específicos.
+    // Pero generalmente el estado del día es el peor estado (Tardanza).
+    if (registroExistente && registroExistente.estado_presencia === 'Tardanza') {
+        nuevoEstado = 'Tardanza';
+    }
+
     return await repository.updateIngreso(controlId, horaIngresoFinal, nuevoEstado, usuarioId, totalMinutos);
 
   } catch (error) {
@@ -396,47 +400,62 @@ const registrarSalida = async (personalId, usuarioId, offlineData = {}) => {
     const horaEvento = horaOffline || horaActual;
 
     const registroExistente = await repository.findBypersonalAndFecha(personalId, fechaEvento);
-    
     if (!registroExistente) throw new AppError('No hay registro de ingreso para hoy. Debe marcar ingreso primero.', 400);
-    // Nota: Ya no bloqueamos si hora_salida existe, porque permitimos múltiples salidas (refrigerio)
 
-    // Determinar Tipo de Salida
-    // Heurística simple: Si hay config de "entrada tarde", asumimos turno partido.
-    // Si la hora es antes de, digamos, las 15:00 (3 PM), y hay turno partido, es SALIDA_REFRIGERIO.
-    // O mejor: contemos cuántos movimientos de SALIDA tiene hoy.
-    
-    // Obtenemos movimientos previos
+    // Verificar si el último movimiento ya fue una salida
     const movimientosPrevios = await repository.getMovimientosByControlId(registroExistente.id);
-    const salidasPrevias = movimientosPrevios.filter(m => m.tipo.includes('SALIDA'));
-    
-    let tipoSalida = 'SALIDA';
-    const configAsistencia = await asistenciaConfigService.getConfigEfectiva(personalId);
-    const horaEntradaTardeConfig = configAsistencia?.hora_entrada_tarde;
-    
-    if (horaEntradaTardeConfig) {
-       // Hay horario partido configurado
-       // Si es la primera salida, es REFRIGERIO
-       if (salidasPrevias.length === 0) {
-         tipoSalida = 'SALIDA_REFRIGERIO';
-       } else {
-         // Si ya hubo salidas, es SALIDA final (o segunda salida)
-         tipoSalida = 'SALIDA';
-       }
-    } else {
-       // Horario corrido
-       tipoSalida = 'SALIDA';
+    const ultimoMovimiento = movimientosPrevios[movimientosPrevios.length - 1];
+
+    if (ultimoMovimiento && ultimoMovimiento.tipo.includes('SALIDA')) {
+        return { alreadyRegistered: true, message: 'El personal ya registró su salida.' };
     }
 
-    // Registrar movimiento
+    const configAsistencia = await asistenciaConfigService.getConfigEfectiva(personalId);
+    const horaEntradaTarde = configAsistencia?.hora_entrada_tarde || '14:00:00';
+    const horaSalida = configAsistencia?.hora_salida || '17:00:00'; // Se agregó hora_salida al config
+
+    const minEvento = timeToMinutes(horaEvento);
+    const minEntradaTarde = timeToMinutes(horaEntradaTarde);
+    const minSalidaOficial = timeToMinutes(horaSalida);
+    const minInicioRefrigerio = minEntradaTarde - 60; 
+
+    let tipoSalida = 'SALIDA';
+    let observacion = '';
+
+    // Ventana Refrigerio Estricta: [EntradaTarde - 60, EntradaTarde]
+    if (minEvento >= minInicioRefrigerio && minEvento <= minEntradaTarde) { // <= para incluir la hora exacta
+        tipoSalida = 'SALIDA_REFRIGERIO';
+        observacion = 'Salida a Refrigerio';
+    } 
+    // Ventana Salida Final: >= SalidaOficial
+    else if (minEvento >= minSalidaOficial) {
+        // Verificar si ya hubo una Salida Final (o SALIDA simple) con observacion 'Salida Final' hoy
+        const movimientosHoy = await repository.getMovimientosByControlId(registroExistente.id);
+        const yaTieneSalidaFinal = movimientosHoy.some(m => m.observacion === 'Salida Final');
+
+        if (yaTieneSalidaFinal) {
+            tipoSalida = 'SALIDA_INTERMITENTE';
+            observacion = 'Salida Intermitente';
+        } else {
+            tipoSalida = 'SALIDA';
+            observacion = 'Salida Final';
+        }
+    }
+    // Intermitente (Fuera de ventanas)
+    else {
+        // Salida antes de hora o rara
+        tipoSalida = 'SALIDA_INTERMITENTE';
+        observacion = 'Salida Intermitente';
+    }
+
     await repository.createMovimiento({
       control_asistencia_id: registroExistente.id,
       tipo: tipoSalida,
       fecha_hora: `${fechaEvento} ${horaEvento}`,
       usuario_registro_id: usuarioId,
-      observacion: tipoSalida === 'SALIDA_REFRIGERIO' ? 'Salida a Refrigerio' : 'Salida Final'
+      observacion: observacion
     });
 
-    // Actualizar salida (siempre guardamos la última hora marcada como hora de salida "oficial" del día)
     return await repository.updateSalida(registroExistente.id, horaEvento);
   } catch (error) {
     logger.error(`Error registrando salida ID ${personalId}:`, error);
@@ -893,4 +912,3 @@ module.exports = {
   evaluarAsistenciasAutomaticas,
   getMovimientos
 };
-

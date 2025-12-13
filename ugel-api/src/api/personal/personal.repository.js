@@ -59,7 +59,14 @@ const findAll = async (options = {}) => {
         p.activo,
         
         -- Estado de asistencia de hoy
-        ca.estado_presencia
+        ca.estado_presencia,
+        (
+            SELECT ma.tipo 
+            FROM movimiento_asistencia ma
+            WHERE ma.control_asistencia_id = ca.id
+            ORDER BY ma.fecha_hora DESC
+            LIMIT 1
+        ) as ultimo_movimiento_tipo
         
       FROM personal p
       LEFT JOIN tipodocumento td ON p.tipo_documento_id = td.id

@@ -413,9 +413,13 @@ const RegistroForm = forwardRef(
               papeletasActivasMap.get(empleado.numero_documento) ||
               papeletasActivasMap.get(nombreCompletoEmpleado);
 
+            const ultimoMovimiento = (empleado.ultimo_movimiento_tipo || '').toUpperCase();
+
             if (papeletaExterna) {
               estado = 'permiso';
               codigoPapeleta = papeletaExterna.codigo_papeleta;
+            } else if (ultimoMovimiento.includes('SALIDA') || ultimoMovimiento === 'SALIDA_INTERMITENTE') {
+              estado = 'ausente';
             } else if (!empleado.estado_presencia) {
               estado = 'ausente';
             } else if (
