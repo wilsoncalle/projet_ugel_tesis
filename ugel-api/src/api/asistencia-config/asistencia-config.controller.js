@@ -10,13 +10,14 @@ const getConfigGlobal = asyncHandler(async (req, res) => {
 });
 
 const updateConfigGlobal = asyncHandler(async (req, res) => {
-  const { minutos_tolerancia_por_dia, dias_tolerancia_por_mes, aplica_desde, hora_entrada } = req.body;
+  const { minutos_tolerancia_por_dia, dias_tolerancia_por_mes, aplica_desde, hora_entrada, hora_entrada_tarde } = req.body;
 
   const config = await service.setConfigGlobal({
     minutos: Number(minutos_tolerancia_por_dia),
     dias: Number(dias_tolerancia_por_mes),
     aplicaDesde: aplica_desde,
-    horaEntrada: hora_entrada
+    horaEntrada: hora_entrada,
+    horaEntradaTarde: hora_entrada_tarde
   });
 
   res.json({
@@ -27,14 +28,15 @@ const updateConfigGlobal = asyncHandler(async (req, res) => {
 });
 
 const updateConfigpersonal = asyncHandler(async (req, res) => {
-  const { personalId, minutos_tolerancia_por_dia, dias_tolerancia_por_mes, aplica_desde, hora_entrada } = req.body;
+  const { personalId, minutos_tolerancia_por_dia, dias_tolerancia_por_mes, aplica_desde, hora_entrada, hora_entrada_tarde } = req.body;
 
   const config = await service.setConfigpersonal({
     personalId: Number(personalId),
     minutos: Number(minutos_tolerancia_por_dia),
     dias: Number(dias_tolerancia_por_mes),
     aplicaDesde: aplica_desde,
-    horaEntrada: hora_entrada
+    horaEntrada: hora_entrada,
+    horaEntradaTarde: hora_entrada_tarde
   });
 
   res.json({

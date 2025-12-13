@@ -14,6 +14,38 @@ const { toLimaDateYYYYMMDD, nowLima } = require('../../utils/fechas');
  * @param {Object} options - Opciones de búsqueda
  * @returns {Object} Registros de asistencia encontrados y total
  */
+const createMovimiento = async ({ control_asistencia_id, tipo, fecha_hora, observacion, usuario_registro_id }) => {
+  try {
+    const query = `
+      INSERT INTO movimiento_asistencia (control_asistencia_id, tipo, fecha_hora, observacion, usuario_registro_id)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *;
+    `;
+    const result = await db.query(query, [control_asistencia_id, tipo, fecha_hora, observacion, usuario_registro_id]);
+    return result.rows[0];
+  } catch (error) {
+    logger.error('Error creando movimiento de asistencia:', error);
+    throw new AppError('Error registrando movimiento', 500);
+  }
+};
+
+const getMovimientosByControlId = async (controlId) => {
+  try {
+    const query = `
+      SELECT ma.*, u.nombre_usuario as usuario_registro
+      FROM movimiento_asistencia ma
+      LEFT JOIN usuario u ON ma.usuario_registro_id = u.id
+      WHERE ma.control_asistencia_id = $1 
+      ORDER BY ma.fecha_hora ASC
+    `;
+    const result = await db.query(query, [controlId]);
+    return result.rows;
+  } catch (error) {
+    logger.error('Error obteniendo movimientos:', error);
+    throw new AppError('Error consultando movimientos', 500);
+  }
+};
+
 const findAll = async (options = {}) => {
   let { 
     page = 1, 
@@ -490,6 +522,7 @@ const updateIngreso = async (id, horaIngreso, estadoPresencia, usuarioId, minuto
       UPDATE controlasistenciapersonal 
       SET 
         ingreso = (date_trunc('day', ingreso) + $1::time),
+        salida = NULL, 
         estado_presencia = $2,
         usuario_registro_id = $3,
         minutos_tardanza = $4
@@ -1560,32 +1593,7 @@ const updatePorPapeletaExterna = async (personalId, fecha, nuevoEstado, observac
   }
 };
 
-module.exports = {
-  findAll,
-  findById,
-  findBypersonalAndFecha,
-  create,
-  updateIngreso,
-  updateSalida,
-  updateEstadoPresencia,
-  marcarAusentesAlFinalDelDia,
-  verificarRegistrosDelDia,
-  actualizarEstadoPorPeriodo,
-  getEstadisticas,
-  getEstadisticasTotales,
-  getEstadisticasPuntualidad,
-  getEstadisticasAusencias,
-  getEstadisticasAreas,
-  getEstadisticaspersonal,
-  getpersonalDetalle,
-  getConfiguracion,
-  countDiasToleranciaUsados,
-  getResumenMensualpersonal,
-  createJustificacion,
-  findAllJustificaciones,
-  updateJustificacionEstado,
-  updatePorPapeletaExterna
-};
+
 
 /**
  * Buscar justificaciones con filtros
@@ -1632,7 +1640,7 @@ async function findAllJustificaciones(options = {}) {
     INNER JOIN controlasistenciapersonal ca ON j.control_asistencia_id = ca.id
     INNER JOIN personal p ON ca.personal_id = p.id
     ${whereString}
-    ORDER BY j.fecha_solicitud DESC
+    ORDER BY ca.ingreso DESC
   `;
   
   try {
@@ -1671,4 +1679,33 @@ async function updateJustificacionEstado(id, estado, observacion, usuarioRespues
     logger.error('Error actualizando estado de justificación:', error);
     throw error;
   }
+};
+
+module.exports = {
+  findAll,
+  findById,
+  findBypersonalAndFecha,
+  create,
+  updateIngreso,
+  updateSalida,
+  updateEstadoPresencia,
+  marcarAusentesAlFinalDelDia,
+  verificarRegistrosDelDia,
+  actualizarEstadoPorPeriodo,
+  getEstadisticas,
+  getEstadisticasTotales,
+  getEstadisticasPuntualidad,
+  getEstadisticasAusencias,
+  getEstadisticasAreas,
+  getEstadisticaspersonal,
+  getpersonalDetalle,
+  getConfiguracion,
+  countDiasToleranciaUsados,
+  getResumenMensualpersonal,
+  updatePorPapeletaExterna,
+  createJustificacion,
+  findAllJustificaciones,
+  updateJustificacionEstado,
+  createMovimiento,
+  getMovimientosByControlId
 };

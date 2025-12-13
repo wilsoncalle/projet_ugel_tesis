@@ -232,10 +232,13 @@ export const asistenciaPersonalService = {
       params: { anio, mes },
     }),
 
-  getMiAsistencia: ({ anio, mes, page, limit }) =>
+  // CORRECCIÓN: Le asignamos nombre y recibimos los parámetros
+  getMiAsistencia: ({ anio, mes, page, limit }) => 
     api.get('/asistencia-personal/mi/asistencia', {
       params: { anio, mes, page, limit },
     }),
+  getMovimientos: (id) => api.get(`/asistencia-personal/${id}/movimientos`),
+
 
   justificar: (id, data) => {
     const formData = new FormData();

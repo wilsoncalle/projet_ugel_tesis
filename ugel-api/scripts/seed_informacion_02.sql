@@ -139,10 +139,12 @@ INSERT INTO public.reniecproveedor (
 -- ------------------------------------------------------------
 INSERT INTO public.config_asistencia_personal (
   id, personal_id, activo, aplica_desde, hora_entrada,
+  hora_entrada_tarde, -- <--- AGREGAR ESTA COLUMNA
   minutos_tolerancia_por_dia, dias_tolerancia_por_mes,
   created_at, updated_at
 ) VALUES (
   1, NULL, TRUE, '2016-01-01', '09:00:00',
+  NULL,
   10, 10,
   '2016-01-01 08:00:00-05', '2025-12-12 14:00:00-05'
 );

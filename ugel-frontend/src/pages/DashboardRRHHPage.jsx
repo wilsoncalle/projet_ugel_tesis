@@ -124,6 +124,55 @@ const DashboardRRHHPage = () => {
     flujoDiario: []
   });
 
+  // Estados para comparación
+  const [comparacion, setComparacion] = useState({
+    asistencias: 0,
+    puntualidad: 0,
+    tardanzas: 0,
+    ausencias: 0
+  });
+
+  // Helper para obtener fechas del período anterior
+  const getPreviousPeriodDates = (periodoActual) => {
+    const now = new Date();
+    const formatDate = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    let start, end;
+
+    switch (periodoActual) {
+      case 'hoy':
+        start = new Date(now);
+        start.setDate(now.getDate() - 1);
+        end = new Date(start);
+        break;
+      case 'semana':
+        const day = now.getDay();
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+        const lunesActual = new Date(now.setDate(diff));
+        start = new Date(lunesActual);
+        start.setDate(lunesActual.getDate() - 7);
+        end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        break;
+      case 'mes':
+        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case 'anio':
+        start = new Date(now.getFullYear() - 1, 0, 1);
+        end = new Date(now.getFullYear() - 1, 11, 31);
+        break;
+      default:
+        return null;
+    }
+    return { start: formatDate(start), end: formatDate(end) };
+  };
+
   // Estados para Historial Widgets
   const [historialAsistenciasPreview, setHistorialAsistenciasPreview] = useState([]);
   const [historialPapeletasPreview, setHistorialPapeletasPreview] = useState([]);
@@ -246,13 +295,29 @@ const DashboardRRHHPage = () => {
 
       const totalAsistencias = asistenciasData.total || 0;
       
-      // Extraer datos de puntualidad
-      const labels = puntualidad.data?.labels || [];
-      const values = puntualidad.data?.datasets?.[0]?.data || [];
+      // Procesar Puntualidad/Tardanzas (Soporte distribucion_por_dia)
+      const distribucionPorDia = puntualidad.data?.distribucion_por_dia || [];
+      let puntualidadCount = 0;
+      let tardanzasCount = 0;
+
+      if (distribucionPorDia.length > 0) {
+         distribucionPorDia.forEach(item => {
+            const estado = (item.estado_presencia || '').toLowerCase();
+            const cantidad = parseInt(item.cantidad || 0);
+            if (estado === 'presente') puntualidadCount += cantidad;
+            if (estado === 'tardanza') tardanzasCount += cantidad;
+         });
+      } else {
+        // Fallback labels/values
+        const labels = puntualidad.data?.labels || [];
+        const values = puntualidad.data?.datasets?.[0]?.data || [];
+        const indexPuntual = labels.findIndex(l => l.toLowerCase().includes('puntual') || l.toLowerCase().includes('presente'));
+        const indexTardanza = labels.findIndex(l => l.toLowerCase().includes('tardanza'));
+        puntualidadCount = indexPuntual >= 0 ? values[indexPuntual] : 0;
+        tardanzasCount = indexTardanza >= 0 ? values[indexTardanza] : 0;
+      }
       
-      const puntualidadCount = values[labels.indexOf('Presente')] || 0;
-      const tardanzasCount = values[labels.indexOf('Tardanza')] || 0;
-      const ausenciasCount = values[labels.indexOf('Ausente')] || values[labels.indexOf('Falta')] || 0;
+      const ausenciasCount = inasistenciasData.total || 0;
 
       setDatosAsistencias({
         totalAsistencias: totalAsistencias,
@@ -265,6 +330,65 @@ const DashboardRRHHPage = () => {
       // Setear historial preview
       if (historial && historial.success) {
         setHistorialAsistenciasPreview(historial.data || []);
+      }
+
+      // --- CÁLCULO DE COMPARACIÓN VS PERÍODO ANTERIOR ---
+      const prevDates = getPreviousPeriodDates(periodo);
+      
+      if (prevDates) {
+        const [prevTotalesRes, prevPuntualidadRes] = await Promise.all([
+          fetch(`/api/asistencia-personal/estadisticas/totales?fechaInicio=${prevDates.start}&fechaFin=${prevDates.end}`, {
+             headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetch(`/api/asistencia-personal/estadisticas/puntualidad?fechaInicio=${prevDates.start}&fechaFin=${prevDates.end}`, {
+             headers: { 'Authorization': `Bearer ${token}` }
+          })
+        ]);
+
+        const prevTotales = await prevTotalesRes.json();
+        const prevPuntualidad = await prevPuntualidadRes.json();
+        
+        // Asistencias Previas
+        const prevTotalAsistencias = prevTotales.data?.asistencias?.total || 0;
+        
+        // Puntualidad/Tardanzas Previas
+        const prevDistribucion = prevPuntualidad.data?.distribucion_por_dia || [];
+        let prevPuntualCount = 0;
+        let prevTardanzasCount = 0;
+
+        if (prevDistribucion.length > 0) {
+           prevDistribucion.forEach(item => {
+              const estado = (item.estado_presencia || '').toLowerCase();
+              const cantidad = parseInt(item.cantidad || 0);
+              if (estado === 'presente') prevPuntualCount += cantidad;
+              if (estado === 'tardanza') prevTardanzasCount += cantidad;
+           });
+        } else {
+           const prevLabels = prevPuntualidad.data?.labels || [];
+           const prevValues = prevPuntualidad.data?.datasets?.[0]?.data || [];
+           const prevIndexPuntual = prevLabels.findIndex(l => l.toLowerCase().includes('puntual') || l.toLowerCase().includes('presente'));
+           const prevIndexTardanza = prevLabels.findIndex(l => l.toLowerCase().includes('tardanza'));
+           prevPuntualCount = prevIndexPuntual >= 0 ? prevValues[prevIndexPuntual] : 0;
+           prevTardanzasCount = prevIndexTardanza >= 0 ? prevValues[prevIndexTardanza] : 0;
+        }
+        
+        // Ausencias Previas (inasistencias.total)
+        const prevTotalAusencias = prevTotales.data?.inasistencias?.total || 0;
+
+        const calcChange = (curr, prev) => {
+          if (prev === 0) return curr > 0 ? 100 : 0;
+          return ((curr - prev) / prev) * 100;
+        };
+
+        setComparacion({
+          asistencias: parseFloat(calcChange(totalAsistencias, prevTotalAsistencias).toFixed(1)),
+          puntualidad: parseFloat(calcChange(puntualidadCount, prevPuntualCount).toFixed(1)),
+          tardanzas: parseFloat(calcChange(tardanzasCount, prevTardanzasCount).toFixed(1)),
+          ausencias: parseFloat(calcChange(ausenciasCount, prevTotalAusencias).toFixed(1)),
+        });
+
+      } else {
+        setComparacion({ asistencias: 0, puntualidad: 0, tardanzas: 0, ausencias: 0 });
       }
 
     } catch (err) {
@@ -873,7 +997,7 @@ const DashboardRRHHPage = () => {
                 <KPICard
                   title="Total Asistencias"
                   value={datosAsistencias.totalAsistencias}
-                  change={0}
+                  change={comparacion.asistencias}
                   icon={UserCheck}
                   colorScheme="blue"
                   subtitle="Personal registrado"
@@ -881,7 +1005,7 @@ const DashboardRRHHPage = () => {
                 <KPICard
                   title="Puntualidad"
                   value={datosAsistencias.puntualidad}
-                  change={0}
+                  change={comparacion.puntualidad}
                   icon={Clock}
                   colorScheme="green"
                   subtitle="Asistencias a tiempo"
@@ -889,7 +1013,7 @@ const DashboardRRHHPage = () => {
                 <KPICard
                   title="Tardanzas"
                   value={datosAsistencias.tardanzas}
-                  change={0}
+                  change={comparacion.tardanzas}
                   icon={Clock}
                   colorScheme="orange"
                   subtitle="Llegadas tarde"
@@ -897,11 +1021,12 @@ const DashboardRRHHPage = () => {
                 <KPICard
                   title="Ausencias"
                   value={datosAsistencias.totalAusencias}
-                  change={0}
+                  change={comparacion.ausencias}
                   icon={XCircle}
                   colorScheme="red"
                   subtitle="Faltas registradas"
                 />
+
               </>
             )}
           </div>

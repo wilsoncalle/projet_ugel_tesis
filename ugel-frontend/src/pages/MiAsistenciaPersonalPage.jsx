@@ -162,7 +162,8 @@ const MiAsistenciaPersonalPage = () => {
     []
   );
 
-  const noEsPersonal = user && user.rol && user.rol !== 'Personal';
+  // Se permite el acceso a cualquier rol, el backend validará si tiene personal_id asociado
+  const noEsPersonal = user && user.rol && user.rol !== 'personal';
 
   const fetchResumen = useCallback(async () => {
     try {

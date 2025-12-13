@@ -260,6 +260,18 @@ router.get(
 );
 
 /**
+ * @route   GET /api/asistencia-personal/:id/movimientos
+ * @desc    Obtener historial de movimientos
+ * @access  Private
+ */
+router.get(
+  '/:id/movimientos',
+  authenticateToken,
+  requireActiveUser,
+  controller.getMovimientos
+);
+
+/**
  * @route   POST /api/asistencia-personal/:id/justificar
  * @desc    Justificar inasistencia o tardanza
  * @access  Private

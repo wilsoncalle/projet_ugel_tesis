@@ -1336,13 +1336,23 @@ const ReportesRRHHPage = () => {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={visitasPorMotivo.labels.map((l, i) => ({ name: l, value: visitasPorMotivo.data[i] }))} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120}>
+                <Pie 
+                  data={visitasPorMotivo.labels.map((l, i) => ({ name: l, value: visitasPorMotivo.data[i] }))} 
+                  dataKey="value" 
+                  nameKey="name" 
+                  cx="40%" 
+                  cy="50%" 
+                  outerRadius={90}
+                >
                   {visitasPorMotivo.labels.map((_, idx) => (
-                    <Cell key={idx} fill={['#2563EB', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6'][idx % 5]} />
+                    <Cell key={idx} fill={[
+                      '#2563EB', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6', 
+                      '#EC4899', '#6366F1', '#14B8A6', '#F97316', '#06B6D4', '#64748B'
+                    ][idx % 11]} />
                   ))}
                 </Pie>
                 <Tooltip />
-                <Legend />
+                <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ maxHeight: '280px', overflowY: 'auto' }} />
               </PieChart>
             </ResponsiveContainer>
           )}
@@ -1516,8 +1526,19 @@ const visitasMetricas = useMemo(() => {
       const key = v.nombre_motivo || 'Sin motivo';
       counts[key] = (counts[key] || 0) + 1;
     });
-    const labels = Object.keys(counts);
-    const data = labels.map((k) => counts[k]);
+    
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const limit = 10;
+    const topEntries = entries.slice(0, limit);
+    const others = entries.slice(limit);
+    
+    if (others.length > 0) {
+      const othersCount = others.reduce((acc, curr) => acc + curr[1], 0);
+      topEntries.push(['Otros', othersCount]);
+    }
+
+    const labels = topEntries.map((e) => e[0]);
+    const data = topEntries.map((e) => e[1]);
     return { labels, data };
   }, [visitas]);
 

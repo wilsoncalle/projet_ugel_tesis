@@ -139,7 +139,7 @@ const DashboardVigilantePage = () => {
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
-    itemsPerPage: 10
+    itemsPerPage: 15
   });
   
   // Estado para la vista previa en tiempo real

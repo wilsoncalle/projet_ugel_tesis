@@ -7,6 +7,7 @@ const repository = require('./personal.repository');
 const areasRepository = require('../areas/areas.repository');
 const tiposContratoRepository = require('../tipos-contrato/tiposcontrato.repository');
 const cargosRepository = require('../cargos/cargos.repository');
+const tiposDocumentoRepository = require('../tipos-documento/tiposdocumento.repository');
 const usuariosService = require('../usuarios/usuarios.service');
 const db = require('../../config/database');
 const { AppError } = require('../../middleware/errorHandler');
@@ -533,9 +534,15 @@ const createpersonal = async (personalData, userId) => {
       throw new AppError('Cargo inactivo', 400);
     }
     
+    // Obtener ID del tipo de documento desde el código
+    const docType = await tiposDocumentoRepository.findByCode(tipoDocumento);
+    if (!docType) {
+      throw new AppError(`Tipo de documento inválido: ${tipoDocumento}`, 400);
+    }
+    
     // Crear el personal
     const newpersonal = await repository.create({
-      tipo_documento: tipoDocumento,
+      tipo_documento_id: docType.id,
       numero_documento: numeroDocumento,
       nombres,
       apellidos,
@@ -605,11 +612,15 @@ const updatepersonal = async (id, personalData, userId) => {
     
     // Preparar datos a actualizar
     if (tipoDocumento !== undefined) {
-      // Verificar que el tipo de documento sea válido
+      // Verificar que el tipo de documento sea válido y obtener su ID
       if (!config.validation.validDocumentTypes.includes(tipoDocumento)) {
         throw new AppError(`Tipo de documento inválido. Tipos válidos: ${config.validation.validDocumentTypes.join(', ')}`, 400);
       }  
-      updateData.tipo_documento = tipoDocumento;
+      const docType = await tiposDocumentoRepository.findByCode(tipoDocumento);
+      if (!docType) {
+         throw new AppError(`Tipo de documento no encontrado en BD: ${tipoDocumento}`, 404);
+      }
+      updateData.tipo_documento_id = docType.id;
     }
     
     if (numeroDocumento !== undefined) {

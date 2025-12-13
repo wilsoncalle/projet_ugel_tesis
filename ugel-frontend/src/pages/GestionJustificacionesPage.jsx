@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import ModalGenerico from '../components/ModalGenerico';
 import TabView from '../components/TabView';
+import SelectCustom from '../components/SelectCustom'; // Importar SelectCustom
 
 const GestionJustificacionesPage = () => {
   useDocumentTitle('Gestión de Justificaciones - RRHH');
@@ -20,6 +21,16 @@ const GestionJustificacionesPage = () => {
   const [loading, setLoading] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState('PENDIENTE');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filtros de fecha
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   // Estado para el modal de rechazo/observación
   const [modalOpen, setModalOpen] = useState(false);
@@ -43,9 +54,29 @@ const GestionJustificacionesPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
+      // Pasamos filtros al servicio (asumiendo que el servicio los maneja o manejaremos filtrado local si la API no soporta)
+      // Actualizaremos la llamada para incluir año y mes si la API lo permite, si no, filtraremos localmente.
+      // Revisitando justificacionesService.getAll: acepta (estado, search).
+      // Si la API no tiene filtro de fecha, filtraremos en el cliente.
+      
       const response = await justificacionesService.getAll(filtroEstado, searchTerm);
       if (response.data?.success) {
-        setJustificaciones(response.data.data);
+        let data = response.data.data;
+
+        // Filtrado Local por Año y Mes (SIEMPRE APLICAR, excepto PENDIENTES que suelen ser de siempre)
+        // Ojo: Si el usuarios quiere ver pendientes historicos, quizas quiera filtrar.
+        // Pero para "Pendientes" lo ideal es ver TODO lo pendiente.
+        // Para "Aprobados/Rechazados" es critico el filtro historico.
+        
+        if (filtroEstado !== 'PENDIENTE') {
+           data = data.filter(item => {
+              const d = new Date(item.fecha);
+              return d.getFullYear() === parseInt(selectedYear) && 
+                     (d.getMonth() + 1) === parseInt(selectedMonth);
+           });
+        }
+        
+        setJustificaciones(data);
       }
     } catch (error) {
       console.error('Error cargando justificaciones', error);
@@ -56,7 +87,21 @@ const GestionJustificacionesPage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [filtroEstado, searchTerm]);
+  }, [filtroEstado, searchTerm, selectedYear, selectedMonth]); // Re-fetch cuando cambian filtros
+
+  // Generar opciones de años (actual - 5)
+  const years = Array.from({length: 6}, (_, i) => {
+     const y = currentYear - i;
+     return { value: y, label: y.toString() };
+  });
+
+  // Opciones de meses
+  const months = [
+    { value: 1, label: 'Enero' }, { value: 2, label: 'Febrero' }, { value: 3, label: 'Marzo' },
+    { value: 4, label: 'Abril' }, { value: 5, label: 'Mayo' }, { value: 6, label: 'Junio' },
+    { value: 7, label: 'Julio' }, { value: 8, label: 'Agosto' }, { value: 9, label: 'Septiembre' },
+    { value: 10, label: 'Octubre' }, { value: 11, label: 'Noviembre' }, { value: 12, label: 'Diciembre' }
+  ];
 
   const handleActionClick = (row, tipo) => {
     setAccionActual({ id: row.id, tipo });
@@ -198,15 +243,76 @@ const GestionJustificacionesPage = () => {
         onTabChange={setFiltroEstado}
       >
         <Card className="bg-white shadow-lg border border-gray-200 rounded-2xl">
+          
+          
+          {/* Controles: Buscador y Filtros */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 border-b border-gray-100 rounded-t-2xl">
+             {/* Buscador - Lado Izquierdo */}
+             <div className="relative flex-1 max-w-md w-full">
+                {/* El componente TableGenerica ya tiene buscador interno si se le pasa searchable.
+                    Para tener los filtros AL LADO, tenemos dos opciones:
+                    1. Usar el prop `actions` de TableGenerica para inyectar los selectores.
+                    2. Sacar el buscador de TableGenerica y poner todo junto aqui.
+                    
+                    OPCION 2: Control total del layout.
+                    Deshabilitamos `searchable={true}` en TableGenerica y manejamos el input aqui.
+                */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre o DNI..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white"
+                  />
+                  <svg
+                    className="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+             </div>
+
+             {/* Filtros - Lado Derecho (solo si no es PENDIENTE) */}
+             {filtroEstado !== 'PENDIENTE' && (
+               <div className="flex gap-2 w-full sm:w-auto">
+                 <div className="w-32">
+                    <SelectCustom 
+                      placeholder="Año"
+                      options={years}
+                      value={years.find(y => y.value === selectedYear)}
+                      onChange={(opt) => setSelectedYear(opt?.value)}
+                      isClearable={false}
+                      minMenuWidth="120px"
+                    />
+                 </div>
+                 <div className="w-32">
+                    <SelectCustom 
+                      placeholder="Mes"
+                      options={months}
+                      value={months.find(m => m.value === selectedMonth)}
+                      onChange={(opt) => setSelectedMonth(opt?.value)}
+                      isClearable={false}
+                      minMenuWidth="120px"
+                    />
+                 </div>
+               </div>
+             )}
+          </div>
+
           <TableGenerica 
             columns={columns} 
             data={justificaciones} 
             isLoading={loading}
             emptyMessage="No hay solicitudes en este estado."
-            searchable={true}
-            searchPlaceholder="Buscar por nombre o DNI..."
-            searchValue={searchTerm}
-            onSearch={setSearchTerm}
+            // Quitamos searchable de aqui porque ya lo implementamos arriba manualmente
+            searchable={false} 
+            pagination={true} 
+            itemsPerPage={10} 
+            className="!mt-0" // Quitamos margen superior porque ya tenemos los controles arriba
           />
         </Card>
       </TabView>

@@ -9,7 +9,8 @@ const ModalDetalles = ({
   title = 'Detalles',
   size = 'md',
   renderContent,
-  fields = []
+  fields = [],
+  children
 }) => {
   const getSizeClasses = () => {
     const sizes = {
@@ -111,6 +112,7 @@ const ModalDetalles = ({
                 {/* Content */}
                 <div className="mt-2">
                   {renderContent ? renderContent(data) : renderDefaultContent()}
+                  {children && <div className="mt-8 border-t border-gray-100 pt-6">{children}</div>}
                 </div>
               </Dialog.Panel>
             </Transition.Child>
