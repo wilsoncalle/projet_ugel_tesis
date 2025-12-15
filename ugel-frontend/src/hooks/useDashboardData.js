@@ -151,32 +151,22 @@ const useDashboardData = () => {
    */
   const fetchDatosPersonal = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      
-      // 1. Fetch de datos Actuales
+      // 1. Fetch de datos Actuales - Usando servicio con interceptores
       const [totalesRes, ausenciasRes, puntualidadRes, areasRes, historialRes] = await Promise.all([
-        fetch(`/api/asistencia-personal/estadisticas/totales?periodo=${periodo}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/asistencia-personal/estadisticas/ausencias?periodo=${periodo}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/asistencia-personal/estadisticas/puntualidad?periodo=${periodo}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/asistencia-personal/estadisticas/areas?periodo=${periodo}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
+        asistenciaPersonalService.getEstadisticasTotales({ periodo }),
+        asistenciaPersonalService.getEstadisticasAusencias({ periodo }),
+        asistenciaPersonalService.getEstadisticasPuntualidad({ periodo }),
+        asistenciaPersonalService.getEstadisticasAreas({ periodo }),
         asistenciaPersonalService.getAll({
           page: 1,
           limit: 10,
         }),
       ]);
 
-      const totales = await totalesRes.json();
-      const ausencias = await ausenciasRes.json();
-      const puntualidad = await puntualidadRes.json();
-      const areas = await areasRes.json();
+      const totales = totalesRes.data;
+      const ausencias = ausenciasRes.data;
+      const puntualidad = puntualidadRes.data;
+      const areas = areasRes.data;
       const historial = historialRes.data;
 
       // Procesar datos actuales
@@ -249,16 +239,18 @@ const useDashboardData = () => {
       const prevDates = getPreviousPeriodDates(periodo);
       if (prevDates) {
         const [prevTotalesRes, prevPuntualidadRes] = await Promise.all([
-          fetch(`/api/asistencia-personal/estadisticas/totales?fechaInicio=${prevDates.start}&fechaFin=${prevDates.end}`, { 
-             headers: { 'Authorization': `Bearer ${token}` } 
+          asistenciaPersonalService.getEstadisticasTotales({ 
+            fechaInicio: prevDates.start,
+            fechaFin: prevDates.end 
           }),
-          fetch(`/api/asistencia-personal/estadisticas/puntualidad?fechaInicio=${prevDates.start}&fechaFin=${prevDates.end}`, { 
-             headers: { 'Authorization': `Bearer ${token}` } 
+          asistenciaPersonalService.getEstadisticasPuntualidad({ 
+            fechaInicio: prevDates.start,
+            fechaFin: prevDates.end 
           })
         ]);
 
-        const prevTotales = await prevTotalesRes.json();
-        const prevPuntualidad = await prevPuntualidadRes.json();
+        const prevTotales = prevTotalesRes.data;
+        const prevPuntualidad = prevPuntualidadRes.data;
 
         // Calcular variaciones
         const prevTotalAsistencias = prevTotales.data?.asistencias?.total || 0;
@@ -305,31 +297,21 @@ const useDashboardData = () => {
    */
   const fetchDatosVisitas = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      
       const [totalesRes, motivoRes, areaRes, frecuentesRes, historialRes] = await Promise.all([
-        fetch(`/api/visitas/totales?periodo=${periodo}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/visitas/por-motivo?periodo=${periodo}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/visitas/por-area?periodo=${periodo}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/visitas/visitantes-frecuentes?periodo=${periodo}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
+        visitasService.getTotales(periodo),
+        visitasService.getVisitasPorMotivo(periodo),
+        visitasService.getVisitasPorArea(periodo),
+        visitasService.getVisitantesFrecuentes(periodo),
         visitasService.getAll({
           page: 1,
           limit: 10,
         }),
       ]);
 
-      const totales = await totalesRes.json();
-      const motivo = await motivoRes.json();
-      const area = await areaRes.json();
-      const frecuentes = await frecuentesRes.json();
+      const totales = totalesRes.data;
+      const motivo = motivoRes.data;
+      const area = areaRes.data;
+      const frecuentes = frecuentesRes.data;
       const historial = historialRes.data;
 
       const flujoDiario = totales.data?.flujoDiario || [];

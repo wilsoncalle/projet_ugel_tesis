@@ -141,6 +141,7 @@ const DashboardVigilantePage = () => {
     totalItems: 0,
     itemsPerPage: 15
   });
+  const FRESH_CACHE_MS = 30_000; // 30s para reutilizar datos sin refetch en cambios rápidos de pestaña
   
   // Estado para la vista previa en tiempo real
   const [vistaPreviaVisitante, setVistaPreviaVisitante] = useState(null);
@@ -266,6 +267,7 @@ const DashboardVigilantePage = () => {
     let isCleaningUp = false;
 
     const initializeSocket = async () => {
+      if (!navigator.onLine) return null;
       // Si ya hay una instancia, no crear otra
       if (socketInstance) return socketInstance;
 
@@ -720,7 +722,54 @@ const DashboardVigilantePage = () => {
 
   const cargarVisitantesActivos = async () => {
     try {
-      setLoading(true);
+      let useLoading = true;
+
+      // Usar caché reciente para responder instantáneamente al cambiar de página
+      try {
+        const cached = localStorage.getItem('cache_visitas_activas');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const ts = Number(parsed?.ts || 0);
+          const data = Array.isArray(parsed?.data) ? parsed.data : [];
+          if (data.length > 0 && Date.now() - ts < FRESH_CACHE_MS) {
+            const transformados = data.map((visita) => ({
+              ...visita,
+              empleadoVisitado: {
+                id: visita.personal_visitado_id,
+                nombres: visita.personal_nombres || '',
+                apellidos: visita.personal_apellidos || '',
+                cargo: visita.personal_cargo || ''
+              },
+              motivo: {
+                id: visita.motivo_visita_id,
+                label: visita.nombre_motivo || ''
+              },
+              lugar: visita.area_destino_id,
+              lugarNombre: visita.nombre_area || '',
+              visitante_nombres: visita.visitante_nombres || visita.visitante?.nombres || '',
+              visitante_apellidos: visita.visitante_apellidos || visita.visitante?.apellidos || '',
+              personal_nombres: visita.personal_nombres || '',
+              personal_apellidos: visita.personal_apellidos || '',
+              personal_cargo: visita.personal_cargo || '',
+              nombre_motivo: visita.nombre_motivo || '',
+              nombre_area: visita.nombre_area || ''
+            }));
+            const activosSinSalida = transformados.filter((visita) => !visita.fecha_salida);
+            setVisitantesActivos(activosSinSalida);
+            setActivosPagination((prev) => ({
+              ...prev,
+              totalItems: activosSinSalida.length,
+              totalPages: Math.ceil(activosSinSalida.length / prev.itemsPerPage),
+              currentPage: 1
+            }));
+            useLoading = false; // evitamos spinner visible
+          }
+        }
+      } catch (e) {
+        console.warn('No se pudo leer cache_visitas_activas', e);
+      }
+
+      if (useLoading) setLoading(true);
       setError('');
       
       let activosData = [];
@@ -814,38 +863,42 @@ const DashboardVigilantePage = () => {
                 // También considerar visitas sin salida (activas)
                 const sinSalida = !v.fecha_salida && !v.hora_salida;
                 
-                console.log('[Online] Comparando:', {
-                  offline: {
-                    doc: visitaOffline.numero_documento,
-                    personal: visitaOffline.personal_visitado_id,
-                    fecha: fechaOffline,
-                    hora: horaOffline
-                  },
-                  api: {
-                    doc: v.numero_documento,
-                    personal: v.personal_visitado_id,
-                    fecha: fechaAPI,
-                    hora: horaAPI,
-                    sinSalida: sinSalida
-                  },
-                  coincidencias: {
-                    documento: mismoDocumento,
-                    personal: mismoPersonal,
-                    fecha: mismaFecha,
-                    hora: mismaHora,
-                    sinSalida: sinSalida
-                  }
-                });
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Online] Comparando:', {
+                    offline: {
+                      doc: visitaOffline.numero_documento,
+                      personal: visitaOffline.personal_visitado_id,
+                      fecha: fechaOffline,
+                      hora: horaOffline
+                    },
+                    api: {
+                      doc: v.numero_documento,
+                      personal: v.personal_visitado_id,
+                      fecha: fechaAPI,
+                      hora: horaAPI,
+                      sinSalida: sinSalida
+                    },
+                    coincidencias: {
+                      documento: mismoDocumento,
+                      personal: mismoPersonal,
+                      fecha: mismaFecha,
+                      hora: mismaHora,
+                      sinSalida: sinSalida
+                    }
+                  });
+                }
                 
                 // Coincidencia si: mismo documento, mismo personal, misma fecha, misma hora Y sin salida
                 return mismoDocumento && mismoPersonal && mismaFecha && mismaHora && sinSalida;
               });
               
               if (visitaAPI) {
-                console.log('[Online] ✅ Encontrada coincidencia para visita offline:', {
-                  offline: visitaOffline,
-                  api: visitaAPI
-                });
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Online] ✅ Encontrada coincidencia para visita offline:', {
+                    offline: visitaOffline,
+                    api: visitaAPI
+                  });
+                }
                 
                 // Marcar esta visita de la API como procesada
                 visitasAPIProcesadas.add(visitaAPI.id);
@@ -859,7 +912,9 @@ const DashboardVigilantePage = () => {
               }
               
               // Si no hay coincidencia, mantener la visita offline
-              console.log('[Online] ⚠️ No se encontró coincidencia para visita offline:', visitaOffline);
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[Online] ⚠️ No se encontró coincidencia para visita offline:', visitaOffline);
+              }
               return visitaOffline;
             });
             
@@ -869,15 +924,17 @@ const DashboardVigilantePage = () => {
             );
             
             // Log solo si hay datos relevantes
-            if (visitasOfflineActualizadas.length > 0 || visitasAPINoUsadas.length > 0) {
-              console.log('[Online] Visitas offline actualizadas:', visitasOfflineActualizadas.length);
-              console.log('[Online] Visitas de la API no usadas:', visitasAPINoUsadas.length);
+            if (process.env.NODE_ENV === 'development') {
+              if (visitasOfflineActualizadas.length > 0 || visitasAPINoUsadas.length > 0) {
+                console.log('[Online] Visitas offline actualizadas:', visitasOfflineActualizadas.length);
+                console.log('[Online] Visitas de la API no usadas:', visitasAPINoUsadas.length);
+              }
             }
             
             // Combinar: visitas offline actualizadas + visitas de la API que no tenían correspondencia offline
             const resultado = [...visitasOfflineActualizadas, ...visitasAPINoUsadas];
             // Log solo si hay datos
-            if (resultado.length > 0) {
+            if (resultado.length > 0 && process.env.NODE_ENV === 'development') {
               console.log('[Online] Total de visitas después de sincronización:', resultado.length);
             }
             

@@ -25,7 +25,7 @@ import {
   getVisitantesActivos,
   papeletasSalidaService,
 } from '../../services/api';
-import { getPendingIngresosPersonal } from '../../utils/offlineDB';
+import { getPendingIngresosPersonal, getPendingSalidasPersonal } from '../../utils/offlineDB';
 import { getCachedData, setCachedData } from '../../utils/referenceCache';
 
 const RegistroForm = forwardRef(
@@ -111,6 +111,13 @@ const RegistroForm = forwardRef(
       areas: 'cache_areas',
       papeletas: 'cache_papeletas_externas',
     });
+    const FORM_CACHE_KEYS = useRef({
+      visitante: 'cache_form_visitante',
+      visitaActivos: 'cache_form_visita_activos',
+      visitaHistorial: 'cache_form_visita_historial',
+      lastLoadTs: 'cache_refs_last_load_ts',
+    });
+    const lastLoadTsRef = useRef(0);
 
     useImperativeHandle(ref, () => ({
       getCurrentFormData: () => {
@@ -150,18 +157,69 @@ const RegistroForm = forwardRef(
     };
 
     useEffect(() => {
+      // Restaurar formularios cacheados
+      try {
+        const storedVisitante = localStorage.getItem(FORM_CACHE_KEYS.current.visitante);
+        if (storedVisitante) setFormVisitante(JSON.parse(storedVisitante));
+      } catch (e) {
+        console.warn('[RegistroForm] No se pudo restaurar formVisitante del caché', e);
+      }
+      try {
+        const storedActivos = localStorage.getItem(FORM_CACHE_KEYS.current.visitaActivos);
+        if (storedActivos) setFormVisitaActivos(JSON.parse(storedActivos));
+      } catch (e) {
+        console.warn('[RegistroForm] No se pudo restaurar formVisitaActivos del caché', e);
+      }
+      try {
+        const storedHistorial = localStorage.getItem(FORM_CACHE_KEYS.current.visitaHistorial);
+        if (storedHistorial) setFormVisitaHistorial(JSON.parse(storedHistorial));
+      } catch (e) {
+        console.warn('[RegistroForm] No se pudo restaurar formVisitaHistorial del caché', e);
+      }
+
       cargarDatosIniciales();
       const handleOfflineIngreso = () => cargarDatosIniciales();
+      const handleOfflineSalida = () => cargarDatosIniciales();
       window.addEventListener('offline-personal-ingreso', handleOfflineIngreso);
-      return () => window.removeEventListener('offline-personal-ingreso', handleOfflineIngreso);
+      window.addEventListener('offline-personal-salida', handleOfflineSalida);
+      return () => {
+        window.removeEventListener('offline-personal-ingreso', handleOfflineIngreso);
+        window.removeEventListener('offline-personal-salida', handleOfflineSalida);
+      };
     }, []);
 
     useEffect(() => {
       tiposDocumentoRef.current = tiposDocumento;
     }, [tiposDocumento]);
 
+    // Persistir formularios en caché local para que sobrevivan a cambios de pestaña/ruta
+    useEffect(() => {
+      try {
+        localStorage.setItem(FORM_CACHE_KEYS.current.visitante, JSON.stringify(formVisitante));
+      } catch (e) {
+        console.warn('[RegistroForm] No se pudo cachear formVisitante', e);
+      }
+    }, [formVisitante]);
+
+    useEffect(() => {
+      try {
+        localStorage.setItem(FORM_CACHE_KEYS.current.visitaActivos, JSON.stringify(formVisitaActivos));
+      } catch (e) {
+        console.warn('[RegistroForm] No se pudo cachear formVisitaActivos', e);
+      }
+    }, [formVisitaActivos]);
+
+    useEffect(() => {
+      try {
+        localStorage.setItem(FORM_CACHE_KEYS.current.visitaHistorial, JSON.stringify(formVisitaHistorial));
+      } catch (e) {
+        console.warn('[RegistroForm] No se pudo cachear formVisitaHistorial', e);
+      }
+    }, [formVisitaHistorial]);
+
     useEffect(() => {
       if (!user?.id) return;
+      if (!navigator.onLine) return;
 
       const token = localStorage.getItem('token');
       const socketURL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
@@ -288,12 +346,58 @@ const RegistroForm = forwardRef(
     }, [visitantesEnEspera, activeTab]);
 
     const cargarDatosIniciales = async () => {
+      const nowTs = Date.now();
+      const cachedLastLoad = Number(localStorage.getItem(FORM_CACHE_KEYS.current.lastLoadTs) || 0);
+      lastLoadTsRef.current = cachedLastLoad;
+
+      let usedCache = false;
       setLoadingData(true);
+
+      // Leer movimientos offline para ajustar estados de personal sin conexión
+      let ingresosOffline = [];
+      let salidasOffline = [];
+      try {
+        [ingresosOffline, salidasOffline] = await Promise.all([
+          getPendingIngresosPersonal(),
+          getPendingSalidasPersonal()
+        ]);
+      } catch (e) {
+        console.warn('[RegistroForm] No se pudieron obtener movimientos offline de personal', e);
+      }
+
+      const offlineMovimientos = [
+        ...(ingresosOffline || []).map((ing) => ({
+          personalId: ing.personalId?.toString(),
+          tipo: 'ingreso',
+          ts: Number(ing.timestamp) || Date.parse(`${ing.fecha}T${ing.horaIngreso || '00:00:00'}`) || 0
+        })),
+        ...(salidasOffline || []).map((sal) => ({
+          personalId: sal.personalId?.toString(),
+          tipo: 'salida',
+          ts: Number(sal.timestamp) || Date.parse(`${sal.fecha}T${sal.horaSalida || '00:00:00'}`) || 0
+        })),
+      ]
+        .filter((m) => m.personalId && m.ts);
+
+      offlineMovimientos.sort((a, b) => a.ts - b.ts);
+      const offlineEstadoMap = new Map();
+      offlineMovimientos.forEach((m) => offlineEstadoMap.set(m.personalId, m.tipo));
+
+      const aplicarEstadoOffline = (lista = []) =>
+        lista.map((emp) => {
+          const offlineEstado = offlineEstadoMap.get(emp.value || emp.id?.toString());
+          if (!offlineEstado) return emp;
+          return {
+            ...emp,
+            estado: offlineEstado === 'ingreso' ? 'disponible' : 'ausente',
+          };
+        });
 
       // 1) Intentar usar datos cacheados (fallback inmediato para offline)
       const cachedTipos = getCachedData(CACHE_KEYS.current.tipos);
       if (cachedTipos?.length) {
         setTiposDocumento(cachedTipos);
+        usedCache = true;
         const tipoDNI = cachedTipos.find(
           (tipo) =>
             tipo.label?.toLowerCase().includes('dni') ||
@@ -312,13 +416,16 @@ const RegistroForm = forwardRef(
         setMotivos(cachedMotivos);
         setMotivosActivos(cachedMotivos);
         setMotivosHistorial([{ value: '', label: 'Todos los motivos' }, ...cachedMotivos]);
+        usedCache = true;
       }
 
       const cachedEmpleados = getCachedData(CACHE_KEYS.current.empleados);
       if (cachedEmpleados?.length) {
-        setEmpleados(cachedEmpleados);
-        setEmpleadosActivos(cachedEmpleados);
-        setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...cachedEmpleados]);
+        const empleadosConOffline = aplicarEstadoOffline(cachedEmpleados);
+        setEmpleados(empleadosConOffline);
+        setEmpleadosActivos(empleadosConOffline);
+        setEmpleadosHistorial([{ value: '', label: 'Todos los empleados' }, ...empleadosConOffline]);
+        usedCache = true;
       }
 
       const cachedAreas = getCachedData(CACHE_KEYS.current.areas);
@@ -326,6 +433,19 @@ const RegistroForm = forwardRef(
         setLugares(cachedAreas);
         setLugaresActivos(cachedAreas);
         setLugaresHistorial([{ value: '', label: 'Todos los lugares' }, ...cachedAreas]);
+        usedCache = true;
+      }
+
+      const recentlyLoaded = usedCache && nowTs - cachedLastLoad < 60 * 1000; // 60s grace
+      if (recentlyLoaded) {
+        setLoadingData(false);
+        return;
+      }
+
+      // Si estamos offline, usar solo caché y salir rápido para evitar timeouts/500
+      if (!navigator.onLine) {
+        setLoadingData(false);
+        return;
       }
 
       // 2) Intentar refrescar desde el backend (si hay conexión)
@@ -336,14 +456,12 @@ const RegistroForm = forwardRef(
           empleadosResponse,
           areasResponse,
           papeletasResponse,
-          ingresosOfflineResult,
         ] = await Promise.allSettled([
           tiposDocumentoService.getAll(),
           motivosVisitaService.getAll(),
           personalService.getAll(),
           areasService.getAll(),
           papeletasSalidaService.getExternas(),
-          getPendingIngresosPersonal(),
         ]);
 
         if (tiposResponse.status === 'fulfilled' && tiposResponse.value.data.success) {
@@ -395,12 +513,6 @@ const RegistroForm = forwardRef(
           }
         });
 
-        const ingresosOffline =
-          ingresosOfflineResult?.status === 'fulfilled'
-            ? ingresosOfflineResult.value
-            : await getPendingIngresosPersonal();
-        const ingresosOfflineIds = new Set((ingresosOffline || []).map((ing) => ing.personalId?.toString()));
-
         if (empleadosResponse.status === 'fulfilled' && empleadosResponse.value.data.success) {
           const empleadosData = empleadosResponse.value.data.data.map((empleado) => {
             const estadoBruto = (empleado.estado_presencia || '').toString().trim().toLowerCase();
@@ -440,8 +552,9 @@ const RegistroForm = forwardRef(
               estado = 'permiso';
             }
 
-            if (ingresosOfflineIds.has(empleado.id?.toString())) {
-              estado = 'disponible';
+            const offlineEstado = offlineEstadoMap.get(empleado.id?.toString());
+            if (offlineEstado) {
+              estado = offlineEstado === 'ingreso' ? 'disponible' : 'ausente';
             }
 
             return {
@@ -470,6 +583,9 @@ const RegistroForm = forwardRef(
           setLugaresHistorial([{ value: '', label: 'Todos los lugares' }, ...lugaresData]);
           setCachedData(CACHE_KEYS.current.areas, lugaresData);
         }
+
+        lastLoadTsRef.current = Date.now();
+        localStorage.setItem(FORM_CACHE_KEYS.current.lastLoadTs, String(lastLoadTsRef.current));
       } catch (error) {
         console.error('Error al cargar datos iniciales:', error);
       } finally {

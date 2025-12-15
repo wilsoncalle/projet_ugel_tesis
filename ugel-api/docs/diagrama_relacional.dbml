@@ -1,0 +1,240 @@
+// =========================================
+// MÓDULO: ORGANIZACIÓN Y PERSONAL
+// =========================================
+
+Table areadestino {
+  id integer [pk]
+  nombre_area varchar(150) [unique, not null]
+  activa boolean [default: true]
+}
+
+Table cargo {
+  id integer [pk]
+  nombre_cargo varchar(150) [unique, not null]
+  descripcion text
+  activo boolean [default: true]
+  fecha_creacion timestamptz [default: `CURRENT_TIMESTAMP`]
+}
+
+Table tipocontrato {
+  id integer [pk]
+  nombre_tipo varchar(100) [unique, not null]
+  activo boolean [default: true]
+}
+
+Table tipodocumento {
+  id integer [pk]
+  codigo varchar(10) [unique, not null]
+  codigo_sunat varchar(5)
+  nombre_completo varchar(100) [not null]
+  activo boolean [default: true]
+}
+
+Table personal {
+  id integer [pk]
+  tipo_documento_id integer
+  numero_documento varchar(20) [not null]
+  nombres varchar(150) [not null]
+  apellidos varchar(150) [not null]
+  fecha_nacimiento date
+  email varchar(150)
+  area_destino_id integer [not null]
+  cargo_id integer
+  tipo_contrato_id integer [not null]
+  activo boolean [default: true]
+}
+
+// Relaciones Organización
+Ref: areadestino.id < personal.area_destino_id
+Ref: cargo.id < personal.cargo_id
+Ref: tipocontrato.id < personal.tipo_contrato_id
+Ref: tipodocumento.id < personal.tipo_documento_id
+
+
+// =========================================
+// MÓDULO: SEGURIDAD Y SISTEMA
+// =========================================
+
+Table usuario {
+  id integer [pk]
+  personal_id integer [unique]
+  nombre_usuario varchar(100) [unique, not null]
+  email varchar(150) [unique, not null]
+  hash_contrasena varchar(255) [not null]
+  rol varchar(20) [not null]
+  activo boolean [default: true]
+  es_sistema boolean [default: false]
+  intentos_fallidos integer [default: 0]
+  bloqueado_hasta timestamptz
+  ultimo_intento_fallido timestamptz
+  fecha_creacion timestamptz [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [default: `CURRENT_TIMESTAMP`]
+}
+
+Table reniecproveedor {
+  id integer [pk]
+  usuario_creador_id integer
+  nombre varchar(150) [not null]
+  base_url text [not null]
+  token text
+  activo boolean [default: false]
+  fecha_creacion timestamptz [default: `CURRENT_TIMESTAMP`]
+  fecha_actualizacion timestamptz [default: `CURRENT_TIMESTAMP`]
+  fecha_activacion timestamptz
+  fecha_desactivacion timestamptz
+}
+
+// Relaciones Seguridad
+Ref: personal.id - usuario.personal_id
+Ref: usuario.id < reniecproveedor.usuario_creador_id
+
+
+// =========================================
+// MÓDULO: ASISTENCIA
+// =========================================
+
+Table config_asistencia_personal {
+  id integer [pk]
+  personal_id integer
+  aplica_desde date [default: `CURRENT_DATE`]
+  hora_entrada time [default: '09:00:00']
+  hora_entrada_tarde time
+  minutos_tolerancia_por_dia integer [default: 10]
+  dias_tolerancia_por_mes integer [default: 10]
+  activo boolean [default: true]
+  created_at timestamptz [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [default: `CURRENT_TIMESTAMP`]
+}
+
+Table controlasistenciapersonal {
+  id integer [pk]
+  personal_id integer [not null]
+  usuario_registro_id integer [not null]
+  ingreso timestamptz [not null]
+  salida timestamptz
+  estado_presencia varchar(15) [not null]
+  minutos_tardanza integer [default: 0]
+  observacion text
+  fecha_registro timestamptz [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamptz [default: `CURRENT_TIMESTAMP`]
+}
+
+Table movimiento_asistencia {
+  id integer [pk]
+  control_asistencia_id integer [not null]
+  tipo varchar(20) [not null]
+  fecha_hora timestamptz [not null, default: `CURRENT_TIMESTAMP`]
+  observacion text
+  usuario_registro_id integer
+  created_at timestamptz [default: `CURRENT_TIMESTAMP`]
+}
+
+Table justificacion {
+  id integer [pk]
+  control_asistencia_id integer [not null]
+  usuario_solicitante_id integer [not null]
+  usuario_respuesta_id integer
+  motivo text [not null]
+  evidencia_url text
+  estado varchar(20) [default: 'PENDIENTE']
+  fecha_solicitud timestamptz [default: `CURRENT_TIMESTAMP`]
+  fecha_respuesta timestamptz
+  observacion_respuesta text
+}
+
+// Relaciones Asistencia
+Ref: personal.id < config_asistencia_personal.personal_id
+Ref: personal.id < controlasistenciapersonal.personal_id
+Ref: usuario.id < controlasistenciapersonal.usuario_registro_id
+Ref: controlasistenciapersonal.id < movimiento_asistencia.control_asistencia_id [delete: cascade]
+Ref: usuario.id < movimiento_asistencia.usuario_registro_id
+Ref: controlasistenciapersonal.id < justificacion.control_asistencia_id [delete: cascade]
+Ref: usuario.id < justificacion.usuario_solicitante_id
+Ref: usuario.id < justificacion.usuario_respuesta_id
+
+
+// =========================================
+// MÓDULO: VISITAS
+// =========================================
+
+Table visitante {
+  id integer [pk]
+  tipo_documento_id integer [not null]
+  numero_documento varchar(20) [not null]
+  nombres varchar(150) [not null]
+  apellidos varchar(150) [not null]
+  fecha_ultima_actualizacion_api timestamptz
+  
+  indexes {
+    (tipo_documento_id, numero_documento) [unique]
+  }
+}
+
+Table motivovisita {
+  id integer [pk]
+  nombre_motivo varchar(150) [unique, not null]
+  activo boolean [default: true]
+}
+
+Table registrovisita {
+  id integer [pk]
+  sync_id varchar(255) [unique]
+  visitante_id integer [not null]
+  area_destino_id integer [not null]
+  motivo_visita_id integer [not null]
+  personal_visitado_id integer
+  delegado_por_id integer
+  usuario_ingreso_id integer [not null]
+  usuario_salida_id integer
+  estado_visita varchar(20) [not null, default: 'PENDIENTE']
+  fecha_ingreso timestamptz [not null]
+  fecha_salida timestamptz
+  fecha_aceptacion timestamptz
+  fecha_rechazo timestamptz
+  motivo_rechazo text
+  fecha_delegacion timestamptz
+  fecha_fin_atencion timestamptz
+  fecha_limite_ingreso timestamptz
+  fecha_limite_salida timestamptz
+}
+
+// Relaciones Visitas
+Ref: tipodocumento.id < visitante.tipo_documento_id
+Ref: visitante.id < registrovisita.visitante_id
+Ref: areadestino.id < registrovisita.area_destino_id
+Ref: motivovisita.id < registrovisita.motivo_visita_id
+Ref: personal.id < registrovisita.personal_visitado_id
+Ref: personal.id < registrovisita.delegado_por_id
+Ref: usuario.id < registrovisita.usuario_ingreso_id
+Ref: usuario.id < registrovisita.usuario_salida_id
+
+
+// =========================================
+// GRUPOS LÓGICOS
+// =========================================
+
+TableGroup Organizacion {
+  areadestino
+  cargo
+  tipocontrato
+  tipodocumento
+  personal
+}
+
+TableGroup Seguridad {
+  usuario
+  reniecproveedor
+}
+
+TableGroup Asistencia {
+  config_asistencia_personal
+  controlasistenciapersonal
+  movimiento_asistencia
+  justificacion
+}
+
+TableGroup Visitas {
+  visitante
+  motivovisita
+  registrovisita
+}

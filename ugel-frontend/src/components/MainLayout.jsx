@@ -585,31 +585,6 @@ const MainLayout = () => {
                       <ClipboardCheck className="h-4 w-4" />
                       <span>Asistencia</span>
                     </NavLink>
-                    <NavLink
-                      to="/vigilante/papeletas"
-                      className={({ isActive }) => `
-                        flex items-center gap-2 py-3 px-2 font-medium text-sm transition-colors
-                        border-b-2
-                        ${isActive
-                          ? 'border-blue-600 text-blue-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-800'
-                        }
-                      `}
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span>Papeletas</span>
-                      {papeletasActivasCount > 0 && (
-                        <span
-                          className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 text-[10px] font-semibold leading-none rounded-full ${
-                            location.pathname === '/vigilante/papeletas'
-                              ? 'text-blue-700 bg-blue-100'
-                              : 'text-gray-700 bg-gray-200'
-                          }`}
-                        >
-                          {papeletasActivasCount}
-                        </span>
-                      )}
-                    </NavLink>
                   </div>
                 )}
 

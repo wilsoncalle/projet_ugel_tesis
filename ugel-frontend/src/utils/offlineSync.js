@@ -18,6 +18,15 @@ import {
 
 const API_BASE_URL = '/api';
 
+const safeGetToken = () => {
+  try {
+    return localStorage.getItem('token');
+  } catch (e) {
+    console.warn('[Sync] No se pudo leer token de storage', e);
+    return null;
+  }
+};
+
 /**
  * Registra un evento de sincronización en el Service Worker
  */
@@ -56,7 +65,7 @@ async function syncPendingVisitas() {
 
   for (const visita of pendingVisitas) {
     try {
-      const token = localStorage.getItem('token');
+      const token = safeGetToken();
       if (!token) {
         console.warn('[Sync] No hay token de autenticación');
         results.failed.push({ visita, error: 'No autenticado' });
@@ -339,7 +348,7 @@ async function syncPendingSalidas() {
 
   for (const salida of pendingSalidas) {
     try {
-      const token = localStorage.getItem('token');
+      const token = safeGetToken();
       if (!token) {
         console.warn('[Sync] No hay token de autenticación');
         results.failed.push({ salida, error: 'No autenticado' });
@@ -479,7 +488,7 @@ async function actualizarSalidasPendientesConNuevoId(visitaIdOffline, nuevaVisit
  * Sincroniza ingresos y salidas de personal pendientes
  */
 async function syncPendingPersonal() {
-  const token = localStorage.getItem('token');
+  const token = safeGetToken();
   const ingresos = await getPendingIngresosPersonal();
   const salidas = await getPendingSalidasPersonal();
   const results = { success: [], failed: [] };
@@ -489,51 +498,59 @@ async function syncPendingPersonal() {
     return results;
   }
 
-  if (ingresos.length > 0 || salidas.length > 0) {
-    console.log(`[Sync] Sincronizando personal: ${ingresos.length} ingresos y ${salidas.length} salidas pendientes`);
-  }
-
-  for (const item of ingresos) {
-    try {
-      const payload = {
-        personalId: item.personalId,
-        fecha: item.fecha,
-        hora: item.horaIngreso,
-        _isOfflineSync: true
-      };
-
-      const response = await fetch(`${API_BASE_URL}/asistencia-personal/ingreso`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      await deleteIngresoPersonalOffline(item.id);
-      results.success.push(item);
-    } catch (error) {
-      console.error('Error sync ingreso personal', error);
-      results.failed.push({ item, error: error.message });
+  // Combinar ingresos y salidas, preservando el orden cronológico de captura
+  const eventosPendientes = [
+    ...ingresos.map((item, index) => ({
+      ...item,
+      _eventType: 'ingreso',
+      _originalOrder: index
+    })),
+    ...salidas.map((item, index) => ({
+      ...item,
+      _eventType: 'salida',
+      _originalOrder: ingresos.length + index
+    }))
+  ].map((item) => ({
+    ...item,
+    _sortTimestamp: typeof item.timestamp === 'number'
+      ? item.timestamp
+      : Date.parse(`${item.fecha}T${item.horaIngreso || item.horaSalida || '00:00:00'}`) || 0
+  })).sort((a, b) => {
+    if (a._sortTimestamp === b._sortTimestamp) {
+      return a._originalOrder - b._originalOrder;
     }
+    return a._sortTimestamp - b._sortTimestamp;
+  });
+
+  if (eventosPendientes.length > 0) {
+    console.log(`[Sync] Sincronizando personal en orden cronológico: ${eventosPendientes.length} eventos`);
+    console.log('[Sync] Orden de envío:', eventosPendientes.map(e => ({
+      id: e.id,
+      tipo: e._eventType,
+      personalId: e.personalId,
+      timestamp: e._sortTimestamp,
+      fecha: e.fecha,
+      hora: e.horaIngreso || e.horaSalida
+    })));
   }
 
-  for (const item of salidas) {
+  for (const evento of eventosPendientes) {
+    const isIngreso = evento._eventType === 'ingreso';
     try {
       const payload = {
-        personalId: item.personalId,
-        fecha: item.fecha,
-        hora: item.horaSalida,
+        personalId: evento.personalId,
+        fecha: evento.fecha,
+        hora: isIngreso ? evento.horaIngreso : evento.horaSalida,
         _isOfflineSync: true
       };
 
-      const response = await fetch(`${API_BASE_URL}/asistencia-personal/salida`, {
-        method: 'PUT',
+      const url = isIngreso
+        ? `${API_BASE_URL}/asistencia-personal/ingreso`
+        : `${API_BASE_URL}/asistencia-personal/salida`;
+      const method = isIngreso ? 'POST' : 'PUT';
+
+      const response = await fetch(url, {
+        method,
         headers: { 
           'Content-Type': 'application/json', 
           'Authorization': `Bearer ${token}` 
@@ -545,11 +562,16 @@ async function syncPendingPersonal() {
         throw new Error(`HTTP ${response.status}`);
       }
 
-      await deleteSalidaPersonalOffline(item.id);
-      results.success.push(item);
+      if (isIngreso) {
+        await deleteIngresoPersonalOffline(evento.id);
+      } else {
+        await deleteSalidaPersonalOffline(evento.id);
+      }
+
+      results.success.push({ type: evento._eventType, item: evento });
     } catch (error) {
-      console.error('Error sync salida personal', error);
-      results.failed.push({ item, error: error.message });
+      console.error(`[Sync] Error sync ${evento._eventType} personal`, error);
+      results.failed.push({ item: evento, error: error.message });
     }
   }
 
