@@ -16,7 +16,7 @@ const poolConfig = {
   password: process.env.DB_PASSWORD || 'qwerty',
   max: 20, // Máximo número de conexiones en el pool
   idleTimeoutMillis: 30000, // Tiempo antes de cerrar conexiones inactivas
-  connectionTimeoutMillis: 2000, // Tiempo máximo para obtener una conexión
+  connectionTimeoutMillis: 5000, // Tiempo máximo para obtener una conexión
   // Forzar la sesión a usar la zona horaria de Lima para que los TIMESTAMPTZ
   // se interpreten y formateen correctamente (UTC-5)
   options: '-c timezone=America/Lima' 
@@ -32,8 +32,9 @@ pool.on('connect', () => {
 
 // Evento de error en el pool
 pool.on('error', (err) => {
-  logger.error('Error inesperado en el cliente de PostgreSQL:', err);
-  process.exit(-1);
+  logger.error('Error inesperado en el cliente de PostgreSQL (Pool Error):', err);
+  // No matar el proceso, el pool tratará de reconectar clientes nuevos
+  // process.exit(-1);
 });
 
 /**

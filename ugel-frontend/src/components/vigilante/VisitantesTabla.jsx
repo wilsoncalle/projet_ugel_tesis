@@ -7,7 +7,7 @@ import Popover from '../Popover';
 import TabView from '../TabView';
 import FiltrosVisitas from './FiltrosVisitas';
 import TableGenerica from '../TableGenerica';
-import ModalDetalles from '../ModalDetalles';
+import ModalDetallesVisita from './ModalDetallesVisita';
 import QuickSearchBar from '../QuickSearchBar';
 import {
   UsersIcon,
@@ -91,55 +91,113 @@ const VisitantesTabla = ({
   }, []);
 
   // Notificación de visitantes no presentados (> 10 min) - SOLO PARA VIGILANTE
-  const notifiedRef = useRef(new Set());
+  // Inicializar desde sessionStorage
+  const getStoredNotified = () => { try { return new Set(JSON.parse(sessionStorage.getItem('notified_visitors') || '[]')); } catch { return new Set(); } };
+  const notifiedRef = useRef(getStoredNotified());
+  const groupedNotificationRef = useRef(null);
+  
+  const saveNotified = (id) => {
+    if (!notifiedRef.current.has(id)) {
+      notifiedRef.current.add(id);
+      try { sessionStorage.setItem('notified_visitors', JSON.stringify(Array.from(notifiedRef.current))); } catch (e) {}
+    }
+  };
 
   useEffect(() => {
-    if (activeTab === 'activos' && visitantesActivos) {
-      visitantesActivos.forEach(v => {
-        // Solo para pendientes y que tengan fecha de ingreso
-        if (v.fecha_ingreso && (v.estado_visita === 'PENDIENTE' || !v.estado_visita)) {
-           try {
-             // Asegurar fecha válida
-             const fechaIngreso = new Date(v.fecha_ingreso);
-             if (!isNaN(fechaIngreso.getTime())) {
-               const diff = (currentTime - fechaIngreso) / 60000;
-               
-               if (diff > 10 && !notifiedRef.current.has(v.id)) {
-                 toast.error(
-                   (t) => (
-                     <div 
-                       className="flex flex-col relative pr-4 cursor-pointer hover:bg-red-50 transition-colors rounded p-1"
-                       onClick={() => handleOpenModal(v)}
-                     >
-                       <button 
-                         onClick={(e) => { e.stopPropagation(); toast.dismiss(t.id); }}
-                         className="absolute -top-1 -right-2 p-1 text-gray-400 hover:text-gray-600 focus:outline-none z-10"
-                         title="Cerrar notificación"
-                       >
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                           <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                         </svg>
-                       </button>
-                       <span className="font-bold pr-2">¡Alerta de Visitante!</span>
-                       <span>El visitante {v.visitante_nombres} {v.visitante_apellidos} no se ha presentado.</span>
-                       <span className="text-xs mt-1">Han pasado más de 10 minutos.</span>
-                       <span className="text-xs text-blue-600 mt-1 underline">Ver detalles</span>
-                     </div>
-                   ),
-                   { 
-                     duration: 8000, 
-                     position: 'top-right', 
-                     style: { border: '2px solid #ef4444' } 
-                   }
-                 );
-                 notifiedRef.current.add(v.id);
-               }
-             }
-           } catch (e) {
-             console.error("Error checking date for notification", e);
-           }
-        }
+    // Si no estamos en la pestaña de activos o no hay visitantes, no hacer nada
+    if (activeTab !== 'activos' || !visitantesActivos) return;
+
+    const noShowVisitors = [];
+    
+    // Identificar visitantes que requieren alerta
+    visitantesActivos.forEach(v => {
+      // Solo para pendientes y que tengan fecha de ingreso
+      if (v.fecha_ingreso && (v.estado_visita === 'PENDIENTE' || !v.estado_visita)) {
+          try {
+            // Asegurar fecha válida
+            const fechaIngreso = new Date(v.fecha_ingreso);
+            if (!isNaN(fechaIngreso.getTime())) {
+              const diff = (currentTime - fechaIngreso) / 60000;
+              
+              // Si pasaron más de 10 min y NO ha sido notificado previamente
+              if (diff > 10 && !notifiedRef.current.has(v.id)) {
+                noShowVisitors.push(v);
+              }
+            }
+          } catch (e) {
+            console.error("Error checking date for notification", e);
+          }
+      }
+    });
+
+    // Si no hay nuevos visitantes "No Show", salir
+    if (noShowVisitors.length === 0) return;
+
+    // Lógica de agrupación de notificaciones
+    if (noShowVisitors.length <= 3) {
+      // Si son 3 o menos, mostrar notificaciones individuales
+      noShowVisitors.forEach(v => {
+        saveNotified(v.id); // Marcar como notificado
+        toast.error(
+          (t) => (
+            <div 
+              className="flex flex-col relative pr-4 cursor-pointer hover:bg-red-50 transition-colors rounded p-1"
+              onClick={() => handleOpenModal(v)}
+            >
+              <button 
+                onClick={(e) => { e.stopPropagation(); toast.dismiss(t.id); }}
+                className="absolute -top-1 -right-2 p-1 text-gray-400 hover:text-gray-600 focus:outline-none z-10"
+                title="Cerrar notificación"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+              <span className="font-bold pr-2">¡Alerta de Visitante!</span>
+              <span>El visitante {v.visitante_nombres} {v.visitante_apellidos} no se ha presentado.</span>
+              <span className="text-xs mt-1">Han pasado más de 10 minutos.</span>
+              <span className="text-xs text-blue-600 mt-1 underline">Ver detalles</span>
+            </div>
+          ),
+          { 
+            duration: 8000, 
+            position: 'top-right', 
+            style: { border: '2px solid #ef4444' } 
+          }
+        );
       });
+    } else {
+      // Si son más de 3, agrupar
+      noShowVisitors.forEach(v => saveNotified(v.id)); // Marcarlos todos
+
+      if (groupedNotificationRef.current) {
+        toast.dismiss(groupedNotificationRef.current);
+      }
+
+      groupedNotificationRef.current = toast.error(
+        (t) => (
+          <div className="flex flex-col relative pr-4">
+             <button 
+                onClick={(e) => { e.stopPropagation(); toast.dismiss(t.id); }}
+                className="absolute -top-1 -right-2 p-1 text-gray-400 hover:text-gray-600 focus:outline-none z-10"
+                title="Cerrar notificación"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            <span className="font-bold">¡Múltiples Visitantes Sin Presentarse!</span>
+            <span>Hay {noShowVisitors.length} visitantes que excedieron los 10 minutos de espera.</span>
+            <span className="text-xs mt-1">Por favor revise la lista de activos.</span>
+          </div>
+        ),
+        { 
+          duration: 10000, 
+          position: 'top-right',
+          style: { border: '2px solid #ef4444', backgroundColor: '#fef2f2' },
+          id: 'grouped-no-show-notification'
+        }
+      );
     }
   }, [visitantesActivos, activeTab, currentTime, handleOpenModal]);
 
@@ -459,25 +517,11 @@ const VisitantesTabla = ({
           let cargo = '';
 
           if (activeTab === 'activos') {
-            console.log('VisitantesTabla - Row completo para activos:', row);
             if ((visitantesEnEspera || []).some((v) => v.id === row.id)) {
-              console.log(
-                'VisitantesTabla - Es visitante en espera, cargo:',
-                row.empleado?.cargo
-              );
               cargo = row.empleado?.cargo || '';
             } else if (row._isOffline || row._isPending) {
-              console.log(
-                'VisitantesTabla - Es visita offline, cargo:',
-                row.personal_cargo
-              );
               cargo = row.personal_cargo || 'Sin cargo';
             } else {
-              console.log(
-                'VisitantesTabla - Es visitante activo, personal_cargo:',
-                row.personal_cargo
-              );
-              console.log('VisitantesTabla - empleadoVisitado:', row.empleadoVisitado);
               cargo =
                 row.personal_cargo ||
                 row.empleadoVisitado?.cargo ||
@@ -486,11 +530,8 @@ const VisitantesTabla = ({
                 '';
             }
           } else {
-            console.log('VisitantesTabla - Row completo para historial:', row);
             cargo = row.personal_cargo || row.cargo_nombre || row.cargo || '';
           }
-
-          console.log('VisitantesTabla - Cargo final:', cargo);
 
           return (
             <div
@@ -1041,134 +1082,13 @@ const VisitantesTabla = ({
         </div>
       </Card>
 
-      <ModalDetalles
+      <ModalDetallesVisita
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         data={selectedItem}
         title={`Detalles de ${
           activeTab === 'activos' ? 'Visitante Activo' : 'Visita'
         }`}
-        size="lg"
-        fields={[
-          {
-            key: 'visitante_nombres',
-            label: 'Visitante',
-            render: (value, data) =>
-              `${data.visitante_nombres || ''} ${
-                data.visitante_apellidos || ''
-              }`.trim()
-          },
-          {
-            key: 'numero_documento',
-            label: 'Documento',
-            render: (value, data) =>
-              `${data.tipo_documento_codigo || 'DNI'}: ${value || ''}`
-          },
-          {
-            key: 'personal_nombres',
-            label: 'Empleado Visitado',
-            render: (value, data) =>
-              `${data.personal_nombres || ''} ${
-                data.personal_apellidos || ''
-              }`.trim()
-          },
-          {
-            key: 'personal_cargo',
-            label: 'Cargo del Empleado',
-            render: (value) => value || 'Sin cargo asignado'
-          },
-          {
-            key: 'nombre_motivo',
-            label: 'Motivo de Visita',
-            render: (value) => value || 'No especificado'
-          },
-          {
-            key: 'nombre_area',
-            label: 'Área de Destino',
-            render: (value) => value || 'No especificada'
-          },
-          {
-            key: 'fecha_ingreso',
-            label: 'Fecha y Hora de Ingreso',
-            render: (value) => {
-              if (!value) return 'No especificada';
-              try {
-                const fecha = new Date(value);
-                return fecha.toLocaleString('es-PE');
-              } catch {
-                return value;
-              }
-            }
-          },
-          {
-            key: 'fecha_salida',
-            label: 'Fecha y Hora de Salida',
-            render: (value) => {
-              if (!value) return 'Visita activa';
-              try {
-                const fecha = new Date(value);
-                return fecha.toLocaleString('es-PE');
-              } catch {
-                return value;
-              }
-            }
-          },
-          {
-            label: 'Registrado por',
-            render: (value) => value || 'No especificado'
-          },
-          {
-            key: 'fecha_aceptacion',
-            label: 'Fecha de Aceptación',
-            render: (value) => {
-              if (!value) return '-';
-              try {
-                return new Date(value).toLocaleString('es-PE');
-              } catch { return value; }
-            }
-          },
-          {
-            key: 'fecha_rechazo',
-            label: 'Fecha de Rechazo',
-            render: (value) => {
-              if (!value) return '-';
-              try {
-                return new Date(value).toLocaleString('es-PE');
-              } catch { return value; }
-            }
-          },
-          {
-            key: 'delegado_por_nombres',
-            label: 'Delegado Por',
-            render: (value, data) => {
-              if (!data.delegado_por_id && !value) return '-';
-              const nombre = data.delegado_por_nombres || '';
-              const apellido = data.delegado_por_apellidos || '';
-              const full = `${nombre} ${apellido}`.trim();
-              return full || 'ID: ' + (data.delegado_por_id || '-');
-            }
-          },
-          {
-            key: 'fecha_delegacion',
-            label: 'Fecha de Delegación',
-            render: (value) => {
-              if (!value) return '-';
-              try {
-                return new Date(value).toLocaleString('es-PE');
-              } catch { return value; }
-            }
-          },
-          {
-            key: 'fecha_fin_atencion',
-            label: 'Fin de Atención',
-            render: (value) => {
-              if (!value) return '-';
-              try {
-                return new Date(value).toLocaleString('es-PE');
-              } catch { return value; }
-            }
-          }
-        ]}
       />
     </div>
   );

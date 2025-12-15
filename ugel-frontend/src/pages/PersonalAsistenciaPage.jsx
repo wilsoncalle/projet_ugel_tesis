@@ -13,7 +13,7 @@ import ModalGenerico from '../components/ModalGenerico';
 import AsistenciaPersonalCalendario from '../components/AsistenciaPersonalCalendario';
 import DateRangeFilter from '../components/DateRangeFilter';
 import QuickSearchBar from '../components/QuickSearchBar';
-import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService, asistenciaConfigService } from '../services/api';
+import { asistenciaPersonalService, personalService, tiposDocumentoService, areasService, asistenciaConfigService, papeletasSalidaService } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { MagnifyingGlassIcon, ClockIcon, CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon, UserGroupIcon, CalendarIcon, DocumentArrowDownIcon, ChevronDownIcon, DocumentTextIcon, XMarkIcon, EyeIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
@@ -57,6 +57,7 @@ const itemVariants = {
 const PersonalAsistenciaPage = () => {
   useDocumentTitle('Asistencia de Personal - COAC-UGEL');
   const { user } = useAuth();
+  const FRESH_CACHE_MS = 30_000; // 30s para reutilizar datos en cambios rápidos de pestaña
 
   // Normaliza registros "Ausente" sin hora_ingreso/salida (creados antes de hora_entrada) para mostrarlos vacíos
   const limpiarAusentesTempranos = (asistencias = []) =>
@@ -227,13 +228,40 @@ const PersonalAsistenciaPage = () => {
 
   const cacheAsistenciaConfig = async () => {
     if (!navigator.onLine) return;
+    
+    // Solo intentar cargar si el usuario es Administrador o RRHH
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        const allowedRoles = ['Administrador', 'RRHH'];
+        if (!allowedRoles.includes(user.rol)) {
+          // Usuario no tiene permisos, no intentar cargar
+          return;
+        }
+      } catch (parseError) {
+        console.warn('Error al parsear usuario', parseError);
+        return;
+      }
+    } else {
+      return; // No hay usuario en localStorage
+    }
+    
     try {
       const response = await asistenciaConfigService.getGlobal();
       if (response.data?.success && response.data.data) {
-        localStorage.setItem('asistenciaConfigOffline', JSON.stringify(response.data.data));
+        try {
+          localStorage.setItem('asistenciaConfigOffline', JSON.stringify(response.data.data));
+        } catch (storageError) {
+          console.warn('No se pudo guardar asistenciaConfigOffline', storageError);
+        }
       }
     } catch (error) {
-      console.warn('No se pudo cachear la configuración de asistencia', error);
+      // Silenciar 401/403 para evitar ruido cuando el endpoint está protegido o el token caducó.
+      const status = error?.response?.status;
+      if (status !== 401 && status !== 403 && status !== 500) {
+        console.warn('No se pudo cachear la configuración de asistencia', error);
+      }
     }
   };
 
@@ -243,22 +271,64 @@ const PersonalAsistenciaPage = () => {
       // Necesitamos ID y hora actual
       const now = new Date();
       const horaActual = now.toLocaleTimeString('en-US', { hour12: false });
-      
-      const registroData = {
-        personalId: row.personal_id,
-        hora: horaActual, 
-        fecha: now.toISOString().slice(0, 10),
-        esRetorno: true // Flag opcional para UI
-      };
+      const fechaActual = now.toISOString().slice(0, 10);
 
+      const personalData = {
+        id: row.personal_id,
+        value: row.personal_id,
+        nombres: row.personal_nombres,
+        apellidos: row.personal_apellidos,
+        numero_documento: row.personal_numero_documento,
+        tipo_documento: row.personal_tipo_documento,
+        cargo_nombre: row.personal_cargo_nombre,
+        area_nombre: row.personal_area_nombre
+      };
+      
       setLoading(true);
-      await asistenciaPersonalService.registrarIngreso(registroData);
-      
-      // Recargar datos
-      await cargarAsistenciasHoy();
-      
-      // Feedback visual (opcional)
-      // setError('Retorno registrado correctamente'); // Usar un toast mejor si existiera
+      const response = await registrarIngresoPersonalWithOfflineSupport(
+        personalData,
+        (id) => asistenciaPersonalService.registrarIngreso({
+          personalId: id,
+          fecha: fechaActual,
+          hora: horaActual
+        })
+      );
+
+      if (response.data.success) {
+        if (response.data.offline) {
+          const saved = response.data.data;
+          const nuevoOffline = {
+            personal_id: saved.personalId,
+            personal_nombres: saved.personalData?.nombres || row.personal_nombres || '',
+            personal_apellidos: saved.personalData?.apellidos || row.personal_apellidos || '',
+            personal_numero_documento: saved.personalData?.numero_documento || row.personal_numero_documento || '',
+            personal_tipo_documento: saved.personalData?.tipo_documento || row.personal_tipo_documento || 'DNI',
+            personal_cargo_nombre: saved.personalData?.cargo_nombre || row.personal_cargo_nombre || '',
+            personal_area_nombre: saved.personalData?.area_nombre || row.personal_area_nombre || '',
+            hora_ingreso: saved.horaIngreso || horaActual,
+            hora_salida: null,
+            estado_presencia: saved.estado_presencia || 'Presente offline',
+            isOffline: true
+          };
+
+          setAsistenciasHoy(prev => {
+            const lista = prev || [];
+            const idx = lista.findIndex(
+              (r) => String(r.personal_id || r.personalId) === String(saved.personalId)
+            );
+            if (idx >= 0) {
+              const copia = [...lista];
+              copia[idx] = { ...copia[idx], ...nuevoOffline };
+              return limpiarAusentesTempranos(copia);
+            }
+            return limpiarAusentesTempranos([...lista, nuevoOffline]);
+          });
+          console.warn('Retorno de personal guardado en modo offline');
+        } else {
+          // Recargar datos solo cuando la petición fue online
+          await cargarAsistenciasHoy();
+        }
+      }
     } catch (err) {
       console.error('Error al registrar retorno rápido:', err);
       if (err.response?.data?.message) {
@@ -307,33 +377,116 @@ const PersonalAsistenciaPage = () => {
 
   const cargarAsistenciasHoy = async () => {
     try {
-      setLoading(true);
-      setError('');
-
+      // Reutilizar caché reciente para respuesta instantánea
+      let useLoading = true;
+      let skipFetch = false;
       let dataServer = [];
+      let papeletasActivasMap = new Map();
+
       try {
-        const response = await asistenciaPersonalService.getHoy({
-          page: 1,
-          limit: 100
-        });
-        if (response.data.success) {
-          dataServer = response.data.data || [];
+        const cached = localStorage.getItem('cache_asistencia_hoy');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const ts = Number(parsed?.ts || 0);
+          const data = Array.isArray(parsed?.data) ? parsed.data : [];
+          if (data.length > 0 && Date.now() - ts < FRESH_CACHE_MS) {
+            dataServer = data;
+            skipFetch = true;
+            useLoading = false;
+          }
+        }
+
+        const cachedPapeletas = localStorage.getItem('cache_papeletas_externas_activas');
+        if (cachedPapeletas) {
+          const parsed = JSON.parse(cachedPapeletas);
+          (parsed.data || [])
+            .filter((p) => p.estado === 'EN_CURSO')
+            .forEach((p) => {
+              if (p.solicitante_numero_documento) {
+                papeletasActivasMap.set(p.solicitante_numero_documento, p);
+              }
+              const nombreCompleto = `${p.solicitante_nombres || ''} ${p.solicitante_apellidos || ''}`
+                .trim()
+                .toLowerCase();
+              if (nombreCompleto) {
+                papeletasActivasMap.set(nombreCompleto, p);
+              }
+            });
         }
       } catch (e) {
-        console.warn('No se pudo cargar asistencias desde el servidor, usando datos previos/locales', e);
-        // Fallback a cache local si existe
+        console.warn('No se pudo leer cache de asistencia/papeletas', e);
+      }
+
+      if (useLoading) setLoading(true);
+      setError('');
+
+      if (!skipFetch) {
         try {
-          const cached = localStorage.getItem('cache_asistencia_hoy');
-          if (cached) {
-            const parsed = JSON.parse(cached);
-            if (Array.isArray(parsed.data)) {
-              dataServer = parsed.data;
+          const [asistenciasResp, papeletasResp] = await Promise.all([
+            asistenciaPersonalService.getHoy({
+              page: 1,
+              limit: 100
+            }),
+            papeletasSalidaService.getExternas()
+          ]);
+
+          if (asistenciasResp.data.success) {
+            dataServer = asistenciasResp.data.data || [];
+          }
+
+          const papeletasData = papeletasResp?.data?.data || [];
+          papeletasData
+            .filter((p) => p.estado === 'EN_CURSO')
+            .forEach((p) => {
+              if (p.solicitante_numero_documento) {
+                papeletasActivasMap.set(p.solicitante_numero_documento, p);
+              }
+              const nombreCompleto = `${p.solicitante_nombres || ''} ${p.solicitante_apellidos || ''}`
+                .trim()
+                .toLowerCase();
+              if (nombreCompleto) {
+                papeletasActivasMap.set(nombreCompleto, p);
+              }
+            });
+          // Cachear papeletas activas para usar en offline inmediato
+          try {
+            localStorage.setItem('cache_papeletas_externas_activas', JSON.stringify({ ts: Date.now(), data: papeletasData }));
+          } catch (err) {
+            console.warn('No se pudo cachear papeletas externas', err);
+          }
+        } catch (e) {
+          console.warn('No se pudo cargar asistencias desde el servidor, usando datos previos/locales', e);
+          // Fallback a cache local si existe
+          try {
+            const cached = localStorage.getItem('cache_asistencia_hoy');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (Array.isArray(parsed.data)) {
+                dataServer = parsed.data;
+              }
+            } else {
+              dataServer = asistenciasHoy || [];
             }
-          } else {
+            const cachedPapeletas = localStorage.getItem('cache_papeletas_externas_activas');
+            if (cachedPapeletas) {
+              const parsed = JSON.parse(cachedPapeletas);
+              (parsed.data || [])
+                .filter((p) => p.estado === 'EN_CURSO')
+                .forEach((p) => {
+                  if (p.solicitante_numero_documento) {
+                    papeletasActivasMap.set(p.solicitante_numero_documento, p);
+                  }
+                  const nombreCompleto = `${p.solicitante_nombres || ''} ${p.solicitante_apellidos || ''}`
+                    .trim()
+                    .toLowerCase();
+                  if (nombreCompleto) {
+                    papeletasActivasMap.set(nombreCompleto, p);
+                  }
+                });
+            }
+          } catch (err) {
             dataServer = asistenciasHoy || [];
           }
-        } catch (err) {
-          dataServer = asistenciasHoy || [];
         }
       }
 
@@ -383,18 +536,31 @@ const PersonalAsistenciaPage = () => {
         return row;
       });
 
-      setAsistenciasHoy(limpiarAusentesTempranos(dataCombinada));
+      // Marcar permisos según papeleta activa
+      const dataConPermisos = dataCombinada.map((row) => {
+        const doc = row.personal_numero_documento || row.numero_documento || row.documento || '';
+        const nombreCompleto = `${row.personal_nombres || row.nombres || ''} ${row.personal_apellidos || row.apellidos || ''}`
+          .trim()
+          .toLowerCase();
+        const papeleta = papeletasActivasMap.get(doc) || (nombreCompleto ? papeletasActivasMap.get(nombreCompleto) : null);
+        if (papeleta) {
+          return { ...row, estado_presencia: 'Permiso', detalle_papeleta: papeleta.codigo_papeleta || papeleta.codigo };
+        }
+        return row;
+      });
+
+      setAsistenciasHoy(limpiarAusentesTempranos(dataConPermisos));
       // Cachear resultado final para usarlo en offline
       try {
-        localStorage.setItem('cache_asistencia_hoy', JSON.stringify({ ts: Date.now(), data: dataCombinada }));
+        localStorage.setItem('cache_asistencia_hoy', JSON.stringify({ ts: Date.now(), data: dataConPermisos }));
       } catch (e) {
         console.warn('No se pudo cachear asistencia de hoy', e);
       }
       
       setHoyPagination(prev => ({
         ...prev,
-        totalItems: dataCombinada.length || 0,
-        totalPages: Math.ceil((dataCombinada.length || 0) / prev.itemsPerPage)
+        totalItems: dataConPermisos.length || 0,
+        totalPages: Math.ceil((dataConPermisos.length || 0) / prev.itemsPerPage)
       }));
     } catch (error) {
       console.error('Error al cargar asistencias de hoy:', error);

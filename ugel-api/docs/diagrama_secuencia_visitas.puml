@@ -1,0 +1,102 @@
+@startuml
+!theme plain
+hide footbox
+autonumber 1 "<b>(00)"
+skinparam maxMessageSize 160
+skinparam ParticipantPadding 40
+skinparam BoxPadding 10
+
+title Flujo Integral de Visitas UGEL (Optimizado)
+
+actor Vigilante
+actor "Personal" as Personal
+
+box "Frontend" #FAD7A0
+    participant Browser as "React App"
+end box
+
+box "Backend (API & Logic)" #F5CBA7
+    participant Auth as "Auth MW"
+    participant Controller as "Controller"
+    participant Service as "Service"
+end box
+
+database PostgreSQL as DB #EDBB99
+
+' === FASE 1 ===
+== Fase 1: Autenticación ==
+Vigilante -> Browser: Credenciales
+Browser -> Controller: POST /api/auth/login
+Controller -> DB: Validar Usuario
+DB --> Controller: OK
+Controller --> Browser: Token JWT
+
+' === FASE 2 ===
+== Fase 2: Registro (Validación Completa) ==
+Vigilante -> Browser: Datos + Registrar
+Browser -> Controller: POST /api/visitas
+
+' Solo mostramos la Auth aquí para no repetir y ahorrar espacio vertical
+Controller -> Auth: Validar Token
+Auth --> Controller: OK
+
+Controller -> Service: registrarIngreso(datos)
+Service -> DB: Buscar DNI
+
+alt Visitante Nuevo
+    Service -> DB: INSERT Visitante
+else Existe
+    note right of DB: Reutiliza ID
+end
+
+Service -> DB: INSERT Visita (PENDIENTE)
+DB --> Service: OK
+Service --> Controller: DTO Visita
+Controller --> Browser: 201 Created
+Browser --> Vigilante: Confirmación
+
+' === FASE 3 ===
+== Fase 3: Gestión (Lógica Compacta) ==
+note over Personal: Acciones validadas por Auth internamente
+
+alt Opción A: Aceptar
+    Personal -> Browser: Clic "Aceptar"
+    Browser -> Controller: POST /api/visitas/:id/aceptar
+    Controller -> Service: acceptVisita(id, personalId)
+    Service -> DB: UPDATE estado = 'ACEPTADO'
+    Controller --> Browser: 200 OK
+
+else Opción B: Rechazar
+    Personal -> Browser: Rechazar + Motivo
+    Browser -> Controller: POST /api/visitas/:id/rechazar
+    Controller -> Service: rejectVisita(id, personalId, motivo)
+    Service -> DB: UPDATE estado = 'RECHAZADO'
+    Controller --> Browser: 200 OK
+
+else Opción C: Delegar
+    Personal -> Browser: Delegar
+    Browser -> Controller: POST /api/visitas/:id/delegar
+    Controller -> Service: delegateVisita(id, personalId, nuevoPersonalId)
+    Service -> DB: UPDATE estado = 'DELEGADO'
+    Controller --> Browser: 200 OK
+end
+
+' === FASE 4 ===
+== Fase 4: Finalización y Salida ==
+
+note over Personal: Fin de Atención
+Personal -> Browser: Finalizar Atención
+Browser -> Controller: POST /api/visitas/:id/finalizar-atencion
+Controller -> Service: finalizarAtencion(id, personalId)
+Service -> DB: UPDATE estado = 'FINALIZADO', fecha_fin_atencion = NOW()
+Controller --> Browser: 200 OK (UI Actualizada)
+
+note over Vigilante: Salida Física
+Vigilante -> Browser: Registrar Salida
+Browser -> Controller: PUT /api/visitas/:id/salida
+Controller -> Service: registrarSalida(id, usuarioId)
+Service -> DB: UPDATE fecha_salida = NOW()
+Controller --> Browser: 200 OK
+Browser --> Vigilante: Ciclo Completado
+
+@enduml

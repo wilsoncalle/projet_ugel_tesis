@@ -577,18 +577,19 @@ export async function saveIngresoPersonalOffline(personalData) {
     const ingresoConTolerancia = minutosEntrada + minutosTolerancia;
     const estadoCalculado = minutosIngreso > ingresoConTolerancia ? 'Tardanza' : 'Presente';
 
-    // Evitar duplicados: si ya existe un ingreso pendiente para este personal en la fecha, no guardar
-    let registroExistente = null;
-    const yaExiste = await new Promise((resolve, reject) => {
+    // Permitir múltiples ingresos el mismo día (intermitentes).
+    // Solo evitar duplicados exactos (misma fecha/hora) para evitar clicks dobles.
+    const esDuplicadoExacto = await new Promise((resolve, reject) => {
       try {
         const index = store.index('personalId');
         const request = index.getAll(IDBKeyRange.only(personalId));
         request.onsuccess = () => {
-          const mismos = request.result.filter(
-            (r) => r.status === 'pending' && r.fecha === fechaIngresoStr
+          const duplicado = request.result.some(
+            (r) => r.status === 'pending' &&
+                   r.fecha === fechaIngresoStr &&
+                   r.horaIngreso === horaIngresoStr
           );
-          registroExistente = mismos[0] || null;
-          resolve(mismos.length > 0);
+          resolve(duplicado);
         };
         request.onerror = () => reject(request.error);
       } catch (e) {
@@ -596,11 +597,17 @@ export async function saveIngresoPersonalOffline(personalData) {
       }
     });
 
-    if (yaExiste) {
+    if (esDuplicadoExacto) {
       return {
-        id: registroExistente.id,
-        ...registroExistente,
-        alreadyRegistered: true
+        id: `dup_${Date.now()}`,
+        personalId,
+        personalData,
+        timestamp: Date.now(),
+        alreadyRegistered: true,
+        fecha: fechaIngresoStr,
+        horaIngreso: horaIngresoStr,
+        estado_presencia: estadoCalculado,
+        status: 'pending'
       };
     }
 

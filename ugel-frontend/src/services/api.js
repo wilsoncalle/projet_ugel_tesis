@@ -258,6 +258,39 @@ export const asistenciaPersonalService = {
       },
     });
   },
+
+  // Estadísticas
+  getEstadisticasTotales: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.periodo) params.append('periodo', filters.periodo);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
+    return api.get(`/asistencia-personal/estadisticas/totales?${params.toString()}`);
+  },
+
+  getEstadisticasAusencias: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.periodo) params.append('periodo', filters.periodo);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
+    return api.get(`/asistencia-personal/estadisticas/ausencias?${params.toString()}`);
+  },
+
+  getEstadisticasPuntualidad: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.periodo) params.append('periodo', filters.periodo);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
+    return api.get(`/asistencia-personal/estadisticas/puntualidad?${params.toString()}`);
+  },
+
+  getEstadisticasAreas: (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.periodo) params.append('periodo', filters.periodo);
+    if (filters.fechaInicio) params.append('fechaInicio', filters.fechaInicio);
+    if (filters.fechaFin) params.append('fechaFin', filters.fechaFin);
+    return api.get(`/asistencia-personal/estadisticas/areas?${params.toString()}`);
+  },
 };
 
 export const tiposDocumentoService = {
@@ -686,6 +719,9 @@ export const visitasService = {
   reject: (id, motivo) => api.post(`/visitas/${id}/rechazar`, { motivo }),
   delegate: (id, nuevoPersonalId) => api.post(`/visitas/${id}/delegar`, { nuevoPersonalId }),
   finalizarAtencion: (id) => api.post(`/visitas/${id}/finalizar-atencion`),
+  
+  // Estadísticas
+  getTotales: (periodo = 'mes') => api.get(`/visitas/totales?periodo=${periodo}`),
 };
 
 export const justificacionesService = {
