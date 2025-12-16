@@ -774,194 +774,201 @@ const DashboardVigilantePage = () => {
       
       let activosData = [];
       
-      // Si estamos online, cargar desde la API
+      // Intentar cargar desde la API si navigator.onLine reporta true
+      let loadedFromAPI = false;
       if (navigator.onLine) {
-      const response = await visitasService.getActivas();
-      
-      if (response.data.success) {
-          activosData = response.data.data || [];
-          // Log solo en modo desarrollo
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[Online] Datos recibidos del backend:', activosData);
-        }
-        
-        // También cargar salidas pendientes para aplicar sobre las visitas del servidor
-        const salidasPendientes = await getPendingSalidas();
-        if (salidasPendientes.length > 0) {
-          console.log('[Online] Salidas pendientes encontradas:', salidasPendientes);
+        try {
+          const response = await visitasService.getActivas();
           
-          // Crear un mapa de salidas por visitaId para acceso rápido
-          const salidasPorVisita = new Map();
-          salidasPendientes.forEach(salida => {
-            salidasPorVisita.set(salida.visitaId, salida);
-          });
-          
-          // Aplicar salidas a las visitas correspondientes del servidor
-          activosData = activosData.map(visita => {
-            const salida = salidasPorVisita.get(visita.id.toString());
-            if (salida) {
-              console.log('[Online] Aplicando salida pendiente a visita del servidor:', {
-                visitaId: visita.id,
-                salidaId: salida.id,
-                fechaSalida: salida.fechaSalida,
-                horaSalida: salida.horaSalida
-              });
-              
-              return {
-                ...visita,
-                fecha_salida: salida.fechaSalida,
-                hora_salida: salida.horaSalida,
-                _hasOfflineExit: true,
-                _offlineExitId: salida.id
-              };
-            }
-            return visita;
-          });
-          
-          console.log('[Online] Salidas aplicadas sobre datos del servidor. Visitas con salida:', 
-            activosData.filter(v => v._hasOfflineExit).length);
-        }
-        
-          // Verificar si hay visitas offline en el estado actual
-          setVisitantesActivos(prevActivos => {
+          if (response.data.success) {
+            activosData = response.data.data || [];
+            loadedFromAPI = true;
             // Log solo en modo desarrollo
             if (process.env.NODE_ENV === 'development') {
-              console.log('[Online] Estado actual de visitantes:', prevActivos);
+              console.log('[Online] Datos recibidos del backend:', activosData);
             }
             
-            // Separar visitas offline de las normales
-            const visitasOffline = prevActivos.filter(v => v._isOffline || v._isPending);
-            const visitasNormales = prevActivos.filter(v => !v._isOffline && !v._isPending);
-            
-            // Log solo si hay datos relevantes
-            if (visitasOffline.length > 0 || visitasNormales.length > 0) {
-              console.log('[Online] Visitas offline encontradas:', visitasOffline.length);
-              console.log('[Online] Visitas normales:', visitasNormales.length);
-            }
-            
-            // Crear un mapa para rastrear qué visitas de la API ya fueron procesadas
-            const visitasAPIProcesadas = new Set();
-            
-            // Actualizar visitas offline con datos de la API
-            const visitasOfflineActualizadas = visitasOffline.map(visitaOffline => {
-              // Buscar coincidencia en las visitas de la API
-              const visitaAPI = activosData.find(v => {
-                // Comparación más robusta usando múltiples criterios
-                const mismoDocumento = v.numero_documento === visitaOffline.numero_documento;
-                const mismoPersonal = v.personal_visitado_id === visitaOffline.personal_visitado_id;
-                
-                // Comparar fechas (normalizar a YYYY-MM-DD)
-                const fechaOffline = visitaOffline.fecha_ingreso?.split('T')[0] || visitaOffline.fecha_ingreso;
-                const fechaAPI = v.fecha_ingreso?.split('T')[0];
-                const mismaFecha = fechaAPI === fechaOffline;
-                
-                // CORRECCIÓN: Usar helper para formatear horas de forma consistente
-                const horaOffline = formatHora(visitaOffline.hora_ingreso);
-                const horaAPI = formatHora(v.hora_ingreso || v.fecha_ingreso);
-                const mismaHora = horaAPI === horaOffline;
-                
-                // También considerar visitas sin salida (activas)
-                const sinSalida = !v.fecha_salida && !v.hora_salida;
-                
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('[Online] Comparando:', {
-                    offline: {
-                      doc: visitaOffline.numero_documento,
-                      personal: visitaOffline.personal_visitado_id,
-                      fecha: fechaOffline,
-                      hora: horaOffline
-                    },
-                    api: {
-                      doc: v.numero_documento,
-                      personal: v.personal_visitado_id,
-                      fecha: fechaAPI,
-                      hora: horaAPI,
-                      sinSalida: sinSalida
-                    },
-                    coincidencias: {
-                      documento: mismoDocumento,
-                      personal: mismoPersonal,
-                      fecha: mismaFecha,
-                      hora: mismaHora,
-                      sinSalida: sinSalida
-                    }
-                  });
-                }
-                
-                // Coincidencia si: mismo documento, mismo personal, misma fecha, misma hora Y sin salida
-                return mismoDocumento && mismoPersonal && mismaFecha && mismaHora && sinSalida;
+            // También cargar salidas pendientes para aplicar sobre las visitas del servidor
+            const salidasPendientes = await getPendingSalidas();
+            if (salidasPendientes.length > 0) {
+              console.log('[Online] Salidas pendientes encontradas:', salidasPendientes);
+              
+              // Crear un mapa de salidas por visitaId para acceso rápido
+              const salidasPorVisita = new Map();
+              salidasPendientes.forEach(salida => {
+                salidasPorVisita.set(salida.visitaId, salida);
               });
               
-              if (visitaAPI) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('[Online] ✅ Encontrada coincidencia para visita offline:', {
-                    offline: visitaOffline,
-                    api: visitaAPI
+              // Aplicar salidas a las visitas correspondientes del servidor
+              activosData = activosData.map(visita => {
+                const salida = salidasPorVisita.get(visita.id.toString());
+                if (salida) {
+                  console.log('[Online] Aplicando salida pendiente a visita del servidor:', {
+                    visitaId: visita.id,
+                    salidaId: salida.id,
+                    fechaSalida: salida.fechaSalida,
+                    horaSalida: salida.horaSalida
                   });
+                  
+                  return {
+                    ...visita,
+                    fecha_salida: salida.fechaSalida,
+                    hora_salida: salida.horaSalida,
+                    _hasOfflineExit: true,
+                    _offlineExitId: salida.id
+                  };
                 }
-                
-                // Marcar esta visita de la API como procesada
-                visitasAPIProcesadas.add(visitaAPI.id);
-                
-                // Retornar la visita actualizada con datos de la API
-                return {
-                  ...visitaAPI,
-                  _wasOffline: true,
-                  _originalOfflineId: visitaOffline._originalId || visitaOffline.id
-                };
+                return visita;
+              });
+              
+              console.log('[Online] Salidas aplicadas sobre datos del servidor. Visitas con salida:', 
+                activosData.filter(v => v._hasOfflineExit).length);
+            }
+            
+            // Verificar si hay visitas offline en el estado actual
+            setVisitantesActivos(prevActivos => {
+              // Log solo en modo desarrollo
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[Online] Estado actual de visitantes:', prevActivos);
               }
               
-              // Si no hay coincidencia, mantener la visita offline
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[Online] ⚠️ No se encontró coincidencia para visita offline:', visitaOffline);
+              // Separar visitas offline de las normales
+              const visitasOffline = prevActivos.filter(v => v._isOffline || v._isPending);
+              const visitasNormales = prevActivos.filter(v => !v._isOffline && !v._isPending);
+              
+              // Log solo si hay datos relevantes
+              if (visitasOffline.length > 0 || visitasNormales.length > 0) {
+                console.log('[Online] Visitas offline encontradas:', visitasOffline.length);
+                console.log('[Online] Visitas normales:', visitasNormales.length);
               }
-              return visitaOffline;
+              
+              // Crear un mapa para rastrear qué visitas de la API ya fueron procesadas
+              const visitasAPIProcesadas = new Set();
+              
+              // Actualizar visitas offline con datos de la API
+              const visitasOfflineActualizadas = visitasOffline.map(visitaOffline => {
+                // Buscar coincidencia en las visitas de la API
+                const visitaAPI = activosData.find(v => {
+                  // Comparación más robusta usando múltiples criterios
+                  const mismoDocumento = v.numero_documento === visitaOffline.numero_documento;
+                  const mismoPersonal = v.personal_visitado_id === visitaOffline.personal_visitado_id;
+                  
+                  // Comparar fechas (normalizar a YYYY-MM-DD)
+                  const fechaOffline = visitaOffline.fecha_ingreso?.split('T')[0] || visitaOffline.fecha_ingreso;
+                  const fechaAPI = v.fecha_ingreso?.split('T')[0];
+                  const mismaFecha = fechaAPI === fechaOffline;
+                  
+                  // CORRECCIÓN: Usar helper para formatear horas de forma consistente
+                  const horaOffline = formatHora(visitaOffline.hora_ingreso);
+                  const horaAPI = formatHora(v.hora_ingreso || v.fecha_ingreso);
+                  const mismaHora = horaAPI === horaOffline;
+                  
+                  // También considerar visitas sin salida (activas)
+                  const sinSalida = !v.fecha_salida && !v.hora_salida;
+                  
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('[Online] Comparando:', {
+                      offline: {
+                        doc: visitaOffline.numero_documento,
+                        personal: visitaOffline.personal_visitado_id,
+                        fecha: fechaOffline,
+                        hora: horaOffline
+                      },
+                      api: {
+                        doc: v.numero_documento,
+                        personal: v.personal_visitado_id,
+                        fecha: fechaAPI,
+                        hora: horaAPI,
+                        sinSalida: sinSalida
+                      },
+                      coincidencias: {
+                        documento: mismoDocumento,
+                        personal: mismoPersonal,
+                        fecha: mismaFecha,
+                        hora: mismaHora,
+                        sinSalida: sinSalida
+                      }
+                    });
+                  }
+                  
+                  // Coincidencia si: mismo documento, mismo personal, misma fecha, misma hora Y sin salida
+                  return mismoDocumento && mismoPersonal && mismaFecha && mismaHora && sinSalida;
+                });
+                
+                if (visitaAPI) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('[Online] ✅ Encontrada coincidencia para visita offline:', {
+                      offline: visitaOffline,
+                      api: visitaAPI
+                    });
+                  }
+                  
+                  // Marcar esta visita de la API como procesada
+                  visitasAPIProcesadas.add(visitaAPI.id);
+                  
+                  // Retornar la visita actualizada con datos de la API
+                  return {
+                    ...visitaAPI,
+                    _wasOffline: true,
+                    _originalOfflineId: visitaOffline._originalId || visitaOffline.id
+                  };
+                }
+                
+                // Si no hay coincidencia, mantener la visita offline
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Online] ⚠️ No se encontró coincidencia para visita offline:', visitaOffline);
+                }
+                return visitaOffline;
+              });
+              
+              // Agregar solo las visitas de la API que NO fueron usadas para actualizar visitas offline
+              const visitasAPINoUsadas = activosData.filter(visitaAPI => 
+                !visitasAPIProcesadas.has(visitaAPI.id)
+              );
+              
+              // Log solo si hay datos relevantes
+              if (process.env.NODE_ENV === 'development') {
+                if (visitasOfflineActualizadas.length > 0 || visitasAPINoUsadas.length > 0) {
+                  console.log('[Online] Visitas offline actualizadas:', visitasOfflineActualizadas.length);
+                  console.log('[Online] Visitas de la API no usadas:', visitasAPINoUsadas.length);
+                }
+              }
+              
+              // Combinar: visitas offline actualizadas + visitas de la API que no tenían correspondencia offline
+              const resultado = [...visitasOfflineActualizadas, ...visitasAPINoUsadas];
+              // Log solo si hay datos
+              if (resultado.length > 0 && process.env.NODE_ENV === 'development') {
+                console.log('[Online] Total de visitas después de sincronización:', resultado.length);
+              }
+              
+              // Cachear resultado final
+              try {
+                localStorage.setItem('cache_visitas_activas', JSON.stringify({ ts: Date.now(), data: resultado }));
+              } catch (e) {
+                console.warn('No se pudo cachear visitas activas', e);
+              }
+
+              return resultado;
             });
             
-            // Agregar solo las visitas de la API que NO fueron usadas para actualizar visitas offline
-            const visitasAPINoUsadas = activosData.filter(visitaAPI => 
-              !visitasAPIProcesadas.has(visitaAPI.id)
-            );
+            // Actualizar paginación
+            setActivosPagination(prev => ({
+              ...prev,
+              totalItems: activosData.length,
+              totalPages: Math.ceil(activosData.length / prev.itemsPerPage),
+              currentPage: 1
+            }));
             
-            // Log solo si hay datos relevantes
-            if (process.env.NODE_ENV === 'development') {
-              if (visitasOfflineActualizadas.length > 0 || visitasAPINoUsadas.length > 0) {
-                console.log('[Online] Visitas offline actualizadas:', visitasOfflineActualizadas.length);
-                console.log('[Online] Visitas de la API no usadas:', visitasAPINoUsadas.length);
-              }
-            }
-            
-            // Combinar: visitas offline actualizadas + visitas de la API que no tenían correspondencia offline
-            const resultado = [...visitasOfflineActualizadas, ...visitasAPINoUsadas];
-            // Log solo si hay datos
-            if (resultado.length > 0 && process.env.NODE_ENV === 'development') {
-              console.log('[Online] Total de visitas después de sincronización:', resultado.length);
-            }
-            
-            // Cachear resultado final
-            try {
-              localStorage.setItem('cache_visitas_activas', JSON.stringify({ ts: Date.now(), data: resultado }));
-            } catch (e) {
-              console.warn('No se pudo cachear visitas activas', e);
-            }
-
-            return resultado;
-          });
-          
-          // Actualizar paginación
-          setActivosPagination(prev => ({
-            ...prev,
-            totalItems: activosData.length,
-            totalPages: Math.ceil(activosData.length / prev.itemsPerPage),
-            currentPage: 1
-          }));
-          
-          return; // Salir aquí ya que actualizamos el estado directamente
-        } else {
-          setError('Error al cargar visitantes activos');
-          return;
+            return; // Salir aquí ya que actualizamos el estado directamente
+          }
+        } catch (apiError) {
+          console.warn('[API] Error al conectar con el servidor, activando modo offline:', apiError.message || apiError);
+          loadedFromAPI = false;
         }
-      } else {
+      }
+      
+      // Si no se pudo cargar desde la API o navigator.onLine es false, cargar desde IndexedDB
+      if (!loadedFromAPI) {
         // Si estamos offline, cargar visitas activas completas (visitas + salidas)
         console.log('[Offline] Cargando visitas activas completas...');
         const { visitasActivas, visitasConSalida } = await getVisitasActivasCompletas();
