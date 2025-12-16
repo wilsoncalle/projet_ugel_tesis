@@ -17,24 +17,9 @@ const CACHE_NAMES = {
 
 const OFFLINE_URL = '/offline.html';
 
-<<<<<<< HEAD
 // ========== PRECACHE ==========
 // Workbox pre-cacheará automáticamente todos los assets del build
 precacheAndRoute(self.__WB_MANIFEST || []);
-=======
-// Assets estáticos para cachear
-// Workbox inyectará automáticamente los assets generados aquí (placeholder obligatorio)
-const WB_MANIFEST = self.__WB_MANIFEST || [];
-
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/offline.html',
-  '/manifest.json',
-  // Añade también los assets generados por Vite para que queden precacheados
-  ...WB_MANIFEST.map((entry) => (entry && entry.url ? entry.url : entry)).filter(Boolean)
-];
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
 
 // Limpiar caches antiguas automáticamente
 cleanupOutdatedCaches();
