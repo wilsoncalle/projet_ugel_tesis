@@ -9,9 +9,8 @@ import {
   saveIngresoPersonalOffline,
   saveSalidaPersonalOffline
 } from '../utils/offlineDB';
-import { registerBackgroundSync, isOnline } from '../utils/offlineSync';
+import { registerBackgroundSync } from '../utils/offlineSync';
 
-<<<<<<< HEAD
 // Estado de conectividad del servidor
 let serverAvailable = true;
 let lastServerCheck = 0;
@@ -29,7 +28,7 @@ async function checkServerAvailability() {
   }
   
   try {
-    // Intentar un HEAD request al endpoint de salud o al root de la API
+    // Intentar un HEAD request al endpoint de salud
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos timeout
     
@@ -76,23 +75,20 @@ async function isReallyOffline() {
   return offline;
 }
 
-=======
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
+/**
+ * Detecta si un error es de red/conectividad
+ */
 function isNetworkError(error) {
   return (
     !error.response ||
     error.message === 'Network Error' ||
     error.code === 'ERR_NETWORK' ||
     error.code === 'ECONNABORTED' ||
-<<<<<<< HEAD
     error.message?.includes('Failed to fetch') ||
     error.message?.includes('NetworkError') ||
     error.response?.status === 503 ||
     error.response?.status === 502 ||
     error.response?.status === 504 ||
-=======
-    error.response?.status === 503 ||
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
     error.response?.status === 0 ||
     (error.response?.status >= 500 && error.response?.status < 600)
   );
@@ -162,16 +158,7 @@ export async function createVisitaWithOfflineSupport(visitaData, visitanteData =
     });
     
     // Detectar si es un error de red o servicio no disponible
-    const isNetworkError = 
-      !error.response || // Sin respuesta = error de red
-      error.message === 'Network Error' || 
-      error.code === 'ERR_NETWORK' ||
-      error.code === 'ECONNABORTED' ||
-      error.response?.status === 503 || // Service Unavailable
-      error.response?.status === 0 || // Network error
-      (error.response?.status >= 500 && error.response?.status < 600); // Errores de servidor
-    
-    if (isNetworkError) {
+    if (isNetworkError(error)) {
       console.log('[Offline API] Error de red/servidor detectado, activando modo offline...');
       
       try {
@@ -208,12 +195,8 @@ export async function createVisitaWithOfflineSupport(visitaData, visitanteData =
  * Registra un ingreso de personal con soporte offline
  */
 export async function registrarIngresoPersonalWithOfflineSupport(personalData, originalFn) {
-<<<<<<< HEAD
   const offline = await isReallyOffline();
   if (offline) {
-=======
-  if (!isOnline()) {
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
     console.log('[Offline API] Sin conexión, guardando ingreso personal localmente...');
     try {
       const savedData = await saveIngresoPersonalOffline(personalData);
@@ -263,12 +246,8 @@ export async function registrarIngresoPersonalWithOfflineSupport(personalData, o
  * Registra una salida de personal con soporte offline
  */
 export async function registrarSalidaPersonalWithOfflineSupport(personalId, originalFn) {
-<<<<<<< HEAD
   const offline = await isReallyOffline();
   if (offline) {
-=======
-  if (!isOnline()) {
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
     console.log('[Offline API] Sin conexión, guardando salida personal localmente...');
     try {
       const savedData = await saveSalidaPersonalOffline(personalId);
@@ -357,7 +336,7 @@ export async function registrarSalidaWithOfflineSupport(visitaId, originalSalida
     return response;
   } catch (error) {
     // Si falla la conexión, guardar offline
-    if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+    if (isNetworkError(error)) {
       console.log('[Offline API] Conexión perdida durante petición de salida, guardando offline...');
       
       try {
@@ -422,4 +401,3 @@ export function getResponseMessage(response) {
     message: response.data.message || 'Operación completada correctamente.'
   };
 }
-
