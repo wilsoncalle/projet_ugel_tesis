@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, User, Clock, CheckCircle, XCircle, Forward, LogOut, MapPin, Briefcase, FileText, Calendar } from 'lucide-react';
@@ -63,34 +62,18 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
       socket.off('salida_visita_registrada', handleSalidaRegistrada);
     };
   }, [isOpen, visitaData?.id]);
+  
   // Construir línea de tiempo de eventos
   const timeline = useMemo(() => {
     if (!visitaData) return [];
-=======
-import { useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { X, User, Clock, CheckCircle, XCircle, Forward, LogOut, MapPin, Briefcase, FileText, Calendar } from 'lucide-react';
-
-const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visita" }) => {
-  // Construir línea de tiempo de eventos
-  const timeline = useMemo(() => {
-    if (!data) return [];
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
     
     const events = [];
     
     // 1. Registro de llegada
-<<<<<<< HEAD
     if (visitaData.fecha_ingreso) {
       events.push({
         tipo: 'LLEGADA',
         fecha: visitaData.fecha_ingreso,
-=======
-    if (data.fecha_ingreso) {
-      events.push({
-        tipo: 'LLEGADA',
-        fecha: data.fecha_ingreso,
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
         icono: <LogOut className="h-5 w-5 transform rotate-180" />,
         color: 'blue',
         titulo: 'Llegada del Visitante',
@@ -99,7 +82,6 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     }
     
     // 2. Aceptación
-<<<<<<< HEAD
     if (visitaData.fecha_aceptacion) {
       events.push({
         tipo: 'ACEPTACION',
@@ -108,21 +90,10 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
         color: 'green',
         titulo: 'Visita Aceptada',
         descripcion: `Aceptada por ${visitaData.personal_nombres || ''} ${visitaData.personal_apellidos || ''}`.trim() || 'Personal'
-=======
-    if (data.fecha_aceptacion) {
-      events.push({
-        tipo: 'ACEPTACION',
-        fecha: data.fecha_aceptacion,
-        icono: <CheckCircle className="h-5 w-5" />,
-        color: 'green',
-        titulo: 'Visita Aceptada',
-        descripcion: `Aceptada por ${data.personal_nombres || ''} ${data.personal_apellidos || ''}`.trim() || 'Personal'
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
       });
     }
     
     // 3. Rechazo
-<<<<<<< HEAD
     if (visitaData.fecha_rechazo) {
       events.push({
         tipo: 'RECHAZO',
@@ -131,33 +102,15 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
         color: 'red',
         titulo: 'Visita Rechazada',
         descripcion: visitaData.motivo_rechazo || 'Sin motivo especificado'
-=======
-    if (data.fecha_rechazo) {
-      events.push({
-        tipo: 'RECHAZO',
-        fecha: data.fecha_rechazo,
-        icono: <XCircle className="h-5 w-5" />,
-        color: 'red',
-        titulo: 'Visita Rechazada',
-        descripcion: data.motivo_rechazo || 'Sin motivo especificado'
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
       });
     }
     
     // 4. Delegación
-<<<<<<< HEAD
     if (visitaData.fecha_delegacion && visitaData.delegado_por_id) {
       const delegadoPor = `${visitaData.delegado_por_nombres || ''} ${visitaData.delegado_por_apellidos || ''}`.trim();
       events.push({
         tipo: 'DELEGACION',
         fecha: visitaData.fecha_delegacion,
-=======
-    if (data.fecha_delegacion && data.delegado_por_id) {
-      const delegadoPor = `${data.delegado_por_nombres || ''} ${data.delegado_por_apellidos || ''}`.trim();
-      events.push({
-        tipo: 'DELEGACION',
-        fecha: data.fecha_delegacion,
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
         icono: <Forward className="h-5 w-5" />,
         color: 'purple',
         titulo: 'Visita Delegada',
@@ -166,17 +119,10 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     }
     
     // 5. Fin de atención
-<<<<<<< HEAD
     if (visitaData.fecha_fin_atencion) {
       events.push({
         tipo: 'FIN_ATENCION',
         fecha: visitaData.fecha_fin_atencion,
-=======
-    if (data.fecha_fin_atencion) {
-      events.push({
-        tipo: 'FIN_ATENCION',
-        fecha: data.fecha_fin_atencion,
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
         icono: <CheckCircle className="h-5 w-5" />,
         color: 'amber',
         titulo: 'Fin de Atención',
@@ -185,17 +131,10 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     }
     
     // 6. Salida
-<<<<<<< HEAD
     if (visitaData.fecha_salida) {
       events.push({
         tipo: 'SALIDA',
         fecha: visitaData.fecha_salida,
-=======
-    if (data.fecha_salida) {
-      events.push({
-        tipo: 'SALIDA',
-        fecha: data.fecha_salida,
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
         icono: <LogOut className="h-5 w-5" />,
         color: 'gray',
         titulo: 'Salida del Visitante',
@@ -205,15 +144,9 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     
     // Ordenar por fecha
     return events.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-<<<<<<< HEAD
   }, [visitaData]);
   
   if (!isOpen || !visitaData) return null;
-=======
-  }, [data]);
-  
-  if (!isOpen || !data) return null;
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
   
   const formatDateTime = (dateString) => {
     if (!dateString) return '-';
@@ -256,15 +189,9 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     return colors[color] || colors.gray;
   };
   
-<<<<<<< HEAD
   const visitanteNombre = `${visitaData.visitante_nombres || ''} ${visitaData.visitante_apellidos || ''}`.trim();
   const personalNombre = `${visitaData.personal_nombres || ''} ${visitaData.personal_apellidos || ''}`.trim();
   const delegadoNombre = `${visitaData.delegado_por_nombres || ''} ${visitaData.delegado_por_apellidos || ''}`.trim();
-=======
-  const visitanteNombre = `${data.visitante_nombres || ''} ${data.visitante_apellidos || ''}`.trim();
-  const personalNombre = `${data.personal_nombres || ''} ${data.personal_apellidos || ''}`.trim();
-  const delegadoNombre = `${data.delegado_por_nombres || ''} ${data.delegado_por_apellidos || ''}`.trim();
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
   
   const modalContent = (
     <div
@@ -310,11 +237,7 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
               <div>
                 <p className="text-xs text-gray-500 mb-1">Documento</p>
                 <p className="text-sm font-medium text-gray-900">
-<<<<<<< HEAD
                   {visitaData.tipo_documento_codigo || 'DNI'}: {visitaData.numero_documento || '-'}
-=======
-                  {data.tipo_documento_codigo || 'DNI'}: {data.numero_documento || '-'}
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
                 </p>
               </div>
             </div>
@@ -333,29 +256,17 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Cargo</p>
-<<<<<<< HEAD
                 <p className="text-sm font-medium text-gray-900">{visitaData.personal_cargo || '-'}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Motivo de Visita</p>
                 <p className="text-sm font-medium text-gray-900">{visitaData.nombre_motivo || '-'}</p>
-=======
-                <p className="text-sm font-medium text-gray-900">{data.personal_cargo || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Motivo de Visita</p>
-                <p className="text-sm font-medium text-gray-900">{data.nombre_motivo || '-'}</p>
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Área de Destino</p>
                 <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
                   <MapPin className="h-3 w-3 text-gray-400" />
-<<<<<<< HEAD
                   {visitaData.nombre_area || '-'}
-=======
-                  {data.nombre_area || '-'}
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
                 </p>
               </div>
               {delegadoNombre && (
@@ -413,17 +324,10 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
           </div>
           
           {/* Información Adicional */}
-<<<<<<< HEAD
           {visitaData.observaciones && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
               <h4 className="text-sm font-semibold text-amber-900 mb-2">Observaciones</h4>
               <p className="text-sm text-amber-800">{visitaData.observaciones}</p>
-=======
-          {data.observaciones && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <h4 className="text-sm font-semibold text-amber-900 mb-2">Observaciones</h4>
-              <p className="text-sm text-amber-800">{data.observaciones}</p>
->>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
             </div>
           )}
         </div>
