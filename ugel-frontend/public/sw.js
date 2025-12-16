@@ -43,8 +43,38 @@ registerRoute(
 );
 
 // 2. API CALLS: Network First (intenta red, si falla usa cache)
+// 2. API CATALOGOS (Selects): Stale While Revalidate
+// Datos que cambian poco: Personal, Areas, Cargos, Motivos, Tipos de Documento
+// Se usa StaleWhileRevalidate para respuesta instantánea y soporte offline robusto
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/'),
+  ({ url }) => {
+    const p = url.pathname;
+    return p.startsWith('/api/') && (
+      p.includes('/areas') ||
+      p.includes('/personal') || // Importante para los selects de personal
+      p.includes('/cargos') ||
+      p.includes('/motivos-') ||
+      p.includes('/tipos-') ||
+      p.includes('/reniec-')
+    );
+  },
+  new StaleWhileRevalidate({
+    cacheName: 'ugel-catalogos-v1',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200]
+      }),
+      new ExpirationPlugin({
+        maxEntries: 200, // Aumentado para soportar lista de personal grande
+        maxAgeSeconds: 7 * 24 * 60 * 60 // 7 días (antes era 5 min en la general)
+      })
+    ]
+  })
+);
+
+// 3. API GENERAL CALLS: Network First (intenta red, si falla usa cache)
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/') && !url.pathname.includes('/auth/'), // Excluir auth
   new NetworkFirst({
     cacheName: CACHE_NAMES.API,
     networkTimeoutSeconds: 5,
@@ -54,7 +84,7 @@ registerRoute(
       }),
       new ExpirationPlugin({
         maxEntries: 100,
-        maxAgeSeconds: 60 * 5 // 5 minutos
+        maxAgeSeconds: 24 * 60 * 60 // 24 horas (Aumentado de 5 min)
       })
     ]
   })
