@@ -23,6 +23,15 @@ const { authenticateToken, requireAdmin } = require('../../middleware/authHandle
 router.get('/', controller.healthCheck);
 
 /**
+ * @route   HEAD /api/health
+ * @desc    Ping ligero sin body (para useConnectivity)
+ * @access  Public
+ */
+router.head('/', (req, res) => {
+  res.status(200).end();
+});
+
+/**
  * @route   GET /api/health/database
  * @desc    Verificar estado de la base de datos
  * @access  Private (Admin)

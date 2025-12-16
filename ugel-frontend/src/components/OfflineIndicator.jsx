@@ -1,19 +1,13 @@
 import { useState, useEffect } from 'react';
 import { WifiIcon, CloudArrowUpIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { useConnectivity } from '../hooks/useConnectivity';
 
 const OfflineIndicator = () => {
-  // Verificar que estamos en el lado del cliente
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const [online, setOnline] = useState(() => {
-    try {
-      return navigator.onLine;
-    } catch {
-      return true;
-    }
-  });
+  // Usar el nuevo hook de conectividad con verificación real
+  const { online: browserOnline, verified: serverReachable, isOffline } = useConnectivity('/api/health', 15000);
+  
+  // Para compatibilidad, consideramos "online" como browserOnline && serverReachable
+  const online = !isOffline;
 
   const [pendingCount, setPendingCount] = useState({ total: 0, visitas: 0, salidas: 0 });
   const [syncing, setSyncing] = useState(false);
@@ -38,28 +32,13 @@ const OfflineIndicator = () => {
 
   // Actualizar estado de conexión y datos
   useEffect(() => {
-    const updateOnlineStatus = () => {
-      try {
-        setOnline(navigator.onLine);
-      } catch (error) {
-        console.error('Error updating online status:', error);
-      }
-    };
-
     const handleSyncComplete = (event) => {
       loadPendingData();
       setSyncing(false);
     };
 
-    const handleConnectionChanged = (event) => {
-      setOnline(event.detail.online);
-    };
-
-    // Listeners para cambios de conectividad
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
+    // Listeners para eventos personalizados
     window.addEventListener('offline-sync-complete', handleSyncComplete);
-    window.addEventListener('connection-status-changed', handleConnectionChanged);
     
     // Cargar datos iniciales
     loadPendingData();
@@ -68,10 +47,7 @@ const OfflineIndicator = () => {
     const intervalId = setInterval(loadPendingData, 5000);
 
     return () => {
-      window.removeEventListener('online', updateOnlineStatus);
-      window.removeEventListener('offline', updateOnlineStatus);
       window.removeEventListener('offline-sync-complete', handleSyncComplete);
-      window.removeEventListener('connection-status-changed', handleConnectionChanged);
       clearInterval(intervalId);
     };
   }, []);
