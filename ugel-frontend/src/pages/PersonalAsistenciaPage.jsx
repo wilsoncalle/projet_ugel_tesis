@@ -616,6 +616,8 @@ const PersonalAsistenciaPage = () => {
   };
 
   const registrarIngreso = async (personalSeleccionado) => {
+    console.log('[registrarIngreso] Iniciando con personalSeleccionado:', personalSeleccionado);
+    
     if (!personalSeleccionado) {
       setError('Debe seleccionar un personal');
       return;
@@ -623,10 +625,15 @@ const PersonalAsistenciaPage = () => {
     
     try {
       setLoading(true);
+      console.log('[registrarIngreso] Llamando al servicio...');
+      
       const response = await registrarIngresoPersonalWithOfflineSupport(
         personalSeleccionado,
         (id) => asistenciaPersonalService.registrarIngreso(parseInt(id))
       );
+      
+      console.log('[registrarIngreso] Respuesta completa:', response);
+      console.log('[registrarIngreso] response.data.success:', response.data.success);
       
       if (response.data.success) {
         setPersonalSeleccionado(null);
@@ -661,6 +668,10 @@ const PersonalAsistenciaPage = () => {
         } else {
           // Actualizar inmediatamente la tabla sin esperar recarga del servidor
           const asistenciaRegistrada = response.data.data;
+          
+          // Log para debugging
+          console.log('[registrarIngreso] Respuesta del backend:', asistenciaRegistrada);
+          
           const nuevoRegistro = {
             personal_id: parseInt(personalSeleccionado.value),
             personal_nombres: personalSeleccionado.nombres || '',
@@ -669,36 +680,53 @@ const PersonalAsistenciaPage = () => {
             personal_tipo_documento: personalSeleccionado.tipo_documento || 'DNI',
             personal_cargo_nombre: personalSeleccionado.cargo_nombre || '',
             personal_area_nombre: personalSeleccionado.area_nombre || '',
-            hora_ingreso: asistenciaRegistrada.hora_ingreso || new Date().toLocaleTimeString('en-US', { hour12: false }),
+            hora_ingreso: asistenciaRegistrada?.hora_ingreso || new Date().toLocaleTimeString('en-US', { hour12: false }),
             hora_salida: null,
-            estado_presencia: asistenciaRegistrada.estado_presencia || 'Presente',
+            // IMPORTANTE: Respetar el estado que viene del backend (puede ser Tardanza, Presente, etc)
+            estado_presencia: asistenciaRegistrada?.estado_presencia || 'Presente',
             isOffline: false
           };
           
+          console.log('[registrarIngreso] Actualizando tabla con:', nuevoRegistro);
+          
           setAsistenciasHoy(prev => {
             const lista = prev || [];
+            console.log('[registrarIngreso] Lista actual tiene', lista.length, 'items');
             const idx = lista.findIndex(
               (row) => String(row.personal_id || row.personalId) === String(nuevoRegistro.personal_id)
             );
+            console.log('[registrarIngreso] Índice encontrado:', idx);
             if (idx >= 0) {
               const copia = [...lista];
-              copia[idx] = { ...copia[idx], ...nuevoRegistro };
-              return limpiarAusentesTempranos(copia);
+              // Sobrescribir completamente la fila existente con los nuevos datos
+              copia[idx] = nuevoRegistro;
+              console.log('[registrarIngreso] Fila actualizada en índice', idx, ':', copia[idx]);
+              const resultado = limpiarAusentesTempranos(copia);
+              console.log('[registrarIngreso] Retornando array con', resultado.length, 'items');
+              return resultado;
             }
-            return limpiarAusentesTempranos([nuevoRegistro, ...lista]);
+            console.log('[registrarIngreso] Agregando nueva fila al inicio');
+            const resultado = limpiarAusentesTempranos([nuevoRegistro, ...lista]);
+            console.log('[registrarIngreso] Retornando array con', resultado.length, 'items');
+            return resultado;
           });
           
           // Recargar en segundo plano para sincronizar con servidor (sin bloquear UI), FORZANDO refresh
           cargarAsistenciasHoy(true).catch(err => console.warn('Error recargando asistencias en background:', err));
         }
       } else {
-        // No mostrar error global si ya existe registro, ya que el formulario muestra la advertencia
-        // setError(response.data.message);
+        // Mostrar el error del backend cuando success es false
+        const errorMsg = response.data.message || 'Error desconocido del servidor';
+        console.error('[registrarIngreso] Backend retornó success=false:', errorMsg);
+        setError(errorMsg);
       }
     } catch (error) {
+      console.error('[registrarIngreso] ERROR CAPTURADO:', error);
+      console.error('[registrarIngreso] error.response:', error.response);
       setError(error.response?.data?.error || error.response?.data?.message || 'Error al registrar ingreso');
     } finally {
       setLoading(false);
+      console.log('[registrarIngreso] Finalizando (loading=false)');
     }
   };
   

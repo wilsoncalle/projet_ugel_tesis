@@ -265,7 +265,11 @@ const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
     let controlId = registroExistente?.id;
     let tipoMovimiento = 'INGRESO';
     let observacion = '';
-    let nuevoEstado = registroExistente ? registroExistente.estado_presencia : 'Presente';
+    // IMPORTANTE: Si existe registro con estado Ausente, empezar con 'Presente' 
+    // y luego calcular si debe ser Tardanza según la hora
+    let nuevoEstado = (registroExistente && registroExistente.estado_presencia !== 'Ausente') 
+        ? registroExistente.estado_presencia 
+        : 'Presente';
     let minutosTardanzaCalculados = 0;
 
     // Lógica clasificación REFINADA
@@ -297,8 +301,15 @@ const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
           observacion = 'Entrada Intermitente';
       } else {
           // El último movimiento FUE un ingreso (INGRESO, RETORNO_REFRIGERIO, etc.)
-          // No permitir dos ingresos seguidos
-          return { alreadyRegistered: true, message: 'El personal ya se encuentra dentro de la institución.' };
+          // EXCEPCIÓN: Si el estado actual es 'Ausente', permitir registrar ingreso tardío
+          if (registroExistente.estado_presencia === 'Ausente') {
+              // Permitir registrar como ingreso intermitente (ya que es un reingreso después de ausencia)
+              tipoMovimiento = 'INGRESO_INTERMITENTE';
+              observacion = 'Ingreso Tardío (después de marcado Ausente)';
+          } else {
+              // No permitir dos ingresos seguidos si ya está presente
+              return { alreadyRegistered: true, message: 'El personal ya se encuentra dentro de la institución.' };
+          }
       }
     }
     
@@ -348,6 +359,25 @@ const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
              }
          }
     }
+        // CASO 3: Ingreso Tardío (después de marcado Ausente)
+    else if (observacion.includes('Ingreso Tardío')) {
+         // Calcular tardanza desde la hora de entrada de la mañana
+         if (minEvento > minEntradaManana) {
+             const diff = minEvento - minEntradaManana;
+             
+             // Aplicar tolerancia si tiene saldo
+             if (tieneSaldo && diff <= minutosTolerancia) {
+                 minutosTardanzaCalculados = 0;
+                 nuevoEstado = 'Presente';
+             } else if (tieneSaldo) {
+                 minutosTardanzaCalculados = diff - minutosTolerancia;
+                 nuevoEstado = 'Tardanza';
+             } else {
+                 minutosTardanzaCalculados = diff;
+                 nuevoEstado = 'Tardanza';
+             }
+         }
+     }
     
     // Papeletas (Lógica existente)
     const papeletaActiva = await papeletasRepository.encontrarPapeletaActivaPorFecha(personalId, fechaEvento);
@@ -371,16 +401,44 @@ const registrarIngreso = async (personalId, usuarioId, offlineData = {}) => {
     });
 
     const totalMinutos = (registroExistente?.minutos_tardanza || 0) + minutosTardanzaCalculados;
-    // Hora ingreso padre: Se mantiene la original si existe
-    const horaIngresoFinal = registroExistente ? registroExistente.hora_ingreso : horaEvento;
     
-    // IMPORTANTE: Si ya estaba en Tardanza, se queda en Tardanza, salvo que queramos ser muy específicos.
-    // Pero generalmente el estado del día es el peor estado (Tardanza).
-    if (registroExistente && registroExistente.estado_presencia === 'Tardanza') {
-        nuevoEstado = 'Tardanza';
+    // Hora ingreso padre: Si estaba Ausente con hora 00:00:00 (creado por cron), usar la hora actual
+    // De lo contrario, mantener la original
+    const esHoraCron = registroExistente?.hora_ingreso === '00:00:00' || 
+                       registroExistente?.hora_ingreso === '00:00:00.000' ||
+                       !registroExistente?.hora_ingreso;
+    
+    const horaIngresoFinal = (registroExistente && !esHoraCron) 
+        ? registroExistente.hora_ingreso 
+        : horaEvento;
+    
+    // IMPORTANTE: Mantener el peor estado
+    // Si ya estaba en Tardanza o si el nuevo estado es Tardanza, mantener Tardanza
+    // Si estaba Ausente y ahora llega (Presente o Tardanza), usar el nuevo estado
+    if (registroExistente) {
+        if (registroExistente.estado_presencia === 'Tardanza') {
+            nuevoEstado = 'Tardanza';
+        } else if (registroExistente.estado_presencia === 'Ausente') {
+            // Si estaba Ausente, usar el nuevo estado calculado (Presente o Tardanza)
+            // nuevoEstado ya está calculado arriba
+        } else if (nuevoEstado === 'Tardanza') {
+            // Si el nuevo estado es peor (Tardanza), usarlo
+            nuevoEstado = 'Tardanza';
+        }
     }
 
-    return await repository.updateIngreso(controlId, horaIngresoFinal, nuevoEstado, usuarioId, totalMinutos);
+    console.log('[registrarIngreso] Valores finales antes de actualizar DB:');
+    console.log('  - controlId:', controlId);
+    console.log('  - horaIngresoFinal:', horaIngresoFinal);
+    console.log('  - nuevoEstado:', nuevoEstado);
+    console.log('  - totalMinutos:', totalMinutos);
+    console.log('  - registroExistente.estado_presencia (antes):', registroExistente?.estado_presencia);
+
+    const resultado = await repository.updateIngreso(controlId, horaIngresoFinal, nuevoEstado, usuarioId, totalMinutos);
+    
+    console.log('[registrarIngreso] Resultado de updateIngreso:', resultado);
+    
+    return resultado;
 
   } catch (error) {
     logger.error(`Error registrando ingreso ID ${personalId}:`, error);
