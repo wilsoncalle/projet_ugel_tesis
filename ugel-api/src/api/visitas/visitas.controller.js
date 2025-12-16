@@ -261,12 +261,12 @@ const reject = asyncHandler(async (req, res) => {
 
 const delegate = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { nuevopersonalId } = req.body;
+  const { nuevoPersonalId } = req.body;
   const personalId = req.user.personalId;
   
   if (!personalId) throw new AppError('Usuario no asociado a personal', 400);
   
-  const visita = await service.delegateVisita(id, personalId, nuevopersonalId);
+  const visita = await service.delegateVisita(id, personalId, nuevoPersonalId);
   
   try {
     const io = req.app.get('socketio');
