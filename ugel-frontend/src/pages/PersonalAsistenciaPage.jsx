@@ -325,8 +325,42 @@ const PersonalAsistenciaPage = () => {
           });
           console.warn('Retorno de personal guardado en modo offline');
         } else {
-          // Recargar datos solo cuando la petición fue online
-          await cargarAsistenciasHoy();
+          // Actualizar inmediatamente la tabla sin esperar recarga
+          setAsistenciasHoy(prev => {
+            const lista = prev || [];
+            const idx = lista.findIndex(
+              (r) => String(r.personal_id || r.personalId) === String(personalData.id)
+            );
+            if (idx >= 0) {
+              const copia = [...lista];
+              copia[idx] = {
+                ...copia[idx],
+                hora_ingreso: horaActual,
+                hora_salida: null,
+                estado_presencia: response.data.data?.estado_presencia || 'Presente',
+                isOffline: false
+              };
+              return limpiarAusentesTempranos(copia);
+            }
+            // Si no existe, agregarlo
+            const nuevoRegistro = {
+              personal_id: personalData.id,
+              personal_nombres: personalData.nombres,
+              personal_apellidos: personalData.apellidos,
+              personal_numero_documento: personalData.numero_documento,
+              personal_tipo_documento: personalData.tipo_documento,
+              personal_cargo_nombre: personalData.cargo_nombre,
+              personal_area_nombre: personalData.area_nombre,
+              hora_ingreso: horaActual,
+              hora_salida: null,
+              estado_presencia: response.data.data?.estado_presencia || 'Presente',
+              isOffline: false
+            };
+            return limpiarAusentesTempranos([nuevoRegistro, ...lista]);
+          });
+          
+          // Recargar en segundo plano, FORZANDO refresh
+          cargarAsistenciasHoy(true).catch(err => console.warn('Error recargando asistencias en background:', err));
         }
       }
     } catch (err) {
@@ -375,7 +409,7 @@ const PersonalAsistenciaPage = () => {
     }
   };
 
-  const cargarAsistenciasHoy = async () => {
+  const cargarAsistenciasHoy = async (forceRefresh = false) => {
     try {
       // Reutilizar caché reciente para respuesta instantánea
       let useLoading = true;
@@ -385,7 +419,7 @@ const PersonalAsistenciaPage = () => {
 
       try {
         const cached = localStorage.getItem('cache_asistencia_hoy');
-        if (cached) {
+        if (cached && !forceRefresh) {
           const parsed = JSON.parse(cached);
           const ts = Number(parsed?.ts || 0);
           const data = Array.isArray(parsed?.data) ? parsed.data : [];
@@ -544,6 +578,17 @@ const PersonalAsistenciaPage = () => {
           .toLowerCase();
         const papeleta = papeletasActivasMap.get(doc) || (nombreCompleto ? papeletasActivasMap.get(nombreCompleto) : null);
         if (papeleta) {
+          // Si ya marcó asistencia (es Presente o Tardanza) o tiene hora de ingreso registrada,
+          // RESPETAR ese estado y solo añadir el detalle de la papeleta.
+          // Solo marcar como 'Permiso' si no ha marcado asistencia o está Ausente.
+          if (
+            row.estado_presencia === 'Presente' || 
+            row.estado_presencia === 'Tardanza' || 
+            (row.hora_ingreso && row.hora_ingreso !== null)
+          ) {
+             return { ...row, detalle_papeleta: papeleta.codigo_papeleta || papeleta.codigo };
+          }
+          
           return { ...row, estado_presencia: 'Permiso', detalle_papeleta: papeleta.codigo_papeleta || papeleta.codigo };
         }
         return row;
@@ -614,7 +659,37 @@ const PersonalAsistenciaPage = () => {
           });
           console.warn('Ingreso de personal guardado en modo offline');
         } else {
-          await cargarAsistenciasHoy();
+          // Actualizar inmediatamente la tabla sin esperar recarga del servidor
+          const asistenciaRegistrada = response.data.data;
+          const nuevoRegistro = {
+            personal_id: parseInt(personalSeleccionado.value),
+            personal_nombres: personalSeleccionado.nombres || '',
+            personal_apellidos: personalSeleccionado.apellidos || '',
+            personal_numero_documento: personalSeleccionado.numero_documento || '',
+            personal_tipo_documento: personalSeleccionado.tipo_documento || 'DNI',
+            personal_cargo_nombre: personalSeleccionado.cargo_nombre || '',
+            personal_area_nombre: personalSeleccionado.area_nombre || '',
+            hora_ingreso: asistenciaRegistrada.hora_ingreso || new Date().toLocaleTimeString('en-US', { hour12: false }),
+            hora_salida: null,
+            estado_presencia: asistenciaRegistrada.estado_presencia || 'Presente',
+            isOffline: false
+          };
+          
+          setAsistenciasHoy(prev => {
+            const lista = prev || [];
+            const idx = lista.findIndex(
+              (row) => String(row.personal_id || row.personalId) === String(nuevoRegistro.personal_id)
+            );
+            if (idx >= 0) {
+              const copia = [...lista];
+              copia[idx] = { ...copia[idx], ...nuevoRegistro };
+              return limpiarAusentesTempranos(copia);
+            }
+            return limpiarAusentesTempranos([nuevoRegistro, ...lista]);
+          });
+          
+          // Recargar en segundo plano para sincronizar con servidor (sin bloquear UI), FORZANDO refresh
+          cargarAsistenciasHoy(true).catch(err => console.warn('Error recargando asistencias en background:', err));
         }
       } else {
         // No mostrar error global si ya existe registro, ya que el formulario muestra la advertencia
@@ -635,10 +710,33 @@ const PersonalAsistenciaPage = () => {
       );
       
       if (response.data.success) {
-        await cargarAsistenciasHoy();
+        const salidaRegistrada = response.data.data;
+        
+        // Actualizar inmediatamente la tabla
+        setAsistenciasHoy(prev => {
+          const lista = prev || [];
+          const idx = lista.findIndex(
+            (row) => String(row.personal_id || row.personalId) === String(personalId)
+          );
+          if (idx >= 0) {
+            const copia = [...lista];
+            copia[idx] = {
+              ...copia[idx],
+              hora_salida: salidaRegistrada.hora_salida || new Date().toLocaleTimeString('en-US', { hour12: false }),
+              isOffline: response.data.offline || false
+            };
+            return limpiarAusentesTempranos(copia);
+          }
+          return prev;
+        });
+        
+        // Recargar en segundo plano (no bloquea UI), FORZANDO refresh
+        cargarAsistenciasHoy(true).catch(err => console.warn('Error recargando asistencias en background:', err));
+        
         if (activeTab === 'historial') {
           handleBuscarHistorial(filtros, historialPagination.currentPage);
         }
+        
         if (response.data.offline) {
           console.warn('Salida de personal guardada en modo offline');
         }

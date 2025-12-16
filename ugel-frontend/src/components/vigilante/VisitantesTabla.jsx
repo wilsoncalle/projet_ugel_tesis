@@ -27,6 +27,7 @@ import {
   VisitantesFrecuentesCard
 } from '../vigilante_estadisticas';
 import { formatHora } from '../../utils/dateHelpers';
+import { useConnectivity } from '../../hooks/useConnectivity';
 
 const VisitantesTabla = ({
   visitantesActivos,
@@ -55,6 +56,9 @@ const VisitantesTabla = ({
 
   // Estado para el dropdown de exportación
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  
+  // Hook para detectar conectividad real (no solo navigator.onLine)
+  const { isOffline } = useConnectivity('/api/health', 15000);
 
   const handleTabClick = (tab) => {
     onTabChange(tab);
@@ -106,6 +110,10 @@ const VisitantesTabla = ({
   useEffect(() => {
     // Si no estamos en la pestaña de activos o no hay visitantes, no hacer nada
     if (activeTab !== 'activos' || !visitantesActivos) return;
+    
+    // Si estamos offline, no mostrar notificaciones de "no presentado"
+    // ya que sin internet no podemos saber el estado real de la visita
+    if (isOffline) return;
 
     const noShowVisitors = [];
     
@@ -199,7 +207,7 @@ const VisitantesTabla = ({
         }
       );
     }
-  }, [visitantesActivos, activeTab, currentTime, handleOpenModal]);
+  }, [visitantesActivos, activeTab, currentTime, handleOpenModal, isOffline]);
 
   const getTabData = useCallback(() => {
     switch (activeTab) {
@@ -233,11 +241,13 @@ const VisitantesTabla = ({
         }
 
         // --- LÓGICA DE NO PRESENTADO (10 MIN) ---
+        // Solo aplicar si estamos online, ya que offline no sabemos el estado real
         const now = currentTime;
         data = data.map(item => {
            let isNoShow = false;
            // Solo aplicar a visitas reales (con ID numérico y fecha_ingreso) y pendientes
-           if (item.fecha_ingreso && (item.estado_visita === 'PENDIENTE' || !item.estado_visita) && !item.isPreview) {
+           // Y SOLO si estamos online
+           if (!isOffline && item.fecha_ingreso && (item.estado_visita === 'PENDIENTE' || !item.estado_visita) && !item.isPreview) {
                try {
                    const ingreso = new Date(item.fecha_ingreso);
                    const diffMins = (now - ingreso) / 60000;
@@ -278,7 +288,8 @@ const VisitantesTabla = ({
     historialVisitas,
     vistaPreviaVisitante,
     vistaPreviaVisita,
-    currentTime
+    currentTime,
+    isOffline
   ]);
 
   const getPaginationProps = useCallback(() => {

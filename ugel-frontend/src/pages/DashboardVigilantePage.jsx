@@ -1084,7 +1084,7 @@ const DashboardVigilantePage = () => {
       
     } catch (error) {
       console.error('Error al cargar visitantes activos:', error);
-        setError('Error al cargar visitantes activos');
+      // No mostrar error al usuario ya que el modo offline maneja esto automáticamente
     } finally {
       setLoading(false);
     }
