@@ -11,13 +11,81 @@ import {
 } from '../utils/offlineDB';
 import { registerBackgroundSync, isOnline } from '../utils/offlineSync';
 
+// Estado de conectividad del servidor
+let serverAvailable = true;
+let lastServerCheck = 0;
+const SERVER_CHECK_INTERVAL = 5000; // Verificar cada 5 segundos
+
+/**
+ * Verifica si el servidor está disponible haciendo un ping rápido
+ */
+async function checkServerAvailability() {
+  const now = Date.now();
+  
+  // Si ya verificamos recientemente, usar el resultado en cache
+  if (now - lastServerCheck < SERVER_CHECK_INTERVAL) {
+    return serverAvailable;
+  }
+  
+  try {
+    // Intentar un HEAD request al endpoint de salud o al root de la API
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos timeout
+    
+    const response = await fetch('/api/health', {
+      method: 'HEAD',
+      signal: controller.signal,
+      cache: 'no-store'
+    }).catch(() => null);
+    
+    clearTimeout(timeoutId);
+    
+    serverAvailable = response && response.ok;
+    lastServerCheck = now;
+    
+    console.log('[Offline API] Verificación del servidor:', serverAvailable ? 'DISPONIBLE' : 'NO DISPONIBLE');
+    return serverAvailable;
+  } catch (error) {
+    console.warn('[Offline API] Error verificando servidor:', error.message);
+    serverAvailable = false;
+    lastServerCheck = now;
+    return false;
+  }
+}
+
+/**
+ * Verifica si estamos realmente offline (combinando navigator.onLine y disponibilidad del servidor)
+ */
+async function isReallyOffline() {
+  const navigatorOffline = !navigator.onLine;
+  
+  if (navigatorOffline) {
+    console.log('[Offline API] navigator.onLine indica OFFLINE');
+    return true;
+  }
+  
+  // Si navigator dice que estamos online, verificar el servidor
+  const serverOnline = await checkServerAvailability();
+  const offline = !serverOnline;
+  
+  if (offline) {
+    console.log('[Offline API] Servidor NO DISPONIBLE, activando modo offline');
+  }
+  
+  return offline;
+}
+
 function isNetworkError(error) {
   return (
     !error.response ||
     error.message === 'Network Error' ||
     error.code === 'ERR_NETWORK' ||
     error.code === 'ECONNABORTED' ||
+    error.message?.includes('Failed to fetch') ||
+    error.message?.includes('NetworkError') ||
     error.response?.status === 503 ||
+    error.response?.status === 502 ||
+    error.response?.status === 504 ||
     error.response?.status === 0 ||
     (error.response?.status >= 500 && error.response?.status < 600)
   );
@@ -34,12 +102,12 @@ function isNetworkError(error) {
 export async function createVisitaWithOfflineSupport(visitaData, visitanteData = null, originalCreateFn) {
   console.log('[Offline API] Iniciando createVisitaWithOfflineSupport');
   console.log('[Offline API] navigator.onLine:', navigator.onLine);
-  console.log('[Offline API] isOnline():', isOnline());
   console.log('[Offline API] visitaData:', visitaData);
   console.log('[Offline API] visitanteData:', visitanteData);
   
-  // Verificar si estamos online
-  if (!isOnline()) {
+  // Verificar si estamos realmente offline (internet O servidor)
+  const offline = await isReallyOffline();
+  if (offline) {
     console.log('[Offline API] Sin conexión, guardando visita localmente...');
     
     try {
@@ -133,7 +201,8 @@ export async function createVisitaWithOfflineSupport(visitaData, visitanteData =
  * Registra un ingreso de personal con soporte offline
  */
 export async function registrarIngresoPersonalWithOfflineSupport(personalData, originalFn) {
-  if (!isOnline()) {
+  const offline = await isReallyOffline();
+  if (offline) {
     console.log('[Offline API] Sin conexión, guardando ingreso personal localmente...');
     try {
       const savedData = await saveIngresoPersonalOffline(personalData);
@@ -183,7 +252,8 @@ export async function registrarIngresoPersonalWithOfflineSupport(personalData, o
  * Registra una salida de personal con soporte offline
  */
 export async function registrarSalidaPersonalWithOfflineSupport(personalId, originalFn) {
-  if (!isOnline()) {
+  const offline = await isReallyOffline();
+  if (offline) {
     console.log('[Offline API] Sin conexión, guardando salida personal localmente...');
     try {
       const savedData = await saveSalidaPersonalOffline(personalId);
@@ -224,8 +294,9 @@ export async function registrarSalidaPersonalWithOfflineSupport(personalId, orig
  * Registra una salida con soporte offline
  */
 export async function registrarSalidaWithOfflineSupport(visitaId, originalSalidaFn, visitanteData = null) {
-  // Verificar si estamos online
-  if (!isOnline()) {
+  // Verificar si estamos realmente offline (internet O servidor)
+  const offline = await isReallyOffline();
+  if (offline) {
     console.log('[Offline API] Sin conexión, guardando salida localmente...');
     
     try {

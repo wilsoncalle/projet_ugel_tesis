@@ -1,19 +1,78 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, User, Clock, CheckCircle, XCircle, Forward, LogOut, MapPin, Briefcase, FileText, Calendar } from 'lucide-react';
+import { socket } from '../../services/socket';
+import { visitasService } from '../../services/api';
 
 const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visita" }) => {
+  // Estado local para los datos de la visita (se actualiza en tiempo real)
+  const [visitaData, setVisitaData] = useState(data);
+
+  // Actualizar el estado local cuando cambian los datos de props
+  useEffect(() => {
+    setVisitaData(data);
+  }, [data]);
+
+  // Escuchar eventos de Socket.IO para actualizaciones en tiempo real
+  useEffect(() => {
+    if (!isOpen || !visitaData?.id) return;
+
+    const handleEstadoActualizado = async (payload) => {
+      // Solo actualizar si es la misma visita
+      if (payload.id !== visitaData.id) return;
+
+      console.log('[ModalDetallesVisita] Estado actualizado:', payload);
+
+      try {
+        // Recargar los datos completos de la visita desde el servidor
+        const response = await visitasService.getById(visitaData.id);
+        if (response.data?.success && response.data?.data) {
+          setVisitaData(response.data.data);
+          console.log('[ModalDetallesVisita] Datos actualizados:', response.data.data);
+        }
+      } catch (error) {
+        console.error('[ModalDetallesVisita] Error al recargar datos:', error);
+      }
+    };
+
+    const handleSalidaRegistrada = async (payload) => {
+      // Solo actualizar si es la misma visita
+      if (payload.visitaId !== visitaData.id) return;
+
+      console.log('[ModalDetallesVisita] Salida registrada:', payload);
+
+      try {
+        // Recargar los datos completos de la visita
+        const response = await visitasService.getById(visitaData.id);
+        if (response.data?.success && response.data?.data) {
+          setVisitaData(response.data.data);
+        }
+      } catch (error) {
+        console.error('[ModalDetallesVisita] Error al recargar datos:', error);
+      }
+    };
+
+    // Suscribirse a los eventos
+    socket.on('estado_visita_actualizado', handleEstadoActualizado);
+    socket.on('salida_visita_registrada', handleSalidaRegistrada);
+
+    // Cleanup: Desuscribirse cuando el modal se cierra o el componente se desmonta
+    return () => {
+      socket.off('estado_visita_actualizado', handleEstadoActualizado);
+      socket.off('salida_visita_registrada', handleSalidaRegistrada);
+    };
+  }, [isOpen, visitaData?.id]);
   // Construir línea de tiempo de eventos
   const timeline = useMemo(() => {
-    if (!data) return [];
+    if (!visitaData) return [];
     
     const events = [];
     
     // 1. Registro de llegada
-    if (data.fecha_ingreso) {
+    if (visitaData.fecha_ingreso) {
       events.push({
         tipo: 'LLEGADA',
-        fecha: data.fecha_ingreso,
+        fecha: visitaData.fecha_ingreso,
         icono: <LogOut className="h-5 w-5 transform rotate-180" />,
         color: 'blue',
         titulo: 'Llegada del Visitante',
@@ -22,35 +81,35 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     }
     
     // 2. Aceptación
-    if (data.fecha_aceptacion) {
+    if (visitaData.fecha_aceptacion) {
       events.push({
         tipo: 'ACEPTACION',
-        fecha: data.fecha_aceptacion,
+        fecha: visitaData.fecha_aceptacion,
         icono: <CheckCircle className="h-5 w-5" />,
         color: 'green',
         titulo: 'Visita Aceptada',
-        descripcion: `Aceptada por ${data.personal_nombres || ''} ${data.personal_apellidos || ''}`.trim() || 'Personal'
+        descripcion: `Aceptada por ${visitaData.personal_nombres || ''} ${visitaData.personal_apellidos || ''}`.trim() || 'Personal'
       });
     }
     
     // 3. Rechazo
-    if (data.fecha_rechazo) {
+    if (visitaData.fecha_rechazo) {
       events.push({
         tipo: 'RECHAZO',
-        fecha: data.fecha_rechazo,
+        fecha: visitaData.fecha_rechazo,
         icono: <XCircle className="h-5 w-5" />,
         color: 'red',
         titulo: 'Visita Rechazada',
-        descripcion: data.motivo_rechazo || 'Sin motivo especificado'
+        descripcion: visitaData.motivo_rechazo || 'Sin motivo especificado'
       });
     }
     
     // 4. Delegación
-    if (data.fecha_delegacion && data.delegado_por_id) {
-      const delegadoPor = `${data.delegado_por_nombres || ''} ${data.delegado_por_apellidos || ''}`.trim();
+    if (visitaData.fecha_delegacion && visitaData.delegado_por_id) {
+      const delegadoPor = `${visitaData.delegado_por_nombres || ''} ${visitaData.delegado_por_apellidos || ''}`.trim();
       events.push({
         tipo: 'DELEGACION',
-        fecha: data.fecha_delegacion,
+        fecha: visitaData.fecha_delegacion,
         icono: <Forward className="h-5 w-5" />,
         color: 'purple',
         titulo: 'Visita Delegada',
@@ -59,10 +118,10 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     }
     
     // 5. Fin de atención
-    if (data.fecha_fin_atencion) {
+    if (visitaData.fecha_fin_atencion) {
       events.push({
         tipo: 'FIN_ATENCION',
-        fecha: data.fecha_fin_atencion,
+        fecha: visitaData.fecha_fin_atencion,
         icono: <CheckCircle className="h-5 w-5" />,
         color: 'amber',
         titulo: 'Fin de Atención',
@@ -71,10 +130,10 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     }
     
     // 6. Salida
-    if (data.fecha_salida) {
+    if (visitaData.fecha_salida) {
       events.push({
         tipo: 'SALIDA',
-        fecha: data.fecha_salida,
+        fecha: visitaData.fecha_salida,
         icono: <LogOut className="h-5 w-5" />,
         color: 'gray',
         titulo: 'Salida del Visitante',
@@ -84,9 +143,9 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     
     // Ordenar por fecha
     return events.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-  }, [data]);
+  }, [visitaData]);
   
-  if (!isOpen || !data) return null;
+  if (!isOpen || !visitaData) return null;
   
   const formatDateTime = (dateString) => {
     if (!dateString) return '-';
@@ -129,9 +188,9 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
     return colors[color] || colors.gray;
   };
   
-  const visitanteNombre = `${data.visitante_nombres || ''} ${data.visitante_apellidos || ''}`.trim();
-  const personalNombre = `${data.personal_nombres || ''} ${data.personal_apellidos || ''}`.trim();
-  const delegadoNombre = `${data.delegado_por_nombres || ''} ${data.delegado_por_apellidos || ''}`.trim();
+  const visitanteNombre = `${visitaData.visitante_nombres || ''} ${visitaData.visitante_apellidos || ''}`.trim();
+  const personalNombre = `${visitaData.personal_nombres || ''} ${visitaData.personal_apellidos || ''}`.trim();
+  const delegadoNombre = `${visitaData.delegado_por_nombres || ''} ${visitaData.delegado_por_apellidos || ''}`.trim();
   
   const modalContent = (
     <div
@@ -177,7 +236,7 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
               <div>
                 <p className="text-xs text-gray-500 mb-1">Documento</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {data.tipo_documento_codigo || 'DNI'}: {data.numero_documento || '-'}
+                  {visitaData.tipo_documento_codigo || 'DNI'}: {visitaData.numero_documento || '-'}
                 </p>
               </div>
             </div>
@@ -196,17 +255,17 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Cargo</p>
-                <p className="text-sm font-medium text-gray-900">{data.personal_cargo || '-'}</p>
+                <p className="text-sm font-medium text-gray-900">{visitaData.personal_cargo || '-'}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Motivo de Visita</p>
-                <p className="text-sm font-medium text-gray-900">{data.nombre_motivo || '-'}</p>
+                <p className="text-sm font-medium text-gray-900">{visitaData.nombre_motivo || '-'}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Área de Destino</p>
                 <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
                   <MapPin className="h-3 w-3 text-gray-400" />
-                  {data.nombre_area || '-'}
+                  {visitaData.nombre_area || '-'}
                 </p>
               </div>
               {delegadoNombre && (
@@ -264,10 +323,10 @@ const ModalDetallesVisita = ({ isOpen, onClose, data, title = "Detalles de Visit
           </div>
           
           {/* Información Adicional */}
-          {data.observaciones && (
+          {visitaData.observaciones && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
               <h4 className="text-sm font-semibold text-amber-900 mb-2">Observaciones</h4>
-              <p className="text-sm text-amber-800">{data.observaciones}</p>
+              <p className="text-sm text-amber-800">{visitaData.observaciones}</p>
             </div>
           )}
         </div>
