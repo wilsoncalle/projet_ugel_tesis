@@ -11,6 +11,7 @@ import {
 } from '../utils/offlineDB';
 import { registerBackgroundSync, isOnline } from '../utils/offlineSync';
 
+<<<<<<< HEAD
 // Estado de conectividad del servidor
 let serverAvailable = true;
 let lastServerCheck = 0;
@@ -75,17 +76,23 @@ async function isReallyOffline() {
   return offline;
 }
 
+=======
+>>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
 function isNetworkError(error) {
   return (
     !error.response ||
     error.message === 'Network Error' ||
     error.code === 'ERR_NETWORK' ||
     error.code === 'ECONNABORTED' ||
+<<<<<<< HEAD
     error.message?.includes('Failed to fetch') ||
     error.message?.includes('NetworkError') ||
     error.response?.status === 503 ||
     error.response?.status === 502 ||
     error.response?.status === 504 ||
+=======
+    error.response?.status === 503 ||
+>>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
     error.response?.status === 0 ||
     (error.response?.status >= 500 && error.response?.status < 600)
   );
@@ -201,8 +208,12 @@ export async function createVisitaWithOfflineSupport(visitaData, visitanteData =
  * Registra un ingreso de personal con soporte offline
  */
 export async function registrarIngresoPersonalWithOfflineSupport(personalData, originalFn) {
+<<<<<<< HEAD
   const offline = await isReallyOffline();
   if (offline) {
+=======
+  if (!isOnline()) {
+>>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
     console.log('[Offline API] Sin conexión, guardando ingreso personal localmente...');
     try {
       const savedData = await saveIngresoPersonalOffline(personalData);
@@ -252,8 +263,12 @@ export async function registrarIngresoPersonalWithOfflineSupport(personalData, o
  * Registra una salida de personal con soporte offline
  */
 export async function registrarSalidaPersonalWithOfflineSupport(personalId, originalFn) {
+<<<<<<< HEAD
   const offline = await isReallyOffline();
   if (offline) {
+=======
+  if (!isOnline()) {
+>>>>>>> 0eab7cb69fe051027a8e90d3d144ebecaac77dfe
     console.log('[Offline API] Sin conexión, guardando salida personal localmente...');
     try {
       const savedData = await saveSalidaPersonalOffline(personalId);

@@ -931,10 +931,10 @@ const rejectVisita = async (id, personalId, motivo) => {
  * Delegar visita
  * @param {number} id - ID de la visita
  * @param {number} personalId - ID del personal que delega
- * @param {number} nuevoPersonalId - ID del nuevo personal
+ * @param {number} nuevopersonalId - ID del nuevo personal
  * @returns {Object} Visita actualizada
  */
-const delegateVisita = async (id, personalId, nuevoPersonalId) => {
+const delegateVisita = async (id, personalId, nuevopersonalId) => {
   try {
     const visita = await repository.findById(id);
     if (!visita) throw new AppError('Visita no encontrada', 404);
@@ -943,10 +943,10 @@ const delegateVisita = async (id, personalId, nuevoPersonalId) => {
       throw new AppError('No tiene permiso para delegar esta visita', 403);
     }
     
-    const nuevoPersonal = await personalRepository.findById(nuevoPersonalId);
-    if (!nuevoPersonal) throw new AppError('Nuevo personal no encontrado', 404);
+    const nuevopersonal = await personalRepository.findById(nuevopersonalId);
+    if (!nuevopersonal) throw new AppError('Nuevo personal no encontrado', 404);
     
-    return await repository.delegar(id, nuevoPersonalId, nuevoPersonal.area_destino_id, personalId);
+    return await repository.delegar(id, nuevopersonalId, nuevopersonal.area_destino_id, personalId);
   } catch (error) {
     logger.error(`Error delegando visita ${id}:`, error);
     throw error;
